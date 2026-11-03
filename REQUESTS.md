@@ -51,3 +51,7 @@ REQ-20261103-codex-executor-lifecycle: PR48 https://github.com/Kevo919/bops/pull
 ## 2026-11-03T21:22:56.0920224Z | Codex | REA connection reload
 REQ-20261103-codex-rea-reload: Kevin supplied REA6.8/DeepSeekHarness handoff and asks reloadREA MCP environment and verifyGhidra/WABT/apktool/ADB. Codex owns localintegration; VSCodeREA envkeys confirmed, actualDSHconfig/reload pathunderinvestigation. Use safetestfixtures; do notclaimproviderreadyfromdownloadsalone. BopsWindowslaunchblockedtaskremainspendinguseropen.
 
+
+## 2026-11-03T21:41:44.1497764Z | Codex | Remaining issues and new-item verification
+REQ-20261103-codex-rea-followup: Kevin asks to fix all open issues and check/test newly added items. Codex prioritizing open REA provider issues and actual Harness verification, then existing Bops MVP deployment/verification blockers. New pinned-app/customization/always-on proposals remain distinct, not claimed implemented. Current Harness UI returns black screen; asked Kevin unlock/foreground while CLI work continues.
+
