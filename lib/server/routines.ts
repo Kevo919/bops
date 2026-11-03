@@ -15,6 +15,7 @@ import { awakeSince, sleptSince } from "./awake";
 import { startSession } from "./sessions";
 import { addMessage, bot, getState, id, LEFT_BEHIND, ownerName, ownSession, patchSession, RESTARTED, session, startLanded, stateDevice, stateEpoch, stateReady, stateTooNew, update } from "./store";
 import { findSkill, skillRefId } from "./workspace-skills";
+import { awayOver } from "./presence";
 
 /**
  * Routines and scheduled asks. Each one belongs to a bot. When one comes due it's a reminder (a message
@@ -524,6 +525,11 @@ async function run(routineId: string, opts: RunOpts): Promise<RoutineRun> {
   if (onRunner() && needsNoComputer(r)) return { at, status: "skipped", error: "Bops on your Mac runs it." };
   const b = bot(r.botId);
   if (!b) return record(r.id, { at, status: "skipped", error: "Its bot isn't there anymore." });
+  // The inactivity brake (Settings → Workspace → General): a routine that would speak up waits while
+  // the owner is away, so nothing piles up unheard. A Run now (their own ask) always runs, and a quiet
+  // routine runs too: it says nothing unless there's something to say.
+  const awayDays = getState().routineAwayDays ?? 7;
+  if (!opts.manual && awayDays > 0 && !r.quiet && awayOver(awayDays)) return record(r.id, { at, status: "skipped", error: "away" });
   if (opts.manual) update(() => (r.lastRunAt = at));
   if (r.reminder) return remind(r, b, at, opts);
   const blocked = checkBlocked(r, b);

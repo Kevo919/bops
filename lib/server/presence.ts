@@ -12,7 +12,25 @@ let view: View | null = null;
 /** A view the app hasn't confirmed for this long is stale: the window closed, or the Mac slept. */
 const STALE_MS = 20_000;
 
+/**
+ * When the owner was last around: every view the window sends, and every message of theirs, moves it
+ * (markSeen). Starts at this process's start, so a restart gives the brake its days to count again
+ * rather than skipping everything at once. The routines' inactivity brake reads it (awayOver).
+ */
+let lastSeenAt = Date.now();
+
+/** The owner showed up: the window said so (setView), or one of their messages arrived. `at` is for tests. */
+export function markSeen(at: number = Date.now()) {
+  lastSeenAt = at;
+}
+
+/** Whether the owner has been away at least this many whole days. */
+export function awayOver(days: number): boolean {
+  return Date.now() - lastSeenAt > days * 86_400_000;
+}
+
 export function setView(v: { chatId?: string; threadId?: string; focused: boolean }) {
+  markSeen();
   view = { chatId: v.chatId || undefined, threadId: v.threadId || undefined, focused: !!v.focused, at: Date.now() };
 }
 

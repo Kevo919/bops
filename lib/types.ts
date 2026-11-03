@@ -1797,6 +1797,12 @@ export type AppState = {
    */
   runners?: Record<string, RunnerState>;
   /**
+   * The routines' inactivity brake (Settings → Workspace → General): a routine that would speak up is
+   * skipped, its run recorded "away", once the owner hasn't been around (lib/server/presence.ts) this
+   * many days. Unset: 7. 0: never skip. Quiet routines (nothing to say) always run.
+   */
+  routineAwayDays?: number;
+  /**
    * How the window looks (Look): set in Settings, or changed by a bot on the owner's own ask in the chat
    * (change_look). Shared like any setting, so the owner's other Macs take it too. A shared workspace
    * never sees it: the look is the owner's, on their own screens.
