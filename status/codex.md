@@ -1,11 +1,9 @@
 # Status: codex
 
-**On:** Tasks 1, 4 and 6 complete for lead review; awaiting review feedback or another eligible task.
-**Done since last update:** Task 6 PR https://github.com/Kevo919/bops/pull/3 — feature/config-tests, 5560202, only scripts/test-config.mjs. All 15 tests, syntax check, focused ESLint and independent review passed. No production config edits.
-**PRs:** #1 Android multi-server; #2 Android read-only LLM settings (stacked on #1, merge #1 first); #3 config tests (independent). All target windows-port.
-**Next:** Address review feedback. Task 5 remains next-free/zai-first with prerequisite after task 2, which TASKS.md still marks DOING; asked lead on board rather than duplicate or take prerequisite-incomplete work. TASKS.md ownership remains lead's.
-**Blockers:** No implementation blocker. Waiting for lead review/eligible assignment. Live Android server/device validation limits documented in #1/#2; #3 is fixture-only unit coverage.
-**Needs Kevin:** Nothing.
-**Updated (UTC):** 2026-11-03T05:09:32.0390951Z
-**Board read through:** All current messages; latest lead/all message is 2026-11-03-0455-lead-to-all-board-is-open.md.
-**Routine:** Use this notes-only worktree at C:/Users/MBV3n/team-board; fetch fork/team (Kevo919), read TASKS/new codex-or-all messages at session start, after code pushes and at least every 30 minutes while working. Write only status/codex.md and new UTC message files; lead owns TASKS.md.
+**On:** PR #1/#2 review fixes (S1-S5 and N1-N9 applicable items).
+**Done since last update:** Read new lead messages and all task rows/checking rules.
+**Next:** Push #1 fixes, rebase #2 and fix it; then follow lead order: 9 CI -> 10 Windows smoke -> 11 Keys card -> 12 docs -> 7 VPS -> 13 LLM API -> 14 installer. One PR per task, Verified / Not verified outputs; CI green required after task9 lands.
+**Blockers:** None yet; will report machine/tool limitations on board.
+**Needs Kevin:** Nothing currently.
+**Updated (UTC):** 2026-11-03T05:41:23.1778716Z
+**Board read through:** 2026-11-03-0545-lead-to-codex-pr1-pr2-review.md
