@@ -43,10 +43,17 @@ if [ "$(id -u)" -ne 0 ]; then echo "Run it as root (sudo bash vps-setup.sh …).
 if [ "$tailscale_mode" != "1" ] && ! [[ "$domain" =~ ^[A-Za-z0-9.-]+$ ]]; then echo "That domain has characters a domain can't have." >&2; exit 1; fi
 
 if [ "$tailscale_mode" != "1" ]; then
+  if ! command -v ss >/dev/null 2>&1; then
+    echo "Cannot check public ports: install iproute2 (which provides ss), then run setup again. Nothing was changed." >&2
+    exit 1
+  fi
   # A public Bops takes 80 and 443 for its HTTPS. If something other than Caddy (ours from an earlier run)
   # is already listening there (n8n, Traefik, nginx, a Docker proxy), stop before touching anything: the
   # server's own setup wins, and Bops belongs on the tailnet instead.
-  listeners=$(ss -H -ltnp 'sport = :80 or sport = :443' 2>/dev/null || true)
+  if ! listeners=$(ss -H -ltnp 'sport = :80 or sport = :443' 2>/dev/null); then
+    echo "Cannot inspect public ports: ss failed. Fix the socket inspection error, then run setup again. Nothing was changed." >&2
+    exit 1
+  fi
   if [ -n "$listeners" ] && grep -qv 'caddy' <<<"$listeners"; then
     echo "Something is already listening on port 80 or 443:" >&2
     echo "$listeners" >&2
@@ -55,11 +62,23 @@ if [ "$tailscale_mode" != "1" ]; then
     echo "  sudo BOPS_TAILSCALE=1 bash vps-setup.sh $repo" >&2
     exit 1
   fi
+  if [ -n "$listeners" ] || [ -s /etc/caddy/Caddyfile ]; then
+    expected_caddy=$(printf '# Managed by Bops vps-setup.sh\n%s {\n    reverse_proxy 127.0.0.1:3210\n}' "$domain")
+    if [ ! -f /etc/caddy/Caddyfile ] || [ "$(cat /etc/caddy/Caddyfile)" != "$expected_caddy" ] ||
+       [ ! -f /etc/systemd/system/bops.service ] ||
+       ! grep -qx 'WorkingDirectory=/home/bops/bops' /etc/systemd/system/bops.service ||
+       ! grep -qx 'ExecStart=/usr/bin/npx next start --port 3210 -H 127.0.0.1' /etc/systemd/system/bops.service; then
+      echo "An existing Caddy listener or configuration is not this Bops installation's managed configuration." >&2
+      echo "Unmarked configurations (including older Bops installations) need manual review; setup will not adopt or overwrite them." >&2
+      echo "Nothing was changed. Use BOPS_TAILSCALE=1 to share this server without changing its public services." >&2
+      exit 1
+    fi
+  fi
 fi
 
 echo "== Packages"
 apt-get update -y
-apt-get install -y git curl ca-certificates debian-keyring debian-archive-keyring apt-transport-https gnupg openssl
+apt-get install -y sudo git curl ca-certificates debian-keyring debian-archive-keyring apt-transport-https gnupg openssl
 if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 22 ]; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
@@ -148,6 +167,7 @@ systemctl restart bops
 if [ "$tailscale_mode" != "1" ]; then
   echo "== HTTPS (Caddy)"
   cat > /etc/caddy/Caddyfile <<CADDY
+# Managed by Bops vps-setup.sh
 $domain {
     reverse_proxy 127.0.0.1:3210
 }
