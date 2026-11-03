@@ -732,6 +732,11 @@ export type Chat = {
   workspaceId?: string;
   /** What its bots no longer read whole, summed up (lib/server/chat-summary.ts). Unset: nothing yet. */
   summary?: ChatSummary;
+  /**
+   * The model its replies run on, "provider/model" (lib/chat-models.ts chatModels), picked in its message box. Unset:
+   * Auto, OpenAI as before. Only the chat's own replies: threads and routines keep theirs.
+   */
+  model?: string;
 };
 
 /**
@@ -1760,6 +1765,8 @@ export type AppState = {
   businessData?: boolean;
   /** The LLMs in config/llms.yaml (lib/agents.ts Llm). Filled in by /api/state for the app; never stored. */
   llms?: { name: string; provider: string; model: string; starter?: boolean; useFor?: string[] }[];
+  /** Which providers' keys this server has for a chat's model (Chat.model), by provider: true or false, never a key. Filled in by /api/state for the app; never stored. */
+  chatKeys?: Record<string, boolean>;
   /**
    * What the user's bots are doing on their other devices right now (thinking, working…; and the chat,
    * when typing), by bot id, from Bops Cloud's live stream (lib/server/live.ts). Filled in by /api/state

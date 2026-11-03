@@ -24,6 +24,7 @@ import { AttachmentTray, MessageImages, useAttachments } from "./attachments";
 import { useComposerListen, withLine, type ComposerReceiver } from "./composer-bridge";
 import { ComposerInput } from "./composer-input";
 import { MicButton } from "./mic-button";
+import { ChatModelPick, chatModelHint } from "./chat-model";
 import { Fold } from "./fold";
 import { SaveSkillDialog } from "./skill-dialog";
 import { undash } from "./side-group";
@@ -538,6 +539,8 @@ export function ChatView({
   const [dropping, setDropping] = useState(false);
   // What went wrong with the mic, shown under the composer for a few seconds.
   const [micError, setMicError] = useState<string | null>(null);
+  // Why the chat's model didn't change (ChatModelPick), until the next pick.
+  const [modelError, setModelError] = useState<string | null>(null);
   useEffect(() => {
     if (!micError) return;
     const t = setTimeout(() => setMicError(null), 6000);
@@ -1023,6 +1026,8 @@ export function ChatView({
                 }
               />
             )}
+            {/* The model this chat's replies run on (Chat.model): Auto is OpenAI, as before. */}
+            {!state.shared && <ChatModelPick state={state} chat={c} onError={setModelError} />}
             <button type="submit" aria-label="Send" disabled={!draft.trim() && !attaching.length} className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-ink disabled:opacity-30">
               <SendIcon />
             </button>
@@ -1030,6 +1035,7 @@ export function ChatView({
           </form>
           )}
           {micError && <div className="px-3 pt-1.5 text-[12px] leading-4 text-[#B42318]">{micError}</div>}
+          {(modelError ?? chatModelHint(state, c)) && <div className="px-3 pt-1.5 text-[12px] leading-4 text-[#B54708]">{modelError ?? chatModelHint(state, c)}</div>}
         </div>
       </div>
 

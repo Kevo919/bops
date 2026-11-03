@@ -1,0 +1,40 @@
+import { llms, ROUTE_KEYS, ROUTE_NAMES, type AgentRoute } from "./agents";
+
+/**
+ * The models a chat can answer on (Chat.model), picked in the chat's message box: "provider/model", from
+ * Your LLMs (config/llms.yaml) and a few built in, so Claude, GLM and DeepSeek are there without editing the
+ * file. Unset is Auto: OpenAI, as before (chat.ts CHAT_MODEL and the router). The server calls each provider on
+ * its key in .env.local (lib/server/chat-providers.ts); the window and the server both read this list.
+ */
+export type ChatModel = { id: string; name: string; provider: AgentRoute };
+
+export const BUILTIN_CHAT_MODELS: ChatModel[] = [
+  { id: "openai/gpt-6.1-sol", name: "GPT 6.1 Sol", provider: "openai" },
+  { id: "anthropic/claude-sonnet-5-5", name: "Claude Sonnet 5.5", provider: "anthropic" },
+  { id: "anthropic/claude-opus-5-5", name: "Claude Opus 5.5", provider: "anthropic" },
+  { id: "anthropic/claude-haiku-5-5", name: "Claude Haiku 5.5", provider: "anthropic" },
+  { id: "zai-coding/glm-5.3", name: "GLM 5.3 (Coding Plan)", provider: "zai-coding" },
+  { id: "zai/glm-5.2", name: "GLM 5.2", provider: "zai" },
+  { id: "deepseek/deepseek-chat", name: "DeepSeek Chat", provider: "deepseek" },
+  { id: "deepseek/deepseek-reasoner", name: "DeepSeek Reasoner", provider: "deepseek" },
+];
+
+/** Your LLMs first (by their names in the file), then the built in ones they don't already have. */
+export function chatModels(): ChatModel[] {
+  const out: ChatModel[] = llms().map((l) => ({ id: `${l.provider}/${l.model}`, name: l.name, provider: l.provider }));
+  for (const m of BUILTIN_CHAT_MODELS) if (!out.some((x) => x.id === m.id)) out.push(m);
+  return out;
+}
+
+/** A model a chat may be set to: one of chatModels(). */
+export const chatModelOk = (model: unknown): model is string => typeof model === "string" && chatModels().some((m) => m.id === model);
+
+/** The provider a "provider/model" names, when it's one Bops knows; undefined for a plain OpenAI model name. */
+export function providerOf(model: string | undefined): AgentRoute | undefined {
+  const p = model?.split("/")[0];
+  return p && model!.includes("/") && Object.hasOwn(ROUTE_KEYS, p) ? (p as AgentRoute) : undefined;
+}
+
+/** The key each provider's chat runs on, and its name for people ("Anthropic"). */
+export const chatKeyName = (p: AgentRoute) => ROUTE_KEYS[p];
+export const providerName = (p: AgentRoute) => ROUTE_NAMES[p];

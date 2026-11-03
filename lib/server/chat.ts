@@ -15,6 +15,8 @@ import { CRM_TOOL_NAMES, CRM_TOOLS, crmNote, crmNowLine, runCrmTool } from "./cr
 import { ORBIT_OWNER_ONLY, ORBIT_TOOL_NAMES, ORBIT_TOOLS, orbitNote, orbitNowLine, runOrbitTool } from "./orbit";
 import type { ResponseInputItem } from "openai/resources/responses/responses";
 import { openaiClient } from "./openai-client";
+import { respond } from "./chat-providers";
+import { providerOf } from "@/lib/chat-models";
 import { contactLine, createBot, namesTheUser } from "./bots";
 import { creditsOut, noteOutOfCredit, outOfCreditWords } from "./cloud";
 import { noOwnComputer } from "./plan";
@@ -69,6 +71,15 @@ const client = openaiClient();
 const CHAT_MODEL = setting("gpt-6.1-sol", "BOPS_CHAT_MODEL", "BOPS_SAM_MODEL");
 /** Texting should feel instant: chat turns mostly reply and route, so they think lightly. Threads think harder. */
 const CHAT_REASONING = { effort: setting("low", "BOPS_CHAT_EFFORT") as "low" | "medium" | "high" };
+/**
+ * The model a chat was set to in its message box (Chat.model, "anthropic/claude-sonnet-5-5"), or undefined for Auto
+ * (CHAT_MODEL and the router, as before). Its replies, the lines it says while a task works, and what a teammate
+ * answers in it all run on that model (chat-providers.ts respond). Threads and routines' tasks don't.
+ */
+const chatModelOf = (chatId: string | undefined) => {
+  const m = chatId ? chat(chatId)?.model : undefined;
+  return m && providerOf(m) ? m : undefined;
+};
 
 const SCHEDULE_PARAMS = {
   type: "object",
@@ -773,18 +784,21 @@ const SURE_FOLLOW_UP = 0.85;
  * A short reply when the user's message goes to a task already under way: written for what they said,
  * like a person texting back, not "On it." every time. Falls back to plain words if it's slow.
  */
-async function acknowledge(b: Bot | undefined, request: string, task: string, passTo?: string) {
+async function acknowledge(b: Bot | undefined, request: string, task: string, passTo: string | undefined, chatId: string) {
   const epoch = stateEpoch();
   const plain = passTo ? `Passing that to ${passTo}.` : `Adding that to ${task.charAt(0).toLowerCase()}${task.slice(1)}.`;
   try {
-    // One short line, said while they wait: Luna (its job is a fixed shape), as fast as Luna goes.
-    const model = LIGHT();
+    // One short line, said while they wait: Luna (its job is a fixed shape), as fast as Luna goes. A chat set to a
+    // model of its own says it on that model.
+    const pinned = chatModelOf(chatId);
+    const model = pinned ?? LIGHT();
     const res = await Promise.race([
       withSpeed(speedFor(model, true), (tier, last) =>
-        client.responses.create(
+        respond(
+          client,
           {
           model,
-          reasoning: { effort: "none" },
+          reasoning: pinned ? CHAT_REASONING : { effort: "none" },
           ...tierParam(tier),
           instructions: `You are ${b?.name ?? "a bot"}, texting ${ownerName()} back. They just added something to a task you're already doing${passTo ? ` (${passTo} is doing it; say you'll pass it on)` : ""}. Reply with one short, natural line about what you'll do now, in words that fit what they said, like a friend would text. The task isn't done yet: never give an answer or a result, and never say it's done. No "On it.", no quotes, no emoji, under 12 words.`,
           input: JSON.stringify({ task, owner_said: request }),
@@ -959,7 +973,7 @@ async function continueThread(chatId: string, text: string, replyTo?: string, me
   const c = chat(chatId)!;
   const speaker = c.kind === "bot" ? c.botIds[0] : target.botId;
   const owner = bot(target.botId);
-  const said = await acknowledge(bot(speaker), text, target.title, speaker === target.botId ? undefined : owner?.name);
+  const said = await acknowledge(bot(speaker), text, target.title, speaker === target.botId ? undefined : owner?.name, chatId);
   if (ours()) addMessage({ chatId, role: "bot", botId: speaker, text: said, sessionIds: [target.id] });
   return true;
 }
@@ -1034,9 +1048,10 @@ async function askTeammate(asker: Bot, toId: string, question: string, chatId: s
       `This is your conversation with ${asker.name} (${asker.role}), your teammate; ${asker.name} asks you things while helping ${owner}. Answer ${asker.name} in one to three plain sentences, from what you know. If you don't know, say so plainly and say how you'd find out. You can't start tasks or ask anyone else here.`,
     ].join("\n");
     stillOurs(ours);
-    // The user is waiting on the answer this goes into: fast.
-    const res = await withSpeed(speedFor(CHAT_MODEL, true), (tier, last) =>
-      client.responses.create({ model: CHAT_MODEL, reasoning: CHAT_REASONING, instructions, input: history(pair, t.id).slice(-16), ...tierParam(tier) }, { ...usageTags("chat", t.id), ...(last ? {} : { maxRetries: 0 }) }),
+    // The user is waiting on the answer this goes into: fast. On the model the chat they're in was set to, if any.
+    const model = chatModelOf(chatId) ?? CHAT_MODEL;
+    const res = await withSpeed(speedFor(model, true), (tier, last) =>
+      respond(client, { model, reasoning: CHAT_REASONING, instructions, input: history(pair, t.id).slice(-16), ...tierParam(tier) }, { ...usageTags("chat", t.id), ...(last ? {} : { maxRetries: 0 }) }),
     );
     stillOurs(ours);
     recordTokens("chat", res.model, res.usage, t.id);
@@ -1083,7 +1098,9 @@ export async function answerForApp(botId: string, app: { title: string; chatId: 
     .filter(Boolean)
     .join("\n");
   const reasoning = { effort: "low" as const };
-  let response = await client.responses.create({ model: CHAT_MODEL, reasoning, instructions, input: question.slice(0, 8000), tools }, usageTags("chat", botId));
+  // On the model the app's chat was set to, if any (chatModelOf).
+  const model = chatModelOf(app.chatId) ?? CHAT_MODEL;
+  let response = await respond(client, { model, reasoning, instructions, input: question.slice(0, 8000), tools }, usageTags("chat", botId));
   stillOurs(ours);
   recordTokens("chat", response.model, response.usage, botId);
   for (let round = 0; round < 8; round++) {
@@ -1109,7 +1126,7 @@ export async function answerForApp(botId: string, app: { title: string; chatId: 
       }),
     );
     stillOurs(ours);
-    response = await client.responses.create({ model: CHAT_MODEL, reasoning, instructions, previous_response_id: response.id, input: outputs, tools }, usageTags("chat", botId));
+    response = await respond(client, { model, reasoning, instructions, previous_response_id: response.id, input: outputs, tools }, usageTags("chat", botId));
     stillOurs(ours);
     recordTokens("chat", response.model, response.usage, botId);
   }
@@ -1942,9 +1959,11 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
     // Someone's waiting on this reply: the user's own message, in the app, by text or in a channel (not
     // an email, which nobody expects back in seconds, or a turn someone else started). It runs fast.
     const waiting = !!opts.answering && !opts.outside && !opts.emailBack;
-    const base: Config = { model: CHAT_MODEL, effort: CHAT_REASONING.effort };
+    // The model the chat was set to (chatModelOf), or Auto: CHAT_MODEL, which the router may raise.
+    const pinned = chatModelOf(chatId);
+    const base: Config = { model: pinned ?? CHAT_MODEL, effort: CHAT_REASONING.effort };
     // How much thinking the message needs (routing.ts routeChat: Jev, alongside what's below). Only the user's own.
-    const routing = waiting ? routeChat(base, lastWords(chatId), botId).catch(() => ({ config: base })) : Promise.resolve({ config: base });
+    const routing = waiting ? routeChat(base, lastWords(chatId), botId, { pinned: !!pinned }).catch(() => ({ config: base })) : Promise.resolve({ config: base });
     // Whether a new bot could have a computer of its own on the user's Orgo plan, so the main bot doesn't promise one.
     // Read quickly or not at all: createBot checks again anyway. Not asked when the bots work on this Mac.
     const noOwnRoom =
@@ -2476,7 +2495,8 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
     const speed = speedFor(model, waiting);
     const create = (input: unknown[], previous?: string) =>
       withSpeed(speed, (tier, last) =>
-        client.responses.create(
+        respond(
+          client,
           { model, reasoning, instructions, ...(previous ? { previous_response_id: previous } : {}), input: input as ResponseInputItem[], tools, ...include, ...tierParam(tier) },
           { ...usageTags("chat", botId), ...(last ? {} : { maxRetries: 0 }) },
         ),

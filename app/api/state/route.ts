@@ -14,7 +14,8 @@ import { screenStreamWanted } from "@/lib/server/orgo";
 import { fullAccessOn } from "@/lib/server/full-access";
 import { tregOn } from "@/lib/server/treg";
 import "@/lib/server/llms";
-import { llms } from "@/lib/agents";
+import { llms, ROUTE_KEYS } from "@/lib/agents";
+import { cloudProxy } from "@/lib/server/cloud";
 import { startActivityBeat } from "@/lib/server/free-hours";
 import { startComputerChecks } from "@/lib/server/sessions";
 import { startRunsOn } from "@/lib/server/runner";
@@ -88,5 +89,16 @@ function forApp(all: AppState): AppState {
   const mac = state.mac ? { ...state.mac, fullAccess: fullAccessOn() || undefined } : state.mac;
   const watches = watchesForApp(state.watches);
   const workspaces = state.workspaces?.map((w) => (w.orbitKey ? { ...w, orbitKey: undefined } : w));
-  return { ...state, mac, watches, workspaces, usage: undefined, bots: state.bots.map((b) => ({ ...b, appsKey: undefined })), screenStream: screenStreamWanted(), businessData: tregOn(), llms: llms(), liveMoods: state.shared ? state.liveMoods : liveMoodsForApp(state) };
+  return { ...state, mac, watches, workspaces, usage: undefined, bots: state.bots.map((b) => ({ ...b, appsKey: undefined })), screenStream: screenStreamWanted(), businessData: tregOn(), llms: llms(), chatKeys: chatKeys(), liveMoods: state.shared ? state.liveMoods : liveMoodsForApp(state) };
+}
+
+/**
+ * Which providers a chat's model can run on here (Chat.model, lib/server/chat-providers.ts): whether each one's key
+ * is set in this server's environment. Only true or false: never a key, or any of it. OpenAI also through Bops Cloud.
+ */
+function chatKeys(): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  for (const [provider, name] of Object.entries(ROUTE_KEYS)) out[provider] = !!process.env[name]?.trim();
+  if (cloudProxy("openai")) out.openai = true;
+  return out;
 }

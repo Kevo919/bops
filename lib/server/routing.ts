@@ -50,10 +50,13 @@ const ULTRAFAST = /^gpt-6(\.1-sol|-astra)(-\d{4}-\d{2}-\d{2})?$/;
  * standard (never faster). Waiting: someone is waiting on the answer right now.
  */
 export function speedFor(model: string, waiting: boolean): Speed {
+  // A chat on another provider (Chat.model "anthropic/…"): no tiers there, so one try, and a 429 is that provider's own.
+  const [provider, name] = model.includes("/") ? [model.split("/")[0], model.slice(model.indexOf("/") + 1)] : ["openai", model];
+  if (provider !== "openai") return "default";
   const cap = setting("auto", "BOPS_SPEED");
   if (!waiting || cap === "standard") return "default";
   if (cap === "fast") return "fast";
-  return ULTRAFAST.test(model) ? "ultrafast" : "fast";
+  return ULTRAFAST.test(name) ? "ultrafast" : "fast";
 }
 
 /** The request's own setting for a tier: standard says nothing (as before). */
@@ -193,10 +196,12 @@ export const ASKS_AGAIN = /\b(try again|that'?s (wrong|not right|incorrect)|not 
  * A chat turn's configuration. The chat stays on its own model and effort (CHAT_MODEL, low) unless
  * the router is on and Jev reads the message as harder: then a tier's model and effort, and pro mode
  * for one hard answer at the top tier. Shadow and off: what it was, with the router's pick logged.
+ * `pinned`: the chat was set to a model (Chat.model): it stays on it, and Jev isn't asked.
  */
-export async function routeChat(base: Config, words: string, botId?: string): Promise<{ config: Config; router?: Config & { tier: Tier; why: string } }> {
+export async function routeChat(base: Config, words: string, botId?: string, opts: { pinned?: boolean } = {}): Promise<{ config: Config; router?: Config & { tier: Tier; why: string } }> {
   const mode = routerMode();
-  if (mode === "off" || !words.trim()) return { config: base };
+  // A chat set to a model of its own (Chat.model): that model, never moved to OpenAI's.
+  if (mode === "off" || !words.trim() || opts.pinned) return { config: base };
   const a = await decide(
     { message: words },
     {

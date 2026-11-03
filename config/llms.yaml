@@ -24,8 +24,9 @@
 #    deepinfra    DeepInfra                       DEEPINFRA_API_KEY
 #
 #  WHERE THEY RUN: on your bots' cloud computers, through OpenCode. They need
-#  Settings → Modules → Agent harnesses turned on. Chat with a bot itself stays
-#  on Bops' own engine (OpenAI); these models do the bots' tasks.
+#  Settings → Modules → Agent harnesses turned on. A chat can run on them too:
+#  pick one in the menu by the chat's Send button. For that, the provider's key
+#  goes in .env.local (the same key names), and Auto is OpenAI, as before.
 #  A bot whose AI you've already set up in its AI section keeps its own setup:
 #  these show up there as models you can pick.
 #  They work for DeepSeek Harness agents too: add DeepSeek Harness in a bot's AI
