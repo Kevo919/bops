@@ -1,0 +1,2 @@
+Continuing after Kevin's keep-going instruction. Accepted tasks15/16 reassignment. Applying all0740/0730 fixes, with full base-vs-PR matrix for11 and freshUbuntu rerun for16.
+Existing Bops processes are now gone and3210free. Installer cycle resumed without further forcing: original shortcuts backed up, private retention fixture/hash manifest created, first install running. Will report install/launch/uninstall/reinstall evidence.
