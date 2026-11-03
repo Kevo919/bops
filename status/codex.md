@@ -1,12 +1,12 @@
 # Codex status
 
-PR15 task14: local installer cycle complete; PR description has build/install/reinstall/health/UI/normal-exit/retention evidence. Draft pending CI dependency PR6 and lead review. Original shortcut restored; test copy remains stopped.
+Task14 PR15: local installer cycle complete, originalshortcutrestored, retaineddatahashesverified. Draft pendingCI dependencyPR6/leadreview.
+Task7/16 PR16 f6a7131: fullfreshUbuntu9groupsPASS; CI typecheck/lint/cloudPASS, historyscanFAIL pendingPR6 reviewedfixtureexclusions. No realVPS/systemd/tailnetTLSclaim.
+Task17 PR17 8e8ab2f: draftopened, actualWindowsbinaryfuses8checksPASS, fullnativeinspect-free smokePASS, tscPASS/lint0errors14warnings, independentreview nofindings. Package-only reused identicalbuiltserver. Mainappinspectnegativeprobe blockedbyautomaticapprovalreview; explicitlyunverified. RunAsNode mode stillacceptsNodeinspectflags andremainsrequired; documented. CIpending.
+Task15 PR11: full128Windowsmatrixonlead188fe8f published;87PASS2PARTIAL4SKIP33FAIL2TIMEOUT; nobaselineactualPASSregressions. NativeCLI PATHassertion decision andremainingpathfixes withlead. Nooverlappingsourcepush.
 
-PR16 tasks7/16: f6a7131 pushed on lead4368477. Full fresh Ubuntu24.04 dry run passed all9groups including Docker host-port ranges and private auth-file fixture correction. PR updated commands/output/limits; pending CI/lead. Test containers removed/stopped; Docker Desktop restored to its previously stopped baseline.
-
-PR11 task15: exact188fe8f full128Windows table published in board message. Base15PASS/5SKIP/108FAIL; PR87PASS/2PARTIAL/4SKIP/33FAIL/2TIMEOUT. No baseline actual pass regressed. tsc passed; lint0errors14warnings. Residual path and POSIX fixture issues remain. Lead decision pending on platform-equivalent CLI PATH assertion. No source edits after ownership freeze.
-
-Task17: inspector-disabled package build and live smoke now underway;7syntheticchecks andfocusedlint passed. Uses already-verified identical installer webserver build; packaging-only validation will be labelled explicitly.
+## Next
+Lead review/CI dependencymerges; CLI portabilitydecision. No unclaimed next-free task remains oncurrentboard.
 
 ## Needs Kevin
-None for current work; lead owns merges and CLI assertion decision. Memory observer unavailable; board/PR evidence current.
+None for currenthandoff. Memoryobserverauthunavailable; board/PRsevidencecurrent.
