@@ -43,6 +43,7 @@ import { offerProposal, PROPOSE_TOOL, sealProposals, type ProposeArgs } from "./
 import { createSkill, findSkill, readSkill, skillRefId, skillsNote, skillText, SkillError, updateSkill, READ_SKILL_TOOL } from "./workspace-skills";
 import { linksFor } from "./channels";
 import { changeLookFromChat } from "./look";
+import { markSeen } from "./presence";
 import { chose, decide, yes, type Answer } from "./decide";
 import { moveToMac, offerMove, replyToSession, startSession } from "./sessions";
 import { asksForMac, mentionsMac } from "./where";
@@ -655,6 +656,8 @@ export async function handleMessage(
   const root = target ? (target.replyTo ?? target.id) : undefined;
   const app = lookingAt && madeApp(lookingAt) ? lookingAt : undefined;
   const mine = addMessage({ chatId, role: "user", text, replyTo: root, images: images?.length ? images : undefined, via, phone, channel, lookingAt: app, ...(member ? { member: saidOf(member) } : {}), ...(agent && !member && /^[A-Za-z0-9_]{1,40}$/.test(agent) ? { agent } : {}), ...(appNote && !member ? { appNote: true as const } : {}), ...(appNote && !member && picks?.length ? { picks } : {}) });
+  // The owner's own words (typed, texted or called in): they're around, for the routines' inactivity brake.
+  if (!member) markSeen();
   trackServerEvent("bops_message_sent", { chat_kind: c.kind, via: onCall ? "call" : (via ?? "app"), image_count: images?.length ?? 0, is_reply: !!root });
   // Into the shared memory (unless the user wants it kept from someone), and remembered if it's a lasting fact. A
   // member's words go in as theirs, so nothing they say about themselves is taken for the owner.
