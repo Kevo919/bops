@@ -1,3 +1,4 @@
+import { computerWordsFor } from "@/lib/computer-words";
 import "server-only";
 import { BLOCKER_LABEL, DISPLAYS, isScreenWatch, live, workspaceOf, type Session } from "@/lib/types";
 import { fullAccessOn } from "./full-access";
@@ -110,7 +111,7 @@ export async function computerBriefing(botId: string, opts: { thread?: string; s
 
   const ownersMac = await macBriefing(botId);
   return [
-    `${shared ? `The computer you share with ${c.name}` : "Your computer"}${mac ? ` (browsers on ${owner}'s Mac)` : ""}, as of now:`,
+    `${shared ? `The computer you share with ${c.name}` : "Your computer"}${mac ? computerWordsFor(process.platform)` (browsers on ${owner}'s Mac)` : ""}, as of now:`,
     ...lines,
     ...(rule ? [rule] : []),
     ...(waiting.length ? [`Waiting on ${owner}: ${waiting.join("; ")}.`] : []),
@@ -129,20 +130,21 @@ async function macBriefing(botId: string) {
   const watched = (state.watches ?? []).filter((w) => w.mac);
   const ago = (t?: number) => (t ? `${Math.max(1, Math.round((Date.now() - t) / 60_000))} min ago` : "not yet");
   const watching = watched.length
-    ? `Windows watched on ${owner}'s Mac (${watched.length}; Bops reads each when it changes, and ${bot(watched[0].botId)?.name ?? "the main bot"} gives the heads-up): ${watched
+    ? computerWordsFor(process.platform)`Windows watched on ${owner}'s Mac (${watched.length}; Bops reads each when it changes, and ${bot(watched[0].botId)?.name ?? "the main bot"} gives the heads-up): ${watched
         .map((w) => `"${w.mac!.title}" in ${w.mac!.app}, for ${w.lookFor}, last read ${ago(w.readAt)}${w.away ? ", paused: the window shows something else right now" : ""}${w.alert ? `, waiting for ${owner}: "${w.alert.text}"` : ""}`)
         .join("; ")}.`
-    : `No windows on ${owner}'s Mac are being watched.`;
+    : computerWordsFor(process.platform)`No windows on ${owner}'s Mac are being watched.`;
   if (!m) return watching;
-  if (!m.ready) return [`${owner}'s Mac: not available to bots (${m.reason ?? "not set up"}).`, watching].join("\n");
+  if (!m.ready) return [computerWordsFor(process.platform)`${owner}'s Mac: not available to bots (${m.reason ?? "not set up"}).`, watching].join("\n");
   const onMac = state.sessions.filter((s) => s.runsOn === "mac" && live(s));
   const yours = onMac.filter((s) => s.botId === botId);
   return [
+    ...(process.platform === "win32" ? ["The local host is a Windows PC. Use Windows terminology and paths; do not assume macOS apps or commands are available."] : []),
     fullAccessOn()
-      ? `${owner}'s Mac: available with full access: a Chrome of the bot's own there (websites see ${owner}'s home internet), a shell, ${owner}'s files and their apps (Messages, Notes, Finder…).`
-      : `${owner}'s Mac: available, in a Chrome of the bot's own there (websites see ${owner}'s home internet). Not its apps (Messages, Notes, Finder…) or files: bots can't use those for now.`,
-    ...(yours.length ? [`Your tasks on ${owner}'s Mac: ${yours.map((s) => `"${s.title}"${s.activity ? ` (${s.activity})` : ""}`).join("; ")}.`] : []),
-    ...(onMac.length > yours.length ? [`Other bots are working on ${owner}'s Mac too (${onMac.length - yours.length}).`] : []),
+      ? computerWordsFor(process.platform)`${owner}'s Mac: available with full access: a Chrome of the bot's own there (websites see ${owner}'s home internet), a shell, ${owner}'s files and their apps (local desktop apps).`
+      : computerWordsFor(process.platform)`${owner}'s Mac: available, in a Chrome of the bot's own there (websites see ${owner}'s home internet). Not its apps (local desktop apps) or files: bots can't use those for now.`,
+    ...(yours.length ? [computerWordsFor(process.platform)`Your tasks on ${owner}'s Mac: ${yours.map((s) => `"${s.title}"${s.activity ? ` (${s.activity})` : ""}`).join("; ")}.`] : []),
+    ...(onMac.length > yours.length ? [computerWordsFor(process.platform)`Other bots are working on ${owner}'s Mac too (${onMac.length - yours.length}).`] : []),
     watching,
   ].join("\n");
 }
@@ -163,7 +165,7 @@ export function teamBriefing(leadId: string, seen?: ReadonlySet<string>) {
   if (!others.length) return lead?.isMain ? "Your team: just you so far." : "";
   const now = Date.now();
   const owner = ownerName();
-  const where = (s: Session) => (s.runsOn === "mac" ? `on ${owner}'s Mac` : s.askWhere ? `waiting for ${owner} to pick Mac or cloud` : "in the cloud");
+  const where = (s: Session) => (s.runsOn === "mac" ? computerWordsFor(process.platform)`on ${owner}'s Mac` : s.askWhere ? computerWordsFor(process.platform)`waiting for ${owner} to pick Mac or cloud` : "in the cloud");
   const lines = others.map((b) => {
     const mine = state.sessions.filter((s) => s.botId === b.id);
     const running = mine.filter(live);
@@ -183,7 +185,7 @@ export function teamBriefing(leadId: string, seen?: ReadonlySet<string>) {
     const c = workComputer(b);
     const computer = c.id !== b.id ? `Works on ${host}.` : c.computerStatus === "ready" ? "" : c.computerStatus === "cloning" ? "Its computer is being set up." : "No computer yet.";
     return [
-      `- ${b.name} (${b.role}${b.runsOn && b.runsOn !== "auto" ? `, works on ${b.runsOn === "mac" ? `${owner}'s Mac` : "the cloud"}` : ""}):`,
+      `- ${b.name} (${b.role}${b.runsOn && b.runsOn !== "auto" ? `, works on ${b.runsOn === "mac" ? computerWordsFor(process.platform)`${owner}'s Mac` : "the cloud"}` : ""}):`,
       doing.length ? `working on ${doing.join("; ")}.` : "free.",
       watching.length ? `Watching ${watching.join(", ")}.` : "",
       alerts.length ? `Waiting on ${owner}: ${alerts.join("; ")}.` : "",
