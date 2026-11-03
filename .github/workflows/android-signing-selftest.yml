@@ -1,0 +1,37 @@
+# TEMP: checks the release-signing path with a throwaway key generated on the runner. Publishes nothing. Removed before merge.
+name: Android signing self-test (TEMP)
+on:
+  push:
+    branches: [feature/android-apk]
+permissions:
+  contents: read
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"'
+      - name: Build release APK with a throwaway key, exactly as android-apk.yml does
+        env:
+          BOPS_VERSION_CODE: ${{ github.run_number }}
+          BOPS_KEYSTORE_PASSWORD: throwaway-pass
+          BOPS_KEY_ALIAS: bops
+          BOPS_KEY_PASSWORD: throwaway-pass
+        run: |
+          keytool -genkeypair -keystore "$RUNNER_TEMP/k.jks" -storepass throwaway-pass -keypass throwaway-pass \
+            -alias bops -keyalg RSA -keysize 2048 -validity 365 -dname "CN=throwaway"
+          ANDROID_KEYSTORE_B64=$(base64 -w0 "$RUNNER_TEMP/k.jks")
+          export BOPS_KEYSTORE_FILE="$RUNNER_TEMP/bops-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$BOPS_KEYSTORE_FILE"
+          cd android
+          ./gradlew assembleRelease
+          A=app/build/outputs/apk/release/app-release.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$A" | tee /dev/stderr | grep -q "CN=throwaway"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$A" | head -1 | tee /dev/stderr | grep -q "versionCode='$BOPS_VERSION_CODE'"
