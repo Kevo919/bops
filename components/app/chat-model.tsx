@@ -5,6 +5,8 @@ import type { AppState, Chat } from "@/lib/types";
 import { chatKeyName, chatModels, chatModelShown, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
 import type { AgentRoute } from "@/lib/agents";
 import { post } from "./ui";
+// The default for new chats (Settings, Models), named in the box's hint.
+import { chatDefault } from "@/lib/chat-models";
 
 /**
  * The model a chat's replies run on (Chat.model), picked in its message box: Auto (OpenAI, as before) first, then
@@ -23,10 +25,12 @@ export function ChatModelPick({ state, chat: c, onError }: { state: AppState; ch
   // One no longer in the list (taken out of config/llms.yaml): still shown, so the box says what the chat is on.
   const gone = value && !models.some((m) => m.id === value) ? value : null;
   const current = models.find((m) => m.id === value);
+  // What new chats start on (Settings, Models), for the box's hint; this chat's own pick, or Auto, is what it runs on.
+  const fallback = chatDefault(keys);
   return (
     <select
       aria-label="Model for this chat"
-      title={current ? `Replies in this chat run on ${current.name}` : "Replies in this chat run on Auto (OpenAI)"}
+      title={`${current ? `Replies in this chat run on ${current.name}` : "Replies in this chat run on Auto (OpenAI)"}${fallback ? `. Default for new chats: ${fallback.name}` : ""}`}
       value={value}
       disabled={saving}
       onChange={async (e) => {

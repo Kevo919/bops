@@ -138,7 +138,13 @@ const AGENT_ID = /^ag_[A-Za-z0-9]{10}$/;
  * state (AppState.llms), and both keep it here. They run on OpenCode, on the provider's key from the Vault, and
  * show as DeepSeek Harness's models too.
  */
-export type Llm = { name: string; provider: AgentRoute; model: string; starter?: boolean; useFor?: Job[] };
+export type Llm = { name: string; provider: AgentRoute; model: string; starter?: boolean; useFor?: Job[]; runBy?: RunBy; chatDefault?: boolean };
+/**
+ * The agents that may run an LLM for bots' tasks (config/llms.yaml run_by; config/llms.cjs RUN_BY says which
+ * providers each runs). OpenCode when it says none. Claude Code and Codex run on an account connected to a bot.
+ */
+export const RUN_BY_KINDS = ["opencode", "dsh"] as const;
+export type RunBy = (typeof RUN_BY_KINDS)[number];
 const g = globalThis as unknown as { __bopsLlms?: Llm[] };
 export const llms = (): Llm[] => g.__bopsLlms ?? [];
 const LLM_PROVIDERS = new Set<string>(Object.keys(ROUTE_KEYS));
@@ -151,7 +157,16 @@ export function setLlms(list: unknown) {
       const l = x as Partial<Llm>;
       if (typeof l.provider !== "string" || !LLM_PROVIDERS.has(l.provider) || typeof l.model !== "string" || !/^[A-Za-z0-9._:/-]{1,120}$/.test(l.model)) continue;
       const jobs = cleanJobs(l.useFor);
-      out.push({ name: typeof l.name === "string" && l.name.trim() ? l.name.trim().slice(0, 60) : l.model, provider: l.provider as AgentRoute, model: l.model, ...(l.starter === true && !out.some((y) => y.starter) ? { starter: true } : {}), ...(jobs ? { useFor: jobs } : {}) });
+      const runBy = (RUN_BY_KINDS as readonly string[]).includes(l.runBy as string) && l.runBy !== "opencode" ? l.runBy : undefined;
+      out.push({
+        name: typeof l.name === "string" && l.name.trim() ? l.name.trim().slice(0, 60) : l.model,
+        provider: l.provider as AgentRoute,
+        model: l.model,
+        ...(l.starter === true && !out.some((y) => y.starter) ? { starter: true } : {}),
+        ...(jobs ? { useFor: jobs } : {}),
+        ...(runBy ? { runBy } : {}),
+        ...(l.chatDefault === true && !out.some((y) => y.chatDefault) ? { chatDefault: true } : {}),
+      });
     }
   g.__bopsLlms = out;
 }
@@ -163,8 +178,14 @@ const llmModels = (kind: AgentKind): (typeof MODELS)[number][] => {
   if (kind === "claude") return list.filter((l) => l.provider === "anthropic").map((l) => ({ id: l.model, kind, label: l.name, short: l.name }));
   return [];
 };
-/** The agent an LLM is in a bot with no AI profile of its own: the same id on every bot, from its provider and model. */
-const llmAgent = (l: Llm): BotAgent => ({ id: agentIdFor("llm", llmModel(l)), kind: "opencode", pays: "key", model: llmModel(l), ...(l.useFor ? { jobs: l.useFor } : {}) });
+/**
+ * The agent an LLM is in a bot with no AI profile of its own: the same id on every bot, from its provider and model
+ * (and the agent that runs it, its run_by: OpenCode unless it says DeepSeek Harness).
+ */
+export const llmAgent = (l: Llm): BotAgent => {
+  const kind: AgentKind = l.runBy === "dsh" ? "dsh" : "opencode";
+  return { id: agentIdFor("llm", kind === "opencode" ? llmModel(l) : `${kind}:${llmModel(l)}`), kind, pays: "key", model: llmModel(l), ...(l.useFor ? { jobs: l.useFor } : {}) };
+};
 /**
  * The AI a bot with no profile of its own starts on, from config/llms.yaml: Bops agent, the starter as its
  * Default, and each LLM set to take some jobs. Undefined without brains, or with no starter and none with jobs:

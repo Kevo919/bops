@@ -198,6 +198,111 @@ try {
     assert.equal(description.find((module) => module.id === "memory").keysSet, true);
   });
 
+  test("LLMs: run_by keeps an agent that runs the provider and leaves out the rest, with why", () => {
+    const problems = [];
+    const list = llms.clean({ llms: [
+      { provider: "openrouter", model: "qwen/qwen3-coder-next", run_by: "dsh" },
+      { provider: "openrouter", model: "a/b", run_by: " DeepSeek-Harness " },
+      { provider: "openai", model: "c", run_by: "opencode" },
+      { provider: "anthropic", model: "d", run_by: "claude" },
+      { provider: "openai", model: "e", run_by: "codex" },
+      { provider: "zai", model: "f", run_by: "agy" },
+      { provider: "zai", model: "g", run_by: ["dsh"] },
+    ] }, problems);
+    assert.deepEqual(list.map((l) => l.runBy), ["dsh", "dsh", "opencode", undefined, undefined, undefined, undefined]);
+    assert.equal(list.length, 7, "a bad run_by leaves the LLM in, on OpenCode");
+    assert.equal(problems.length, 4);
+    assert.match(problems[0], /Claude account/);
+    assert.match(problems[1], /ChatGPT account/);
+    assert.match(problems[2], /run_by is one of opencode, dsh/);
+    assert.equal(llms.runByOk("dsh", "openrouter"), true);
+    assert.equal(llms.runByOk("claude", "anthropic"), false);
+  });
+
+  test("LLMs: one chat_default (the first, only when true) and each job to the first LLM that has it", () => {
+    const problems = [];
+    const list = llms.clean({ llms: [
+      { name: "A", provider: "openai", model: "a", chat_default: "true", use_for: ["coding", "writing"] },
+      { name: "B", provider: "openai", model: "b", chat_default: true, use_for: ["coding"] },
+      { name: "C", provider: "openai", model: "c", chat_default: true, use_for: ["writing", "research"] },
+    ] }, problems);
+    assert.deepEqual(list, [
+      { name: "A", provider: "openai", model: "a", useFor: ["coding", "writing"] },
+      { name: "B", provider: "openai", model: "b", chatDefault: true },
+      { name: "C", provider: "openai", model: "c", useFor: ["research"] },
+    ]);
+    assert.deepEqual(problems, ["B's job coding: A has it already (each job goes to one LLM)", "C's job writing: A has it already (each job goes to one LLM)"]);
+  });
+
+  test("LLMs: change moves a job, a chat default and the starter, without touching its input", () => {
+    const before = [
+      { name: "A", provider: "openai", model: "a", starter: true, useFor: ["coding", "writing"] },
+      { name: "B", provider: "anthropic", model: "b", chatDefault: true },
+    ];
+    const input = structuredClone(before);
+    const done = llms.change(input, { op: "update", id: "anthropic/b", useFor: ["writing"], starter: true, runBy: "dsh" });
+    assert.deepEqual(input, before);
+    assert.deepEqual(done.moved, [{ job: "writing", from: "A" }]);
+    assert.deepEqual(done.list, [
+      { name: "A", provider: "openai", model: "a", useFor: ["coding"], from: "openai/a" },
+      { name: "B", provider: "anthropic", model: "b", chatDefault: true, useFor: ["writing"], starter: true, runBy: "dsh", from: "anthropic/b" },
+    ]);
+    assert.match(llms.change(before, { op: "update", id: "anthropic/b", runBy: "claude" }).error, /Claude account/);
+    assert.match(llms.change(before, { op: "add", provider: "openai", model: "a" }).error, /already/);
+    assert.deepEqual(llms.change(before, { op: "add", provider: "openrouter", model: "x/y" }).list.at(-1), { name: "x/y", provider: "openrouter", model: "x/y" });
+    assert.match(llms.change(Array.from({ length: 20 }, (_, i) => ({ name: `${i}`, provider: "openai", model: `m${i}` })), { op: "add", provider: "openai", model: "n" }).error, /At most 20/);
+  });
+
+  test("LLMs: write keeps comments, unknown fields and entries Bops left out, and round-trips run_by and chat_default", () => {
+    const source = "# Top note\nllms:\n  # first\n  - name: A\n    provider: openai\n    model: a # why A\n    use_for: [coding, writing]\n    extra: kept\n\n  - name: Odd\n    provider: unknown\n    model: z\n\n  # Examples below\n  # - name: B\n";
+    const root = fixture("write-llms", "llms.yaml", source);
+    const done = llms.change(llms.read(root, () => {}), { op: "add", name: "Q", provider: "openrouter", model: "qwen/qwen3-coder-next", useFor: ["coding"], runBy: "dsh", chatDefault: true });
+    llms.write(root, done.list, done.removed);
+    const written = readFileSync(join(root, "config", "llms.yaml"), "utf8");
+    for (const keep of ["# Top note", "# first", "# why A", "extra: kept", "provider: unknown", "# Examples below", "use_for: [writing]"]) assert.ok(written.includes(keep), `Lost: ${keep}`);
+    assert.ok(written.indexOf("run_by: dsh") < written.indexOf("# Examples below"));
+    assert.deepEqual(llms.read(root, () => {}), [
+      { name: "A", provider: "openai", model: "a", useFor: ["writing"] },
+      { name: "Q", provider: "openrouter", model: "qwen/qwen3-coder-next", useFor: ["coding"], runBy: "dsh", chatDefault: true },
+    ]);
+    const gone = llms.change(llms.read(root, () => {}), { op: "remove", id: "openai/a" });
+    llms.write(root, gone.list, gone.removed);
+    assert.ok(!readFileSync(join(root, "config", "llms.yaml"), "utf8").includes("name: A"));
+    assert.equal(existsSync(join(root, "config", "llms.yaml.tmp")), false);
+  });
+
+  test("LLMs: write makes a new file when there's none, and never overwrites one with a mistake in it", () => {
+    const root = join(scratch, "new-llms-root");
+    llms.write(root, [{ name: "M", provider: "deepseek", model: "deepseek-chat", chatDefault: true }]);
+    assert.deepEqual(llms.read(root), [{ name: "M", provider: "deepseek", model: "deepseek-chat", chatDefault: true }]);
+    const bad = fixture("bad-write", "llms.yaml", "llms: [nope\n");
+    assert.throws(() => llms.write(bad, []), /mistake/);
+    assert.equal(readFileSync(join(bad, "config", "llms.yaml"), "utf8"), "llms: [nope\n");
+  });
+
+  test("LLMs: the shipped config/llms.yaml reads clean, and its OpenRouter examples parse when turned on", () => {
+    const shipped = readFileSync(new URL("../config/llms.yaml", import.meta.url), "utf8");
+    const problems = [];
+    assert.ok(llms.clean(require("yaml").parse(shipped), problems).length >= 1);
+    assert.deepEqual(problems, []);
+    const on = shipped.replace(/^ {2}# - name: .*OpenRouter.*\n(?: {2}# {3}.*\n)+/gm, (block) => block.replace(/^ {2}# /gm, "  "));
+    const list = llms.clean(require("yaml").parse(on), problems);
+    assert.deepEqual(problems, []);
+    assert.deepEqual(list.filter((l) => l.provider === "openrouter").map((l) => [l.model, l.runBy ?? "opencode"]), [["deepseek/deepseek-v4-pro", "opencode"], ["qwen/qwen3-coder-next", "dsh"]]);
+  });
+
+  test("LLMs: a chat-only provider (Ollama) takes no jobs, run_by or starter, but can be the chat default", () => {
+    const problems = [];
+    const list = llms.clean({ llms: [{ name: "Local", provider: "ollama", model: "qwen2.5:3b", use_for: ["coding"], run_by: "dsh", starter: true, chat_default: true }, { name: "Cloud", provider: "openai", model: "x", use_for: ["coding"] }] }, problems);
+    assert.deepEqual(list, [{ name: "Local", provider: "ollama", model: "qwen2.5:3b", chatDefault: true }, { name: "Cloud", provider: "openai", model: "x", useFor: ["coding"] }]);
+    assert.equal(problems.length, 2);
+    assert.ok(problems.every((p) => /chats only/.test(p)));
+    assert.match(llms.change(list, { op: "update", id: "ollama/qwen2.5:3b", useFor: ["coding"] }).error, /chats only/);
+    assert.match(llms.change(list, { op: "add", provider: "ollama", model: "llama4", runBy: "dsh" }).error, /chats only/);
+    assert.equal(llms.change(list, { op: "add", provider: "ollama", model: "llama4", useFor: [], chatDefault: true }).list.at(-1).chatDefault, true);
+    assert.equal(llms.runByOk("opencode", "ollama"), false);
+  });
+
   console.log(`PASS: ${passed} config tests (temporary fixtures only)`);
 } finally {
   // scratch was created by this process under the OS temp directory; nothing in the repo is removed.

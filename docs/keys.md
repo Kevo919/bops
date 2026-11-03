@@ -96,4 +96,15 @@ To use other Ollama models, add them to `config/llms.yaml` with `provider: ollam
 
 Restart Bops, check the configured keys in **Settings → This Mac → Keys**, then select the corresponding provider/model in Bops. Keep spending alerts enabled where available, but use an enforced cap when you need requests to stop. Rate limits control request speed; they are not spending budgets.
 
+## Adding models
+
+Once a key is set, add the provider's models in **Settings → This Mac → Models** (right under Keys). No file editing or restart is needed.
+
+1. **Add a model** → pick a provider. For **OpenRouter (hundreds of models)**, search its list (for example `qwen coder` or `deepseek`) and click one: the id and a name are filled in, with its price per million tokens. If OpenRouter's list can't be reached, type the id from [openrouter.ai/models](https://openrouter.ai/models), such as `qwen/qwen3-coder-next`.
+2. **Use for**: pick the kinds of work it takes (Coding, Planning, Thinking, Research, Writing, Web tasks). Each job belongs to one model, so picking a job another model has moves it, and the card says which one it came from. A new thread about that kind of work starts on this model unless you pick another.
+3. **Run by**: the agent that runs it on your bots' computers. OpenCode is the default; DeepSeek Harness runs every provider too. Claude Code and Codex run on an account you connect in a bot's AI section, so they can't be picked here.
+4. **Default for new chats**: chats made from then on start on this model (while its key is set; otherwise Auto, OpenAI). Chats you already have keep their model, and **Auto (OpenAI)** can always be picked again in a chat's model box. **Default for bot tasks**: what new bots start on.
+
+Each row shows whether its provider's key is set on this server (green) or not yet (amber, naming the key). Saving writes `config/llms.yaml`, keeping its comments. That file is tracked by git, so your changes show up as local edits there (`git status`), and an update that also changes it may ask you to keep or merge yours; you can still edit that file by hand (restart Bops after). Bots you have set up in their own AI section keep their own setup.
+
 Provider links and instructions were checked against public official sources on 2026-11-03. Account pages may show a sign-in or JavaScript app shell; that does not verify the controls inside your account. Providers may change their screens, prefixes, prices and billing rules.
