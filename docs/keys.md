@@ -1,6 +1,6 @@
 # Set up your provider keys
 
-This guide covers the seven keys, plus the free Ollama setting, shown in **Settings → This Mac → Keys** when you run your own Bops server. A key is a password that lets Bops use your provider account. Only configure the providers you use. Provider API usage and cloud computers can cost money; a chat-app subscription does not automatically include API credits.
+This guide covers the eight keys, plus the free Ollama setting, shown in **Settings → This Mac → Keys** when you run your own Bops server. A key is a password that lets Bops use your provider account. Only configure the providers you use. Provider API usage and cloud computers can cost money; a chat-app subscription does not automatically include API credits.
 
 ## Put keys on the machine running Bops
 
@@ -55,7 +55,15 @@ Claude API billing is separate from a Claude chat subscription.
 
 Bops uses this variable for both `zai` and `zai-coding` routes. **GLM Coding Plan is a separate product with a dedicated endpoint and usage limits**; make sure the selected route matches your key's product. Its extra-usage spending limits are not the same as standard API balance. See the quickstart and [documented balance/plan errors](https://docs.z.ai/api-reference/api-code). Do not assume a Coding Plan subscription pays for every standard API call.
 
-## 6. DeepSeek — `DEEPSEEK_API_KEY`
+## 6. Z.ai Coding Plan (China) — `ZAI_CODING_CN_API_KEY`
+
+1. Sign in to [open.bigmodel.cn](https://open.bigmodel.cn) with the account that holds your GLM Coding Plan for the China region, open **API keys**, and create a key for Bops.
+2. Put it in `ZAI_CODING_CN_API_KEY=`. No stable prefix was verified; copy the complete key as issued.
+3. Bops uses this variable only for the `zai-coding-cn` route, which sends requests to `https://open.bigmodel.cn/api/coding/paas/v4` (OpenAI-compatible chat completions), the China-region counterpart of `zai-coding`. A key from z.ai does not work here, and this key does not work on the `zai` or `zai-coding` routes.
+
+The **Check** button for this key requests the model list at `open.bigmodel.cn/api/paas/v4/models`; **unavailable** there does not prove the key is invalid. A plan without balance answers chat requests with z.ai's code `1113`, which Bops reports as no balance or Coding Plan. The open.bigmodel.cn pages, plan quotas and billing for the China region were not checked for this guide.
+
+## 7. DeepSeek — `DEEPSEEK_API_KEY`
 
 1. Sign in to [DeepSeek API keys](https://platform.deepseek.com/api_keys) and create a key. This is the key-management link supplied by the [official API documentation](https://api-docs.deepseek.com/).
 2. Put it in `DEEPSEEK_API_KEY=`. No stable prefix was verified in the official documentation.
@@ -63,7 +71,7 @@ Bops uses this variable for both `zai` and `zai-coding` routes. **GLM Coding Pla
 
 The official key and top-up pages loaded DeepSeek's sign-in screen in a browser. Their authenticated controls were not inspected.
 
-## 7. OpenRouter — `OPENROUTER_API_KEY`
+## 8. OpenRouter — `OPENROUTER_API_KEY`
 
 1. Sign in to [OpenRouter keys](https://openrouter.ai/settings/keys) and create a key for Bops.
 2. Put it in `OPENROUTER_API_KEY=`. The [official tutorial](https://openrouter.ai/blog/tutorials/image-generation/) illustrates `sk-or-v1-…`.
@@ -71,7 +79,7 @@ The official key and top-up pages loaded DeepSeek's sign-in screen in a browser.
 
 Choose models with prices you are comfortable paying and review account top-up settings as well as the key limit.
 
-## 8. Ollama (free, local) — `OLLAMA_BASE_URL`
+## 9. Ollama (free, local) — `OLLAMA_BASE_URL`
 
 Ollama runs open models on your own server, so chats on it cost nothing and need no account or key. Use it when you want a free model for everyday chat; small models are slower and less capable than the paid ones above.
 
