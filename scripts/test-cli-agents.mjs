@@ -367,7 +367,9 @@ fake("codex", `exec ${JSON.stringify(computerNode)} ${JSON.stringify(fakeCodex)}
 // xfce4-terminal: what it was asked (and on which screen), then the command after -x, in its place.
 fake("xfce4-terminal", `echo "$DISPLAY $*" >> ${JSON.stringify(TERMINAL)}\nwhile [ $# -gt 0 ] && [ "$1" != -x ]; do shift; done\nshift\nexec "$@"`);
 fake("setsid", `exec "$@"`);
-const lines = (f) => (existsSync(f) ? readFileSync(f, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
+// Each record is one append ending in "\n". A fake may still be writing the last one while a test polls (a run's
+// record has its whole environment), so a last piece with no "\n" yet is left for the next read, not parsed.
+const lines = (f) => (existsSync(f) ? readFileSync(f, "utf8").split("\n").slice(0, -1).filter(Boolean).map((l) => JSON.parse(l)) : []);
 /** Every Claude Code process the fake computers ran for a thread (not its status checks), oldest first. */
 const runs = () => lines(RUNS).filter((r) => r.args.includes("-p"));
 /** Every Claude Code opened in a terminal, oldest first. */
