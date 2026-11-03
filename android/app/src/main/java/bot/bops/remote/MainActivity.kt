@@ -300,7 +300,14 @@ class MainActivity : Activity() {
                 }
                 override fun onReceivedHttpError(view: WebView, req: WebResourceRequest, res: WebResourceResponse) {
                     // The code stopped working (unpaired, or paired again elsewhere): back to setup.
-                    if (req.isForMainFrame && current?.id == server.id && sameSite(req.url.toString(), address) && (res.statusCode == 401 || res.statusCode == 403)) forget(server, "Bops didn't take the pairing code anymore. Pair again.")
+                    if (req.isForMainFrame && sameSite(req.url.toString(), address) && (res.statusCode == 401 || res.statusCode == 403)) {
+                        // Destroying a WebView inside its own callback is unsafe. A queued rejection
+                        // must also not replace a newly selected page or a refreshed pairing.
+                        view.post {
+                            if (web === view && current?.id == server.id && current?.code == server.code)
+                                forget(server, "Bops didn't take the pairing code anymore. Pair again.")
+                        }
+                    }
                 }
             }
             webChromeClient = object : WebChromeClient() {

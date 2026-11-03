@@ -66,9 +66,10 @@ class MultiServerTests : Instrumentation() {
         check(ServerSafety.normalizeAddress(" HTTPS://BOPS.Example.COM:443/ ") == "https://bops.example.com")
         check(ServerSafety.normalizeAddress("HTTP://100.64.0.1:80/") == "http://100.64.0.1")
         check(ServerSafety.normalizeAddress("https://BOPS.Example.COM:8443/base/") == "https://bops.example.com:8443/base")
-        check(ServerSafety.normalizeAddress("https://User:Pa%40ss@BOPS.Example.COM:443/Base%2FPath/?Next=Mixed#Section") ==
-            "https://User:Pa%40ss@bops.example.com/Base%2FPath?Next=Mixed#Section")
-        check(ServerSafety.normalizeAddress("https://trusted.example@OTHER.example:443/") == "https://trusted.example@other.example")
+        for (address in listOf("https://user@host.example", "https://host.example?", "https://host.example#", "https://host.example/?x=1", "http://100.64.0.1/#x")) {
+            check(ServerSafety.normalizeAddress(address) == address)
+            check(ServerSafety.safeAddress(ServerSafety.normalizeAddress(address)) != null)
+        }
         check(ServerSafety.normalizeAddress("https://bops%2eexample.com/") == "https://bops%2eexample.com/")
         check(ServerSafety.normalizeAddress("https://[2001:DB8::1]:443/") == "https://[2001:db8::1]")
         val first = store.save("Initial", "https://BOPS.Example.COM:443/", "old-code")
@@ -84,23 +85,32 @@ class MultiServerTests : Instrumentation() {
         val migrated = store.save("Legacy updated", "https://legacy.example", "updated-code")
         check(migrated.id == "legacy-id" && store.all().size == 1 && store.active()?.code == "updated-code")
         check(store.save("Other path", "https://legacy.example/other", "other-code").id != migrated.id)
-        check(store.save("Other user", "https://user@legacy.example", "user-code").id != migrated.id)
         val broken = "[{\"id\":\"broken\",\"code\":\"private-test-code\""
         prefs.edit().putString("servers", broken).putString("activeServer", "legacy-id").commit()
         check(store.all().isEmpty() && store.active() == null)
         check(prefs.getString("servers", null) == "[]" && !prefs.contains("activeServer"))
-        val backups = prefs.all.filterKeys { it.startsWith("servers.corrupt.") }
-        check(backups.size == 1 && backups.values.single() == broken)
-        check(ServerStore(targetContext).all().isEmpty())
-        check(prefs.all.filterKeys { it.startsWith("servers.corrupt.") } == backups)
-        // Syntactically valid JSON with an invalid row also recovers, keeping both originals privately.
+        check(prefs.getString("servers.corrupt.latest", null) == broken)
+        val savedAt = prefs.getLong("servers.corrupt.savedAt", 0)
+        check(savedAt > 0 && ServerStore(targetContext).all().isEmpty())
+        check(prefs.getLong("servers.corrupt.savedAt", 0) == savedAt)
+        // New corruption replaces the previous private backup rather than retaining old codes.
         prefs.edit().putString("servers", "[{}]").putString("activeServer", "bad").commit()
         check(store.all().isEmpty() && store.active() == null)
-        check(prefs.all.filterKeys { it.startsWith("servers.corrupt.") }.values.toSet() == setOf(broken, "[{}]"))
+        check(prefs.getString("servers.corrupt.latest", null) == "[{}]")
         prefs.edit().putInt("servers", 42).putString("activeServer", "bad").commit()
         check(store.all().isEmpty() && store.active() == null)
         check(prefs.getString("servers", null) == "[]")
-        check(prefs.all.filterKeys { it.startsWith("servers.corrupt.") }.values.toSet() == setOf(broken, "[{}]", "42"))
+        check(prefs.getString("servers.corrupt.latest", null) == "42")
+        check(prefs.all.keys.count { it.startsWith("servers.corrupt.") } == 2)
+        prefs.edit().putLong("servers.corrupt.savedAt", System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000)
+            .putString("servers.corrupt.legacy", "old-private-code").commit()
+        ServerStore(targetContext)
+        check(prefs.all.keys.none { it.startsWith("servers.corrupt.") })
+        val seenServer = store.save("Seen", "https://seen.example", "seen-code")
+        prefs.edit().putInt("seen:${seenServer.id}", 42).commit()
+        check(store.seen(seenServer) == null && !prefs.contains("seen:${seenServer.id}"))
+        store.remember(seenServer, setOf("learned"))
+        check(store.seen(seenServer) == setOf("learned"))
         check(store.save("Recovered", "https://recovered.example", "new-code").code == "new-code")
         prefs.edit().clear().commit()
     }
@@ -202,6 +212,45 @@ class MultiServerTests : Instrumentation() {
                 .invoke(activity, android.content.Intent(activity, MainActivity::class.java).putExtra("serverId", a.id))
             check(field.get(activity) === originalWeb) // Tapping this server's ping must not reload its draft.
         }
+        fun reject(view: android.webkit.WebView, address: String) {
+            val request = object : android.webkit.WebResourceRequest {
+                override fun getUrl() = android.net.Uri.parse(address)
+                override fun isForMainFrame() = true
+                override fun isRedirect() = false
+                override fun hasGesture() = false
+                override fun getMethod() = "GET"
+                override fun getRequestHeaders() = emptyMap<String, String>()
+            }
+            view.webViewClient.onReceivedHttpError(view, request,
+                android.webkit.WebResourceResponse("text/html", "UTF-8", 401, "Unauthorized", emptyMap(),
+                    java.io.ByteArrayInputStream(byteArrayOf())))
+        }
+        val webField = MainActivity::class.java.getDeclaredField("web").apply { isAccessible = true }
+        runOnMainSync {
+            val view = webField.get(activity) as android.webkit.WebView
+            reject(view, a.address)
+            check(webField.get(activity) === view) // Destruction must wait until this callback returns.
+            // Leave before the rejection runs: the queued callback must not erase this pairing.
+            views(activity.window.decorView).filterIsInstance<android.widget.Button>()
+                .first { it.text.toString().startsWith("Servers") }.performClick()
+        }
+        waitForIdleSync()
+        check(store.all().first { it.id == a.id }.code == a.code)
+        click("My PC")
+        awaitCookie(a.address, "bops_remote=${a.code}")
+        waitForIdleSync()
+        runOnMainSync {
+            val view = webField.get(activity) as android.webkit.WebView
+            reject(view, a.address)
+            check(webField.get(activity) === view)
+        }
+        waitForIdleSync()
+        check(store.all().first { it.id == a.id }.code == null)
+        runOnMainSync { check(webField.get(activity) == null) }
+        store.save(a.name, a.address, a.code!!)
+        click("Saved servers")
+        click("My PC")
+        awaitCookie(a.address, "bops_remote=${a.code}")
         click("Servers")
         click("Hostinger")
         awaitCookie(b.address, "bops_remote=${b.code}")
@@ -221,6 +270,11 @@ class MultiServerTests : Instrumentation() {
                 .any { it.text.toString() == "https://my-pc.ts.net@evil.example.invalid" })
             check(views(activity.window.decorView).filterIsInstance<android.widget.TextView>()
                 .any { it.text.toString() == "Target server: evil.example.invalid:443" })
+        }
+        click("Connect")
+        runOnMainSync {
+            check(views(activity.window.decorView).filterIsInstance<android.widget.TextView>()
+                .any { it.text.toString() == "Use an address without user information, a query, or a fragment." })
         }
         check(store.all().size == 2)
         click("Saved servers")

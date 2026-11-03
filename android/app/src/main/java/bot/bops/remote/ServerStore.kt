@@ -14,13 +14,14 @@ class ServerStore(context: Context) {
 
     init {
         synchronized(lock) {
+            pruneCorruptBackup()
             if (!prefs.contains("servers")) {
                 val address = prefs.getString("address", null)
                 val old = address?.let { Server(UUID.randomUUID().toString(), "My Bops", it, prefs.getString("code", null)) }
                 val edit = prefs.edit().putString("servers", encode(listOfNotNull(old)))
                 if (old != null) {
                     edit.putString("activeServer", old.id)
-                    prefs.getStringSet("seen", null)?.let { edit.putStringSet("seen:${old.id}", it.toSet()) }
+                    readSeen("seen")?.let { edit.putStringSet("seen:${old.id}", it) }
                 }
                 edit.remove("address").remove("code").remove("seen").apply()
             }
@@ -28,6 +29,7 @@ class ServerStore(context: Context) {
     }
 
     fun all(): List<Server> = synchronized(lock) {
+        pruneCorruptBackup()
         val stored = prefs.all["servers"]
         val raw = stored?.toString() ?: "[]"
         try {
@@ -41,7 +43,8 @@ class ServerStore(context: Context) {
         } catch (_: JSONException) {
             // Keep the original (including credentials) only in the same private, non-backed-up prefs.
             // Recover once so the activity, watcher and boot receiver cannot repeatedly crash on it.
-            prefs.edit().putString("servers.corrupt.${UUID.randomUUID()}", raw)
+            prefs.edit().putString("servers.corrupt.latest", raw)
+                .putLong("servers.corrupt.savedAt", System.currentTimeMillis())
                 .putString("servers", "[]").remove("activeServer").apply()
             emptyList()
         }
@@ -83,7 +86,26 @@ class ServerStore(context: Context) {
         }
     }
 
-    fun seen(server: Server): Set<String>? = synchronized(lock) { prefs.getStringSet("seen:${server.id}", null)?.toSet() }
+    fun seen(server: Server): Set<String>? = synchronized(lock) { readSeen("seen:${server.id}") }
+
+    private fun readSeen(key: String): Set<String>? {
+        val value = prefs.all[key] ?: return null
+        if (value is Set<*> && value.all { it is String }) return value.filterIsInstance<String>().toSet()
+        prefs.edit().remove(key).apply()
+        return null // Relearn existing keys quietly on the next successful poll.
+    }
+
+    private fun pruneCorruptBackup() {
+        val values = prefs.all
+        val savedAt = values["servers.corrupt.savedAt"] as? Long
+        val now = System.currentTimeMillis()
+        val expired = savedAt == null || savedAt > now || now - savedAt >= 7L * 24 * 60 * 60 * 1000
+        val obsolete = values.keys.filter {
+            it.startsWith("servers.corrupt.") &&
+                (expired || it !in setOf("servers.corrupt.latest", "servers.corrupt.savedAt"))
+        }
+        if (obsolete.isNotEmpty()) prefs.edit().apply { obsolete.forEach { remove(it) } }.apply()
+    }
     fun remember(server: Server, keys: Set<String>) = synchronized(lock) {
         if (all().find { it.id == server.id }?.code == server.code)
             prefs.edit().putStringSet("seen:${server.id}", keys).apply()
