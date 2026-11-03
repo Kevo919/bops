@@ -670,7 +670,7 @@ export function KeysCard() {
               <button className={light} disabled={busy !== null || row.status === "not set"} aria-label={`Check ${row.label}`} onClick={() => void check(row.key)}>Check</button>
             </div>
           ))}
-          <a className="text-[12px] underline" href="https://github.com/Kevo919/bops/blob/3410e4f6b75ef7b9add17a3a255f56067c0101b6/docs/keys.md" target="_blank" rel="noopener noreferrer">How to get keys and set spending limits</a>
+          <a className="text-[12px] underline" href="https://github.com/Kevo919/bops/blob/windows-port/docs/keys.md" target="_blank" rel="noopener noreferrer">How to get keys and set spending limits</a>
           <p className="text-[12px] text-pencil">A successful authentication check does not guarantee credits or access to every model. After changing .env.local, restart Bops and refresh this list.</p>
         </div>
       }
