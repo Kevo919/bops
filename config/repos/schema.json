@@ -40,7 +40,7 @@
       "description": "Non-secret environment variables set for install, run and health.",
       "additionalProperties": { "type": "string" }
     },
-    "clone": { "type": "string", "pattern": "^git (-c .+ )?clone ", "description": "Run in the parent folder; the clone lands in a folder named <id>. Private repos may pass a credential helper with git -c." },
+    "clone": { "type": "string", "pattern": "^(git (-c (?!credential)[^ ]+ )?clone |broker-tarball: )", "description": "Run in the parent folder; the clone lands in a folder named <id>. Private repos use broker-tarball: Bops' server fetches a pinned tarball through its key broker, so no token ever reaches the bot's computer (no credential helpers)." },
     "install": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Shell commands, run in order inside the clone." },
     "run": {
       "oneOf": [

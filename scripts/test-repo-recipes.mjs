@@ -139,8 +139,13 @@ export function validateRecipe(recipe, fileName) {
   if (recipe.id !== id) errors.push(`$.id: "${recipe.id}" must match the file name "${id}"`);
   if (typeof recipe.repo === "string" && recipe.url !== `https://github.com/${recipe.repo}`)
     errors.push(`$.url: must be https://github.com/${recipe.repo}`);
-  if (typeof recipe.clone === "string" && typeof recipe.url === "string" && !recipe.clone.includes(recipe.url))
-    errors.push("$.clone: must clone $.url");
+  if (typeof recipe.clone === "string" && typeof recipe.url === "string") {
+    // A private repo comes as a pinned tarball through Bops' key broker (never a token on the bot's computer).
+    const broker = recipe.clone.startsWith("broker-tarball: ");
+    if (broker ? !recipe.clone.startsWith(`broker-tarball: ${recipe.repo} `) : !recipe.clone.includes(recipe.url)) errors.push("$.clone: must clone $.url");
+    if (broker && recipe.private !== true) errors.push("$.clone: broker-tarball is for private repos");
+    if (/credential/i.test(recipe.clone)) errors.push("$.clone: no git credential helpers (private repos use broker-tarball)");
+  }
   if (recipe.kind === "web" && recipe.port === undefined) errors.push("$.port: required for kind web");
   if (recipe.kind === "web" && recipe.health?.http && recipe.port !== undefined) {
     const port = Number(recipe.health.http.match(/:(\d+)/)?.[1]);

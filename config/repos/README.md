@@ -62,3 +62,5 @@ that was tested.
 Read the repo's README and LICENSE from a fresh clone, then run the steps for real in a scratch folder
 (never inside this repo), with a time limit on anything long-running. Record what actually happened,
 including failures with the first error line, then run `node scripts/test-repo-recipes.mjs`.
+
+Private repos (`private: true`) use `clone: "broker-tarball: owner/repo …"`: Bops' server fetches a pinned tarball through its key broker with the named token, and unpacks it on the bot's computer. The token never reaches the computer, a URL, `.git/config` or a log. Git credential helpers are refused.
