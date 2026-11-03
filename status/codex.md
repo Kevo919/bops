@@ -1,19 +1,18 @@
 # Codex status
 
-Updated 2026-11-03T16:14Z. Hourly automation bops-hourly-build-check active; owner codex-heartbeat-20261103-1540; stop by ~16:25 UTC. Lead alone merges.
+Updated 2026-11-03T16:34Z. Hourly automation bops-hourly-build-check active; this run ending. Lead alone merges.
 
-## Ready for review
-- PR30 AUTH-ONLY MVP ready at 9f87d42. Both CI green; exact-head clean verification worktree typecheck exit 0, lint 0 errors/14 warnings, subscription DOM 13 and Models DOM 8 passed. Earlier auth 12, gated fake chat 14 and proxy tests passed. Actual local CLI status helper reports connected metadata for both providers; no fresh login or provider-token validation. PR22 folded and closed. Chat remains hard-disabled/unwired; task47 parked.
-- PR17 head 0c4b0bc includes installer base b2d3551, both CI green; 7 light fuse checks passed. PR body now distinguishes earlier artifact evidence from current head. Fresh combined NSIS build and binary fuse-byte inspection are waiting on lead build lock (09:46 local timestamp); never steal it. No installed app/inspector retry after prior automatic approval blocks.
+## Completed / review
+- PR30 auth-only MVP MERGED by lead at a9e36ca. Exact-head tests/CI passed; real fresh login and provider-token validation remain unverified. Chat hard-disabled; task47 parked. PR22 closed as superseded.
+- PR17 review nits fixed in 0f15f20: resetAdHocDarwinSignature=true, fuse/shutdown tests added to Fork CI. Local7 checks PASS, CI41672731478/Fork41672731498 PASS. Marked ready per lead instruction. Current combined NSIS artifact still NOT verified; earlier real binary/smoke evidence clearly separate in PR. No inspector/app retry after prior automatic approval blocks.
+- Installer PR33 draft c557cb0: production unpacked build command, versioned artifact filenames, preserve deleted shortcuts. Nine static/synthetic checks and independent source/template review PASS. CI41672781982/Fork41672782019 PASS. Fresh NSIS build and live deleted-shortcut upgrade remain unverified.
 
-## In progress / next
-- Installer nits on codex/windows-installer-followups in C:/Users/MBV3n/bops-installer-followups: unpacked production-build command, versioned artifact name, preserve deleted shortcuts during upgrade. Code-only worker and independent review active; no heavy build yet.
-- Lead owns Repos19/38, Connections48, Handy41, cron26, soul28. Zai owns PR19/27 fixes and MCP PR32; do not overwrite.
-- After PR30 review and PR17/nits, recipe verification35-37 in Docker is assigned to Codex. Docker not started; needs exclusive heavy slot.
+## Concrete continuation
+1. Auth review-nits work is UNCOMMITTED in C:/Users/MBV3n/bops-local-subscription-followups, branch codex/local-subscription-followups, base a9e36ca. Six files modified: app/api/local-subscriptions/route.ts, components/app/setup.tsx, docs/windows.md, lib/server/local-subscriptions.ts, scripts/test-local-subscriptions.mjs, scripts/test-subscriptions-ui.mjs. Desktop bridge gating, per-kind polling, no unusable Claude printed URL, native-installer copy, proxy/CA override policy. Independent source review found no security blocker; small UI/test findings sent to worker. Re-read diff, run focused tests, type/lint when permitted, commit/push draft PR. Do not assume tests passed; worker interrupted at run deadline.
+2. PR17/33 combined packaging and fuse-byte check after lead releases shared build lock. Lock still belongs to lead at16:34; do not steal. Lead's first build failed due production NODE_ENV pruning dev deps; retry in progress. Clear NODE_ENV before dependency installs.
+3. Docker recipe verification35-37 follows MVP fixes; no Docker started this run. Lead owns Repos/Connections/Handy/cron/soul, Zai owns PR19/27 and MCP32.
 
 ## Needs Kevin
-- No Bops decision needed. Separate tooling outage: memory observer reports "Claude Code could not authenticate the observer"; Claude Code /login or claude auth login is needed to restore automatic memory capture. Work state and board are maintained explicitly.
+Memory observer reports "Claude Code could not authenticate the observer". Refresh via Claude Code /login or claude auth login to restore automatic memory capture; explicit board/work-state tracking continues.
 
-## Handoff
-- Lead lock still present at16:11 UTC; earlier main .next/BUILD_ID absent. Lead notified at16:01 and16:05. Do not infer build success from process disappearance.
-- No Docker, emulator, paid model call, installer launch or foreign-process termination this run. Only release owned hourly lock at exit; shared build lock belongs to lead.
+No foreign processes stopped. Shared build lock untouched. Hourly lock released only if owned by this run. No Bops launch, installer execution, paid model call or new heavy build after lead took slot.
