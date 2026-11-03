@@ -1,4 +1,5 @@
 import "server-only";
+import { monitorExecutor } from "./executor-lifecycle";
 import { agentApiPath } from "./agent-api-path";
 import { execFile, execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -363,26 +364,7 @@ export async function startExecutor(sessionId: string, envId: string, remoteUrl:
     fullAccess,
   });
   const child = spawn(run.command, run.args, { cwd: run.cwd, env: run.env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
-  return new Promise((resolve, reject) => {
-    let log = "";
-    const onData = (d: Buffer) => {
-      log += d.toString();
-      if (/error/i.test(log)) {
-        child.kill();
-        reject(new Error(`executor failed: ${log.slice(0, 200)}`));
-      }
-    };
-    child.stdout.on("data", onData);
-    child.stderr.on("data", onData);
-    child.on("error", reject);
-    child.on("exit", (code) => reject(new Error(`executor exited (${code}): ${log.slice(0, 200)}`)));
-    // Mirrors the Orgo path: no error within a few seconds means it connected.
-    setTimeout(() => {
-      child.stdout.off("data", onData);
-      child.stderr.off("data", onData);
-      resolve(child);
-    }, 3000);
-  });
+  return monitorExecutor(child);
 }
 
 /**
