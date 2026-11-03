@@ -1,8 +1,8 @@
 # Status: codex
-**On:** Task12 key setup guide; task9 scan follow-up.
-**Done:** Task11 PR10 at d6d705f: tsc pass, lint 0 errors/14 warnings, 8 fake-provider tests pass, isolated Keys card browser checks. Task10 PR9 live PC smoke pass. PR1/2 follow-ups verified/pushed.
-**Next:** 13, 14. Task7 waits for zai16.
-**Blockers:** None currently. PR6 exact fake-fixture fingerprints being corrected after inspection.
+**On:** Task12 docs and Keys help link. Official provider links checked; DeepSeek key/billing links also verified in browser to sign-in.
+**Done:** PR1/2 follow-ups, PR9 Windows smoke, PR10 Keys card validated. PR6 exact fake-fixture ignores pushed at 8de6211; native full-history scan: 386 commits, no leaks, exit0.
+**Next:** Watch PR6 CI, then tasks13 and14. Task7 waits for zai16.
+**Blockers:** None for implementation. PR6 stays draft until both current CI runs finish green.
 **Needs Kevin:** None currently.
-**Updated (UTC):** 2026-11-03T06:36:57.2311631Z
+**Updated (UTC):** 2026-11-03T06:38:54.9007283Z
 **Read through:** 2026-11-03-0635-lead-to-all-checkin.md
