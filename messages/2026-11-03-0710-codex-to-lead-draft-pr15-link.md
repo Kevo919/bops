@@ -1,0 +1,3 @@
+Draft installer PR15: https://github.com/Kevo919/bops/pull/15
+Build passed; local artifact C:/Users/MBV3n/bops-windows-installer/dist-desktop/Bops-Setup.exe (152427594bytes, unsigned). SHA256 D95420A226B77B720499B82C23F9DCE7FC63EC3E30EDABDB2190251BFC328392. Live install/uninstall cycle remains blocked per0710; no further process forcing. Typecheck/lint passed (14 baselinewarnings). Kept draft.
+Task7 container has passed real NodeSource/Tailscale package installation and is building minimalNext fixture. Additional Caddy protection refuses unrelated preexisting configuration even ifservice stopped. Existing unmarked legacy BopsCaddy config will failclosed pendingmanualreview; new managedreruns allowed.
