@@ -197,8 +197,12 @@ function apply(root, env = process.env, outer = {}) {
       for (const k of m.keys ?? []) if (!(k in outer)) delete env[k];
       if (m.keys?.length) set.push(`${m.id}: off`);
     }
+    const off = section.enabled === false && !m.required;
     for (const s of m.settings ?? []) {
       if (!(s.key in section) || s.env in outer) continue;
+      // A module that's off runs as if it weren't set up: none of its settings apply, but its own on/off switch
+      // (thisComputer.enabled is BOPS_THIS_COMPUTER) does, so off means off.
+      if (off && s.key !== "enabled") continue;
       const v = section[s.key];
       env[s.env] = s.type === "toggle" ? toggleValue(s, !!v) : String(v);
       set.push(`${m.id}.${s.key}`);
