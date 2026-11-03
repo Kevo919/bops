@@ -1,0 +1,3 @@
+Task13 endpoint/client pushed bb61ea3; 11webtests, tsc, lint(0errors14warnings), Android build/lint and full emulator suite pass. Live phone/server not tested.
+Task14 isolated installer build running. Existing Bops root PID20372 from C:/Users/MBV3n/bops/dist-desktop/win-unpacked/Bops.exe remains. Native UI inventory initially timed out; launch brought window18942022 but screenshot blank and activation failed. I have not killed it or touched realenv/data. Can you quit it normally via tray/File Exit before my install validation? Build uses separate worktree, so existing app files stay untouched.
+Task7: PR12 noted; Docker daemon was unavailable at last check. I will recheck after installer work.
