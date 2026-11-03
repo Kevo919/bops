@@ -7,6 +7,7 @@ import { useMacApp } from "./mac-screens";
 import { RestartAsk } from "./restart";
 import { post } from "./ui";
 import { UpdateSettings } from "./update-notice";
+import type { KeyCheckResult } from "@/lib/server/key-check";
 
 /*
  * Everything Bops needs on this Mac, in one place: Settings → This Mac. It never stands in the way: signing in
@@ -424,6 +425,7 @@ export function ThisMacSettings({ state }: { state: AppState }) {
       <FullAccessCard items={items} />
       <PhoneCard />
       <ModulesCard />
+      <KeysCard />
       <UpdateSettings />
     </div>
   );
@@ -590,6 +592,89 @@ function PhoneCard() {
           </button>
         )}
       </div>
+    </Card>
+  );
+}
+
+/** Presence is local. Provider requests only happen when the owner presses a row's Check button. */
+export function KeysCard() {
+  const [keys, setKeys] = useState<KeyCheckResult[] | null>(null);
+  const [busy, setBusy] = useState<string | null>("refresh");
+  const [error, setError] = useState<string | null>(null);
+  const pending = useRef<AbortController | null>(null);
+  const load = useCallback(async () => {
+    pending.current?.abort();
+    const controller = new AbortController();
+    pending.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch("/api/key-check", { signal: controller.signal, cache: "no-store" });
+      if (response.status === 403) throw new Error("Open Settings in the Bops desktop app to check its server keys.");
+      if (!response.ok) throw new Error("Couldn't read key status. Try Refresh.");
+      const body = (await response.json()) as { keys?: KeyCheckResult[] };
+      if (!Array.isArray(body.keys) || body.keys.length === 0) throw new Error("No key status was returned. Try Refresh.");
+      if (pending.current === controller) setKeys(body.keys);
+    } catch (e) {
+      if (pending.current === controller) setError(controller.signal.aborted ? "Reading key status timed out. Try Refresh." : e instanceof Error && e.message.startsWith("Open Settings") ? e.message : "Couldn't read key status. Check that Bops is running, then try Refresh.");
+    } finally {
+      clearTimeout(timeout);
+      if (pending.current === controller) setBusy(null);
+    }
+  }, []);
+  useEffect(() => {
+    const start = setTimeout(() => void load(), 0);
+    return () => {
+      clearTimeout(start);
+      pending.current?.abort();
+      pending.current = null;
+    };
+  }, [load]);
+  const check = async (key: string) => {
+    if (busy) return;
+    const controller = new AbortController();
+    pending.current = controller;
+    setBusy(key);
+    setError(null);
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch("/api/key-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }), signal: controller.signal });
+      if (!response.ok) throw new Error("Couldn't check this key. Open the desktop app and try again.");
+      const body = (await response.json()) as { result?: KeyCheckResult };
+      if (!body.result || body.result.key !== key) throw new Error("The check returned no result. Try again.");
+      if (pending.current === controller) setKeys((rows) => rows?.map((row) => row.key === key ? body.result! : row) ?? null);
+    } catch {
+      if (pending.current === controller) setError("Couldn't complete the check. Try again when the server is reachable.");
+    } finally {
+      clearTimeout(timeout);
+      if (pending.current === controller) setBusy(null);
+    }
+  };
+  const set = keys?.filter((key) => key.status !== "not set").length ?? 0;
+  return (
+    <Card
+      icon={ICONS.modules}
+      title="Keys"
+      line="Server API keys from your environment. Values are never shown. Check sends one request to that provider; OpenAI checks generate up to one token and may cost a tiny amount."
+      tone={error ? "todo" : set ? "ok" : "none"}
+      status={busy === "refresh" ? "Reading key status…" : keys ? `${set} of ${keys.length} set` : "Key status unavailable"}
+      below={
+        <div className="flex flex-col gap-2" aria-live="polite">
+          {error && <p role="alert" className="text-[12px] text-[#B00020]">{error}</p>}
+          {keys?.map((row) => (
+            <div key={row.key} className="flex items-center gap-2 rounded-md px-2 py-1.5 shadow-[0_0_0_1px_#E6E6E3]">
+              <div className="min-w-0 flex-1 text-[12px]">
+                <div className="font-medium">{row.label}: {busy === row.key ? "Checking…" : row.status}</div>
+                <div className="break-all font-mono text-[11px] text-pencil">{row.key}</div>
+                {row.message && <p className="text-pencil">{row.message}</p>}
+              </div>
+              <button className={light} disabled={busy !== null || row.status === "not set"} aria-label={`Check ${row.label}`} onClick={() => void check(row.key)}>Check</button>
+            </div>
+          ))}
+          <p className="text-[12px] text-pencil">A successful authentication check does not guarantee credits or access to every model. After changing .env.local, restart Bops and refresh this list.</p>
+        </div>
+      }
+    >
+      <button className={light} disabled={busy !== null} onClick={() => { setBusy("refresh"); setError(null); void load(); }}>Refresh</button>
     </Card>
   );
 }
