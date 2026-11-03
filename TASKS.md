@@ -1,5 +1,12 @@
 # Tasks
 
+## How every task is checked (all of us)
+1. Before you say DONE: re-read your diff against the task's GOAL and every word of its row. Fix what doesn't match.
+2. Run every check the task names, plus npx tsc --noEmit -p . and npm run lint for web changes, or gradlew assembleDebug lintDebug for Android. Paste the real output in the PR under "Verified".
+3. Write "Not verified" honestly: what you couldn't run, and why.
+4. After task 9 lands: no PR is ready until CI is green.
+5. The lead reviews every PR before Kevin merges it.
+
 Owned by the lead. Statuses: TODO, DOING, REVIEW (PR open), DONE, BLOCKED.
 
 | # | Task | Who | Status | Branch / PR | Notes |
@@ -13,6 +20,13 @@ Owned by the lead. Statuses: TODO, DOING, REVIEW (PR open), DONE, BLOCKED.
 
 | 7 | (after review fixes) Hostinger dry run: a script that checks scripts/vps-setup.sh on a fresh Ubuntu 24.04 container (Docker), as far as it goes without a real domain (skip Caddy cert), and fix what breaks. scripts/test-vps-setup.sh | codex | TODO | | Don't change other files except vps-setup.sh fixes; tell lead each fix |
 | 8 | Tests for change_look owner gate and CSS sanitizer | zai | TODO | | Part of task 2's PR |
+
+| 9 | CI for the fork: .github/workflows/fork-ci.yml runs on every PR into windows-port: npm ci, npx tsc --noEmit -p ., npm run lint, node scripts/test-bot-ai.mjs, node --conditions=react-server scripts/test-cli-agents.mjs, node scripts/test-config.mjs, and in android/ ./gradlew assembleDebug lintDebug (JDK 17). Runs only in forks (copy sync-upstream.yml's guard) | codex | TODO | | GOAL: no PR merges red. Prove it: open a throwaway PR that breaks a test and show CI fails, then close it |
+| 10 | Windows smoke test: scripts/smoke-windows.ps1 starts dist-desktop\win-unpacked\Bops.exe, waits for /api/health, pairs a code with scripts/pair-phone.mjs, checks /api/pings (200 with the code, 403 without), /api/modules (403 from the phone), unpairs, quits Bops through the tray-equivalent path (POST /api/restart is NOT quit; use the same stop desktop/windows.cjs stopServerTree uses), and checks no node.exe from the bops folder is left running. Prints PASS/FAIL per step | codex | TODO | | GOAL: one command tells Kevin the PC build works. Run it on this PC and paste the output in the PR. Must not leave a phone paired or change .env.local |
+| 11 | Key check in Settings: a "Keys" card in components/app/setup.tsx listing OPENAI_API_KEY, OPENAI_EXECUTOR_API_KEY, ORGO_API_KEY, ANTHROPIC_API_KEY, ZAI_API_KEY, DEEPSEEK_API_KEY, OPENROUTER_API_KEY: set / works / no credit / invalid, with a Check button. Server: lib/server/key-check.ts + app/api/key-check/route.ts (window only, like app/api/modules/route.ts allowed), each check one cheap call (models list; for OpenAI credit, a 1-token request only when the user presses Check). Never return or log a key value | codex | TODO | | GOAL: Kevin sees at a glance why a bot can't answer ("OpenAI: no credit"). Tests in scripts/test-key-check.mjs with a fake fetch |
+| 12 | docs/keys.md: where to get every key above (links, which page, what it starts with, set a spending limit), plain English, and link it from README "This fork" and from the Keys card | codex | TODO | | Verify every link loads |
+| 13 | GET /api/llms: a small read-only route returning { llms } (same auth as /api/state) and switch the Android settings screen to it (falls back to /api/state on 404) | codex | TODO | | After PR #2's fixes |
+| 14 | Windows installer: make npm run app:build:win's NSIS target (not just --dir) build Bops-Setup.exe; install to the user's folder, Start Menu shortcut, uninstall keeps your data; docs/windows.md "Install Bops on Windows" | codex | TODO | | Build it on this PC; install, launch, uninstall, reinstall; report what you saw |
 
 ## Done
 
