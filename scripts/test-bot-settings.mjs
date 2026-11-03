@@ -12,7 +12,8 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 Object.assign(process.env, {
@@ -28,11 +29,12 @@ Object.assign(process.env, {
 });
 const OWNER = "+14155550100";
 const LINE = "+14155550199";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -123,12 +125,12 @@ globalThis.fetch = async (input, init) => {
   return realFetch(input, init);
 };
 
-const S = await import(`${root}/lib/server/store.ts`);
-const V = await import(`${root}/lib/server/phone-voice.ts`);
-const C = await import(`${root}/lib/server/call.ts`);
-const M = await import(`${root}/lib/server/mail.ts`);
-const P = await import(`${root}/lib/server/phone.ts`);
-const route = await import(`${root}/app/api/bots/route.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const V = await import(`${rootUrl}/lib/server/phone-voice.ts`);
+const C = await import(`${rootUrl}/lib/server/call.ts`);
+const M = await import(`${rootUrl}/lib/server/mail.ts`);
+const P = await import(`${rootUrl}/lib/server/phone.ts`);
+const route = await import(`${rootUrl}/app/api/bots/route.ts`);
 
 S.update((s) => {
   s.owner = { name: "Ava", about: "" };
@@ -322,7 +324,7 @@ const settle = () => new Promise((r) => setTimeout(r, 50));
   assert.equal((await patch({ site: null })).status, 200);
   assert.equal(ws().botSites, undefined, "None: gone, and the map with it");
 
-  const wsRoute = await import(`${root}/app/api/workspaces/route.ts`);
+  const wsRoute = await import(`${rootUrl}/app/api/workspaces/route.ts`);
   const name = (body, window = true) =>
     wsRoute.PATCH(new Request("http://localhost/api/workspaces", { method: "PATCH", headers: { "content-type": "application/json", ...(window ? { "x-bops-window": "window-token-test" } : {}) }, body: JSON.stringify(body) }));
   assert.deepEqual(await said(await name({ id: "ws_main", computerName: { computer: "comp_test", name: "  Front   desk " } })), { status: 200, ok: true, name: "Front desk" });
@@ -337,6 +339,8 @@ const settle = () => new Promise((r) => setTimeout(r, 50));
 }
 
 fake.close();
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log("bot settings: all tests passed");
 process.exit(0);

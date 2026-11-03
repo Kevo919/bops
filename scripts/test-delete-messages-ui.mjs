@@ -11,11 +11,12 @@ import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -49,9 +50,9 @@ globalThis.fetch = async () => Response.json({ ok: true });
 const emitWarning = process.emitWarning.bind(process);
 process.emitWarning = (warning, ...rest) => (rest[0]?.code === "MODULE_TYPELESS_PACKAGE_JSON" ? undefined : emitWarning(warning, ...rest));
 
-const D = await import(pathToFileURL(`${root}/components/app/message-deletes.tsx`).href);
-const { ChatView } = await import(pathToFileURL(`${root}/components/app/chat-view.tsx`).href);
-const { sharedWsId } = await import(`${root}/lib/shared.ts`);
+const D = await import(`${rootUrl}/components/app/message-deletes.tsx`);
+const { ChatView } = await import(`${rootUrl}/components/app/chat-view.tsx`);
+const { sharedWsId } = await import(`${rootUrl}/lib/shared.ts`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -156,7 +157,7 @@ await check("Select messages: a ring by each message, picked or not, the row one
 await check("nothing the window says about deleting messages has a dash or says Orbit", () => {
   const words = [];
   for (const f of ["components/app/message-deletes.tsx"]) {
-    const src = ts.createSourceFile(f, readFileSync(`${root}/${f}`, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const src = ts.createSourceFile(f, readFileSync(`${rootPath}/${f}`, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const walk = (n) => {
       if (ts.isJsxAttribute(n) && n.name.getText() === "className") return;
       if (ts.isImportDeclaration(n)) return;

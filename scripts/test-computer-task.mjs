@@ -30,7 +30,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFil
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { gunzipSync } from "node:zlib";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE)_/.test(k)) delete process.env[k];
@@ -39,12 +39,13 @@ process.env.BOPS_DEVICE_SEED = "test-computer-task";
 process.env.BOPS_RESPONSES_WS = "0";
 // The CRM's tools are off for bots now (lib/server/crm.ts crmForBots); this test still checks them.
 process.env.BOPS_CRM_TOOLS = "1";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 // Modules that would start processes when loaded, or that Node can't load, are stand-ins: each export does nothing.
 const STAND_INS = new Set(["relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -68,8 +69,8 @@ process.chdir(scratch);
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 // The screen tools Bops puts on a computer are read from the working folder (sessions.ts ensureScreenTools).
-symlinkSync(join(root, "node_modules"), join(scratch, "node_modules"));
-symlinkSync(join(root, "vm"), join(scratch, "vm"));
+symlinkSync(join(rootPath, "node_modules"), join(scratch, "node_modules"));
+symlinkSync(join(rootPath, "vm"), join(scratch, "vm"));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(check, what, ms = 15_000) {
   for (const end = Date.now() + ms; Date.now() < end; await sleep(25)) {
@@ -223,9 +224,9 @@ globalThis.fetch = async (input, init) => {
 const warned = [];
 console.warn = (...a) => warned.push(a.join(" "));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const Cl = await import(`${root}/lib/server/cloud.ts`);
-const X = await import(`${root}/lib/server/sessions.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const Cl = await import(`${rootUrl}/lib/server/cloud.ts`);
+const X = await import(`${rootUrl}/lib/server/sessions.ts`);
 
 await S.bindSignIn(USER.id, "sk_orgo_test");
 S.update((s) => {
@@ -458,7 +459,7 @@ assert.equal(S.getState().messages.filter((m) => m.resultOf === halfway.id).leng
 // Compact while the AI credit is used up isn't run on Bops agent (as a chat's Compact isn't). One whose run couldn't get the
 // computer ready says so quietly in the thread: its result stays in the chat, nothing's sent anywhere, and it can be tried again.
 {
-  const { threadCompactBlocked } = await import(`${root}/lib/types.ts`);
+  const { threadCompactBlocked } = await import(`${rootUrl}/lib/types.ts`);
   const resultOf = () => S.getState().messages.filter((m) => m.resultOf === started.id).map((m) => m.text);
   const was = structuredClone(S.session(started.id));
   assert.deepEqual(resultOf(), ["Done, it's in /workspace."]);
@@ -640,8 +641,8 @@ S.update((st) => (st.account = { user: USER, signedInAt: Date.now() }));
 // the persona after Bops' own rules, as the user's preferences; the skills by name, read in full with
 // read_skill (a use), or in full when the task follows one (a routine's: Session.procedure). Their folders
 // go onto the computer, under /workspace/capabilities.
-const W = await import(`${root}/lib/server/workspace-skills.ts`);
-const { workspaceOf } = await import(`${root}/lib/types.ts`);
+const W = await import(`${rootUrl}/lib/server/workspace-skills.ts`);
+const { workspaceOf } = await import(`${rootUrl}/lib/types.ts`);
 S.update(() => (S.bot(main.id).persona = "Keep answers to two sentences. Check the calendar before suggesting times."));
 const ws = workspaceOf(main);
 const proc = W.createSkill(ws, {
@@ -739,8 +740,8 @@ assert.equal(usesOf(), 2, "picking up again isn't another use");
 // one that answers NOTHING posts nothing (no chip, no result, no text) and is recorded as quiet; any other
 // answer is posted in the bot's chat and sent where its results go (deliverTo: a text here, in dry run),
 // once. A run that fails says so in the chat and where its results go, once.
-const R = await import(`${root}/lib/server/routines.ts`);
-const Sync = await import(`${root}/lib/server/routine-sync.ts`);
+const R = await import(`${rootUrl}/lib/server/routines.ts`);
+const Sync = await import(`${rootUrl}/lib/server/routine-sync.ts`);
 process.env.BOPS_PHONE_DRY_RUN = "1";
 process.env.BOPS_OWNER_PHONES = "+15550001111";
 S.update(() => Object.assign(S.bot(main.id), { phone: "+15550002222", phoneLine: { numberId: "num_1", agentId: "ag_1" } }));
@@ -847,7 +848,7 @@ delete process.env.BOPS_OWNER_PHONES;
 /* ---------------- Screens: who left them, holds, and picking up where it left off (lib/screens.ts) ---------------- */
 
 const { existsSync: frameExists } = await import("node:fs");
-const F = await import(`${root}/lib/server/frames.ts`);
+const F = await import(`${rootUrl}/lib/server/frames.ts`);
 // A task that let go of its screen: the screen says who left it and when, and the thread keeps its last frame.
 answers.push(() => response("resp_l1", [said("Done.")]));
 const leaver = S.session(await task("Check the weather", "Weather"));
@@ -936,7 +937,7 @@ assert.deepEqual(
 
 /* ---------------- One computer's screenshots: a task's go first, and the app's views don't pile up ---------------- */
 
-const O = await import(`${root}/lib/server/orgo.ts`);
+const O = await import(`${rootUrl}/lib/server/orgo.ts`);
 pc.shotDelay = 40;
 shotLog.length = 0;
 const looks = [
@@ -1018,9 +1019,9 @@ onCommand = () => ({ output: "", exit_code: 0 });
 // in and the call), sends no output for that call, and ends its turn. Its thread waits, queued, holding no screen and no
 // process; its status Waiting for your OK is the unanswered request alone. Nothing keeps its computer up meanwhile.
 process.env.TREG_TOKEN = "treg_test";
-const P = await import(`${root}/lib/server/permission.ts`);
-const T = await import(`${root}/lib/types.ts`);
-const FH = await import(`${root}/lib/server/free-hours.ts`);
+const P = await import(`${rootUrl}/lib/server/permission.ts`);
+const T = await import(`${rootUrl}/lib/types.ts`);
+const FH = await import(`${rootUrl}/lib/server/free-hours.ts`);
 const DEAR = { endpoint_id: "acme.company_lookup", input: { domain: "acme.example" } };
 const askOf = (sessionId) => S.getState().appApprovals?.find((a) => a.threadId === sessionId);
 const actives = () => orgoCalls.filter((c) => c === "POST /bops/computer/active").length;
@@ -1288,8 +1289,8 @@ await S.flushState(5000);
 await until(() => [acmeTask, acmeChat].every((x) => cloudState.blob?.routines?.some((r) => r.id === x.routine.id)), "the routines in Bops Cloud, as the Mac made them");
 // This Bops as the computer's runner (runner-start.ts): its computer's own Orgo key in a file only it can read
 // (runner-key.ts), which Orgo's profile says is that computer's, and no identity here.
-const RK = await import(`${root}/lib/server/runner-key.ts`);
-const OA = await import(`${root}/lib/server/orgo-auth.ts`);
+const RK = await import(`${rootUrl}/lib/server/runner-key.ts`);
+const OA = await import(`${rootUrl}/lib/server/orgo-auth.ts`);
 const keyDir = join(scratch, "runner-key");
 mkdirSync(keyDir, { mode: 0o700 });
 writeFileSync(join(keyDir, ".orgo-secrets.env"), "export ORGO_API_KEY=sk_orgo_test\n", { mode: 0o600 });
@@ -1436,7 +1437,7 @@ try {
 
 /* ---------------- The page-script loop guard: when the model gets the screen ---------------- */
 
-const CT = await import(`${root}/lib/server/computer-task.ts`);
+const CT = await import(`${rootUrl}/lib/server/computer-task.ts`);
 const pageRan = (o) => ({ text: (o.ok ?? true) ? (o.value ?? "") : `Failed: ${o.error}`, run: { ok: true, changed: false, ...o } });
 let g = CT.newPageGuard();
 // Reads that answer something don't need a look, until the third in a row: then a glance, to check.
@@ -1462,7 +1463,7 @@ assert.deepEqual(CT.pageLook(g, "screenshot(); return 'x'", pageRan({ value: "x"
 
 /* ---------------- A thread that asks you something: kept in the chat, a chime, a text if nobody answers ---------------- */
 
-const AS = await import(`${root}/lib/asks.ts`);
+const AS = await import(`${rootUrl}/lib/asks.ts`);
 AS.askTiming.textAfterMs = 150;
 const QUESTION = "Which of the two hotels should I book?";
 answers.push(() => response("resp_q1", [{ ...said(QUESTION), phase: "final_answer" }]));
@@ -1556,7 +1557,7 @@ await until(() => !["queued", "running", "starting"].includes(S.session(p1.id).s
 // carries it on from where it paused, with a turn of its own. Only a reply or Stop resolves it. A reply wakes the computer
 // whose run asked (the run goes on there); Stop never does, and ends the run where it paused. Nothing else touches a
 // waiting run or its request: a takeover of a screen and handing it back, a change from elsewhere merged in.
-const RUNNER_DEV = (await import(`${root}/cloud/device.ts`)).deviceIdOf(USER.id, COMPUTER);
+const RUNNER_DEV = (await import(`${rootUrl}/cloud/device.ts`)).deviceIdOf(USER.id, COMPUTER);
 const OTHER_MAC = "dev_other_mac";
 const realNow = Date.now;
 process.env.TREG_TOKEN = "treg_test";

@@ -14,7 +14,7 @@ import { addMessage, bot, getState, id, sameState, update } from "./store";
  * Brains: the agent a bot's tasks run on, when the user brings their own instead of Bops agent (Bops'
  * own, on AI credit). Claude Code, which Bops installs unmodified on the bot's computer at a pinned
  * version, signed in with the user's own Claude plan or run on their own Anthropic key; or Codex, on
- * their own OpenAI key. Bops never pays for these runs and never handles the plan's login: the user
+ * their own OpenAI key or (self-hosted owner only) ChatGPT plan. Bops never pays for these runs and never handles the plan's login: the user
  * signs in through Claude Code's own sign-in, in a terminal on one of the bot's screens that they drive
  * live in Bops, and the login stays in that brain's folder on that computer (vm/bin/bops-brain). Bops
  * only ever asks Claude Code whether it's signed in, and keeps what it says about whose account it is
@@ -102,12 +102,18 @@ export type NewBrain = { kind: BrainKind; auth: BrainAuth; name?: string; keySco
 
 /**
  * Add a brain to the workspace (the current one unless `workspaceId`): Claude Code on a Claude plan or an
- * Anthropic key, or Codex on an OpenAI key. `bots` may use it; with `use`, they use it now (Bot.brain).
+ * Anthropic key, or Codex on an OpenAI key or a self-hosted ChatGPT plan. `bots` may use it; with `use`, they use it now (Bot.brain).
  */
+/** ChatGPT subscriptions belong to the self-hosted owner, never Bops Cloud credit. */
+export function requireCodexPlan(kind: string, auth: string) {
+  if (kind === "codex" && auth === "plan" && (process.env.BOPS_SELF_HOSTED !== "1" || getState().shared))
+    throw new BrainError("Codex with a ChatGPT plan is only available to the self-hosted owner.", 403);
+}
+
 export function addBrain(n: NewBrain): Brain {
   if (n.kind !== "claude" && n.kind !== "codex") throw new BrainError("Pick Claude Code or Codex.", 400);
   if (n.auth !== "plan" && n.auth !== "key") throw new BrainError("Pick how it signs in.", 400);
-  if (n.kind === "codex" && n.auth !== "key") throw new BrainError("Codex works with your own OpenAI API key only.", 400);
+  requireCodexPlan(n.kind, n.auth);
   const wsId = n.workspaceId ?? getState().workspace ?? getState().workspaces?.[0]?.id;
   if (!wsId || !getState().workspaces?.some((w) => w.id === wsId)) throw new BrainError("No such workspace.", 404);
   const bots = botsIn(n.bots, wsId);
@@ -500,11 +506,12 @@ function record(brainId: string, computerId: string, st: BrainStatus) {
  */
 export async function signInStatus(brainId: string, computerId: string): Promise<BrainStatus> {
   const x = need(brainId);
-  if (x.kind !== "claude" || x.auth !== "plan") throw new BrainError("Only a Claude Code brain on a Claude plan signs in on a computer.", 400);
+  if (x.auth !== "plan") throw new BrainError("Only an agent on a plan signs in on a computer.", 400);
+  requireCodexPlan(x.kind, x.auth);
   await ensureBrainTools(computerId);
-  const r = await orgo.bash(computerId, `bops-brain status ${brainId} ${computerId}`, 30);
+  const r = await orgo.bash(computerId, `bops-brain status ${brainId} ${computerId} ${x.kind}`, 30);
   const st = parseStatus(r.output);
-  if (!st) throw new BrainError("Claude Code didn't say whether it's signed in. Try again.", 502);
+  if (!st) throw new BrainError("The agent didn't say whether it's signed in. Try again.", 502);
   if (brainById(brainId)) record(brainId, computerId, st);
   return st;
 }
@@ -553,7 +560,8 @@ const signingIn = (brainId: string, patch: Brain["signingIn"]) =>
  */
 export async function startSignIn(brainId: string, botId: string): Promise<{ botId: string; display: number }> {
   const x = need(brainId);
-  if (x.kind !== "claude" || x.auth !== "plan") throw new BrainError("Only a Claude Code brain on a Claude plan signs in on a computer.", 400);
+  if (x.auth !== "plan") throw new BrainError("Only an agent on a plan signs in on a computer.", 400);
+  requireCodexPlan(x.kind, x.auth);
   const b = bot(botId);
   if (!b) throw new BrainError("No such bot.", 404);
   if (!x.bots.includes(botId)) throw new BrainError(`Let ${b.name} use ${x.name} first.`, 400);
@@ -601,7 +609,7 @@ async function signIn(brainId: string, botId: string, computerId: string, displa
     watching.delete(brainId);
     await orgo.bash(computerId, `bops-brain cancel ${brainId}`, 15).catch(() => null);
     await handBack(botId, display);
-    addMessage({ chatId: botChatId(botId), role: "system", text: `Claude Code didn't sign in on ${name()}'s computer: ${why}` });
+    addMessage({ chatId: botChatId(botId), role: "system", text: `${brainById(brainId)?.kind === "codex" ? "Codex" : "Claude Code"} didn't sign in on ${name()}'s computer: ${why}` });
   };
   try {
     const { ensureScreens } = await import("./sessions");
@@ -609,10 +617,11 @@ async function signIn(brainId: string, botId: string, computerId: string, displa
     if (!live()) return;
     if (!driving(botId, display)) return await fail(`${name()}'s computer is asleep and couldn't wake up.`);
     await ensureScreens(computerId);
-    await ensureClaudeCode(computerId);
+    if (brainById(brainId)?.kind === "codex") await ensureCodex(computerId);
+    else await ensureClaudeCode(computerId);
     await ensureBrainTools(computerId);
     if (!live()) return;
-    const r = await orgo.bash(computerId, `bops-brain login ${brainId} ${display} ${computerId}`, 30);
+    const r = await orgo.bash(computerId, `bops-brain login ${brainId} ${display} ${computerId} ${brainById(brainId)!.kind}`, 30);
     if (r.exit_code !== 0 || !r.output.includes("signing in")) return await fail(`its sign-in didn't open (${r.output.trim().slice(0, 120) || "no answer"}).`);
   } catch (e) {
     return await fail((e as Error).message);
@@ -631,7 +640,7 @@ async function signIn(brainId: string, botId: string, computerId: string, displa
       await orgo.bash(computerId, `bops-brain cancel ${brainId}`, 15).catch(() => null);
       await handBack(botId, display);
       const x = brainById(brainId);
-      addMessage({ chatId: botChatId(botId), role: "system", text: `${x?.name ?? "Claude Code"} is signed in on ${name()}'s computer with your ${planName(st.account?.plan)}.` });
+      addMessage({ chatId: botChatId(botId), role: "system", text: `${x?.name ?? "Claude Code"} is signed in on ${name()}'s computer with your ${x?.kind === "codex" ? "ChatGPT plan" : planName(st.account?.plan)}.` });
       // Threads that waited for it there carry on.
       const { brainSignedIn } = await import("./sessions");
       brainSignedIn(brainId, computerId);
@@ -663,7 +672,7 @@ export async function signOut(brainId: string, botId: string) {
   const computerId = workComputer(b).computerId;
   if (!computerId) return;
   await ensureBrainTools(computerId);
-  await orgo.bash(computerId, `bops-brain logout ${x.id}`, 30);
+  await orgo.bash(computerId, `bops-brain logout ${x.id} ${x.kind}`, 30);
   record(x.id, computerId, { loggedIn: false });
 }
 

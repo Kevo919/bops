@@ -11,8 +11,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseHTML } from "linkedom";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
 const { compile } = await import("@tailwindcss/node");
 
 let passed = 0;
@@ -22,9 +23,9 @@ const test = async (name, f) => {
   console.log(`ok - ${name}`);
 };
 
-const source = readFileSync(`${root}/app/globals.css`, "utf8");
+const source = readFileSync(`${rootPath}/app/globals.css`, "utf8");
 const UTILITIES = ["cursor-crosshair", "cursor-none", "cursor-grab", "cursor-text", "cursor-default", "cursor-pointer"];
-const css = (await compile(source, { base: `${root}/app`, onDependency() {} })).build(UTILITIES);
+const css = (await compile(source, { base: `${rootPath}/app`, onDependency() {} })).build(UTILITIES);
 
 /** Each top-level `@layer name { ... }` block of the compiled CSS, with its body, in order. */
 function layers(text) {

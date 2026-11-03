@@ -20,10 +20,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 process.env.NEXT_PUBLIC_BOPS_BRAINS = "1";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -97,8 +98,8 @@ globalThis.fetch = async (url, init = {}) => {
 
 const { createElement: h, act } = await import("react");
 const { createRoot } = await import("react-dom/client");
-const App = await import(pathToFileURL(`${root}/components/app/bops-app.tsx`).href);
-const Logins = await import(pathToFileURL(`${root}/components/app/logins.tsx`).href);
+const App = await import(`${rootUrl}/components/app/bops-app.tsx`);
+const Logins = await import(`${rootUrl}/components/app/logins.tsx`);
 
 let passed = 0;
 const test = async (name, f) => {
@@ -235,7 +236,7 @@ await test("Settings: Account, then Workspace with its switcher, then Orgo team 
 });
 
 await test("the footer's Logins opens Settings at Logins, and the bot panel's Manage in Logins goes there too", () => {
-  const src = readFileSync(`${root}/components/app/bops-app.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
   assert.match(src, /const openVault = \(keysFor\?: string\) => setSettings\(\{ at: "logins"/, "openVault is Settings at Logins");
   assert.match(src, /onVault=\{\(\) => openVault\(\)\}/, "the footer calls it");
   assert.match(src, /onOpenVault=\{\(\) => openVault\(\)\}/, "and the bot panel");
@@ -462,7 +463,7 @@ await test("every word plain: no dashes, never Orbit", () => {
     assert.ok(!/orbit/i.test(w), "Knowledge, never Orbit");
   }
   for (const f of ["components/app/logins.tsx", "lib/server/logins.ts", "app/api/logins/route.ts"]) {
-    const src = readFileSync(`${root}/${f}`, "utf8");
+    const src = readFileSync(`${rootPath}/${f}`, "utf8");
     // Its words in quotes and template strings of one line: what the page and the routes say.
     const strings = [...src.matchAll(/"([^"\\\n]{3,})"|`([^`\\\n]{3,})`/g)].map((x) => x[1] ?? x[2]).filter((x) => /[a-z] [a-z]/i.test(x));
     for (const x of strings) assert.ok(!/[‒–—―]| - /.test(x), `${f}: ${x}`);

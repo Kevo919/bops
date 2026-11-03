@@ -1,3 +1,4 @@
+import { join } from "node:path";
 // Tests for Compact in the window (components/app/chat-view.tsx, lib/chat-summary.ts, lib/types.ts threadCompacts): the
 // chat's menu has Compact for the owner, and in a shared workspace for a member with Write on every bot in it (alone
 // there), never with Read; it's off, saying why, while a bot answers and with nothing new since the last one. Pressed,
@@ -17,9 +18,11 @@ import ts from "typescript";
 // A build with brains, so a thread Claude Code ran shows as one.
 process.env.NEXT_PUBLIC_BOPS_BRAINS = "1";
 const root = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
+// A file URL for import specifiers, from this OS-path root.
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -62,8 +65,8 @@ globalThis.fetch = async (url, init = {}) => {
   return { ok: status < 400, status, json: async () => body };
 };
 
-const { ChatView, ThreadSheet } = await import(pathToFileURL(`${root}/components/app/chat-view.tsx`).href);
-const { sharedWsId } = await import(`${root}/lib/shared.ts`);
+const { ChatView, ThreadSheet } = await import(fileUrl("components/app/chat-view.tsx"));
+const { sharedWsId } = await import(fileUrl("lib/shared.ts"));
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 

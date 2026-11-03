@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 // End to end, the bot's browser beside the chat (components/app/bot-browser.tsx), on the local two-person stack
 // (scripts/dev-two-person.mjs: started here when it isn't up, and stopped again after). Two people in headless Chrome:
 // the owner and sam (a member with Write on the bot and Use its computer).
@@ -55,8 +56,8 @@ import { checkTake, describe } from "./check-takes.mjs";
 import { removeTemp } from "./fixtures/cleanup.mjs";
 import { ACCOUNT, BOT, SAM, PROJECT } from "./fixtures/two-person.mjs";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
-const OUT = process.env.B2_OUT || join(root, ".scratch", "B2");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const OUT = process.env.B2_OUT || join(rootPath, ".scratch", "B2");
 const TAKES = process.argv.includes("--takes");
 for (const d of ["shots", ...(TAKES ? ["takes/stills"] : [])]) mkdirSync(join(OUT, d), { recursive: true });
 const { chromium } = await import("playwright");
@@ -64,7 +65,7 @@ const { default: WebSocket } = await import("ws");
 
 /* ---------------- The stack ---------------- */
 
-const stateFile = join(root, ".scratch", "two-person", "stack.json");
+const stateFile = join(rootPath, ".scratch", "two-person", "stack.json");
 const running = () => {
   try {
     const s = JSON.parse(readFileSync(stateFile, "utf8"));
@@ -77,7 +78,7 @@ const running = () => {
 let started = false;
 if (!running()) {
   console.log("starting the two-person stack…");
-  const r = spawnSync(process.execPath, [join(root, "scripts", "dev-two-person.mjs"), "start"], { stdio: "inherit" });
+  const r = spawnSync(process.execPath, [join(rootPath, "scripts", "dev-two-person.mjs"), "start"], { stdio: "inherit" });
   if (r.status !== 0) process.exit(1);
   started = true;
 }
@@ -800,7 +801,7 @@ try {
     console.log(`  the sign-in step read: ${r.signedInAs} (it waited ${r.waited} ms)`);
     assert.equal(r.signedInAs, ACCOUNT.name);
     for (const p of [owner.page, sam.page]) assert.ok(!(await p.evaluate(() => fetch("/api/state").then((x) => x.text()))).includes(ACCOUNT.password), "not in /api/state");
-    assert.ok(!readFileSync(join(root, ".scratch", "two-person", "stack.log"), "utf8").includes(ACCOUNT.password), "not in Bops Cloud's or the relay's log");
+    assert.ok(!readFileSync(join(rootPath, ".scratch", "two-person", "stack.log"), "utf8").includes(ACCOUNT.password), "not in Bops Cloud's or the relay's log");
     await beat(1500);
   });
 
@@ -1035,6 +1036,6 @@ try {
       ].join("\n"),
     );
   }
-  if (started) spawnSync(process.execPath, [join(root, "scripts", "dev-two-person.mjs"), "stop"], { stdio: "inherit" });
+  if (started) spawnSync(process.execPath, [join(rootPath, "scripts", "dev-two-person.mjs"), "stop"], { stdio: "inherit" });
 }
 console.log(`browser tab end to end: ${passed} passed`);
