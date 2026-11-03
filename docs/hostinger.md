@@ -15,6 +15,14 @@ sudo bash vps-setup.sh bops.example.com https://github.com/<you>/bops.git
 
 It does every step below and prints a pairing code for your phone. To have the server share one Bops with your PC, run it as `sudo BOPS_SYNC=orgo bash vps-setup.sh …` and sign in with Orgo from your phone ([docs/sync.md](sync.md)). Then add your keys to `/home/bops/bops/.env.local` and `systemctl restart bops`. Run it again any time to update.
 
+**The server already runs something on ports 80 and 443** (n8n behind Traefik, any Docker stack)? The setup refuses to touch those, on purpose. Use Tailscale mode instead: no domain, no Caddy, no public port. Your phone reaches the server over your Tailscale network:
+
+```bash
+sudo BOPS_TAILSCALE=1 bash vps-setup.sh https://github.com/<you>/bops.git
+```
+
+See [Sharing the server](#sharing-the-server-no-public-ports-tailscale) below for what it does and what you need on the phone.
+
 The steps it takes, if you'd rather do them by hand:
 
 ## 1. The server
@@ -86,6 +94,18 @@ bops.example.com {
 ```
 
 `systemctl reload caddy`. Caddy gets the certificate by itself.
+
+## Sharing the server (no public ports: Tailscale)
+
+For a VPS that already serves things on 80 and 443, Bops needs none of them. With `BOPS_TAILSCALE=1` the setup:
+
+1. Installs Tailscale from its own apt repository and signs this server into your Tailscale account: it prints a login link and waits for you to open it (or pass `BOPS_TS_AUTHKEY` to do it unattended).
+2. Runs Bops on 127.0.0.1 as always, and puts `tailscale serve` in front of it: Bops answers at `https://<this server's tailnet name>`, with a certificate Tailscale keeps, on the tailnet's 443 only. No public port, no Caddy, and nothing about n8n, Traefik or Docker changes.
+3. Pairs your phone the same way; the address you enter in the app is the tailnet address.
+
+On the phone, install Tailscale and sign in with the same account: the tailnet address then works from anywhere, home or mobile data. Only your tailnet's machines can reach Bops; nobody on the public internet can even see it.
+
+By hand, the pieces are `tailscale up`, `tailscale serve --bg --https=443 http://127.0.0.1:3210`, and `BOPS_PUBLIC_URL=https://<tailnet name>` in `.env.local`.
 
 ## 5. Pair your phone
 
