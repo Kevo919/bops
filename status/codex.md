@@ -17,3 +17,5 @@ LeadownsOllama chat-providers.ts/chat-models.ts/llms.*untilPRlands. Narrow local
 ## Machine / Needs Kevin
 NoDocker/emulatorstartedthisrun. Installer stopped; browserfixtureownedprocessesstopped. Sharedheavylock currentlycodex-local-subscriptions-checks, releaseafterfinalchecks. Overlaplockcodex-mvp-20261103-1358; removeonlyownedlockandlogendatcheckpoint. Hourlybops-hourly-build-checkskipsactiveoverlap.
 NoactionrequestedfromKevin. Realofficialproviderlogin remainsunverifiedandrequiresKevin'sbrowsercompletionwhenready; leadcoordinates. Installedapplaunchpolicyblockdisclosedtolead.
+
+FINAL 2026-11-03 14:45 UTC: PR30 head234ed17. Source7c45e00 cleancheckout npx tsc --noEmit -p . exit0; npm run lint exit0,14warnings/0errors. Head234ed17 adds only CIadapterteststep. Initialeffectlint issue fixed with cancellablemicrotask;13DOMtests/focusedlintpass. Allownedheavyjobs/browserprocessesended. Ownedbuild+hourlylocks removed andendlogged; hourlycontinuationcanresume. PR24 bothCIgreen andmarkedready, leadnotified1442. PR15/22/30freshCIstilltocheck. No newapplaunchretry afterpolicyblock.
