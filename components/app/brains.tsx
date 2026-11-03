@@ -87,7 +87,7 @@ export function brainLine(state: AppState, x: Brain, keys?: string[]): string {
   // Sam's and Rook's computers"), else each ("Max plan on Sam's computer, Pro plan on Rook's computer").
   const on = (x.signIns ?? []).flatMap((s) => {
     const who = owner(s.computerId);
-    return who ? [{ who, plan: planName(s.account?.plan) }] : [];
+    return who ? [{ who, plan: x.kind === "codex" ? "ChatGPT plan" : s.account?.plan ? `Claude ${planName(s.account.plan)}` : "Claude plan" }] : [];
   });
   const plans = [...new Set(on.map((s) => s.plan))];
   if (plans.length === 1) return `${plans[0]} · signed in on ${computersSaid([...new Set(on.map((s) => s.who))])}`;

@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AppState } from "@/lib/types";
+import { BRAINS_ON, signInOn, workBot, workspaceOf, type AppState, type Bot, type BotAi } from "@/lib/types";
+import { aiOf, accountOf, paysLabel } from "@/lib/agents";
+import { brainSignIn } from "./brains";
+import { useVaultKeyNames } from "./keys";
 import { Spinner } from "./mascot";
 import { useMacApp } from "./mac-screens";
 import { RestartAsk } from "./restart";
-import { post } from "./ui";
+import { post, teamOf, useSelfHosted } from "./ui";
 import { UpdateSettings } from "./update-notice";
 import type { KeyCheckResult } from "@/lib/server/key-check";
 
@@ -27,6 +30,100 @@ import type { KeyCheckResult } from "@/lib/server/key-check";
  * The user's mobile isn't asked for here: it becomes theirs when they call or text their bot's number
  * (the bot's profile and Settings say how), or with a texted code in Settings (owner-phone.tsx).
  */
+
+/** Subscription connections stay on the selected bot's computer; no credentials are read here. */
+export function AiSubscriptionsCard({ state, onShowScreen, onOpenVault }: { state: AppState; onShowScreen: (botId: string, display: number) => void; onOpenVault: () => void }) {
+  const selfHosted = useSelfHosted();
+  const bots = teamOf(state).filter((b) => state.host !== "mac" && b.runsOn !== "mac" && workBot(b, state.bots).computerId);
+  const [selected, setSelected] = useState("");
+  const b = bots.find((x) => x.id === selected) ?? bots[0];
+  const keys = useVaultKeyNames(b ? workspaceOf(b) : "", !!b && !state.shared);
+  if (!BRAINS_ON || state.shared) return null;
+  return (
+    <section aria-label="AI subscriptions" className="mx-[22px] mt-4 flex shrink-0 flex-col gap-3 rounded-2xl bg-[#FAFAF9] p-4 shadow-[0_0_0_1px_#E6E6E3]">
+      <h2 className="text-[15px] font-semibold">AI subscriptions</h2>
+      <p className="text-[12px] leading-5 text-[#6B6B6B]">Use your subscriptions for tasks on bots&apos; computers. They do not power the bot&apos;s chat, which needs an API key. Choose the subscription agent when starting a task.</p>
+      <label className="flex flex-wrap items-center gap-2 text-[12px]">Connect on
+        <select aria-label="Subscription bot and computer" value={b?.id ?? ""} disabled={!b} onChange={(e) => setSelected(e.target.value)} className="min-w-0 max-w-full rounded-lg border border-[#E6E6E3] bg-white p-2">
+          {!b && <option value="">No bot computer available</option>}
+          {bots.map((bot) => <option key={bot.id} value={bot.id}>{bot.name} · {workBot(bot, state.bots).name}&apos;s computer</option>)}
+        </select>
+      </label>
+      {!b && <p className="text-[12px]">Give a bot a computer before connecting a subscription.</p>}
+      {(["claude", "codex", "zai"] as const).map((kind) => <SubscriptionRow key={`${b?.id}:${kind}`} kind={kind} state={state} bot={b} keys={keys} selfHosted={selfHosted} onShowScreen={onShowScreen} onOpenVault={onOpenVault} />)}
+    </section>
+  );
+}
+
+export function SubscriptionRow({ kind, state, bot: b, keys, selfHosted, onShowScreen, onOpenVault }: { kind: "claude" | "codex" | "zai"; state: AppState; bot?: Bot; keys?: ReadonlySet<string>; selfHosted: boolean; onShowScreen: (botId: string, display: number) => void; onOpenVault: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [chosen, setChosen] = useState("");
+  const [disconnecting, setDisconnecting] = useState(false);
+  const active = useRef(true);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  const candidates = b ? aiOf(b, state).agents.filter((a) => kind === "zai" ? (a.kind === "opencode" || a.kind === "dsh") && a.pays === "key" && a.model?.startsWith("zai-coding/") : a.kind === kind && a.pays === "plan") : [];
+  const agent = candidates.find((a) => a.id === chosen) ?? candidates[0];
+  const account = agent && accountOf(agent, state);
+  const computer = b && workBot(b, state.bots).computerId;
+  const signing = computer && account?.signingIn?.computerId === computer ? account.signingIn : undefined;
+  const signed = !signing?.failed && account && computer ? signInOn(account, computer) : undefined;
+  const pending = signing && !signing.failed;
+  const allowed = !!b && !state.shared && (kind !== "codex" || selfHosted);
+  const name = kind === "claude" ? "Claude Pro/Max" : kind === "codex" ? "ChatGPT Plus/Pro" : "z.ai GLM Coding Plan";
+  const connected = signed && agent ? paysLabel(agent, state, computer).replace(/ plan$/, " subscription") : undefined;
+  const perform = async (action: "connect" | "out" | "refresh") => {
+    if (!allowed || !b || busy) return;
+    setBusy(true); setError(null);
+    try {
+      if (action === "out" || action === "refresh") {
+        if (kind === "zai" ? !agent : !account) throw new Error("Choose a connected account first.");
+        const res = kind === "zai" ? await post("/api/bots/ai", { botId: b.id, op: "remove", agentId: agent!.id }) : action === "out" ? await post("/api/brains/sign-out", { brainId: account!.id, botId: b.id }) : await fetch(`/api/brains/sign-in?brain=${encodeURIComponent(account!.id)}&bot=${encodeURIComponent(b.id)}`, { cache: "no-store" });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error ?? "The connection could not be updated.");
+        setDisconnecting(false);
+      } else {
+        let next: (typeof candidates)[number] | undefined = agent;
+        if (!next) {
+          const res = await post("/api/bots/ai", { botId: b.id, op: "add", kind: kind === "zai" ? "opencode" : kind, pays: kind === "zai" ? "key" : "plan", ...(kind === "zai" ? { model: "zai-coding/glm-5.3" } : {}) });
+          const j = await res.json() as { error?: string; added?: string; ai?: BotAi };
+          if (!active.current) return;
+          if (!res.ok) throw new Error(j.error ?? "The subscription agent could not be added.");
+          next = j.ai?.agents.find((a) => a.id === j.added);
+          if (!next) throw new Error("The agent was not returned. Refresh Settings before retrying.");
+          setChosen(next.id);
+        }
+        if (!active.current) return;
+        if (kind === "zai") onOpenVault();
+        else {
+          if (!next.account) throw new Error("This agent has no subscription account.");
+          const problem = await brainSignIn(next.account, b.id, (botId, display) => { if (active.current) onShowScreen(botId, display); });
+          if (problem) throw new Error(problem);
+        }
+      }
+    } catch (e) { setError(e instanceof Error ? e.message : "Couldn't reach Bops. Try again."); }
+    finally { setBusy(false); }
+  };
+  return <div className="flex flex-col gap-2 rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]">
+    <h3 className="text-[13px] font-semibold">{name}</h3>
+    {candidates.length > 1 && <label>Account <select aria-label={`${name} account`} value={agent?.id} disabled={busy} onChange={(e) => { setChosen(e.target.value); setError(null); }}>{candidates.map((a) => <option key={a.id} value={a.id}>{accountOf(a, state)?.name ?? a.model}</option>)}</select></label>}
+    {kind === "zai" ? <>
+      <p>The Coding Plan uses a key from your z.ai plan account, saved in Keys as ZAI_API_KEY. This is not a browser sign-in.</p>
+      <p role="status">{agent ? keys === undefined ? "Coding Plan route configured; key status unavailable." : keys.has("ZAI_API_KEY") ? "Coding Plan route configured; key saved. Subscription entitlement is not verified." : "Coding Plan route configured; add your plan account's key." : "Not configured. A regular Z.ai API key alone does not confirm a Coding Plan subscription."}</p>
+    </> : <>
+      <p role="status">{pending ? "Signing in on this computer…" : signing?.failed ? `Sign-in failed: ${signing.failed}` : connected ? `Connected: ${connected}` : "Not signed in on this computer."}</p>
+      {signed && <p className="text-[#6B6B6B]">{signed.account?.email ?? "Account email unavailable"}{signed.account?.orgName ? ` · ${signed.account.orgName}` : ""} · Last confirmed: {new Date(signed.at).toLocaleString()}{kind === "codex" && !signed.account?.plan ? ". ChatGPT did not report the subscription tier." : ""}</p>}
+      {kind === "codex" && !selfHosted && <p>ChatGPT subscriptions are available only to the self-hosted owner.</p>}
+    </>}
+    <div className="flex flex-wrap gap-2">
+      {pending && signing ? <button type="button" disabled={!allowed || busy} onClick={() => onShowScreen(signing.botId, signing.display)} className={dark}>Show sign-in screen</button> : !signed && <button type="button" disabled={!allowed || busy} onClick={() => void perform("connect")} className={dark}>{busy ? "Connecting…" : kind === "zai" ? "Connect your Coding Plan key" : "Sign in with your subscription"}</button>}
+      {signed && <><button type="button" disabled={!allowed || busy} onClick={() => void perform("refresh")} className={light}>Check connection</button><button type="button" disabled={!allowed || busy} onClick={() => void perform("out")} className={light}>Sign out on this computer</button></>}
+      {kind === "zai" && agent && <button type="button" disabled={!allowed || busy} onClick={() => setDisconnecting(true)} className={light}>Disconnect Coding Plan tasks</button>}
+    </div>
+    {disconnecting && <div role="alertdialog" aria-label="Disconnect Coding Plan tasks" className="rounded-lg bg-[#FFF8EB] p-3"><p>This removes the selected Coding Plan agent and stops its running tasks. Your saved Z.ai key stays available to other agents.</p><div className="mt-2 flex gap-2"><button type="button" disabled={busy} className={dark} onClick={() => void perform("out")}>Disconnect</button><button type="button" disabled={busy} className={light} onClick={() => setDisconnecting(false)}>Cancel</button></div></div>}
+    {error && <p role="alert" className="text-[#B00020]">{error}</p>}
+  </div>;
+}
 
 export type PermId = "screen" | "microphone" | "notifications" | "accessibility" | "fullDisk" | "automation";
 export type PermStatus = "granted" | "denied" | "not-determined" | "restricted" | "unknown";
