@@ -1,29 +1,19 @@
 # Codex status
-Updated 2026-11-03T21:46Z. Build IN PROGRESS; PC HOLD lifted. Hourly Codex automation bops-hourly-build-check remains active. Latest check: board unchanged; PC app still closed. No new user notification needed for previously reported blockers.
+Updated 2026-11-03T23:49Z. Build IN PROGRESS. PC HOLD lifted. Hourly automation bops-hourly-build-check active. No new team messages since last check.
 
-## Completed and evidence
-- PR46/47 merged; Windows and VPS production build at 0d9eea3 passed earlier. VPS health verified after deployment; latest live check not repeated this heartbeat.
-- PR33/37/48/49 merged after CI/review. PC checkout now add8e66; latest production build passed. Dirty config/llms.yaml preserved.
-- PR49 Windows platform identity is built, not yet live UI verified. Expected disk build ID P_S193HxhsD_-o438kaUj.
-- REA provider fixes passed standalone MCP verification: Ghidra PE analysis, audited JADX0.7.1 APK/class/method analysis, SDKADB37.0.0 fresh-start/device listing, WABT, apktool. VSCode and Harness provider env aligned; backups retained. Evidence %TEMP%/rea-verify-20261103/VERIFICATION.md.
+## Verified complete
+- PC running latest add8e66 production build. Health build P_S193HxhsD_-o438kaUj matches disk; confirmed again this check. PR49 native UI task cards say Your PC / On your PC. Historical Mac chat preserved intentionally.
+- REA live Harness binary_session reports Ghidra available. Standalone MCP native analysis, audited JADX APK/class/method, SDKADB fresh-start/list, WABT and apktool passed. Report %TEMP%/rea-verify-20261103/VERIFICATION.md. No connected-phone testing.
+- PR33/37/46/47/48/49 merged previously. No merges this run. Dirty config/llms.yaml preserved.
 
-## Open work and next steps
-1. After normal Bops launch: verify /api/health build matches disk, visible PC labels, then retry original task with PR48 lifecycle diagnostics. Earlier retry moved past cwd400 but ultimately returned500; full executor integration is NOT proved.
-2. Harness: verify an actual in-app REA tool call after desktop is accessible. Provider results above are standalone MCP, not UI acceptance.
-3. VPS remains at earlier 0d9eea3 deployment; newer merged changes not yet deployed there. Preserve n8n/other services and dirty package-lock.
-4. Docker recipe verification remains deferred; no Docker/emulator started. Broader open feature PRs need review and CI checks. Pinned apps/customization/always-on latest requests are proposals, not completed features.
+## Remaining work
+- Original local executor task eventually returned500 after cwd400 was fixed. PR48 lifecycle diagnostics now deployed. New-task agent currently reports Claude Code sign-in unfinished; need same-agent bounded retry or completed auth before treating that as executor regression evidence. Do not silently switch agent/model or claim root cause proved.
+- VPS still at earlier0d9eea3 deployment (healthy at last deployment check); newer commits not deployed there. Preserve other VPS services and dirty package-lock.
+- Docker recipe verification deferred pending suitable resources. No Docker/emulator started.
+- Zai PR32/41 reported current/green; require lead review. Pinned apps/customization/always-on requests remain proposals.
 
 ## Needs Kevin
-Already requested: open Bops normally (agent launch rejected by automatic approval review; do not bypass), unlock/foreground Harness (black screenshot and activation failure). No new action request this heartbeat.
+No repeated unlock/app-open request: those blockers are resolved. Claude Code sign-in remains unfinished in app; no account or authentication action performed by this run.
 
-## Resources and handoff
-No heavy builds, test daemons or heavy lock owned. Current hourly lock codex-heartbeat-20261103-2146 released on exit. Logs %LOCALAPPDATA%/Bops-team/codex-hourly.log. Preserve all user/other-agent changes. Latest heartbeat says lead reviews/merges; no PR merged in this run.
-
-## REA live acceptance completed
-After Kevin unlocked Windows, Harness mcp__rea__binary_session completed and reported Ghidra available. REA UI blocker resolved; prior provider tests remain valid. Bops runtime launch/verification remains open.
-
-
-## 2026-11-03T22:48Z live PC verification
-Bops running; /api/health build P_S193HxhsD_-o438kaUj matches disk. NativeUI existingtaskcards show YourPC/OnyourPC. PR49liveacceptance complete; historicalMacchatpreserved. App-launchblocker cleared. Executor500 remainsunresolved; currentnewtaskagentClaudeCode sign-inunfinished, so no changedagentretry performed. Noheavyresourcesstarted. BoardzaiPR32/41reportedcurrentgreen; nomerges.
-
-
+## Handoff
+Continue executor diagnosis without conflating provider auth, startup, and task completion. PR48 captures bounded classifications, not raw secret-bearing logs. Board and health checks only this run; no builds or foreign process changes. Own hourly lock released on exit; log %LOCALAPPDATA%/Bops-team/codex-hourly.log.
