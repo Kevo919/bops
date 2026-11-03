@@ -1,0 +1,63 @@
+id: gods-eye-view
+name: God's Eye View
+repo: bilawalsidhu/gods-eye-view
+url: https://github.com/bilawalsidhu/gods-eye-view
+license: MIT
+license_note: >-
+  Code is MIT, but bundled and live data keep their own terms: TeleGeography data is CC BY-NC-SA
+  (non-commercial; commercial users must delete that folder) and OpenSky flight data is a
+  non-commercial research/education license. See DATA_SOURCES.md.
+what: A 3D globe web app that layers live flights, satellites, weather, ships and other public feeds, with optional AI voice control.
+good_for: live geospatial dashboards
+stack: [node, vite]
+requirements:
+  node: ">=24.14.0"
+  other:
+    - "package.json engines: >=24.14.0 <25 or >=26 <27; the setup doctor warns on Node 25"
+keys_optional:
+  - name: GOOGLE_MAPS_API_KEY
+    for: Google photorealistic 3D tiles and maps in the browser
+  - name: GOOGLE_MAPS_SERVER_API_KEY
+    for: Google Places search and Street View on the server
+  - name: CESIUM_ION_TOKEN
+    for: Cesium ion terrain and imagery
+  - name: OPENAI_API_KEY
+    for: Voice control and HUD summaries
+  - name: GEMINI_API_KEY
+    for: Gemini Live voice
+  - name: AISSTREAM_API_KEY
+    for: Live vessel positions
+  - name: MAPILLARY_CLIENT_TOKEN
+    for: Mapillary street-level imagery
+  - name: OPENSKY_CLIENT_ID
+    for: Authenticated OpenSky flights (higher rate limits)
+  - name: OPENSKY_CLIENT_SECRET
+    for: Authenticated OpenSky flights, paired with OPENSKY_CLIENT_ID
+keys_required: []
+clone: git clone --depth 1 https://github.com/bilawalsidhu/gods-eye-view.git gods-eye-view
+install:
+  - npm ci
+  - npm run doctor
+run: npm run dev
+background: true
+kind: web
+port: 4173
+health:
+  http: http://127.0.0.1:4173/
+  expect: 200
+fits_bot_computer: true
+fits_reason: Starts keyless in seconds (494 MB node_modules), but the bot computer needs Node 24.14+; the globe itself renders in the viewer's browser.
+verified:
+  date: "2026-11-03"
+  by: claude-agent (Linux sandbox, Node 24.22.2 via npx -y node@24)
+  commit: f3adccd
+  steps:
+    clone: pass
+    install: "pass: npm ci (8 s) and npm run doctor ('Ready. Run npm run dev'), both exit 0"
+    run: "pass: Vite 6.4.4 ready on http://localhost:4173"
+    health: "pass: GET http://127.0.0.1:4173/ returned 200 with <title>God's Eye View"
+  notes: >-
+    The sandbox had Node 22.23.4, below the engines floor, so every step ran with Node 24.22.2 from
+    npx -y node@24 placed first on PATH. Optional keys go in .env or the in-app POWER UP panel; with none,
+    the doctor reports Esri imagery, keyless OpenSky flights and simulated traffic. The README also offers
+    docker compose, not used here.

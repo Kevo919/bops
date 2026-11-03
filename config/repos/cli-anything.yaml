@@ -1,0 +1,41 @@
+id: cli-anything
+name: CLI-Anything
+repo: HKUDS/CLI-Anything
+url: https://github.com/HKUDS/CLI-Anything
+license: Apache-2.0
+license_note: ""
+what: A registry and package manager (cli-hub) for agent-friendly command-line wrappers around desktop and web software such as GIMP, Blender and LibreOffice.
+good_for: giving agents CLIs for desktop apps
+stack: [python]
+requirements:
+  python: ">=3.10"
+  other:
+    - "Each harness needs its upstream app installed too (for example GIMP or LibreOffice)"
+keys_optional: []
+keys_required: []
+env:
+  CLI_HUB_NO_ANALYTICS: "1"
+clone: git clone --depth 1 https://github.com/HKUDS/CLI-Anything.git cli-anything
+install:
+  - python3 -m venv .venv
+  - .venv/bin/pip install ./cli-hub
+run: .venv/bin/cli-hub search image
+kind: cli
+health:
+  cmd: .venv/bin/cli-hub --help
+  expect_exit: 0
+fits_bot_computer: true
+fits_reason: Small pure-Python install (about 18 MB venv); individual harnesses may pull in large upstream apps.
+verified:
+  date: "2026-11-03"
+  by: claude-agent (Linux sandbox, Python 3.13.18)
+  commit: 34f5195
+  steps:
+    clone: pass
+    install: "pass: pip install ./cli-hub installed cli-hub 0.4.1"
+    run: "pass: cli-hub search image listed comfyui, gimp, inkscape and others, exit 0"
+    health: "pass: cli-hub --help exit 0"
+  notes: >-
+    The README installs the same package from PyPI (pip install cli-anything-hub); this recipe installs
+    it from the clone. cli-hub sends usage analytics (Umami/PostHog) unless CLI_HUB_NO_ANALYTICS=1, which
+    the recipe sets. Installing a harness (cli-hub install <name>) was not exercised.

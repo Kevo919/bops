@@ -54,6 +54,8 @@ jobs:
         run: node --conditions=react-server scripts/test-llms.mjs
       - name: Look permission and sanitizer tests
         run: node --conditions=react-server scripts/test-look.mjs
+      - name: Repo recipe tests
+        run: node scripts/test-repo-recipes.mjs
 
   android:
     if: github.repository != 'OrgoAI/bops'
