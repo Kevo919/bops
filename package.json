@@ -17,6 +17,7 @@
     "app:release": "scripts/release.sh",
     "setup:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-windows.ps1",
     "app:build:win": "next build && node -e \"require('fs').writeFileSync('desktop/repo.json', JSON.stringify({ path: process.cwd(), built: true }))\" && electron-builder --win nsis --x64 --publish never",
+    "app:build:win:dir": "next build && node -e \"require('fs').writeFileSync('desktop/repo.json', JSON.stringify({ path: process.cwd(), built: true }))\" && electron-builder --win --x64 --dir --publish never",
     "app:dev:win": "node -e \"require('fs').writeFileSync('desktop/repo.json', JSON.stringify({ path: process.cwd() }))\" && electron-builder --win --dir",
     "modules:example": "node scripts/modules-example.cjs",
     "sync:upstream": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-upstream.ps1",
@@ -190,7 +191,7 @@
       "createStartMenuShortcut": true,
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": false,
-      "artifactName": "Bops-Setup.exe"
+      "artifactName": "Bops-Setup-${version}-${arch}.exe"
     }
   }
 }
