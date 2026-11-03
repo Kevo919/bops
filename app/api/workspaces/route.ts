@@ -80,7 +80,8 @@ export async function PATCH(request: Request) {
   if (routineAwayDays !== undefined) {
     if (!fromBopsWindow(request) || sharedOpen()) return Response.json({ error: "Only the owner can change this." }, { status: 403 });
     if (typeof routineAwayDays !== "number" || !Number.isInteger(routineAwayDays) || routineAwayDays < 0 || routineAwayDays > 365) return Response.json({ error: "Say whole days, 0 to 365 (0 is never skip)." }, { status: 400 });
-    update((s) => (s.routineAwayDays = routineAwayDays || undefined));
+    // 0 is "never skip" and stays 0: `|| undefined` would turn it back into the default 7.
+    update((s) => (s.routineAwayDays = routineAwayDays));
     return Response.json({ ok: true });
   }
   // Where its chat is answered is the owner's to say: from their own window, with their own workspace open.
