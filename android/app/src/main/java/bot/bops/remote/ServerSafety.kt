@@ -10,6 +10,9 @@ object ServerSafety {
         val input = address.trim()
         return try {
             val uri = URI(input)
+            // Unsupported components stay intact so validation rejects them, never silently
+            // converting a credential-bearing URL into a different pairing destination.
+            if (uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null) return input
             val scheme = uri.scheme?.lowercase(Locale.ROOT) ?: return input
             if (scheme != "http" && scheme != "https") return input
             val host = uri.host?.lowercase(Locale.ROOT) ?: return input
@@ -24,6 +27,8 @@ object ServerSafety {
 
     fun safeAddress(a: String): String? {
         val u = Uri.parse(a)
+        if (u.userInfo != null || u.encodedQuery != null || u.encodedFragment != null)
+            return "Use an address without user information, a query, or a fragment."
         val host = u.host ?: return "That isn't an address."
         if (u.scheme == "https") return null
         if (u.scheme != "http") return "The address starts with http:// or https://."
