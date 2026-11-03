@@ -15,3 +15,5 @@ Hourly continuation: Codex heartbeat `bops-hourly-build-check` ACTIVE, first due
 
 ## Needs Kevin
 None for current work. Lead owns review and merge.
+
+Task18 draft PR20 opened at 5ab23bb; CI pending. PR11 native bot-ai passed 25. Repos design approved but network/control-socket isolation gap posted to lead; recipe branch still unpublished.
