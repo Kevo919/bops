@@ -15,6 +15,7 @@ export const BUILTIN_CHAT_MODELS: ChatModel[] = [
   { id: "anthropic/claude-haiku-5-5", name: "Claude Haiku 5.5", provider: "anthropic" },
   { id: "zai-coding/glm-5.3", name: "GLM 5.3 (Coding Plan)", provider: "zai-coding" },
   { id: "zai/glm-5.2", name: "GLM 5.2", provider: "zai" },
+  { id: "zai-coding-cn/glm-5.3", name: "GLM 5.3 (Coding Plan, China)", provider: "zai-coding-cn" },
   { id: "deepseek/deepseek-chat", name: "DeepSeek Chat", provider: "deepseek" },
   { id: "deepseek/deepseek-reasoner", name: "DeepSeek Reasoner", provider: "deepseek" },
   // Shown only on a server with OLLAMA_BASE_URL set (chatModelShown); other Ollama models go in config/llms.yaml.
@@ -26,6 +27,16 @@ export function chatModels(): ChatModel[] {
   const out: ChatModel[] = llms().map((l) => ({ id: `${l.provider}/${l.model}`, name: l.name, provider: l.provider }));
   for (const m of BUILTIN_CHAT_MODELS) if (!out.some((x) => x.id === m.id)) out.push(m);
   return out;
+}
+
+/**
+ * The model new chats start on: Your LLMs' chat default (config/llms.yaml chat_default, Settings, Models), when
+ * its provider has a key here (`keys`: provider to set or not, never a key). Set once on a chat as it's made
+ * (lib/server/chat-default.ts); chats there already keep their model, or Auto. Undefined: new chats start on Auto.
+ */
+export function chatDefault(keys: Partial<Record<string, boolean>>): ChatModel | undefined {
+  const l = llms().find((x) => x.chatDefault);
+  return l && keys[l.provider] ? { id: `${l.provider}/${l.model}`, name: l.name, provider: l.provider } : undefined;
 }
 
 /** A model a chat may be set to: one of chatModels(). */

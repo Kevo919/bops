@@ -2,6 +2,7 @@ import { getState, id, update } from "@/lib/server/store";
 import { botChatId, type Chat } from "@/lib/types";
 import { notReady } from "@/lib/server/ready";
 import { deleteGroupChat } from "@/lib/server/remove";
+import { newChatModel } from "@/lib/server/chat-default";
 
 /** Start a conversation: one bot opens its own chat, two or more make a group chat. */
 export async function POST(request: Request) {
@@ -10,7 +11,9 @@ export async function POST(request: Request) {
   const { botIds, title } = (await request.json()) as { botIds?: string[]; title?: string };
   if (!botIds?.length) return Response.json({ error: "pick at least one bot" }, { status: 400 });
   if (botIds.length === 1) return Response.json({ chatId: botChatId(botIds[0]) });
-  const chat: Chat = { id: id("grp"), kind: "group", botIds, title: title?.trim() || undefined, createdAt: Date.now(), typing: [], workspaceId: getState().workspace };
+  // It starts on the chat default (Settings, Models), when its key is set; else Auto.
+  const model = newChatModel();
+  const chat: Chat = { id: id("grp"), kind: "group", botIds, title: title?.trim() || undefined, createdAt: Date.now(), typing: [], workspaceId: getState().workspace, ...(model ? { model } : {}) };
   update((s) => s.chats.push(chat));
   return Response.json({ chatId: chat.id });
 }

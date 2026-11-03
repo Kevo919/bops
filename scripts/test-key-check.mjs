@@ -49,7 +49,9 @@ const resultOf = async (key, status, data) => {
 
 try {
   await test("GET exposes exactly eight metadata rows and makes no provider calls", async () => {
-    const expected = [ROUTE_KEYS.openai, "OPENAI_EXECUTOR_API_KEY", ROUTE_KEYS.anthropic, ROUTE_KEYS.zai, ROUTE_KEYS.deepseek, ROUTE_KEYS.openrouter, "ORGO_API_KEY", ROUTE_KEYS.ollama];
+    const expected = [ROUTE_KEYS.openai, "OPENAI_EXECUTOR_API_KEY", ROUTE_KEYS.anthropic, ROUTE_KEYS.zai, ROUTE_KEYS["zai-coding-cn"], ROUTE_KEYS.deepseek, ROUTE_KEYS.openrouter, "ORGO_API_KEY", ROUTE_KEYS.ollama];
+    assert.equal(ROUTE_KEYS["zai-coding-cn"], "ZAI_CODING_CN_API_KEY", "the China Coding Plan has a key of its own");
+    assert.equal(keyCheckList().find(x => x.key === "ZAI_CODING_CN_API_KEY").label, "Z.ai Coding Plan (China)");
     assert.equal(ROUTE_KEYS.ollama, "OLLAMA_BASE_URL", "Ollama's row is its address: it has no key");
     assert.equal(keyCheckList().find(x => x.key === "OLLAMA_BASE_URL").label, "Ollama (free, local)");
     assert.deepEqual(keyCheckList().map(x => x.key), expected);
@@ -91,6 +93,7 @@ try {
     for (const [key, url, data] of [
       [ROUTE_KEYS.anthropic, "https://api.anthropic.com/v1/models", { data: [] }],
       [ROUTE_KEYS.zai, "https://api.z.ai/api/paas/v4/models", { data: [] }],
+      [ROUTE_KEYS["zai-coding-cn"], "https://open.bigmodel.cn/api/paas/v4/models", { data: [] }],
       [ROUTE_KEYS.deepseek, "https://api.deepseek.com/models", { data: [] }],
       [ROUTE_KEYS.openrouter, "https://openrouter.ai/api/v1/key", { data: { limit_remaining: null } }],
       ["ORGO_API_KEY", "https://www.orgo.ai/api/account/capacity", { capacity: 2 }],
@@ -122,7 +125,9 @@ try {
     calls = []; assert.equal((await resultOf(ROUTE_KEYS.openrouter, 200, { data: { limit_remaining: 0 } })).status, "no credit");
     for (const status of [400, 404]) {
       calls = []; assert.equal((await resultOf(ROUTE_KEYS.zai, status, { error: {} })).status, "unavailable");
+      calls = []; assert.equal((await resultOf(ROUTE_KEYS["zai-coding-cn"], status, { error: {} })).status, "unavailable");
     }
+    calls = []; assert.equal((await resultOf(ROUTE_KEYS["zai-coding-cn"], 401, { error: { code: "1000", message: "SYNTHETIC_SECRET" } })).status, "invalid");
   });
   await test("network failure, timeout and oversized responses cannot leak secrets or imply invalid", async () => {
     reply = () => { throw new Error("SYNTHETIC_SECRET"); };
