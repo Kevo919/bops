@@ -49,7 +49,7 @@ import { readyAgents } from "@/lib/agents";
 import { footerPageOf, openFooterPage } from "./sidebar-footer";
 import { CloudUnreachable, SignIn, useAuthStatus } from "./sign-in";
 import { PickComputer, useSizePick } from "./computer-size";
-import { ThisMacSettings } from "./setup";
+import { AiSubscriptionsCard, ThisMacSettings } from "./setup";
 import { TooltipLayer } from "./tooltip";
 import { LoginsPage } from "./logins";
 import { MacPreviews } from "./mac-tab";
@@ -2314,6 +2314,7 @@ export function Settings({
         {team_.length > 0 && group("Orgo team only", null, team_)}
       </nav>
       <main data-settings-pane={pane} className={`flex min-h-0 min-w-0 flex-1 flex-col ${framed ? "" : "overflow-y-auto pb-8"}`}>
+        {(pane === "profile" || pane === "ai") && <AiSubscriptionsCard state={state} onShowScreen={onShowScreen} onOpenVault={onOpenVault} />}
         {body}
       </main>
     </div>
