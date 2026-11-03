@@ -268,7 +268,7 @@ const TERMINAL = join(LOG, "terminal.log");
 const fakeCodex = join(scratch, "fake-codex.mjs");
 writeFileSync(
   fakeCodex,
-  `import { appendFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+  `import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 const RUNS = ${JSON.stringify(CODEX_RUNS)}, HEARD = ${JSON.stringify(HEARD)}, FLAGS = ${JSON.stringify(FLAGS)}, PICTURE = ${JSON.stringify(PICTURE)};
@@ -279,7 +279,18 @@ appendFileSync(RUNS, JSON.stringify({ pid, ppid: process.ppid, at: Date.now(), a
 const TEST = ${process.pid};
 setInterval(() => { try { process.kill(TEST, 0); } catch (e) { if (e.code === "ESRCH") process.exit(0); } }, 1000).unref();
 const heard = (x) => appendFileSync(HEARD, JSON.stringify({ pid, at: Date.now(), ...x }) + "\\n");
-if (args[0] === "--version") { console.log("codex-cli 0.160.0"); process.exit(0); }
+if (args.includes("--version")) { console.log("codex-cli 0.160.0"); process.exit(0); }
+const authFile = join(process.env.CODEX_HOME, "auth.json");
+if (args.includes("login")) {
+  if (args.includes("status")) {
+    const mode = existsSync(authFile) ? readFileSync(authFile, "utf8") : "none";
+    console.error(mode === "chatgpt" ? "Logged in using ChatGPT" : mode === "api" ? "Logged in using an API key - synthetic-private-hint" : "Not logged in");
+    process.exit(mode === "none" ? 1 : 0);
+  }
+  if (!args.includes("--device-auth")) process.exit(2);
+  writeFileSync(authFile, "chatgpt"); process.exit(0);
+}
+if (args.includes("logout")) { rmSync(authFile, { force: true }); process.exit(0); }
 const resume = args[1] === "resume";
 const pos = [];
 for (let i = resume ? 2 : 1; i < args.length; i++) { if (args[i] === "-c") { i++; continue; } if (!args[i].startsWith("--")) pos.push(args[i]); }
@@ -1215,6 +1226,46 @@ await test("Codex never runs without its key: no ChatGPT sign-in, no key from an
   S.update(() => {
     S.bot(main.id).brain = PLAN.id;
   });
+});
+
+await test("Codex device login is private, plan runs have no key or gate, and logout revokes its status", async () => {
+  const c = pc(PC);
+  const id = "brain_chatgpt_test";
+  const dir = join(c.brains, id);
+  const login = await runHere(c, `bops-brain login ${id} 100 ${PC} codex`);
+  assert.equal(login.exit_code, 0);
+  assert.match(login.output, /signing in/);
+  // Complete the fake CLI device flow synchronously; no real account or browser is contacted.
+  assert.equal((await runHere(c, `bops-brain sign-in ${id} 100 codex`)).exit_code, 0);
+  let status = await runHere(c, `bops-brain status ${id} ${PC} codex`);
+  assert.deepEqual(JSON.parse(status.output), { loggedIn: true, authMethod: "chatgpt" });
+  const run = await runHere(c, `bops-brain run ${id} codex --bot boppy --agent ag_plan000001 -- --version`);
+  assert.equal(run.exit_code, 0, run.output);
+  const last = JSON.parse(readFileSync(CODEX_RUNS, "utf8").trim().split("\n").at(-1));
+  assert.equal(last.env.CODEX_HOME, dir);
+  for (const name of ["OPENAI_API_KEY", "CODEX_API_KEY", "OPENAI_BASE_URL", "BOPS_GATE"]) assert.equal(last.env[name], undefined, name);
+  assert.ok(last.args.includes('forced_login_method="chatgpt"'));
+  // Invoke the generated plan wrapper from a different agent's environment: all six providers are poisoned.
+  const nestedKeys = ["OPENAI_API_KEY", "CODEX_API_KEY", "ANTHROPIC_API_KEY", "DEEPINFRA_API_KEY", "ZAI_API_KEY", "DEEPSEEK_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_BASE_URL", "OPENAI_BASE_URL", "BOPS_GATE", "OPENCODE_CONFIG_CONTENT", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "OPENCODE_CONFIG", "DSH_HOME", "CLAUDE_CONFIG_DIR", "CLAUDE_ENV_FILE"];
+  const bin = await runHere(c, `bops-brain bin nested_bot --also codex:plan:${id}:gpt-6.1-sol`);
+  assert.equal(bin.exit_code, 0);
+  const wrapper = join(bin.output.trim(), "codex");
+  const nested = await runHere(c, `${nestedKeys.map((k) => `${k}=fixture-sentinel`).join(" ")} BOPS_MODEL=wrong-parent-model '${wrapper}' --version`);
+  assert.equal(nested.exit_code, 0, nested.output);
+  const nestedRun = JSON.parse(readFileSync(CODEX_RUNS, "utf8").trim().split("\n").at(-1));
+  for (const key of nestedKeys) assert.equal(nestedRun.env[key], undefined, key);
+  assert.equal(nestedRun.env.CODEX_HOME, dir);
+  assert.ok(nestedRun.args.includes('model="gpt-6.1-sol"'));
+  assert.ok(!nestedRun.args.join(" ").includes("wrong-parent-model"));
+  writeFileSync(join(dir, "auth.json"), "api");
+  status = await runHere(c, `bops-brain status ${id} ${PC} codex`);
+  assert.deepEqual(JSON.parse(status.output), { loggedIn: false });
+  assert.ok(!status.output.includes("synthetic-private-hint"));
+  writeFileSync(join(dir, "auth.json"), "chatgpt");
+  assert.equal((await runHere(c, `bops-brain logout ${id} codex`)).exit_code, 0);
+  assert.equal(existsSync(join(dir, "auth.json")), false);
+  status = await runHere(c, `bops-brain status ${id} ${PC} codex`);
+  assert.deepEqual(JSON.parse(status.output), { loggedIn: false });
 });
 
 /* ---------------- Open in terminal ---------------- */

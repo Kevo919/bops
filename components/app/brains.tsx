@@ -564,7 +564,7 @@ export function BotBrain({ state, bot: b, onShowScreen, className }: { state: Ap
       {now?.auth === "plan" && where !== "none" && onShowScreen && (going || !signedIn) && (
         <div className="flex items-center gap-2">
           <span className="min-w-0 flex-1 text-[12px] leading-4 text-[#3A3A38]">
-            {going ? "Claude Code's sign-in is open on its screen." : now.signingIn?.failed ? `The last sign-in didn't finish: ${undash(now.signingIn.failed)}` : `Sign in with your Claude plan on ${computerOf(state, b)} to use it.`}
+            {going ? `${now.kind === "codex" ? "Codex" : "Claude Code"}'s sign-in is open on its screen.` : now.signingIn?.failed ? `The last sign-in didn't finish: ${undash(now.signingIn.failed)}` : `Sign in with your ${now.kind === "codex" ? "ChatGPT plan" : "Claude plan"} on ${computerOf(state, b)} to use it.`}
           </span>
           {going ? (
             <button onClick={() => onShowScreen(going.botId, going.display)} className={light}>

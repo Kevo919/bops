@@ -31,7 +31,7 @@ import { brainSignIn } from "./brains";
 import { Fold } from "./fold";
 import { DefaultPill, NewThread, useBotKeys, useDismiss } from "./new-thread";
 import { undash } from "./side-group";
-import { post } from "./ui";
+import { post, useSelfHosted } from "./ui";
 
 /**
  * A bot's AI, in its profile (lib/agents.ts): the agents it can run as tiles, the Default marked; tap one to change
@@ -253,6 +253,7 @@ function AgentEditor({
   onShowScreen?: (botId: string, display: number) => void;
   onAddKey?: () => void;
 }) {
+  const selfHosted = useSelfHosted();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ask, setAsk] = useState<{ body: Record<string, unknown>; words: string } | null>(null);
@@ -284,15 +285,16 @@ function AgentEditor({
         <div role="group" aria-label="Pays with" className="flex shrink-0 gap-0.5 rounded-full bg-black/[0.05] p-[3px]">
           {PAYS_SHOWN[x.kind].map((p: AgentPays) => {
             const soon = PAYS_SOON[x.kind]?.[p];
-            const name = p === "plan" ? (x.kind === "codex" ? "OpenAI plan" : x.pays === "plan" && acct?.signIns?.[0]?.account?.plan ? `${upper(acct.signIns[0].account.plan)} plan` : "Claude plan") : p === "key" ? "Your key" : PAYS_NAMES[p];
-            const off = ro || busy || !!soon || x.kind === "bops";
+            const name = p === "plan" ? (x.kind === "codex" ? "ChatGPT plan" : x.pays === "plan" && acct?.signIns?.[0]?.account?.plan ? `${upper(acct.signIns[0].account.plan)} plan` : "Claude plan") : p === "key" ? "Your key" : PAYS_NAMES[p];
+            const ownerPlanOnly = x.kind === "codex" && p === "plan" && !selfHosted;
+            const off = ro || busy || !!soon || ownerPlanOnly || x.kind === "bops";
             return (
               <button
                 key={p}
                 type="button"
                 aria-pressed={x.pays === p}
                 aria-disabled={off || undefined}
-                title={soon ? `Soon: ${soon}` : undefined}
+                title={ownerPlanOnly ? "ChatGPT plans are available only to the self-hosted owner." : soon ? `Soon: ${soon}` : undefined}
                 onClick={() => !off && p !== x.pays && guard({ op: "update", agentId: x.id, pays: p })}
                 className={`${pill} ${off ? "cursor-default" : ""} ${x.pays === p ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F]" : soon ? "text-[#B5B5B3]" : "text-[#6B6B6B] hover:text-ink"}`}
               >
@@ -302,6 +304,7 @@ function AgentEditor({
           })}
         </div>
       </div>
+      {x.kind === "codex" && x.pays === "plan" && <span className={quiet}>For the self-hosted owner. Sign in with ChatGPT on the bot's screen using the device code. Your plan allowance applies; this does not use Bops Cloud credit.</span>}
       {soons.length > 0 && <span className={quiet}>Soon: {soons.join(" ")}</span>}
       {(x.kind === "claude" || x.kind === "codex") && (accounts.length > 1 || x.pays === "plan") && (
         <div className="flex flex-col items-end gap-1">
