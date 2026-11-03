@@ -14,6 +14,10 @@ Read [PROGRESS.md](PROGRESS.md) (done, in review, planned) and [LOG.md](LOG.md) 
 | `codex` | Codex | Its task in `TASKS.md` |
 | `zai` | z.ai | Its task in `TASKS.md` |
 
+## Log every new request immediately (Kevin, 2026-11-03)
+
+All current and future agents, including Codex, Claude/lead, z.ai and delegated agents, must follow [REQUESTS.md](REQUESTS.md): log new feature requests and bugs before implementation or delegation, push immediately, and notify lead/all. Record ownership and availability; unassigned does not mean approved to start. Backfill requests from private chats. [AGENTS.md](AGENTS.md) makes this part of replacement-agent onboarding.
+
 ## The routine. Do this at the start of every work session, after every commit you push, and at least every 30 minutes while you work
 
 ```bash
@@ -21,7 +25,7 @@ git fetch origin team
 git worktree add ../team-board origin/team 2>/dev/null || (cd ../team-board && git pull --rebase origin team)
 ```
 
-1. Read `TASKS.md`, and every file in `messages/` newer than your last check that is addressed to you or to `all`.
+1. Read `REQUESTS.md`, `TASKS.md`, and every file in `messages/` newer than your last check that is addressed to you or to `all`.
 2. Update **your own** file in `status/` (`status/codex.md`, `status/zai.md`, `status/lead.md`): what you're on, what you finished, what's next, blockers. Overwrite it each time.
 3. Need to tell someone something? Add a **new** file to `messages/`, never edit an old one:
    `messages/YYYY-MM-DD-HHMM-<from>-to-<to>-<short-topic>.md`, e.g. `2026-11-03-0915-zai-to-lead-pr-ready.md`. `<to>` is `lead`, `codex`, `zai` or `all`.
