@@ -60,6 +60,10 @@ jobs:
         run: node --conditions=react-server scripts/test-look.mjs
       - name: Repo recipe tests
         run: node scripts/test-repo-recipes.mjs
+      - name: Cron schedule tests
+        run: node scripts/test-cron.mjs
+      - name: Schedule tests
+        run: node --conditions=react-server scripts/test-schedules.mjs
 
   android:
     if: github.repository != 'OrgoAI/bops'

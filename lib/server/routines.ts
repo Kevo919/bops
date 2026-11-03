@@ -215,7 +215,7 @@ export function createRoutine(botId: string, title: string, goal: string, schedu
   if (!bot(botId)) return { error: "No such bot." };
   const owner = ownerName();
   const outside = opts.fromOutside?.trim() || undefined;
-  if (outside && (schedule?.kind === "every" || schedule?.kind === "before_event" || (schedule && "times" in schedule && (schedule.times?.length ?? 0) > 1)))
+  if (outside && (schedule?.kind === "every" || schedule?.kind === "before_event" || schedule?.kind === "cron" || (schedule && "times" in schedule && (schedule.times?.length ?? 0) > 1)))
     return { error: `Only ${owner} can set up a routine that repeats through the day.` };
   if (outside && opts.deliverTo) return { error: `Only ${owner} can have a routine's results sent by text, email, Slack, Telegram or Discord. Its results stay in this chat.` };
   const zone = checkZone(opts.timeZone);
@@ -284,7 +284,7 @@ export function editRoutine(
   // And in the cloud: its thread is marked as theirs, which never runs on the user's Mac (sessions.ts StartOptions.outside).
   if (r.fromOutside && patch.where === "mac") return { error: outsideStaysInCloud(r) };
   // And at most once a day: a stranger's routine never repeats through the day (createRoutine).
-  if (r.fromOutside && (patch.schedule?.kind === "every" || patch.schedule?.kind === "before_event" || (patch.schedule && "times" in patch.schedule && (patch.schedule.times?.length ?? 0) > 1)))
+  if (r.fromOutside && (patch.schedule?.kind === "every" || patch.schedule?.kind === "before_event" || patch.schedule?.kind === "cron" || (patch.schedule && "times" in patch.schedule && (patch.schedule.times?.length ?? 0) > 1)))
     return { error: `Only ${ownerName()} can set up a routine that repeats through the day.` };
   const zone = "timeZone" in patch ? checkZone(patch.timeZone) : { timeZone: r.timeZone };
   if (zone.error) return { error: zone.error };

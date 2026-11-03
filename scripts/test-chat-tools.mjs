@@ -346,8 +346,8 @@ await check("the instructions have the new rules, said once, and none of the old
   const names = toolNames(typical);
   for (const n of ["web_search", "web_fetch", "read_skill", "create_skill", "update_skill", "schedule", "manage_routine", "watch", "start_task", "make_app", "change_app"]) assert.ok(names.includes(n), `has ${n}`);
   const tool = (n) => typical.tools.find((x) => x.name === n);
-  assert.deepEqual(tool("schedule").parameters.properties.schedule.properties.kind.enum, ["daily", "weekdays", "weekly", "monthly", "every", "before_event", "once"]);
-  for (const k of ["times", "days", "day_of_month"]) assert.ok(k in tool("schedule").parameters.properties.schedule.properties, `schedule has ${k}`);
+  assert.deepEqual(tool("schedule").parameters.properties.schedule.properties.kind.enum, ["daily", "weekdays", "weekly", "monthly", "every", "before_event", "once", "cron"]);
+  for (const k of ["times", "days", "day_of_month", "expr"]) assert.ok(k in tool("schedule").parameters.properties.schedule.properties, `schedule has ${k}`);
   assert.ok("time_zone" in tool("schedule").parameters.properties);
   assert.match(tool("schedule").parameters.properties.schedule.description, /8 AM and 5 PM on Mon, Wed, Fri" is weekly, times \["08:00","17:00"\], days \[1,3,5\]/);
   assert.match(tool("schedule").parameters.properties.schedule.description, /"30 minutes before each meeting" is before_event, minutes 30/);
