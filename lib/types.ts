@@ -871,6 +871,13 @@ export type Message = {
   /** Set on a "Remembered: …" line: the fact (so it can be undone) and an older one it may replace. */
   memory?: { ws: string; /** Saved to this bot's own bank (it keeps its memory to itself: lib/chain.ts). */ bot?: string; id: string; fact: string; undone?: boolean; old?: { id: string; text: string; forgotten?: boolean } };
   /**
+   * Set on Bops' line about a look a bot changed in the chat (chat.ts change_look, the owner's own turn
+   * only): what changed in one line, and the whole look before it (a record only: Undo takes the last
+   * change back off AppState.look's history, never from here). The line offers Undo and Reset (back to
+   * Bops' own look); `undone`/`reset` once the owner pressed the button.
+   */
+  look?: { summary: string; before: Look; undone?: true; reset?: true };
+  /**
    * Set on the note a bot's save to the CRM leaves (lib/server/crm.ts): the workspace and file, how many
    * rows it added and changed (or that it made the file), the copy from before it (`snapshot`) and the
    * file's version after it, so the note can open the file and undo the save while nothing changed since.
@@ -1591,6 +1598,40 @@ export type KeepDays = 30 | 90 | 365 | null;
 /** How long a copy of what the user deleted stays on the Mac it was deleted on (AppState.privacy): 0 is gone at once. */
 export type DeletedDays = 0 | 7 | 30;
 
+/** The window's color scheme (Look.theme): light or dark, or follow the system. */
+export type LookTheme = "light" | "dark" | "system";
+/** How much room the window's parts keep between them (Look.density). */
+export type LookDensity = "compact" | "normal" | "roomy";
+
+/**
+ * How the Bops window looks (AppState.look), as the owner set it in Settings or asked a bot to make it in
+ * the chat ("make the app dark green"). Every field is optional: one that isn't given keeps what it had.
+ * `css` is the owner's or a bot's own extra styles, checked before they're kept (lib/server/look.ts
+ * sanitizeCss): CSS can only paint, never load or run anything.
+ */
+export type Look = {
+  theme?: LookTheme;
+  /** The color buttons, links and highlights take, as #RRGGBB. */
+  accent?: string;
+  /** Text size as a share of the usual: 0.85 (smaller) to 1.4 (larger). */
+  fontScale?: number;
+  density?: LookDensity;
+  /** Extra CSS, at most 20 KB, with everything that could load or run taken out first. */
+  css?: string;
+};
+
+/** The window's look and where it came from (AppState.look): what's on now, and the ones before it to go back to. */
+export type LookState = {
+  /** What's applied now, as it was after the last change. */
+  current: Look;
+  /**
+   * The looks before the current one, newest first, at most LOOK_HISTORY (lib/server/look.ts): each
+   * change (Reset too) pushes what it replaced, and Undo, from the chat or Settings, takes the newest
+   * back off, so it walks back one change at a time.
+   */
+  history: Look[];
+};
+
 export type AppState = {
   /** Who the bots work for. Empty until set in Settings. */
   owner?: Owner;
@@ -1755,6 +1796,12 @@ export type AppState = {
    * whose routines are whose.
    */
   runners?: Record<string, RunnerState>;
+  /**
+   * How the window looks (Look): set in Settings, or changed by a bot on the owner's own ask in the chat
+   * (change_look). Shared like any setting, so the owner's other Macs take it too. A shared workspace
+   * never sees it: the look is the owner's, on their own screens.
+   */
+  look?: LookState;
   /**
    * Whether the computers' other screens stream live through Orgo too, not only over the tailnet
    * (BOPS_SCREEN_STREAM=1, screenStreamWanted in lib/server/orgo.ts). Filled in by /api/state for the
