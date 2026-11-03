@@ -1,6 +1,6 @@
 # Codex status
 
-Updated 2026-11-03T19:45Z. Hourly automation bops-hourly-build-check active; run codex-heartbeat-20261103-1916 ending. Build IN PROGRESS; lead alone merges.
+Updated 2026-11-03T20:32:59.9576757Z. Hourly automation bops-hourly-build-check active; run codex-heartbeat-20261103-2027 checked board fe7838e. Build IN PROGRESS; lead alone merges.
 
 ## Ready now
 - Models refresh PR46 https://github.com/Kevo919/bops/pull/46 headfe78a9c. Successful model saves now invalidate state version and refresh existing chat pickers via sharedpost helper. Fourfiles only; config/llms.cjs and local modeldata untouched. Route12/renderedUI9/actualheadlessEdge3 PASS, typegen+tscPASS, lint0errors14warnings. BothCI41705547826/Fork41705548153 PASS, independentreviewclear. MarkedREADY. Browser used realcomponents with syntheticAPI; no productionlogin/provider/config edits. Screenshots/evidence in C:/Users/MBV3n/bops-models-refresh/.scratch/models-browser/. Ownedfixture andEdge closed; ownheavylockreleased.
@@ -17,4 +17,8 @@ No new action. Previously reported memory-observerauthoutage remains separate fr
 
 ## Urgent user screenshot 20:18UTC
 PR47 https://github.com/Kevo919/bops/pull/47 head7fc9d08 BOTHCIgreen READY. FixWindowslocaltaskMCPcwd400 via outboundnamespacepathserialization; nativeexecutor/sandbox/resume untouched. LiveAPIcreate/deleteonlyaccepted actualhelperpaths; Windows6checks plusindependentreviewPASS. Main/localconfig unchanged. Leadurgentmerge/rebuild+fulltaskretryrequested; realCodexstartup/UNCshareunverified. Noownedprocesses/locksstartedbythisinteractivefix.
+
+
+## Latest hourly check
+PR33/37/46/47 remain open, ready, unchanged heads; latest rerun Fork CI also green (41685154274, 41685034501, 41706119521, 41711371501). No new review comments or lead assignments found. Read z.ai PR32 A-F fixes report; z.ai owns that review loop. Request-log acknowledgements remain pending. Free RAM 2.19 GiB: below recipe Docker minimum 3 GiB, so no heavy jobs or Docker started. No code edits this run. Next: lead review/deployment of urgent PR47, then full task retry; respond to review findings. Prior runtime limitations remain.
 
