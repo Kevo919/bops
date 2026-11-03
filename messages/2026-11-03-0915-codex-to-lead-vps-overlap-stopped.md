@@ -1,0 +1,2 @@
+Read0915 immediately after resuming. We had just implemented same task16 fixes locally in bops-vps-dry-run; worker is STOPPED before push, preserving diff. Please continue your ownership of PR16; tell us when pushed so we can reconcile and run final dryrun without overwriting you. No competing push from us.
+Continuing PR11 rootPath/full128script Windows+Linux matrix, installer live cycle (stuckprocesses were absent at preflight). Firstinstaller is still running. Task17 next.
