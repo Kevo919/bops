@@ -1847,6 +1847,11 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
   // In a workspace shared with the user it's the owner's memory: shown, nothing to undo or forget (readOnly).
   if (m.role === "system" && m.memory) return <MemoryNote m={m} readOnly={ro} className={enter ? "motion-new-item" : ""} />;
 
+  // A look this bot changed in the chat (change_look, the owner's own ask): what changed, with Undo
+  // and Reset (lib/server/look.ts holds both). The owner's own Bops only: a shared workspace's slice
+  // of the messages keeps just its own fields, so members never see it.
+  if (m.role === "system" && m.look) return <LookNote m={m} readOnly={ro} className={enter ? "motion-new-item" : ""} />;
+
   // A bot's save to the CRM: Open the file, or Undo it (only where the CRM is open: lib/crm-access.ts; and
   // neither in a workspace shared with the user, whose CRM is the owner's). CrmNote takes no class, so a new
   // one rises in inside a box that leaves its own alignment as it was.
@@ -2217,6 +2222,44 @@ function SystemNote({ text }: { text: string }) {
 }
 
 /** Something a bot remembered, with Undo (and Forget old for what it replaced): neither when `readOnly` (a shared workspace's, its owner's memory). */
+/** A look change a bot made in the chat (Message.look): what changed, with Undo (the look before it, kept on the message) and Reset (Bops' own look). */
+function LookNote({ m, readOnly = false, className = "" }: { m: Message; readOnly?: boolean; className?: string }) {
+  const look = m.look!;
+  const [busy, setBusy] = useState(false);
+  const act = (action: "undo" | "reset") => {
+    setBusy(true);
+    void post("/api/look", { action, messageId: m.id }).finally(() => setBusy(false));
+  };
+  const button = "shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium leading-4 text-ink hover:bg-black/[0.05] disabled:opacity-40";
+  const done = look.undone ? "Undone" : look.reset ? "Back to Bops' own look" : undefined;
+  return (
+    <div className={`flex w-full max-w-[400px] flex-col self-center rounded-[14px] bg-[#F7F7F6] py-2 pl-3 pr-1.5 text-[12px] leading-4 ${className}`}>
+      <div className="flex items-start gap-2">
+        <svg width="13" height="13" viewBox="0 0 16 16" className="mt-[1.5px] shrink-0 text-[#9A9A98]" aria-hidden>
+          <path d="M8 2a6 6 0 0 0-3.9 10.6L8 14l3.9-1.4A6 6 0 0 0 8 2Z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+          <circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+        </svg>
+        <div className="min-w-0 flex-1 pt-px">
+          <span className="font-medium text-[#6B6B6B]">{done ?? "New look"}</span>
+          <span className={`line-clamp-2 text-[#3A3A3A ${done ? " text-[#9A9A98] line-through" : ""}`} title={look.summary}>
+            {look.summary}
+          </span>
+        </div>
+        {!done && !readOnly && (
+          <div className="flex shrink-0 gap-0.5">
+            <button disabled={busy} onClick={() => act("undo")} className={button}>
+              Undo
+            </button>
+            <button disabled={busy} onClick={() => act("reset")} className={button}>
+              Reset
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MemoryNote({ m, readOnly = false, className = "" }: { m: Message; readOnly?: boolean; className?: string }) {
   const mem = m.memory!;
   const [busy, setBusy] = useState(false);

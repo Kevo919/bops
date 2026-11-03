@@ -39,6 +39,7 @@ import { proposedWords } from "@/lib/skill-proposals";
 import { offerProposal, PROPOSE_TOOL, sealProposals, type ProposeArgs } from "./skill-proposals";
 import { createSkill, findSkill, readSkill, skillRefId, skillsNote, skillText, SkillError, updateSkill, READ_SKILL_TOOL } from "./workspace-skills";
 import { linksFor } from "./channels";
+import { changeLookFromChat } from "./look";
 import { chose, decide, yes, type Answer } from "./decide";
 import { moveToMac, offerMove, replyToSession, startSession } from "./sessions";
 import { asksForMac, mentionsMac } from "./where";
@@ -832,6 +833,7 @@ const LOOKUPS = new Set([
   "update_skill",
   "deploy_app",
   "local_app",
+  "change_look",
   ...DATA_TOOL_NAMES,
   ...CRM_TOOL_NAMES,
   ...ORBIT_TOOL_NAMES,
@@ -1211,7 +1213,7 @@ type ChatPause = Omit<TurnOptions, "group" | "background" | "resume"> & {
  * it, talk in the chat, or ask a teammate. Those are for the user's own turns. (It can open and update
  * Orbit's issues.)
  */
-const NOT_IN_BACKGROUND = new Set(["react", "schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "remember", "make_page", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "hand_off", "tell_task", "ask_teammate", "create_bot", ...ORBIT_OWNER_ONLY]);
+const NOT_IN_BACKGROUND = new Set(["react", "schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "remember", "make_page", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "hand_off", "tell_task", "ask_teammate", "create_bot", ...ORBIT_OWNER_ONLY]);
 
 /**
  * What a turn someone else started (an email, a text or a call from outside) never has: anything that sets
@@ -1222,7 +1224,7 @@ const NOT_IN_BACKGROUND = new Set(["react", "schedule", "manage_routine", "watch
 /** All a sample (BackgroundJob.sample) has: finding an app's actions and running the ones that only read. */
 const SAMPLE_TOOLS = new Set(["find_app_actions", "use_app"]);
 
-const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "create_bot"]);
+const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "create_bot"]);
 
 /**
  * What a member's turn (TurnOptions.member) never has: what sets up or changes what the bots do on their own
@@ -1234,14 +1236,14 @@ const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_w
  * The owner's drafts are left out with the tools themselves; the Connected apps and keys this bot has are there, asking
  * the owner before anything that changes something.
  */
-const NOT_FROM_MEMBER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "create_bot", "remember", "recall", "text_me", ...ORBIT_OWNER_ONLY]);
+const NOT_FROM_MEMBER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "create_bot", "change_look", "remember", "recall", "text_me", ...ORBIT_OWNER_ONLY]);
 /**
  * Not on a chat turn a computer's runner answers (runner-chat.ts): what writes parts of the state a computer may not
  * (routines, watches, skills, bots: cloud/computer-scope.ts would hold them back, and the bot would say it did what never
  * landed), what keeps files on the owner's Mac (pages, pictures, apps), and work handed to another bot, which may be on
  * another computer. Those wait for the owner's Mac.
  */
-const NOT_ON_RUNNER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "propose_skill_change", "create_bot", "make_page", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "hand_off", "ask_teammate"]);
+const NOT_ON_RUNNER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "propose_skill_change", "create_bot", "change_look", "make_page", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "hand_off", "ask_teammate"]);
 /** Tools that only read: calling them is nothing that can't be done twice (turn-context.ts noteActing). */
 const ONLY_READS = new Set(["find_app_actions", "recall", "check_email", "read_email", "web_fetch", "read_skill", "react"]);
 const notFromMember = (apps: boolean) => (apps ? NOT_FROM_MEMBER : new Set([...NOT_FROM_MEMBER, "make_app", "change_app", "work_on_app", "deploy_app", "local_app"]));
@@ -2230,6 +2232,23 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
             }),
           ]
         : []),
+      // How the Bops window looks (lib/server/look.ts), changed on the owner's own ask only: never a turn
+      // someone else started, a member's, a call or a routine's run (they don't get the tool at all:
+      // NOT_FROM_OUTSIDE, NOT_FROM_MEMBER, NOT_IN_BACKGROUND, and a runner's turn neither: NOT_ON_RUNNER),
+      // and every field is checked before anything is kept (lib/look-theme.ts). The chat shows the change
+      // under the reply, with Undo and Reset.
+      ...(opts.outside || member || bg || opts.call
+        ? []
+        : [
+            fn("change_look", `Change how the Bops window looks, when ${owner} asks for it ("make the app dark green", "bigger text", "hide the sidebar labels"). Use it the moment they ask how Bops should look, then say what changed. What you don't name keeps what it has. Extra CSS can only paint: nothing that loads or runs anything is kept. ${owner} can Undo the change in the chat, or set the look themselves in Settings.`, {
+              theme: { type: ["string", "null"], enum: ["light", "dark", "system", null], description: "The window's colors: light, dark, or system to follow this computer's. Null to keep." },
+              accent: { type: ["string", "null"], description: 'The color buttons and highlights take, as #RRGGBB ("#1F6F43" for dark green). Null to keep.' },
+              font_scale: { type: ["number", "null"], description: "How big the text is: 0.85 (85%, smaller) to 1.4 (140%, larger), 1 the usual. Null to keep." },
+              density: { type: ["string", "null"], enum: ["compact", "normal", "roomy", null], description: "How much room the window's parts keep. Null to keep." },
+              css: { type: ["string", "null"], description: 'Extra CSS for the window, at most 20 KB, plain styles only: no @import, no url() except url(data:image/...), no javascript:, no "<". Null to keep, "" to clear.' },
+              summary: { type: "string", description: "One short line saying what changed, shown under the change in the chat (\"Dark green accents, slightly bigger text\")." },
+            }),
+          ]),
     ];
     // A routine's run looks things up and may start a task; it never sets something up or talks in the chat.
     // Someone else's turn never sets up or changes what the bots do on their own.
@@ -2600,6 +2619,13 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
           if (e instanceof SkillError) return `Not saved: ${e.message}${e.problems?.length ? ` (${e.problems.map((x) => `${x.path}${x.line ? ` line ${x.line}` : ""}: ${x.reason}`).join("; ")})` : ""}`;
           throw e;
         }
+      }
+      // The window's look, changed on the owner's own ask (the tool is on their turns alone; a lookup it
+      // wasn't offered does nothing above). On a turn that read something from outside Bops it isn't
+      // changed, like a skill isn't saved: a page's, an email's or an app's words could be what asked.
+      if (name === "change_look") {
+        if (outsideRead) return `Not changed: this turn read something from outside Bops (a page, an email, an app or data), and that can't change how the window looks. Ask ${owner} to say it themselves in the chat.`;
+        return changeLookFromChat(b, a, chatId);
       }
       if (name === "deploy_app") {
         // An app goes on the public web: on a turn that read something from outside Bops, only when the user's own words asked to deploy it.
