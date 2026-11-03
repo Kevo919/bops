@@ -8,6 +8,7 @@ import { getState } from "./store";
 import { fromThisMac } from "./owner-email";
 import { fromBopsWindow } from "./ui-token";
 import { getLocalSubscriptionStatus, localSubscriptionRuntime } from "./local-subscriptions";
+import { localCodexChatIsolationVerified } from "./local-codex-chat-capability";
 
 export const LOCAL_CODEX_DISCLOSURE = "Runs in Codex on this PC with your ChatGPT plan. It can read files on this PC but can't change them or go online.";
 const MAX_INPUT = 128 * 1024;
@@ -41,6 +42,7 @@ export function requireLocalCodexChatOwner(request: Request, chatId: string): vo
  * Never used by the API executor.
  */
 export async function runLocalCodexChat(input: { request: Request; chatId: string; prompt: string; signal?: AbortSignal }): Promise<string> {
+  if (!localCodexChatIsolationVerified()) throw new Error("ChatGPT-plan chat is unavailable until local file and network isolation can be verified. No message was sent to Codex.");
   requireLocalCodexChatOwner(input.request, input.chatId);
   const scope = () => {
     const state = getState();

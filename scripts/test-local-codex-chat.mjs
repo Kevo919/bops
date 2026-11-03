@@ -44,10 +44,23 @@ const modules = {
     localSubscriptionRuntime: () => ({ file: "synthetic-codex", env: { HOME: "synthetic-official-home", PATH: "synthetic-path" } }),
   },
 };
-const api = {};
-new Function("require", "exports", "setTimeout", ts.transpile(source, { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }))((id) => {
-  assert.ok(Object.hasOwn(modules, id), `unexpected dependency ${id}`); return modules[id];
-}, api, (callback, ms) => setTimeout(callback, Math.min(ms, 50)));
+const productionCapability = {};
+const capabilitySource = readFileSync(fileURLToPath(new URL("../lib/server/local-codex-chat-capability.ts", import.meta.url)), "utf8");
+new Function("require", "exports", ts.transpile(capabilitySource, { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }))((id) => {
+  assert.equal(id, "server-only"); return {};
+}, productionCapability);
+function loadAdapter(capability) {
+  const api = {};
+  new Function("require", "exports", "setTimeout", ts.transpile(source, { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }))((id) => {
+    if (id === "./local-codex-chat-capability") return capability;
+    assert.ok(Object.hasOwn(modules, id), `unexpected dependency ${id}`); return modules[id];
+  }, api, (callback, ms) => setTimeout(callback, Math.min(ms, 50)));
+  return api;
+}
+// Only this in-memory test loader can exercise the unapproved prototype path.
+// There is no production option, environment variable or function argument bypass.
+const api = loadAdapter({ localCodexChatIsolationVerified: () => true });
+const productionApi = loadAdapter(productionCapability);
 const request = () => new Request("http://127.0.0.1/api/chat", { headers: { "x-bops-window": "synthetic-window" } });
 const input = () => ({ request: request(), chatId: "chat", prompt: "synthetic prompt" });
 const saved = { self: process.env.BOPS_SELF_HOSTED, token: process.env.BOPS_UI_TOKEN };
@@ -60,6 +73,13 @@ async function test(name, fn) {
   for (const c of calls) assert.ok(!existsSync(c.options.cwd), "owned empty working directory cleaned after process exit");
 }
 try {
+  await test("real production capability rejects before status, filesystem or any CLI process", async () => {
+    statusHook = () => { assert.fail("production must not invoke CLI status"); };
+    assert.equal(productionCapability.localCodexChatIsolationVerified(), false);
+    await assert.rejects(productionApi.runLocalCodexChat(input()), /unavailable until local file and network isolation can be verified/);
+    await assert.rejects(productionApi.runLocalCodexChat(undefined), /No message was sent to Codex/);
+    assert.equal(calls.length, 0);
+  });
   await test("missing actual request, phone, remote and shared requests fail before spawning", async () => {
     await assert.rejects(api.runLocalCodexChat({ ...input(), request: undefined }), /private desktop/);
     for (const r of [new Request("http://evil.test", { headers: { "x-bops-window": "synthetic-window" } }), new Request("http://127.0.0.1", { headers: { "x-bops-window": "synthetic-window", "x-bops-remote": "" } }), new Request("http://127.0.0.1")]) await assert.rejects(api.runLocalCodexChat({ ...input(), request: r }), /private desktop/);
