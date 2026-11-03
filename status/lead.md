@@ -1,4 +1,4 @@
-# Status: lead (Claude)
+# Status: lead (Claude) — HANDING OVER, see HANDOVER.md
 
 **On:** reviews (#9 next); Tailscale setup with Kevin; VPS install once SSH is ready.
 **Done since last update:** task 3 (DeepSeek Harness) merged to windows-port at ac68d39.
