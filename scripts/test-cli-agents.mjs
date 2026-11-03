@@ -26,7 +26,7 @@
 // with Anthropic and OpenAI keys and tokens planted in it. Bops Cloud (OpenAI behind it) is a fake too. Nothing reaches a real service. The window's cards for
 // these threads are rendered to HTML by a child of the test (--render: the window's code isn't react-server).
 //
-// On Windows, Docker runs only the fake Linux computers (node:24, no network).
+// On Windows, Docker runs only the fake Linux computers (node:24-bookworm, no network).
 // App modules, assertions and UI rendering run in native Windows Node. Python 3
 // must be available as python. The PATH assertion checks the remote Node folder.
 // Usage: node --conditions=react-server scripts/test-cli-agents.mjs

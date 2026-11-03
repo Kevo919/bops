@@ -37,14 +37,14 @@ export function linuxComputerFixture(nativeScratch) {
   const start = () => {
     try {
       if (docker(['info', '--format', '{{.OSType}}']).toString().trim() !== 'linux') throw new Error('Docker must use Linux containers');
-      docker(['image', 'inspect', 'node:24']);
+      docker(['image', 'inspect', 'node:24-bookworm']);
       // No host networking, published ports, socket, credentials or repository mount.
       started = true; // Also clean up if Docker creates it but the client times out.
-      docker(['run', '-d', '--name', name, '--network', 'none', '--memory', '1g', '--cpus', '1', '--mount', `type=bind,source=${mountedScratch},target=${remote}`, 'node:24', 'sleep', 'infinity']);
+      docker(['run', '-d', '--name', name, '--network', 'none', '--memory', '1g', '--cpus', '1', '--mount', `type=bind,source=${mountedScratch},target=${remote}`, 'node:24-bookworm', 'sleep', 'infinity']);
       docker(['exec', name, 'bash', '-c', 'command -v node && command -v python3 && command -v ps && command -v pkill']);
     } catch (error) {
       stop();
-      throw new Error('Windows CLI tests require running Linux Docker and a local node:24 image with bash, python3 and procps.', { cause: error });
+      throw new Error('Windows CLI tests require running Linux Docker and a local node:24-bookworm image with bash, python3 and procps.', { cause: error });
     }
   };
   const poison = {
