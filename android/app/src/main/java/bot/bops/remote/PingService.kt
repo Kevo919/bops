@@ -31,9 +31,18 @@ class PingService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private val prefs by lazy { getSharedPreferences("bops", MODE_PRIVATE) }
 
+    private val servers by lazy { ServerStore(this) }
+    private val inFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    @Volatile private var stopped = false
+
     private val tick = object : Runnable {
         override fun run() {
-            thread { check() }
+            if (servers.all().none { it.code != null }) { stopSelf(); return }
+            for (server in servers.all()) {
+                if (server.code != null && ServerSafety.safeAddress(server.address) == null && inFlight.add(server.id)) {
+                    thread { try { check(server) } finally { inFlight.remove(server.id) } }
+                }
+            }
             handler.postDelayed(this, EVERY_MS)
         }
     }
@@ -46,6 +55,7 @@ class PingService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        stopped = false
         channels()
         val watching = Notification.Builder(this, QUIET)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
@@ -63,22 +73,28 @@ class PingService : Service() {
     }
 
     override fun onDestroy() {
+        stopped = true
         handler.removeCallbacks(tick)
         super.onDestroy()
     }
 
     /** One look: new pings become notifications; the ones seen before are remembered (by key), not shown again. */
-    private fun check() {
-        val address = prefs.getString("address", null) ?: return
-        val code = prefs.getString("code", null) ?: return
+    private fun check(server: Server) {
+        val address = server.address
+        val code = server.code ?: return
+        var connection: HttpURLConnection? = null
         try {
             val c = (URL("$address/api/pings").openConnection() as HttpURLConnection).apply {
+                instanceFollowRedirects = false
                 connectTimeout = 10000; readTimeout = 15000
                 setRequestProperty("Cookie", "bops_remote=$code")
             }
+            connection = c
+            if (c.responseCode == 401 || c.responseCode == 403) { servers.forget(server); return }
             if (c.responseCode != 200) return
-            val list = JSONObject(c.inputStream.bufferedReader().readText()).getJSONArray("pings")
-            val seen = prefs.getStringSet("seen", null)
+            val list = JSONObject(c.inputStream.bufferedReader().use { it.readText() }).getJSONArray("pings")
+            if (stopped || servers.all().find { it.id == server.id }?.code != code) return
+            val seen = servers.seen(server)
             val now = (0 until list.length()).map { list.getJSONObject(it) }
             // The first look only learns what's already there: nothing old buzzes the phone.
             if (seen != null) {
@@ -86,24 +102,27 @@ class PingService : Service() {
                 for (p in now) {
                     val key = p.getString("key")
                     if (key in seen) continue
-                    nm.notify(key.hashCode(), Notification.Builder(this, ALERTS)
+                    nm.notify("${server.id}:$key", 0, Notification.Builder(this, ALERTS)
                         .setSmallIcon(android.R.drawable.ic_dialog_info)
-                        .setContentTitle(p.optString("title", "Bops"))
+                        .setContentTitle("${server.name}: ${p.optString("title", "Bops")}")
                         .setContentText(p.optString("body"))
                         .setStyle(Notification.BigTextStyle().bigText(p.optString("body")))
-                        .setContentIntent(openApp())
+                        .setContentIntent(openApp(server))
                         .setAutoCancel(true)
                         .build())
                 }
             }
             // Kept to what's still listed, so the set doesn't grow for ever.
-            prefs.edit().putStringSet("seen", now.map { it.getString("key") }.toSet()).apply()
+            servers.remember(server, now.map { it.getString("key") }.toSet())
         } catch (_: Exception) {
             // Out of reach for now (no Tailscale, PC asleep): try again next minute.
-        }
+        } finally { connection?.disconnect() }
     }
 
-    private fun openApp() = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE)
+    private fun openApp(server: Server? = null) = PendingIntent.getActivity(this, 0,
+        Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .setAction(server?.let { "bot.bops.remote.OPEN.${it.id}" })
+            .putExtra("serverId", server?.id), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
 
     private fun channels() {
         val nm = getSystemService(NotificationManager::class.java)
@@ -121,7 +140,10 @@ class PingService : Service() {
         /** Start it when the phone is paired and notifications are on (the default). */
         fun startIfWanted(context: Context) {
             val p = context.getSharedPreferences("bops", Context.MODE_PRIVATE)
-            if (p.getString("code", null) == null || !p.getBoolean("notify", true)) return
+            if (ServerStore(context).all().none { it.code != null } || !p.getBoolean("notify", true)) {
+                context.stopService(Intent(context, PingService::class.java))
+                return
+            }
             context.startForegroundService(Intent(context, PingService::class.java))
         }
     }
