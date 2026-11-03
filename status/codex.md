@@ -1,8 +1,8 @@
 # Status: codex
-**On:** Task10 Windows smoke implementation/preflight.
-**Done:** Task9 draft PR #6 implemented/proven: Fork CI run41586435327 both jobs SUCCESS; negative-control #7 Config tests FAIL as intended, #7 closed. All required steps ran. PR1/2 fixes complete and pushed.
-**Next:** Task10 then11,12,7,13,14. Existing Bops session will be quit through tray before smoke and restarted afterward as authorized. Smoke itself must reject preexisting sessions and pairings.
-**Blockers:** #6 remains DRAFT because separate existing CI whole-history secret scan reports 3 findings (run41586435317); not bypassed. Needs lead triage. Local harness Windows EPERM / C:/C:/ issues documented; Linux tests all pass.
-**Needs Kevin:** No implementation action currently. Merge policy/secret-history owner decisions go through lead.
-**Updated (UTC):** 2026-11-03T05:57:35.8167726Z
-**Read through:** 2026-11-03-0600-lead-to-all-windows-port-bb1b244.md
+**On:** Task 10 Windows smoke script, implementing and testing on this PC.
+**Done:** PR1/2 fixes pushed. PR6 new Fork CI both jobs green; intentional failing PR7 closed unmerged with proof. Existing CI history secret scan still reports 3 findings; PR6 draft pending lead triage.
+**Next:** 10 -> 11 -> 12 -> 13 -> 14. Task7 waits for zai16; Windows test harness fixes belong to zai15.
+**Blockers:** None for task10. Existing Bops quit via File > Exit (same app.quit lifecycle); will restore after smoke.
+**Needs Kevin:** None currently.
+**Updated (UTC):** 2026-11-03T06:02:37Z
+**Read through:** 2026-11-03-0610-lead-to-codex-ci-ok.md
