@@ -441,12 +441,43 @@ await test("Claude Code is npm's own package at the pinned version, into Bops' f
   assert.equal(pc("pc-y").installs, 2, "one that failed is tried again");
 });
 
-await test("the brain scripts go on a computer as they are in vm/bin, and only when they changed", async () => {
+await test("the brain scripts go on a computer with Linux line endings, and only when they changed", async () => {
   await B.ensureBrainTools("pc-main");
-  for (const f of ["bops-brain", "bops-brain-browser"]) assert.equal(readFileSync(join(pc("pc-main").bin, f), "utf8"), readFileSync(join(rootPath, "vm/bin", f), "utf8"));
+  for (const f of ["bops-brain", "bops-brain-browser"]) assert.equal(readFileSync(join(pc("pc-main").bin, f), "utf8"), readFileSync(join(rootPath, "vm/bin", f), "utf8").replace(/\r\n/g, "\n"));
   const n = pc("pc-main").commands.length;
   await B.ensureBrainTools("pc-main");
   assert.equal(pc("pc-main").commands.length, n, "checked once per run of Bops");
+});
+
+await test("CRLF brain scripts replace stale remote hashes with executable LF uploads", async () => {
+  const fixture = join(scratch, "crlf-source");
+  mkdirSync(join(fixture, "vm/bin"), { recursive: true });
+  const names = ["bops-brain", "bops-brain-browser", "bops-agent", "bops-ai-gate", "bops-exec"];
+  const c = pc("pc-crlf");
+  for (const name of names) {
+    const lf = readFileSync(join(rootPath, "vm/bin", name), "utf8").replace(/\r\n/g, "\n");
+    assert.match(lf, /^#!\/usr\/bin\/env (bash|python3)\n/);
+    const crlf = lf.replace(/\n/g, "\r\n");
+    writeFileSync(join(fixture, "vm/bin", name), crlf);
+    writeFileSync(join(c.bin, name), crlf);
+  }
+  const before = process.cwd();
+  try {
+    process.chdir(fixture);
+    await B.ensureBrainTools("pc-crlf");
+    for (const name of names) {
+      const uploaded = readFileSync(join(c.bin, name));
+      const source = readFileSync(join(fixture, "vm/bin", name));
+      assert.equal(uploaded.toString(), source.toString().replace(/\r\n/g, "\n"));
+      assert.notEqual(createHash("md5").update(uploaded).digest("hex"), createHash("md5").update(source).digest("hex"));
+      assert.ok(c.commands.some((command) => command.endsWith(`> /usr/local/bin/${name} && chmod 0755 /usr/local/bin/${name} && echo ok`)));
+    }
+    const count = c.commands.length;
+    await B.ensureBrainTools("pc-crlf");
+    assert.equal(c.commands.length, count, "normalized content uses the existing cache");
+  } finally {
+    process.chdir(before);
+  }
 });
 
 await test("Claude Code's status is kept to whether it's signed in, how, and whose account", () => {

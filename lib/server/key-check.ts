@@ -8,10 +8,11 @@ export type KeyCheckResult = {
   message?: string;
 };
 
-type Probe = { key: string; label: string; url: string; kind: "openai" | "anthropic" | "models" | "openrouter" | "orgo" };
+type Probe = { key: string; label: string; url: string; kind: "openai" | "anthropic" | "models" | "openrouter" | "orgo" | "ollama" };
 const provider = (route: AgentRoute, url: string, kind: Probe["kind"]): Probe => ({ key: ROUTE_KEYS[route], label: ROUTE_NAMES[route], url, kind });
-// Scope is intentionally these five providers plus the executor and Orgo, not every Vault service.
-// Fixed HTTPS destinations: request data and environment overrides cannot redirect a secret.
+// Scope is intentionally these five providers plus the executor, Orgo and Ollama, not every Vault service.
+// Fixed HTTPS destinations: request data and environment overrides cannot redirect a secret. Ollama is the one
+// exception: its address is the owner's own setting, and the only secret sent there is its own (OLLAMA_API_KEY).
 const probes: Probe[] = [
   provider("openai", "https://api.openai.com/v1/chat/completions", "openai"),
   { key: "OPENAI_EXECUTOR_API_KEY", label: "OpenAI executor", url: "https://api.openai.com/v1/chat/completions", kind: "openai" },
@@ -20,7 +21,11 @@ const probes: Probe[] = [
   provider("deepseek", "https://api.deepseek.com/models", "models"),
   provider("openrouter", "https://openrouter.ai/api/v1/key", "openrouter"),
   { key: "ORGO_API_KEY", label: "Orgo", url: "https://www.orgo.ai/api/account/capacity", kind: "orgo" },
+  // Ollama has no key: its row is its address (OLLAMA_BASE_URL), set only in this server's .env.local by its owner,
+  // and the check lists its models there (GET {base}/models). OLLAMA_API_KEY, if set, goes with it as Bearer.
+  { key: ROUTE_KEYS.ollama, label: ROUTE_NAMES.ollama, url: "", kind: "ollama" },
 ];
+const ollamaModels = () => `${(process.env.OLLAMA_BASE_URL?.trim() ?? "").replace(/\/+$/, "")}/models`;
 
 export function keyCheckList(): KeyCheckResult[] {
   return probes.map(({ key, label }) => ({ key, label, status: process.env[key]?.trim() ? "set" : "not set" }));
@@ -58,17 +63,25 @@ export async function checkKey(key: string): Promise<KeyCheckResult | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
   try {
+    const ollamaKey = process.env.OLLAMA_API_KEY?.trim();
     const headers: Record<string, string> = kind === "anthropic"
       ? { "x-api-key": secret, "anthropic-version": "2023-06-01" }
+      : kind === "ollama" ? (ollamaKey ? { Authorization: `Bearer ${ollamaKey}` } : {})
       : { Authorization: `Bearer ${secret}` };
     if (kind === "openai") headers["Content-Type"] = "application/json";
-    const response = await fetch(probe.url, {
+    const response = await fetch(kind === "ollama" ? ollamaModels() : probe.url, {
       method: kind === "openai" ? "POST" : "GET", headers, redirect: "error", cache: "no-store", signal: controller.signal,
       // A tiny generation distinguishes exhausted credit from merely being allowed to list models.
       ...(kind === "openai" ? { body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "user", content: "Hi" }], max_tokens: 1, stream: false }) } : {}),
     });
     const data = await payload(response);
     const error = data?.error && typeof data.error === "object" ? data.error as Record<string, unknown> : null;
+    if (kind === "ollama") {
+      if (response.status === 401 || response.status === 403) return result("invalid", "Ollama's address answered but wants a key: set OLLAMA_API_KEY to the one its proxy expects.");
+      if (!response.ok || !data || !Array.isArray(data.data)) return result("unavailable", "Something answered at OLLAMA_BASE_URL, but not as Ollama's model list. Check the address ends in /v1.");
+      const n = data.data.length;
+      return result("works", n ? `Ollama answered with ${n} model${n === 1 ? "" : "s"}. It's free: no key or credit needed.` : "Ollama answered, but has no models yet: pull one on the server (ollama pull qwen2.5:3b).");
+    }
     if (response.status === 401) return result("invalid", "The provider rejected this key's authentication.");
     if (response.status === 402 || (kind === "openai" && [error?.code, error?.type].some((code) => code === "insufficient_quota" || code === "billing_hard_limit_reached")))
       return result("no credit", "The provider reports insufficient credit or an exhausted spending allowance.");
@@ -86,6 +99,7 @@ export async function checkKey(key: string): Promise<KeyCheckResult | null> {
     } else if (kind !== "orgo" && !Array.isArray(data.data)) return result("unavailable", "The provider returned an unexpected response.");
     return result("works", "The authenticated check succeeded. Generation credit and access to individual models were not tested.");
   } catch {
+    if (kind === "ollama") return result("unavailable", "Nothing answered at OLLAMA_BASE_URL, or it timed out. Check that Ollama is running and the address is right.");
     return result("unavailable", "The provider could not be reached or the check timed out. This does not mean the key is invalid.");
   } finally { clearTimeout(timer); }
 }
