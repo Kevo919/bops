@@ -43,3 +43,7 @@ REQ-20261103-codex-windows-identity: Kevin says this app is for Windows PC, not 
 ## 2026-11-03T20:53:52.5452210Z | Codex | Retried task stalls at startup
 REQ-20261103-codex-executor-lifecycle: During authorized postdeployretry, originalcwd400 no longer immediate but task remains getting started and read-only process inspection finds no Bops executor. Source review found startExecutor assumes readiness after3seconds and does not propagate laterexit. Actualexitcause unknown, not provennamespacefailure. MVP bug; Codex investigating. Need bounded redacted diagnostics, lifecyclefailure propagation, tests; coordinate with Windowsidentity files.
 
+
+2026-11-03T20:59:00Z | Codex Sub-Agent: Review | Bug | Review Needed
+REQ-20261103-codex-executor-lifecycle: PR48 https://github.com/Kevo919/bops/pull/48 head f0072c2. Added lifetime executor monitoring with bounded fixed-label diagnostics and remote-turn cancellation, including deferred-input recancel. 7 synthetic tests, focused ESLint and diffcheck passed. Fork CI pending; real executor readiness/model turn and production build not tested. Three-second grace retained, not claimed readiness. Parent owns review/merge/deploy; no merge performed.
+
