@@ -1010,28 +1010,32 @@ export function ChatView({
               }}
             />
             )}
-            {solo && !state.shared && (
-              <AgentChipPick
-                state={state}
-                bot={solo}
-                keys={boxKeys}
-                value={picked?.id ?? null}
-                onPick={(id) =>
-                  setAgentPicks((p) => {
-                    const next = { ...p };
-                    if (id) next[c.id] = id;
-                    else delete next[c.id];
-                    return next;
-                  })
-                }
-              />
-            )}
-            {/* The model this chat's replies run on (Chat.model): Auto is OpenAI, as before. */}
-            {!state.shared && <ChatModelPick state={state} chat={c} onError={setModelError} />}
             <button type="submit" aria-label="Send" disabled={!draft.trim() && !attaching.length} className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-ink disabled:opacity-30">
               <SendIcon />
             </button>
             </div>
+            {!state.shared && (
+            <div data-composer-chips className="flex min-w-0 flex-wrap items-center gap-1.5 pt-1 [&>*]:min-w-0 [&>*]:max-w-full">
+              {solo && !state.shared && (
+                <AgentChipPick
+                  state={state}
+                  bot={solo}
+                  keys={boxKeys}
+                  value={picked?.id ?? null}
+                  onPick={(id) =>
+                    setAgentPicks((p) => {
+                      const next = { ...p };
+                      if (id) next[c.id] = id;
+                      else delete next[c.id];
+                      return next;
+                    })
+                  }
+                />
+              )}
+              {/* The model this chat's replies run on (Chat.model): Auto is OpenAI, as before. */}
+              {!state.shared && <ChatModelPick state={state} chat={c} onError={setModelError} />}
+            </div>
+            )}
           </form>
           )}
           {micError && <div className="px-3 pt-1.5 text-[12px] leading-4 text-[#B42318]">{micError}</div>}
