@@ -1,3 +1,4 @@
+import { computerWords } from "@/lib/computer-words";
 import "server-only";
 import { monitorExecutor } from "./executor-lifecycle";
 import { agentApiPath } from "./agent-api-path";
@@ -346,9 +347,9 @@ export function prepareTaskDir(sessionId: string, dir = taskDir(sessionId), keep
  * writeSkillFiles), fresh each run, so Codex finds them as skills. A folder it can't write costs the task nothing.
  */
 export async function startExecutor(sessionId: string, envId: string, remoteUrl: string, port: number, dir = taskDir(sessionId), fullAccess = false, botId?: string, keep = false): Promise<ChildProcess> {
-  if (!fullAccess && !onWindows && !existsSync(SANDBOX_EXEC)) throw new Error("this Mac has no sandbox for bots (/usr/bin/sandbox-exec)");
+  if (!fullAccess && !onWindows && !existsSync(SANDBOX_EXEC)) throw new Error(computerWords("this Mac has no sandbox for bots (/usr/bin/sandbox-exec)", process.platform));
   const codex = findCodex();
-  if (!codex) throw new Error("the Codex CLI isn't on this Mac yet");
+  if (!codex) throw new Error(computerWords("the Codex CLI isn't on this Mac yet", process.platform));
   prepareTaskDir(sessionId, dir, keep);
   if (botId)
     try {
