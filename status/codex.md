@@ -1,16 +1,17 @@
 # Codex status
 
-Restart recovery: board read through PC GO. Task22 checked: 3.79GiB free RAM; no Docker Desktop/backend/emulator processes running. No heavy job started; lead has priority and workers told to wait for bops-build.lock/lead clearance.
+Updated 2026-11-03 13:30 UTC. Board read through the lead's PC GO and recipe-format messages. No newer reply to the Repos design yet.
 
-Hourly check configured: Codex heartbeat `Bops hourly build check`, id bops-hourly-build-check, hourly, ACTIVE. Created2026-11-03T13:10Z; firstdueabout14:10Z (08:10CST). Uses overlaplock and localstart/endlog,45minbudget, PC HOLD/heavylock, stopwhen actualBuildstatusBUILD DONE. Manualresumesessionlock acquired; no scheduledrun yet.
+- PR11: b777fff contains remaining portable paths and the Windows CLI fixture; d87f364 merges current windows-port. Native Windows assertions use Docker only for fake Linux computers. Live CLI and final matrix remain pending.
+- PR15: latest shortcut fix 2ea7436 passes CI and Fork CI (41644006037, 41644006146). Live shortcut upgrade validation still pending; earlier install/uninstall/reinstall evidence applies to the earlier build only.
+- PR17: both workflows green at 30be004. Waiting for installer follow-up before final alignment.
+- PR18: both workflows green; ready for lead review.
+- Task18: nine-file Codex ChatGPT-plan draft includes owner/self-hosted guards and provider-token isolation. Syntax checks pass; independent re-review underway. Behavioral tests and real login not yet verified.
+- Task19: design posted in the 1323 message. Awaiting recipe schema and sandbox/private clone/tool registration decisions before implementation.
 
-PR11:6residualpathfixes ready; CLIfixturecode inprogress. WindowsNode keepsassertions; Dockeronly suppliesfakeLinuxcomputers because POSIXrunnersemantics cannot be reproduced inGitBash. One authorizedPATHassertion targetsconfiguredcomputerNode; no productionrunner edits. Finalmatrix waitingheavylock.
+Heavy work: 4.43 GiB free at 13:28 UTC, no build lock then. Respecting lead's first 20-minute window before taking the shared lock.
 
-CI: PR6merged before followuppush; creating CImaintenancePR for provider/key/catalog/look tests and exacthistoryscanfix after reviewingfreshfingerprints. Open15/17 baseintegrationongoing;17add/addsmokeconflict resolved preservingverifiedinspect-freeversion afterconfirming incomingfileequalsoriginalPR9.
+Hourly continuation: Codex heartbeat `bops-hourly-build-check` ACTIVE, first due about 14:10 UTC. Current manual session uses the overlap lock and local run log. Each run is limited to about 45 minutes; stop only when the board's build status is BUILD DONE.
 
 ## Needs Kevin
-None for currentwork; lead owns review/merge understandingapproval.
-
-Update: PR18 CI-followup bothworkflowsgreen/ready. PR15/17 baseintegrationCIgreen;15task42shortcutcodependinglivevalidation. Task18code-onlystarted;19designinspectionunderway.
-
-Task19 designposted; awaitingrecipeformat+sandbox/privateclone/registration/phonegate decisions. Task18inprogress. Heavyworkstillheldforleadfirst20min.
+None for current work. Lead owns review and merge.
