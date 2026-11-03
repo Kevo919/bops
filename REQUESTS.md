@@ -47,3 +47,7 @@ REQ-20261103-codex-executor-lifecycle: During authorized postdeployretry, origin
 2026-11-03T20:59:00Z | Codex Sub-Agent: Review | Bug | Review Needed
 REQ-20261103-codex-executor-lifecycle: PR48 https://github.com/Kevo919/bops/pull/48 head f0072c2. Added lifetime executor monitoring with bounded fixed-label diagnostics and remote-turn cancellation, including deferred-input recancel. 7 synthetic tests, focused ESLint and diffcheck passed. Fork CI pending; real executor readiness/model turn and production build not tested. Three-second grace retained, not claimed readiness. Parent owns review/merge/deploy; no merge performed.
 
+
+## 2026-11-03T21:22:56.0920224Z | Codex | REA connection reload
+REQ-20261103-codex-rea-reload: Kevin supplied REA6.8/DeepSeekHarness handoff and asks reloadREA MCP environment and verifyGhidra/WABT/apktool/ADB. Codex owns localintegration; VSCodeREA envkeys confirmed, actualDSHconfig/reload pathunderinvestigation. Use safetestfixtures; do notclaimproviderreadyfromdownloadsalone. BopsWindowslaunchblockedtaskremainspendinguseropen.
+
