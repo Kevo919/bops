@@ -96,20 +96,27 @@ class MainActivity : Activity() {
     }
 
     /** Null when the server answers as Bops and takes the code; otherwise what's wrong, in words. */
-    private fun check(address: String, code: String): String? = try {
-        val health = (URL("$address/api/health").openConnection() as HttpURLConnection).apply { connectTimeout = 8000; readTimeout = 8000 }
-        if (health.responseCode != 200 || !health.inputStream.bufferedReader().readText().contains("\"bops\"")) return "That address answers, but it isn't Bops."
-        val state = (URL("$address/api/state").openConnection() as HttpURLConnection).apply {
-            connectTimeout = 8000; readTimeout = 15000
-            setRequestProperty("Cookie", "bops_remote=$code")
+    private fun check(address: String, code: String): String? {
+        try {
+            // With the code: from another device Bops answers nothing at all without it (proxy.ts).
+            val health = (URL("$address/api/health").openConnection() as HttpURLConnection).apply {
+                connectTimeout = 8000; readTimeout = 8000
+                setRequestProperty("Cookie", "bops_remote=$code")
+            }
+            if (health.responseCode == 403) return "Bops didn't take that pairing code. Pair again in the Bops app and use the new code."
+            if (health.responseCode != 200 || !health.inputStream.bufferedReader().readText().contains("\"bops\"")) return "That address answers, but it isn't Bops."
+            val state = (URL("$address/api/state").openConnection() as HttpURLConnection).apply {
+                connectTimeout = 8000; readTimeout = 15000
+                setRequestProperty("Cookie", "bops_remote=$code")
+            }
+            return when (state.responseCode) {
+                in 200..299 -> null
+                401, 403 -> "Bops didn't take that pairing code. Pair again in the Bops app and use the new code."
+                else -> "Bops answered ${state.responseCode}. Try again in a moment."
+            }
+        } catch (e: Exception) {
+            return "Can't reach $address. Is Bops open on your computer, and is Tailscale on here and there?"
         }
-        when (state.responseCode) {
-            in 200..299 -> null
-            401, 403 -> "Bops didn't take that pairing code. Pair again in the Bops app and use the new code."
-            else -> "Bops answered ${state.responseCode}. Try again in a moment."
-        }
-    } catch (e: Exception) {
-        "Can't reach $address. Is Bops open on your computer, and is Tailscale on here and there?"
     }
 
     private fun open(address: String, code: String) {

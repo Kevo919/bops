@@ -1,0 +1,6 @@
+# Android build output and this machine's SDK path: never in the repo.
+.gradle/
+build/
+app/build/
+local.properties
+*.apk
