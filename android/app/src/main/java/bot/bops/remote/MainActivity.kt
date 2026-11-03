@@ -346,6 +346,7 @@ class MainActivity : Activity() {
 
     private fun showSettings(server: Server) {
         // Keep this WebView and its draft/navigation intact while native settings are visible.
+        web?.onPause()
         screen++
         pendingMic?.deny(); pendingMic = null
         settingsPage = findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
@@ -415,6 +416,7 @@ class MainActivity : Activity() {
         screen++
         settingsPage = null
         setContentView(page)
+        web?.onResume()
     }
 
     private fun forget(server: Server, why: String) {

@@ -14,8 +14,22 @@ import java.util.concurrent.TimeUnit
 internal object LlmCatalogChecks {
     private const val body = """{"state":{"llms":[{"name":"Planner","provider":"openai","model":"example-model","starter":true,"useFor":["planning","thinking"]},{"name":"Writer","provider":"anthropic","model":"other-model"}]}}"""
     private class Response(url: URL, private val status: Int, private val body: String,
-                           private val gate: CountDownLatch? = null) : HttpURLConnection(url) {
+                           private val gate: CountDownLatch? = null,
+                           private val declaredLength: Int = -1) : HttpURLConnection(url) {
         var closed = false
+        var streamClosed = false
+        var bytesRead = 0
+        var largestRead = 0
+        private val stream by lazy {
+            object : java.io.ByteArrayInputStream(body.toByteArray(Charsets.UTF_8)) {
+                override fun read(): Int = super.read().also { if (it != -1) bytesRead++ }
+                override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                    largestRead = maxOf(largestRead, length)
+                    return super.read(buffer, offset, length).also { if (it > 0) bytesRead += it }
+                }
+                override fun close() { streamClosed = true; super.close() }
+            }
+        }
         override fun connect() {}
         override fun disconnect() { closed = true }
         override fun usingProxy() = false
@@ -23,7 +37,11 @@ internal object LlmCatalogChecks {
             check(gate?.await(5, TimeUnit.SECONDS) != false)
             return status
         }
-        override fun getInputStream() = body.byteInputStream()
+        override fun getContentLength() = declaredLength
+        override fun getContentLengthLong() = declaredLength.toLong()
+        override fun getHeaderField(name: String?) =
+            if (name.equals("Content-Length", true) && declaredLength >= 0) declaredLength.toString() else null
+        override fun getInputStream() = stream
     }
 
     fun clientChecks() {
@@ -35,7 +53,7 @@ internal object LlmCatalogChecks {
         check(result.models[1].jobs.isEmpty() && !result.models[1].starter)
         check(last!!.url.toString() == "${server.address}/api/state")
         check(last!!.getRequestProperty("Cookie") == "bops_remote=${server.code}")
-        check(last!!.requestMethod == "GET" && !last!!.instanceFollowRedirects && last!!.closed)
+        check(last!!.requestMethod == "GET" && !last!!.instanceFollowRedirects && last!!.closed && last!!.streamClosed)
         check(last!!.connectTimeout == 8000 && last!!.readTimeout == 15000)
         check((catalog.parse("""{"state":{"llms":[]}}""") as CatalogResult.Loaded).models.isEmpty())
         for (invalid in listOf("not JSON", "{}", """{"state":{}}""", """{"state":{"llms":[{}]}}"""))
@@ -45,6 +63,50 @@ internal object LlmCatalogChecks {
         check(LlmCatalog { throw java.io.IOException("fixture") }.load(server) is CatalogResult.Error)
         check(LlmCatalog { error("must not connect") }.load(server.copy(code = null)) === CatalogResult.Unpaired)
         check(LlmCatalog { error("must not connect") }.load(server.copy(address = "http://192.168.1.1")) is CatalogResult.Error)
+        responseLimitChecks(server)
+    }
+
+    private fun responseLimitChecks(server: Server) {
+        val limit = 5 * 1024 * 1024
+        // A multibyte value ensures the boundary measures UTF-8 bytes, not String length.
+        val json = """{"state":{"llms":[]},"note":"é"}"""
+        val exact = json + " ".repeat(limit - json.toByteArray(Charsets.UTF_8).size)
+        var reply: Response? = null
+        val exactResult = LlmCatalog { Response(it, 200, exact).also { response -> reply = response } }.load(server)
+        check(exactResult is CatalogResult.Loaded && exactResult.models.isEmpty())
+        check(reply!!.bytesRead == limit && reply!!.closed && reply!!.streamClosed)
+        check(reply!!.largestRead <= 8192)
+        // Both unknown and deliberately understated Content-Length must still hit the byte cap.
+        for (declaredLength in listOf(-1, 1)) {
+            val result = LlmCatalog {
+                Response(it, 200, exact + " ".repeat(100_000), declaredLength = declaredLength)
+                    .also { response -> reply = response }
+            }.load(server)
+            check(result is CatalogResult.Error && result.message.contains("exceeds the 5 MiB limit"))
+            check(reply!!.bytesRead == limit + 1) { "Must stop after the single overflow probe byte" }
+            check(reply!!.largestRead <= 8192 && reply!!.closed && reply!!.streamClosed)
+        }
+        // Under the character limit but over the byte limit must also fail.
+        val multibyte = """{"state":{"llms":[]},"note":"""" + "é".repeat(limit / 2) + "\"}"
+        check(multibyte.length < limit && multibyte.toByteArray(Charsets.UTF_8).size > limit)
+        val result = LlmCatalog { Response(it, 200, multibyte).also { response -> reply = response } }.load(server)
+        check(result is CatalogResult.Error && result.message.contains("exceeds the 5 MiB limit"))
+        check(reply!!.bytesRead == limit + 1 && reply!!.streamClosed && reply!!.closed)
+        var streamClosed = false
+        var disconnected = false
+        val failed = LlmCatalog { url ->
+            object : HttpURLConnection(url) {
+                override fun connect() {}
+                override fun disconnect() { disconnected = true }
+                override fun usingProxy() = false
+                override fun getResponseCode() = 200
+                override fun getInputStream() = object : java.io.InputStream() {
+                    override fun read(): Int = throw java.io.IOException("Interrupted fixture")
+                    override fun close() { streamClosed = true }
+                }
+            }
+        }.load(server)
+        check(failed is CatalogResult.Error && streamClosed && disconnected)
     }
 
     fun uiChecks(test: Instrumentation, activity: Activity, a: Server, b: Server) {
