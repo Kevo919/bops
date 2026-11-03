@@ -47,7 +47,7 @@ The idea: you say how Bops should look, in plain words, and it changes.
 
 1. Open `config/llms.yaml` in Notepad (in the config folder). **You should see:** the models your bots can use, starting with Claude, each as a small block with a name.
 2. In Bops, open a chat and click the model picker (the model's name in a menu by the Send button). **You should see:** Auto, the models from your file (Your LLMs), and a few built in. Pick a different one and send a message; the reply comes from it (the name shows the switch).
-3. To add a model later: copy one block in the file, change its name, provider and model lines to another you have a key for, save, restart Bops (`Ctrl+C`, then `npm run app`), and it appears in the picker.
+3. To add a model later: copy one block in the file, change its name, provider and model lines to another you have a key for, and put that key in `.env.local` (in the Bops folder; it's for the models the chat itself runs on). Save, restart Bops (`Ctrl+C`, then `npm run app`), and it appears in the picker. Keys for the task agents (Claude Code, Codex, DeepSeek Harness) are a different thing: those go in **Keys** in Settings, not the file.
 
 ## 6. The right agent for each job
 
@@ -74,7 +74,7 @@ The idea: you say how Bops should look, in plain words, and it changes.
 
 You need: an Android phone and the Bops app on it (built from the android folder; ask the team for the current APK).
 
-1. In Bops on the PC: **Settings → Your phone → Pair a phone**. **You should see:** an address and a one-time code.
+1. In Bops on the PC: **Settings → This Mac → Your phone → Pair a phone**. **You should see:** an address and a one-time code.
 2. On the phone, open the Bops app and enter both. **You should see:** your bots and chats, live.
 3. From the phone, ask a bot something. **You should see:** the answer on the phone, and the same conversation on the PC a moment later.
 4. When a bot needs you (a task asks a question), **you should see** the phone notify you, and answering there continues the task.
@@ -93,7 +93,7 @@ You need: a Hostinger VPS (or any Ubuntu server) and your fork on GitHub. Full d
 ## 11. Bots working on the PC itself
 
 1. Ask your bot: "open Chrome and check what's on example.com". **You should see:** it works in a Chrome window of its own, separate from yours, and shows you what it did.
-2. By default that's all it can touch. If you want it to work as you (your files, your apps): **Settings → Full access**, turn it on, read what it says, and confirm. Then ask: "open the Documents folder and list the PDFs". **You should see:** it reads your actual Documents folder.
+2. By default that's all it can touch. If you want it to work as you (your files, your apps): **Settings → Full access**, turn it on, read what it says, and confirm. Then ask: "open the Documents folder and list the PDFs". **You should see:** it reads your actual Documents folder. When you're done trying it, turn Full access back off: the default is the safer way to live.
 3. Your saved logins and tokens stay encrypted; their key lives in Windows Credential Manager (open it: press Windows key, type "Credential Manager", Enter; you'll find a Bops entry). **You should see:** nothing readable in plain text in the Bops folder.
 
 ## 12. Staying current
@@ -107,9 +107,9 @@ In the folder's command window:
 
 1. `npx next typegen` then `npx tsc --noEmit`. **You should see:** no output (that's success).
 2. `npm run lint`. **You should see:** "0 errors" (warnings are fine).
-3. `node --conditions=react-server scripts/test-look.mjs`, then `node scripts/test-look-ui.mjs`, then `node --conditions=react-server scripts/test-chat-tools.mjs`. **You should see:** "passed, 0 failed" from each.
+3. `node --conditions=react-server scripts/test-look.mjs`, then `node scripts/test-look-ui.mjs`, then `node --conditions=react-server scripts/test-chat-tools.mjs`. **You should see:** "passed, 0 failed" from each. (The first two cover the Look feature: they land on your copy with pull request #4, until it merges.)
 
-Note: most older scripts in that folder were written for Mac and Linux. On Windows run the three above; if another one fails with a path starting `/C:/`, that's the known Windows path issue, not your setup.
+Note: most older scripts in that folder were written for Mac and Linux. On Windows run the three above; if another one fails with a path starting `/C:/`, that's the Windows path issue pull request #11 is fixing, not your setup.
 
 ## When something doesn't work
 
