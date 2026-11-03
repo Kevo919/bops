@@ -32,7 +32,7 @@ import { num, privacyOf } from "@/lib/privacy";
 import { compactBlocked } from "@/lib/chat-summary";
 import { ApiAsk, apiAskOf, apiCallOf, ApiNote } from "./keys";
 import { BrainBadge, brainSignIn, openInTerminal, threadBadge } from "./brains";
-import { AGENTS, aiOf, hasProfile, isCli, threadAgent, upper } from "@/lib/agents";
+import { AGENTS, aiOf, hasProfile, hasTerminal, isCli, threadAgent, upper } from "@/lib/agents";
 import { AgentChip, AgentMark } from "./agent-marks";
 import { threadAgentWords, threadKind } from "./bot-ai";
 import { AgentChipPick, boxAgents, pickLine, useBotKeys } from "./new-thread";
@@ -2405,7 +2405,7 @@ export function ThreadSheet({
   const terminal = state.takeover?.terminal && state.takeover.sessionId === s.id ? state.takeover.display : undefined;
   // Any CLI agent's thread its bot still runs on that account (lib/agents.ts threadAgent).
   const now = BRAINS_ON && runner && runner !== "agent" ? threadAgent(s, b, state) : undefined;
-  const canTerminal = !!now && isCli(now.kind) && !now.gone && (now.account?.id ?? "-") === s.brainRun?.brainId && s.runsOn !== "mac" && state.host !== "mac" && terminal === undefined && !!onShowScreen;
+  const canTerminal = !!now && hasTerminal(now.kind) && !now.gone && (now.account?.id ?? "-") === s.brainRun?.brainId && s.runsOn !== "mac" && state.host !== "mac" && terminal === undefined && !!onShowScreen;
   // The agent it runs on, for its header: its mark, model and how it pays (a line of its own under the title).
   const kindNow = threadKind(s);
   const shownAgent = BRAINS_ON && (kindNow !== "bops" || !!badge || !!s.agent) ? { kind: kindNow, model: s.agent?.kind === kindNow ? s.agent.model : undefined } : undefined;

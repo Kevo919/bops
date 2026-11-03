@@ -38,6 +38,22 @@ export const CODEX_VERSION = "0.160.0";
 export const OPENCODE_VERSION = "2.0.27";
 export const OPENCODE_PREFIX = "/opt/bops/opencode";
 export const OPENCODE_BIN = `${OPENCODE_PREFIX}/bin/opencode`;
+/**
+ * DeepSeek Harness on every computer that runs it: npm's @deepseek-ai/dsh at the version Bops checked (its headless
+ * profile, --json events and --session-id), never on a PATH. It needs Node 24.9 or newer, which a computer's own
+ * Node may not be, so it gets a Node of its own beside it (nodejs.org's build, checked against its SHA-256 here),
+ * which only its own runs use (bops-brain runs it by that Node's path): nothing else on the computer changes.
+ */
+export const DSH_VERSION = "0.2.2-alpha.2";
+export const DSH_PREFIX = "/opt/bops/dsh";
+export const DSH_BIN = `${DSH_PREFIX}/bin/dsh`;
+export const DSH_NODE_VERSION = "24.11.1";
+export const DSH_NODE = `${DSH_PREFIX}/node/bin/node`;
+/** nodejs.org's SHA-256 of each Node build Bops may fetch for it (SHASUMS256.txt for that version). */
+const DSH_NODE_SHA256 = {
+  x64: "58a5ff5cc8f2200e458bea22e329d5c1994aa1b111d499ca46ec2411d58239ca",
+  arm64: "0dc93ec5c798b0d347f068db6d205d03dea9a71765e6a53922b682b91265d71f",
+};
 /** Each brain's folder on a computer: Claude Code's CLAUDE_CONFIG_DIR, Codex's CODEX_HOME. */
 export const BRAINS_DIR = "/root/.bops/brains";
 export const brainDir = (brainId: string) => `${BRAINS_DIR}/${brainId}`;
@@ -388,6 +404,50 @@ export function ensureOpenCode(computerId: string): Promise<void> {
   });
   ready.catch(() => openCodeReady.delete(computerId));
   openCodeReady.set(computerId, ready);
+  return ready;
+}
+
+/** Each computer's install of DeepSeek Harness, once per run of Bops; one that failed is tried again next time. */
+const dshReady = new Map<string, Promise<void>>();
+
+/**
+ * The shell that installs the pinned DeepSeek Harness unless that version is there, and says so: its own Node first
+ * (fetched only when it isn't that version, and kept only when its SHA-256 is nodejs.org's), then npm's package with
+ * that Node's own npm, into DSH_PREFIX. Its runs work in a sandbox (bubblewrap, else the kernel's Landlock): a
+ * computer without bubblewrap gets it, when it can, and one that can't still has Landlock to try.
+ */
+export function dshInstallCommand() {
+  const v = DSH_VERSION;
+  const n = DSH_NODE_VERSION;
+  const log = "/var/log/bops/dsh-install.log";
+  const has = `[ "$(DSH_TELEMETRY_DISABLED=1 ${DSH_NODE} ${DSH_BIN} --version 2>/dev/null)" = "${v}" ]`;
+  return [
+    "mkdir -p /var/log/bops",
+    `${has} || (set -e
+  case "$(uname -m)" in x86_64|amd64) A=x64; SUM=${DSH_NODE_SHA256.x64} ;; aarch64|arm64) A=arm64; SUM=${DSH_NODE_SHA256.arm64} ;; *) echo "no Node build for $(uname -m)"; exit 1 ;; esac
+  mkdir -p ${DSH_PREFIX}
+  if [ "$(${DSH_NODE} --version 2>/dev/null)" != "v${n}" ]; then
+    curl -fsSL --max-time 240 -o ${DSH_PREFIX}/node.tar.gz "https://nodejs.org/dist/v${n}/node-v${n}-linux-$A.tar.gz"
+    echo "$SUM  ${DSH_PREFIX}/node.tar.gz" | sha256sum -c -
+    rm -rf ${DSH_PREFIX}/node && mkdir -p ${DSH_PREFIX}/node
+    tar -xzf ${DSH_PREFIX}/node.tar.gz -C ${DSH_PREFIX}/node --strip-components=1
+    rm -f ${DSH_PREFIX}/node.tar.gz
+  fi
+  PATH="${DSH_PREFIX}/node/bin:/usr/local/bin:/usr/bin:/bin" ${DSH_PREFIX}/node/bin/npm install -g --prefix ${DSH_PREFIX} --no-audit --no-fund --loglevel=error @deepseek-ai/dsh@${v}) > ${log} 2>&1`,
+    `command -v bwrap > /dev/null 2>&1 || (DEBIAN_FRONTEND=noninteractive timeout 120 apt-get install -y -qq bubblewrap >> ${log} 2>&1 || true)`,
+    `if ${has}; then echo "dsh ${v}"; else tail -3 ${log}; fi`,
+  ].join("\n");
+}
+
+/** DeepSeek Harness on a computer, at DSH_VERSION, into DSH_PREFIX (on no PATH: bops-brain runs it). Throws with plain words when it can't be. */
+export function ensureDsh(computerId: string): Promise<void> {
+  const known = dshReady.get(computerId);
+  if (known) return known;
+  const ready = orgo.bash(computerId, dshInstallCommand(), 290).then((r) => {
+    if (!r.output.includes(`dsh ${DSH_VERSION}`)) throw new BrainError(`DeepSeek Harness didn't install on the computer (${r.output.trim().slice(-160) || "no answer"}).`, 502);
+  });
+  ready.catch(() => dshReady.delete(computerId));
+  dshReady.set(computerId, ready);
   return ready;
 }
 

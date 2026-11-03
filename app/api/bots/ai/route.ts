@@ -6,7 +6,7 @@ import { BRAINS_ON, type AgentKind, type AgentPays } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const KINDS: AgentKind[] = ["bops", "claude", "codex", "opencode", "agy"];
+const KINDS: AgentKind[] = ["bops", "claude", "codex", "opencode", "dsh", "agy"];
 const PAYS: AgentPays[] = ["credit", "plan", "key"];
 const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 

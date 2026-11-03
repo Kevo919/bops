@@ -21,15 +21,16 @@
 #   bops-brain cancel <brain>              close that sign-in's terminal, and its Chrome (bops-brain-browser)
 #   bops-brain logout <brain>              Claude Code's own `auth logout` for that brain
 #   bops-brain forget <brain>              sign out, and delete the brain's folder
-#   bops-brain run <brain|-> claude|codex|opencode [--computer <computer>] [--key-file <file>]
+#   bops-brain run <brain|-> claude|codex|opencode|dsh [--computer <computer>] [--key-file <file>]
 #                  [--bot <bot> --agent <agent> [--model <m>] [--effort low|medium|high] [--route <r>]
-#                   [--also <agents>] [--oc-config <file>] [--label <word>] [--shell-after|--shell-only]] [--] <args...>
+#                   [--also <agents>] [--oc-config <file>] [--dsh-patch <file>] [--label <word>] [--shell-after|--shell-only]] [--] <args...>
 #       run the brain's CLI. Without --bot, as before: a key brain's key comes in a 0600 file that's read
 #       into the environment (ANTHROPIC_API_KEY for Claude Code, CODEX_API_KEY for Codex) and deleted, never
 #       on a command line. With --computer, a folder signed in on another computer is deleted first, as
 #       status does. Of the caller's environment only DISPLAY carries over (the screen its tools work on).
 #       Codex runs only on a key (never a ChatGPT sign in), with Bops' settings in its folder (config.toml).
 #       With --bot, it is that bot's agent (a bot's AI profile, lib/agents.ts): see "A bot's own settings".
+#       DeepSeek Harness (dsh) runs only as a bot's agent, on a key, headless (dsh --profile headless).
 #   bops-brain bin <bot> [--also <agents>]
 #       the bin folder of the bot's own Bops agent (its executor's commands: bops-exec's fourth argument),
 #       with the bot's wrappers in it. Prints its path.
@@ -50,6 +51,8 @@
 #                                               runs gets this bot's account and model. No secret is in them.
 #   /root/.bops/bots/<bot>/tmp                  TMPDIR for all of it
 #   /root/.bops/bots/<bot>/opencode/            OpenCode's own folders for this bot (XDG_*)
+#   /root/.bops/bots/<bot>/agents/<agent>/dsh/  DeepSeek Harness's DSH_HOME for this agent: its profile, its
+#                                               sessions, and each run's own patch (run-<pid>.json)
 # On a key, the key never enters the bot's processes: a gate of this run's own (bops-ai-gate) holds it and
 # the agent gets a token for it and its 127.0.0.1 address. The token is worth nothing once the run is over.
 # --also names the bot's other agents for its wrappers ("claude:plan:<brain>:<model>,codex:key"): a Claude
@@ -57,7 +60,8 @@
 # A thread's own model and thinking are in its run's environment (BOPS_MODEL, BOPS_EFFORT), never in a file:
 # two threads of one agent may run on two models side by side, and each one's nested claude, codex or
 # opencode keeps to its own. OpenCode's agent file is the same for all of them (its providers at the gate);
-# the run's model and provider come in OPENCODE_CONFIG_CONTENT.
+# the run's model and provider come in OPENCODE_CONFIG_CONTENT. DeepSeek Harness's come in a patch of the run's
+# own (dsh_patch), the last layer of its profile, so they win over anything in its DSH_HOME.
 set -euo pipefail
 BRAINS="${BOPS_BRAINS:-/root/.bops/brains}"
 CLAUDE="${BOPS_CLAUDE:-/opt/bops/claude/bin/claude}"
@@ -65,6 +69,9 @@ CODEX="${BOPS_CODEX:-/usr/local/bin/codex}"
 LOGS="${BOPS_LOGS:-/var/log/bops}"
 BOTS="${BOPS_BOTS:-/root/.bops/bots}"
 OPENCODE="${BOPS_OPENCODE:-/opt/bops/opencode/bin/opencode}"
+# DeepSeek Harness, and the Node of its own it runs on (it needs Node 24.9 or newer): both by path, on no PATH.
+DSH="${BOPS_DSH:-/opt/bops/dsh/bin/dsh}"
+DSH_NODE="${BOPS_DSH_NODE:-/opt/bops/dsh/node/bin/node}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 GATE_BIN="${BOPS_GATE_BIN:-$HERE/bops-ai-gate}"
 # Tests only: the gate's fake provider (bops-ai-gate reads these).
@@ -280,6 +287,48 @@ print(json.dumps(c))
 ' "$MODEL" "$ROUTE"
 }
 
+# This run's own patch for DeepSeek Harness's profile (dsh --patch, the last layer, so it wins): the thread's
+# rows from --dsh-patch (only Bops' MCP servers and its briefing: anything else in that file is dropped), then
+# the run's provider at its gate (apiKeyEnv names the variable with the run token: the key is never in a file),
+# its model as the default, and DeepSeek's own model and web routes off (they'd go to DeepSeek around the gate,
+# on whatever DEEPSEEK_API_KEY holds). Nothing secret is in it. Prints its path.
+dsh_patch() {
+  local f="$G/dsh/run-$$.json"
+  find "$G/dsh" -maxdepth 1 -name 'run-*.json' -mmin +720 -delete 2>/dev/null || true
+  printf '%s' "$DSHCONTENT" | python3 -I -c '
+import json, os, re, sys
+model, route, gate, out = sys.argv[1:5]
+API = {"anthropic": "anthropic-messages", "openai": "openai-responses"}
+BASE = {"anthropic": "/anthropic", "deepinfra": "/deepinfra/v1/openai"}
+KEYS = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "deepinfra": "DEEPINFRA_API_KEY", "zai": "ZAI_API_KEY", "zai-coding": "ZAI_API_KEY", "deepseek": "DEEPSEEK_API_KEY", "openrouter": "OPENROUTER_API_KEY"}
+try:
+    given = json.loads(sys.stdin.read() or "[]")
+except ValueError:
+    given = []
+rows = []
+for x in given if isinstance(given, list) else []:
+    if not isinstance(x, dict):
+        continue
+    if set(x) == {"insert"} and isinstance(x["insert"], list):
+        ins = [r for r in x["insert"] if isinstance(r, dict) and set(r) == {"id", "name", "config"} and r["name"] == "@deepseek-ai/dsh-mcp-client"
+               and isinstance(r["id"], str) and re.fullmatch(r"bops-mcp-[A-Za-z0-9_-]{1,32}", r["id"]) and isinstance(r["config"], dict) and r["config"].get("transport") == "stdio"]
+        if ins:
+            rows.append({"insert": ins})
+    elif x.get("id") == "system-prompt" and set(x) == {"id", "config"} and isinstance(x["config"], dict):
+        c = {k: v for k, v in x["config"].items() if k in ("personaPrefix", "personaSuffix") and isinstance(v, str)}
+        rows.append({"id": "system-prompt", "config": c})
+name = model.split("/", 1)[1]
+rows.append({"id": "llm-pi-ai", "config": {"providers": {route: {"apiKeyEnv": KEYS[route], "api": API.get(route, "openai-completions"), "baseURL": gate + "/" + route + "/v1" if route not in BASE else gate + BASE[route], "models": [{"id": name, "name": name}]}}}})
+rows.append({"id": "agent-default-model", "config": {"provider": route, "model": name}})
+rows += [{"id": x, "disabled": True} for x in ("llm-deepseek", "llm-deepseek-account", "web-search-deepseek", "web-deepseek-api")]
+fd = os.open(out + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+os.write(fd, json.dumps(rows).encode())
+os.close(fd)
+os.replace(out + ".tmp", out)
+print(out)
+' "$MODEL" "$ROUTE" "$GURL" "$f"
+}
+
 # This run's gate (bops-ai-gate): the key goes into its stdin, never a command line or a variable anything
 # else sees, and the run gets a fresh token and the gate's address. The gate's parent is this process, which
 # becomes the CLI (exec), so the gate goes when the run does.
@@ -355,7 +404,7 @@ case "$CMD" in
     ;;
   run)
     KIND="${3:-}"; shift 3
-    KEYFILE=""; C=""; BOT=""; AGENT=""; MODEL=""; EFFORT=""; ROUTE=""; ALSO=""; OCC=""; LABEL="bot"; AFTER=""
+    KEYFILE=""; C=""; BOT=""; AGENT=""; MODEL=""; EFFORT=""; ROUTE=""; ALSO=""; OCC=""; DSHP=""; LABEL="bot"; AFTER=""
     while [ $# -gt 0 ]; do
       case "$1" in
         --computer) C="${2:?computer}"; shift 2 ;;
@@ -367,6 +416,7 @@ case "$CMD" in
         --route) ROUTE="${2:?route}"; shift 2 ;;
         --also) ALSO="${2:?agents}"; shift 2 ;;
         --oc-config) OCC="${2:?file}"; shift 2 ;;
+        --dsh-patch) DSHP="${2:?file}"; shift 2 ;;
         --label) LABEL="${2:?label}"; shift 2 ;;
         --shell-after) AFTER=after; shift ;;
         --shell-only) AFTER=only; shift ;;
@@ -383,11 +433,14 @@ case "$CMD" in
       [ -z "$ALSO" ] || [[ "$ALSO" =~ ^[a-z]+:[a-z]+(:[A-Za-z0-9_-]*(:[A-Za-z0-9._:/-]*)?)?(,[a-z]+:[a-z]+(:[A-Za-z0-9_-]*(:[A-Za-z0-9._:/-]*)?)?)*$ ]] || bad "those agents"
       [[ "$LABEL" =~ ^[A-Za-z0-9._-]{1,30}$ ]] || bad "that label"
       [ -z "$OCC" ] || [[ "$OCC" =~ ^/[A-Za-z0-9._/\ -]+\.json$ ]] || bad "that OpenCode config"
+      [ -z "$DSHP" ] || [[ "$DSHP" =~ ^/[A-Za-z0-9._/\ -]+\.json$ ]] || bad "that DeepSeek Harness patch"
       case "$KIND" in
         claude) [ "$ID" != - ] || bad "Claude Code runs on an account" ;;
         codex) [ "$ID" != - ] || bad "Codex runs on an account" ;;
         opencode) [ "$ID" = - ] && [ -n "$ROUTE" ] && [ -n "$MODEL" ] || bad "OpenCode runs on a key, by its model" ;;
-        *) bad "claude, codex or opencode?" ;;
+        # Its model is its provider's: "deepseek/deepseek-chat" runs on the deepseek route, and only there.
+        dsh) [ "$ID" = - ] && [ -n "$ROUTE" ] && [[ "$MODEL" == "$ROUTE/"?* ]] && [ -z "$AFTER" ] || bad "DeepSeek Harness runs on a key, by its model, headless" ;;
+        *) bad "claude, codex, opencode or dsh?" ;;
       esac
     elif [ "$KIND" != claude ] && [ "$KIND" != codex ]; then
       echo "claude or codex?" >&2; exit 2
@@ -405,6 +458,8 @@ case "$CMD" in
     fi
     OCCONTENT=""
     [ -n "$OCC" ] && [ -f "$OCC" ] && OCCONTENT="$(cat "$OCC")"
+    DSHCONTENT=""
+    [ -n "$DSHP" ] && [ -f "$DSHP" ] && DSHCONTENT="$(cat "$DSHP")"
     SCREEN="${DISPLAY:-}"
     if [ -z "$BOT" ]; then
       # As before: the brain's own folder, its key (if any) in its CLI's own environment.
@@ -468,6 +523,25 @@ case "$CMD" in
         OPENCODE_CONFIG_CONTENT="$(oc_content)" || { echo "Bops couldn't set up OpenCode for this run" >&2; exit 1; }
         export OPENCODE_CONFIG_CONTENT
         CLI=("$OPENCODE")
+        ;;
+      dsh)
+        # Its own home (profile, sessions) in the agent's folder, no telemetry, the run token in its provider's
+        # key variable (the run's patch names it), and its Node's folder last on PATH: what it runs finds the
+        # computer's own node first, as before.
+        mkdir -p "$G/dsh" && chmod 700 "$G/dsh"
+        export DSH_HOME="$G/dsh" BOPS_GATE="$GURL" DSH_TELEMETRY_DISABLED=1 DSH_TELEMETRY_MODE=DISABLED PATH="$PATH:$(dirname "$DSH_NODE")"
+        case "$ROUTE" in
+          anthropic) export ANTHROPIC_API_KEY="$TOKEN" ;;
+          openai) export OPENAI_API_KEY="$TOKEN" ;;
+          deepinfra) export DEEPINFRA_API_KEY="$TOKEN" ;;
+          zai | zai-coding) export ZAI_API_KEY="$TOKEN" ;;
+          deepseek) export DEEPSEEK_API_KEY="$TOKEN" ;;
+          openrouter) export OPENROUTER_API_KEY="$TOKEN" ;;
+        esac
+        RP="$(dsh_patch)" && [ -s "$RP" ] || { echo "Bops couldn't set up DeepSeek Harness for this run" >&2; exit 1; }
+        # Unattended, so nothing asks: approvals off, in its workspace-write sandbox (it writes only in /workspace,
+        # where it runs, and its temp folder; what else it would do is turned down, not asked).
+        CLI=("$DSH_NODE" "$DSH" --profile headless --patch "$RP" --permission-mode workspace-write --approval-policy never)
         ;;
     esac
     TOKEN=""

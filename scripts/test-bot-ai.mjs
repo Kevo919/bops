@@ -554,6 +554,149 @@ await test("keys and run tokens are taken out of anything read back from a compu
   assert.deepEqual(P.redactDeep({ a: [said], b: 1 }), { a: [P.redact(said)], b: 1 });
 });
 
+/* ---------------- DeepSeek Harness ---------------- */
+
+await test("DeepSeek Harness: a profile keeps it (on a key, by its model, several on several models), and adding it from the window works", async () => {
+  const dsh = { id: "ag_dsh0000001", kind: "dsh", pays: "key" };
+  const ai = A.cleanAi({
+    agents: [
+      { id: "bops", kind: "bops", pays: "credit" },
+      dsh,
+      { id: "ag_dsh0000002", kind: "dsh", pays: "key", model: "deepseek/deepseek-reasoner", jobs: ["coding"] },
+      { id: "ag_dsh0000003", kind: "dsh", pays: "credit" },
+      { id: "ag_dsh0000004", kind: "dsh", pays: "plan" },
+      { id: "ag_dsh0000005", kind: "dsh", pays: "key", model: "evil.example/x" },
+      { id: "ag_dsh0000006", kind: "dsh", pays: "key", model: "openrouter/deepseek/deepseek-chat" },
+    ],
+    default: "ag_dsh0000002",
+  });
+  assert.deepEqual(ai, {
+    agents: [
+      { id: "bops", kind: "bops", pays: "credit" },
+      dsh,
+      { id: "ag_dsh0000002", kind: "dsh", pays: "key", model: "deepseek/deepseek-reasoner", jobs: ["coding"] },
+      { id: "ag_dsh0000005", kind: "dsh", pays: "key" },
+      { id: "ag_dsh0000006", kind: "dsh", pays: "key", model: "openrouter/deepseek/deepseek-chat" },
+    ],
+    default: "ag_dsh0000002",
+  });
+  assert.deepEqual(A.AGENTS.dsh, { name: "DeepSeek Harness", maker: "Any model", pays: ["key"] });
+  assert.deepEqual(A.PAYS_SHOWN.dsh, ["credit", "key"]);
+  assert.ok(A.isCli("dsh") && A.anyModel("dsh") && !A.hasTerminal("dsh") && A.hasTerminal("opencode"));
+  assert.equal(A.defaultModel("dsh"), "deepseek/deepseek-chat");
+  assert.equal(A.gateRoute(dsh), "deepseek");
+  assert.equal(A.agentKeyName(dsh), "DEEPSEEK_API_KEY");
+  assert.equal(A.gateRoute({ kind: "dsh", pays: "key", model: "anthropic/claude-sonnet-5-5" }), "anthropic");
+  assert.equal(A.agentKeyName({ kind: "dsh", pays: "key", model: "zai-coding/glm-5.3" }), "ZAI_API_KEY");
+  // Your LLMs (config/llms.yaml) are its models too, after DeepSeek's own: its default stays DeepSeek Chat.
+  A.setLlms([{ name: "Claude Sonnet 5.5", provider: "anthropic", model: "claude-sonnet-5-5", starter: true }, { name: "Kimi", provider: "openrouter", model: "moonshotai/kimi-k3" }]);
+  try {
+    assert.deepEqual(A.modelsFor("dsh").map((m) => m.id).slice(0, 4), ["deepseek/deepseek-chat", "deepseek/deepseek-reasoner", "anthropic/claude-sonnet-5-5", "openrouter/moonshotai/kimi-k3"]);
+    assert.equal(A.defaultModel("dsh"), "deepseek/deepseek-chat");
+    assert.equal(A.modelsFor("dsh").filter((m) => m.id === "anthropic/claude-sonnet-5-5").length, 1, "once");
+    assert.ok(A.modelOk("dsh", "openrouter/moonshotai/kimi-k3"));
+  } finally {
+    A.setLlms([]);
+  }
+  // From the window: + Add → DeepSeek Harness, on a key, then it goes again.
+  const before = JSON.stringify(bot("rook").ai);
+  const res = await R.POST(fromWindow({ botId: "rook", op: "add", kind: "dsh", pays: "key" }));
+  assert.equal(res.status, 200);
+  const added = await res.json();
+  assert.deepEqual(added.ai.agents.find((x) => x.id === added.added), { id: added.added, kind: "dsh", pays: "key" });
+  const two = BA.setBotAi("rook", { op: "add", kind: "dsh", pays: "key", model: "deepseek/deepseek-reasoner" });
+  assert.equal(two.agents.filter((x) => x.kind === "dsh").length, 2, "a second one, on another model");
+  assert.throws(() => BA.setBotAi("rook", { op: "add", kind: "dsh", pays: "key", model: "evil.example/x" }), /DeepSeek Harness can't use that model\./);
+  assert.throws(() => BA.setBotAi("rook", { op: "add", kind: "dsh", pays: "credit" }), /Soon: Credit for DeepSeek Harness needs Bops Cloud to carry it first\./);
+  // Its tile and editor: its model and key, Other model, and that it picks how hard to think by itself.
+  const st = S.getState();
+  assert.equal(render(h(AgentTile, { agent: { id: added.added, kind: "dsh", pays: "key" }, bot: bot("rook"), state: st, isDefault: false })), "DeepSeek Harness DeepSeek Chat · your DeepSeek key");
+  assert.equal(render(h(AgentTile, { agent: { id: added.added, kind: "dsh", pays: "key" }, bot: bot("rook"), state: st, isDefault: false, keys: new Set(["ANTHROPIC_API_KEY"]) })), "DeepSeek Harness No DeepSeek key in your Vault yet.");
+  const ed = render(h(BotAiSection, { state: st, bot: bot("rook"), editing: added.added, onShowScreen() {} }));
+  assert.match(ed, /Model DeepSeek Chat DeepSeek Reasoner · Thinks before it answers .*Other model ▾/, ed);
+  assert.match(ed, /DeepSeek Harness picks how hard to think by itself\./);
+  assert.match(ed, /Soon: Credit for DeepSeek Harness needs Bops Cloud to carry it first\./);
+  plain(ed, "DeepSeek Harness's editor");
+  // Its own terminal isn't offered for it: Bops runs it headless only.
+  const onlyDsh = { ...bot("rook"), ai: { agents: [{ id: "bops", kind: "bops", pays: "credit" }, { id: added.added, kind: "dsh", pays: "key" }], default: added.added } };
+  assert.ok(!/Open its terminal/.test(render(h(BotAiSection, { state: st, bot: onlyDsh, onShowScreen() {} }))));
+  for (const x of bot("rook").ai.agents.filter((y) => y.kind === "dsh")) BA.setBotAi("rook", { op: "remove", agentId: x.id });
+  assert.equal(JSON.stringify(bot("rook").ai), before, "as it was");
+});
+
+await test("DeepSeek Harness: a thread runs on it, on its model's provider's key, with its flags for the computer", () => {
+  const b = { id: "bot_dsh", name: "Dee Bot", effort: "high", ai: { agents: [{ id: "bops", kind: "bops", pays: "credit" }, { id: "ag_dsh0000001", kind: "dsh", pays: "key" }, { id: "ag_dsh0000002", kind: "dsh", pays: "key", model: "zai-coding/glm-5.3", jobs: ["coding"] }], default: "ag_dsh0000001" } };
+  const st = { bots: [b], brains: [], host: "orgo" };
+  const picked = A.pickAgent(b, st, [], undefined, "Draft a letter");
+  assert.deepEqual(picked, { id: "ag_dsh0000001", kind: "dsh", model: "deepseek/deepseek-chat" }, "the Default, on DeepSeek Chat");
+  assert.deepEqual(A.pickAgent(b, st, [], undefined, "Fix the bug in my script"), { id: "ag_dsh0000002", kind: "dsh", model: "zai-coding/glm-5.3" }, "the one set for coding");
+  const r = A.threadAgent({ id: "s", botId: b.id, agent: picked }, b, st);
+  assert.deepEqual([r.kind, r.model, r.route, r.keyName, r.account, r.gone], ["dsh", "deepseek/deepseek-chat", "deepseek", "DEEPSEEK_API_KEY", undefined, undefined]);
+  assert.equal(A.agentLabel(r.agent, { bot: b, state: st }), "DeepSeek Harness · DeepSeek Chat");
+  assert.equal(A.agentNamed(b, st, "deepseek harness").id, "ag_dsh0000001");
+  // Its flags: no --effort (it picks how hard to think by itself), its gate's route, its model whole, and the bot's other agent.
+  assert.deepEqual(C.agentFlags(r, b), ["--bot", "bot_dsh", "--agent", "ag_dsh0000001", "--model", "deepseek/deepseek-chat", "--route", "deepseek", "--also", "dsh:key:-:zai-coding/glm-5.3", "--label", "deebot"]);
+  assert.equal(C.cliDriver("dsh"), C.dshDriver);
+  assert.equal(C.dshDriver.steers, false);
+  assert.equal(C.dshDriver.asks, false);
+  assert.equal(C.dshDriver.compacts, false);
+  // Its session: its own id, which it says on its first run; Bops' placeholder until then looks the same.
+  assert.match(C.dshDriver.newSession(), /^session-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+  assert.equal(C.cliId("session-aff6ed29-fb34-41f9-ba6c-680db8aa466a"), "session-aff6ed29-fb34-41f9-ba6c-680db8aa466a");
+  assert.equal(C.dshDriver.cliId("session-x; rm -rf /"), undefined);
+  assert.equal(C.dshDriver.line("Fix it"), '{"text":"Fix it"}\n');
+  assert.match(C.dshDriver.note("Maya"), /^You run as DeepSeek Harness on this computer, for Bops\..* only in \/workspace/);
+  assert.ok(!/[–—]/.test(C.dshDriver.note("Maya")), "no long dashes in what it's told");
+});
+
+await test("DeepSeek Harness's events (captured from dsh 0.2.2-alpha.2 against a fake provider) read as a thread's steps, its answer and how its turn ended", () => {
+  const D = C.dshDriver;
+  // scripts/fixtures/dsh-run.jsonl: a real `dsh --profile headless --json --session-id ...` run (its second turn on a
+  // session), talking to a fake OpenAI-shaped provider on 127.0.0.1, then the final of a run the fake turned down
+  // with a 401. Captured from dsh itself, not written by hand; a real provider's model was never in it.
+  const events = readFileSync(join(root, "scripts/fixtures/dsh-run.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const read = events.flatMap((e) => D.parse(e));
+  assert.deepEqual(read, [
+    { type: "started", session: "session-aff6ed29-fb34-41f9-ba6c-680db8aa466a", failed: [] },
+    { type: "thinking", text: "Checking the folder first." },
+    { type: "text", text: "Let me look." },
+    { type: "tool", id: "call_1", tool: "command", detail: "ran ls", args: { command: "ls", description: "List the folder" } },
+    { type: "text", text: "The folder has notes.txt." },
+    { type: "result", ok: true, text: "The folder has notes.txt." },
+    { type: "result", ok: false, text: '401: {"message":"Authentication Fails, Your api key: ****abcd is invalid","type":"authentication_error"}', stop: "auth" },
+  ]);
+  // How its other turns end, as dsh said them in those runs (a 402 is its balance; nothing answering is the gate down).
+  const final = (error) => ({ type: "final", sessionId: "session-b6f8fa88-ef5f-4202-a577-70f568a2f3a6", reason: { kind: "error", error }, text: "" });
+  assert.deepEqual(D.parse(final({ message: '402: {"message":"Insufficient Balance","type":"unknown_error"}', code: "QUOTA" })), [{ type: "result", ok: false, text: '402: {"message":"Insufficient Balance","type":"unknown_error"}', stop: "limit" }]);
+  assert.deepEqual(D.parse(final({ message: "Connection error.", code: "TRANSPORT" })), [{ type: "result", ok: false, text: "Connection error.", stop: "down" }]);
+  assert.deepEqual(D.parse(final({ message: 'pi-ai provider "deepseek" has no configured model "x"', code: "UNKNOWN_MODEL" })), [{ type: "result", ok: false, text: 'pi-ai provider "deepseek" has no configured model "x"', stop: "model" }]);
+  assert.deepEqual(D.parse(final({ message: "it broke", code: "PI_AI_ERROR" })), [{ type: "result", ok: false, text: "it broke" }], "a code that isn't a stop: a failed turn");
+  // From source (packages/bundle/headless/src): not yet seen in a run.
+  assert.deepEqual(D.parse({ type: "final", sessionId: "s", reason: { kind: "aborted", reason: { kind: "user" } }, text: "" }), [{ type: "result", ok: false, text: "it was stopped" }]);
+  assert.deepEqual(D.parse({ type: "final", sessionId: "s", reason: { kind: "max-tokens" }, text: "Half an answer" }), [{ type: "result", ok: true, text: "Half an answer" }]);
+  assert.deepEqual(D.parse({ type: "error", message: 'session "session-x" does not exist; omit --session-id to start a new Session' }), [{ type: "result", ok: false, text: 'session "session-x" does not exist; omit --session-id to start a new Session' }]);
+  // Bops' own tools by their own names; its others worded as Claude Code's are.
+  assert.deepEqual(D.parse({ type: "tool_call", callId: "c2", tool: "mcp__screen__click", input: { x: 1, y: 2 } }), [{ type: "tool", id: "c2", tool: "click", args: { x: 1, y: 2 } }]);
+  assert.deepEqual(D.parse({ type: "tool_call", callId: "c3", tool: "edit", input: { file_path: "/workspace/src/cart.ts", old_string: "a", new_string: "b" } })[0].detail, "edited cart.ts");
+  assert.deepEqual(D.parse({ type: "tool_call", callId: "c4", tool: "web_fetch", input: { url: "https://www.example.com/a" } })[0].detail, "read example.com/a");
+  assert.deepEqual(D.parse({ type: "tool_call", callId: "c5", tool: "subagent", input: { description: "Check the tax rules", prompt: "..." } })[0].detail, "brought in a helper for Check the tax rules");
+  assert.deepEqual(D.parse({ type: "tool_call", callId: "c6", tool: "mcp__github__list", input: {} })[0].detail, "used list (github)");
+  assert.deepEqual(D.parse({ type: "tool_result", callId: "c6", status: "completed", result: "ok" }), [], "a tool's result isn't a step of its own");
+  assert.deepEqual(D.parse({ type: "status", phase: "turn_end", turn: 1, reason: { kind: "completed" } }), []);
+  assert.deepEqual(D.parse({ type: "bops", subtype: "exited", code: 130 }), [{ type: "exited", code: 130 }]);
+});
+
+await test("DeepSeek Harness's stop words: its key, its limit, its provider down, a model its key can't use", () => {
+  const r = { kind: "dsh", agent: { id: "ag_dsh0000001", kind: "dsh", pays: "key" }, model: "deepseek/deepseek-chat" };
+  const auth = C.stoppedWords(r, "auth", "401", "Dee's computer");
+  assert.equal(auth, "DeepSeek turned down your key for DeepSeek Harness. I can finish this on Bops agent, on your credit, or wait.\n\nOptions: Finish on Bops agent | Wait");
+  assert.equal(C.stoppedWords(r, "limit", "402 Insufficient Balance", "x"), "DeepSeek Harness reached what your DeepSeek key allows. I can finish this on Bops agent, on your credit, or wait.\n\nOptions: Finish on Bops agent | Wait");
+  assert.equal(C.stoppedWords(r, "down", "Connection error.", "x"), "DeepSeek isn't answering right now. I can try again, or finish this on Bops agent, on your credit.\n\nOptions: Try again | Finish on Bops agent");
+  assert.match(C.stoppedWords({ ...r, model: "deepseek/deepseek-reasoner" }, "model", "", "x", undefined, "Dee"), /^Your DeepSeek key can't use DeepSeek Reasoner\. Pick another model for new threads in Dee's profile\./);
+  assert.equal(C.stoppedWords({ ...r, model: "zai-coding/glm-5.3" }, "down", "", "x").split(" isn't")[0], "Z.ai Coding Plan");
+  for (const w of [auth, C.stoppedWords(r, "limit", "", "x"), C.stoppedWords(r, "down", "", "x")]) plain(w, "a stop's words");
+});
+
 /* ---------------- The window ---------------- */
 
 await test("the AI section: its agents as tiles with the Default marked, agy Soon, Thinking, threads now with their agent, calls, and what stays on credit", () => {

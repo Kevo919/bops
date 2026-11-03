@@ -1,9 +1,9 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { AGENTS, agentLabel, aiOf, isCli, keyVendor, ROUTE_NAMES, shellLabel, threadAgent, type AgentRun } from "@/lib/agents";
+import { AGENTS, agentLabel, aiOf, anyModel, hasTerminal, isCli, keyVendor, ROUTE_NAMES, shellLabel, threadAgent, type AgentRun } from "@/lib/agents";
 import { redactDeep } from "@/lib/secret-patterns";
 import { BRAINS_ON, CLI_NAMES, live, planName, workspaceOf, type Bot, type Brain, type CliKind } from "@/lib/types";
-import { ensureBrainTools, ensureClaudeCode, ensureCodex, ensureOpenCode, revealBrainKey, revealNamedKey } from "./brains";
+import { ensureBrainTools, ensureClaudeCode, ensureCodex, ensureDsh, ensureOpenCode, revealBrainKey, revealNamedKey } from "./brains";
 import { KeysError } from "./keys";
 import { heldAsk } from "./permission";
 import { orgo } from "./orgo";
@@ -28,7 +28,8 @@ import { bot, getState, ownerName, session } from "./store";
  * approveTool), with the app approval card.
  *
  * A driver is one CLI's part in this: how it's installed, what it's told, how a message is written for it,
- * and how its output reads. Claude Code's, Codex's and OpenCode's are here, on the same files and turn loop.
+ * and how its output reads. Claude Code's, Codex's, OpenCode's and DeepSeek Harness's are here, on the same
+ * files and turn loop. DeepSeek Harness runs one `dsh --profile headless --json` per message, like Codex.
  * Codex and OpenCode run one `codex exec` (`opencode run`) per message on the same thread (bops-agent keeps it
  * going between them), on the user's own key, with full access on the computer as Bops agent's executor has.
  *
@@ -380,8 +381,124 @@ export const opencodeDriver: CliDriver = {
   },
 };
 
+/* ---------------- DeepSeek Harness ---------------- */
+
+/** DeepSeek Harness's own tools, worded as Claude Code's are. Bops' MCP tools come as mcp__<server>__<tool>, as Claude Code's do. */
+function dshTool(name: string, args: Record<string, unknown>): { tool: string; detail?: string } {
+  const mcp = /^mcp__([A-Za-z0-9_-]+?)__(.+)$/.exec(name);
+  if (mcp) return mcp[1] === "screen" || mcp[1] === "browser" ? { tool: mcp[2] } : { tool: mcp[2], detail: `used ${mcp[2]} (${mcp[1]})` };
+  switch (name) {
+    case "bash":
+      return { tool: "command", detail: `ran ${cut(str(args.command) ?? "a command", 100)}` };
+    case "job_output":
+    case "job_list":
+    case "job_kill":
+      return { tool: "command", detail: name === "job_kill" ? "stopped a command" : "checked on a command" };
+    case "read":
+    case "read_image":
+      return { tool: "read", detail: `read ${base(args.file_path)}` };
+    case "edit":
+    case "apply_patch":
+      return { tool: "edit", detail: `edited ${base(args.file_path)}` };
+    case "write":
+      return { tool: "edit", detail: `wrote ${base(args.file_path)}` };
+    case "glob":
+      return { tool: "search", detail: `looked for files like ${cut(str(args.pattern) ?? "", 60)}` };
+    case "grep":
+      return { tool: "search", detail: `searched files for "${cut(str(args.pattern) ?? "", 50)}"` };
+    case "web_fetch":
+      return { tool: "search", detail: `read ${cut((str(args.url) ?? "a page").replace(/^https?:\/\/(www\.)?/, ""), 70)}` };
+    case "web_search": {
+      const q = Array.isArray(args.queries) ? args.queries.filter((x) => typeof x === "string").join(", ") : (str(args.query) ?? "");
+      return { tool: "search", detail: q ? `searched "${cut(q, 70)}"` : "searched the web" };
+    }
+    case "todo_write":
+      return { tool: "note", detail: "updated its todo list" };
+    case "subagent":
+    case "subagent_fork":
+      return { tool: "helper", detail: str(args.description) ? `brought in a helper for ${cut(str(args.description)!, 60)}` : "started a helper" };
+    default:
+      return { tool: name, detail: `used ${name}` };
+  }
+}
+
+/** DeepSeek Harness's session for a thread: its own id, which it makes on the thread's first run and says (its session event). */
+const DSH_SESSION = /^session-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * How a failed turn's error code (its LlmFailure's, packages/llm) is a stop of Bops': its key's limit or balance,
+ * its key turned down, a model the provider doesn't have, or the provider (or the gate) not answering. A code not
+ * here is read from its words (stopOf), as the other CLIs' are.
+ */
+const DSH_STOPS: Record<string, Exclude<CliStop, "vault">> = {
+  RATE_LIMIT: "limit",
+  QUOTA: "limit",
+  ACCOUNT_QUOTA: "limit",
+  AUTH: "auth",
+  INVALID_CREDENTIAL: "auth",
+  MISSING_CREDENTIAL: "auth",
+  MODEL_UNSUPPORTED: "model",
+  UNKNOWN_MODEL: "model",
+  SERVER: "down",
+  TRANSPORT: "down",
+  TIMEOUT: "down",
+  STREAM_CLOSED: "down",
+};
+const dshFailed = (text: string, code?: string): CliEvent => {
+  const stop = (code ? DSH_STOPS[code] : undefined) ?? stopOf(text);
+  return { type: "result", ok: false, text, ...(stop ? { stop } : {}) };
+};
+
+/**
+ * DeepSeek Harness 0.2.2-alpha.2 (`dsh --profile headless --json`, bops-agent _dsh): each message a run of its own
+ * on the thread's session (`--session-id` from its second on), its events as its JSON projection writes them
+ * (packages/bundle/headless/src/json-stream.ts): session, status, thinking, text, tool_call, tool_result, then final
+ * (its answer and how the turn ended), or error when the run itself failed. Read here as they came from a run of
+ * that version against a fake provider (scripts/fixtures/dsh-run.jsonl); not yet run live against a real provider.
+ * Like Codex it doesn't steer and never asks: it runs with approvals off, in a sandbox that writes only in /workspace.
+ */
+export const dshDriver: CliDriver = {
+  kind: "dsh",
+  cliId: (v) => (v && DSH_SESSION.test(v) ? v : undefined),
+  // A placeholder until its first run says its own (it can't be given one to make): no folder has it, so that run starts fresh.
+  newSession: () => `session-${crypto.randomUUID()}`,
+  steers: false,
+  asks: false,
+  compacts: false,
+  prepare: async (computerId) => {
+    await ensureDsh(computerId);
+    await ensureBrainTools(computerId);
+  },
+  note: (owner) =>
+    `You run as DeepSeek Harness on this computer, for Bops. Your tools are DeepSeek Harness's own (bash for the shell, read, edit and write for files, glob and grep to find things, web_fetch to read a page, todo_write for your to-do list, subagent for helpers) and Bops' (mcp__screen__* for the screen, ${owner}'s apps and signing in with their saved logins; mcp__browser__* for the Chrome on your screen). Where the instructions above name a tool, use the one of yours that does that: the shell is bash. Your shell and file tools may change files only in /workspace, so keep your work there. What would change ${owner}'s apps (sending, posting, paying) asks them in Bops first and waits for their answer; if they say no, don't do it another way.`,
+  line: (text) => `${JSON.stringify({ text })}\n`,
+  parse: (e) => {
+    if (e.type === "session") return [{ type: "started", session: str(e.sessionId), failed: [] }];
+    if (e.type === "thinking" && str(e.text)?.trim()) return [{ type: "thinking", text: str(e.text)!.trim().split("\n")[0] }];
+    if (e.type === "text" && str(e.text)?.trim()) return [{ type: "text", text: str(e.text)!.trim() }];
+    if (e.type === "tool_call") {
+      const args = e.input && typeof e.input === "object" && !Array.isArray(e.input) ? (e.input as Record<string, unknown>) : {};
+      return [{ type: "tool", id: str(e.callId) ?? "", ...dshTool(str(e.tool) ?? "tool", args), args }];
+    }
+    if (e.type === "final") {
+      const reason = (e.reason && typeof e.reason === "object" ? e.reason : {}) as Record<string, unknown>;
+      const text = str(e.text)?.trim() ?? "";
+      // Its output-token ceiling still ends the turn with what it said: that's its answer.
+      if (reason.kind === "completed" || (reason.kind === "max-tokens" && text)) return [{ type: "result", ok: true, ...(text ? { text } : {}) }];
+      if (reason.kind === "error") {
+        const err = (reason.error && typeof reason.error === "object" ? reason.error : {}) as Record<string, unknown>;
+        return [dshFailed(str(err.message)?.trim() || "its turn failed", str(err.code))];
+      }
+      return [dshFailed(reason.kind === "aborted" ? "it was stopped" : `it stopped (${str(reason.kind) ?? "no reason given"})`)];
+    }
+    if (e.type === "error") return [dshFailed(str(e.message)?.trim() || "it failed")];
+    if (e.type === "bops" && e.subtype === "exited") return [{ type: "exited", code: Number(e.code) || 0 }];
+    return [];
+  },
+};
+
 /** None in a build without brains (BRAINS_ON): every thread runs on Bops agent, one a CLI agent ran too. */
-const DRIVERS: Partial<Record<CliKind, CliDriver>> = BRAINS_ON ? { claude: claudeDriver, codex: codexDriver, opencode: opencodeDriver } : {};
+const DRIVERS: Partial<Record<CliKind, CliDriver>> = BRAINS_ON ? { claude: claudeDriver, codex: codexDriver, opencode: opencodeDriver, dsh: dshDriver } : {};
 /** The driver for a CLI agent, when this build runs it (one without runs on Bops agent). */
 export const cliDriver = (kind: CliKind) => DRIVERS[kind];
 
@@ -418,10 +535,10 @@ const b64 = (s: string) => Buffer.from(s).toString("base64");
 
 /**
  * A CLI session's id as Bops keeps it and puts it in a command: Claude Code's and Codex's are UUIDs, OpenCode's
- * "ses_" and letters. One that isn't (the CLI's output said something else, and the bot's own shell can write
- * there) is never used.
+ * "ses_" and letters, DeepSeek Harness's "session-" and a UUID. One that isn't (the CLI's output said something
+ * else, and the bot's own shell can write there) is never used.
  */
-export const cliId = (v: string | undefined) => uuidId(v) ?? opencodeDriver.cliId(v);
+export const cliId = (v: string | undefined) => uuidId(v) ?? opencodeDriver.cliId(v) ?? dshDriver.cliId(v);
 
 /**
  * The thread's agent as its bot's profile has it now, for a start of its process (each one: a run can last
@@ -456,7 +573,8 @@ export function alsoSpec(b: Bot, except?: string) {
 
 export function agentFlags(r: AgentRun, b: Bot) {
   const others = alsoSpec(b, r.agent.id);
-  const effort = r.kind !== "opencode" && (b.effort === "low" || b.effort === "medium" || b.effort === "high") ? b.effort : undefined;
+  // OpenCode and DeepSeek Harness pick how hard to think by themselves (their models' own ways differ).
+  const effort = !anyModel(r.kind) && (b.effort === "low" || b.effort === "medium" || b.effort === "high") ? b.effort : undefined;
   return [
     "--bot", b.id,
     "--agent", r.agent.id,
@@ -569,7 +687,7 @@ export async function closeCli(run: Pick<CliRun, "computerId" | "sessionId">) {
 export async function openTerminal(o: { sessionId: string; computerId: string; display: number; agent: AgentRun; cli: string; mcp: unknown; prompt: string }) {
   const name = CLI_NAMES[o.agent.kind as CliKind];
   const { run: now, bot: b } = agentNow({ sessionId: o.sessionId, agent: o.agent, name });
-  const driver = cliDriver(now.kind as CliKind);
+  const driver = hasTerminal(now.kind) ? cliDriver(now.kind) : undefined;
   const cli = driver?.cliId(o.cli);
   if (!driver || !cli) throw new Error(`${name} has no session to open`);
   await put(o, "mcp.json", JSON.stringify(o.mcp));
@@ -585,7 +703,7 @@ export async function openTerminal(o: { sessionId: string; computerId: string; d
  * along as a file the run reads and deletes, for the gate that holds it while the terminal is open.
  */
 export async function openShell(o: { botId: string; computerId: string; display: number; agent: AgentRun; bot: Bot }) {
-  const driver = cliDriver(o.agent.kind as CliKind);
+  const driver = hasTerminal(o.agent.kind) ? cliDriver(o.agent.kind) : undefined;
   if (!driver) throw new Error("Only Claude Code, Codex or OpenCode opens a terminal");
   await driver.prepare(o.computerId);
   if (o.agent.agent.pays === "key") {

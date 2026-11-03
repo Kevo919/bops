@@ -9,8 +9,9 @@ import {
   agentState,
   agentTag,
   aiOf,
+  anyModel,
   defaultModel,
-  isCli,
+  hasTerminal,
   JOB_HELP,
   JOB_NAMES,
   JOBS,
@@ -138,11 +139,11 @@ export function AgentTile({ agent: x, bot: b, state, isDefault, on, keys, onClic
   );
 }
 
-/** The model an agent's threads start on: its list, and for OpenCode any other provider/model. */
+/** The model an agent's threads start on: its list, and for OpenCode and DeepSeek Harness any other provider/model. */
 function ModelRow({ agent: x, disabled, onPick }: { agent: BotAgent; disabled?: boolean; onPick: (model: string | null) => void }) {
   const list = modelsFor(x.kind);
   const current = x.model ?? list[0]?.id ?? "";
-  const other = x.kind === "opencode" && !!x.model && !list.some((m) => m.id === x.model);
+  const other = anyModel(x.kind) && !!x.model && !list.some((m) => m.id === x.model);
   const [typing, setTyping] = useState(other ? (x.model ?? "") : "");
   const [otherOpen, setOtherOpen] = useState(other);
   return (
@@ -165,7 +166,7 @@ function ModelRow({ agent: x, disabled, onPick }: { agent: BotAgent; disabled?: 
               {m.note ? ` · ${m.note}` : ""}
             </option>
           ))}
-          {x.kind === "opencode" && <option value="__other">Other model</option>}
+          {anyModel(x.kind) && <option value="__other">Other model</option>}
         </select>
         <span aria-hidden className="text-[10px] text-[#9A9A98]">
           ▾
@@ -337,7 +338,7 @@ function AgentEditor({
           )}
         </div>
       )}
-      {x.kind === "opencode" && <span className={quiet}>OpenCode picks how hard to think by itself.</span>}
+      {anyModel(x.kind) && <span className={quiet}>{AGENTS[x.kind].name} picks how hard to think by itself.</span>}
       <div className="flex items-center gap-2">
         <span className={`min-w-0 flex-1 text-[12px] leading-4 ${st.ready ? "text-[#3A3A38]" : "text-[#B54708]"}`}>{st.line}</span>
         {!ro && st.button === "show" && going && onShowScreen && (
@@ -402,19 +403,24 @@ function AgentEditor({
   );
 }
 
-/** + Add: what can be added (another Claude Code account, another OpenCode model, when it has one); the new agent's editor opens. */
+/** + Add: what can be added (another Claude Code account, another OpenCode or DeepSeek Harness model, when it has one); the new agent's editor opens. */
 function AddMenu({ bot: b, agents, onAdded }: { bot: Bot; agents: BotAgent[]; onAdded: (r: { error: string | null; added?: string }) => void }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useDismiss(open, () => setOpen(false), box);
   const has = (k: AgentKind) => agents.some((x) => x.kind === k);
-  // Another OpenCode is on a model the bot's OpenCode agents aren't on yet (else it would be the same one).
-  const ocModels = new Set(agents.filter((x) => x.kind === "opencode").map((x) => x.model ?? defaultModel("opencode")));
-  const ocNext = modelsFor("opencode").find((m) => !ocModels.has(m.id));
+  // Another OpenCode (or DeepSeek Harness) is on a model the bot's agents of that kind aren't on yet (else it would be the same one).
+  const nextModel = (k: AgentKind) => {
+    const on = new Set(agents.filter((x) => x.kind === k).map((x) => x.model ?? defaultModel(k)));
+    return modelsFor(k).find((m) => !on.has(m.id));
+  };
+  const ocNext = nextModel("opencode");
+  const dshNext = nextModel("dsh");
   const items: { label: string; body: Record<string, unknown> }[] = [
     { label: has("claude") ? "Another Claude Code account" : "Claude Code", body: { kind: "claude", pays: "plan", ...(has("claude") ? { newAccount: true } : {}) } },
     ...(!has("codex") ? [{ label: "Codex", body: { kind: "codex", pays: "key" } }] : []),
     ...(!has("opencode") ? [{ label: "OpenCode", body: { kind: "opencode", pays: "key" } }] : ocNext ? [{ label: `OpenCode on ${ocNext.short}`, body: { kind: "opencode", pays: "key", model: ocNext.id } }] : []),
+    ...(!has("dsh") ? [{ label: "DeepSeek Harness", body: { kind: "dsh", pays: "key" } }] : dshNext ? [{ label: `DeepSeek Harness on ${dshNext.short}`, body: { kind: "dsh", pays: "key", model: dshNext.id } }] : []),
   ];
   if (agents.length >= MAX_AGENTS) return null;
   return (
@@ -586,7 +592,8 @@ export function BotAiSection({
   const said = summary(state, b);
   const shared = BRAINS_ON ? sharesComputerWithLogins(b, state) : undefined;
   const cloud = state.host !== "mac" && b.runsOn !== "mac";
-  const cliAgent = ai.agents.find((x) => x.id === ai.default && isCli(x.kind)) ?? ai.agents.find((x) => isCli(x.kind));
+  // Open its terminal: a CLI agent with a terminal of its own (not DeepSeek Harness, which Bops runs headless only).
+  const cliAgent = ai.agents.find((x) => x.id === ai.default && hasTerminal(x.kind)) ?? ai.agents.find((x) => hasTerminal(x.kind));
   const where = brainRuns(b, state);
   const owner = state.owner?.name ?? "the owner";
   const agy: BotAgent = { id: "agy", kind: "agy", pays: "key" };

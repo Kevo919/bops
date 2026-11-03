@@ -2,9 +2,9 @@
 # A thread a brain runs (lib/server/cli-agents.ts): one process per thread on this computer, started
 # detached and pinned to the thread's screen, that Bops talks to through files, since Bops reaches the
 # computer one command at a time (Orgo's bash) and has no stream back. For Claude Code it's Claude Code
-# itself, reading each message as it comes; for Codex and OpenCode, a small runner here that gives each
-# message to a `codex exec` (or `opencode run`) of its own on the thread (resumed after the first), one after
-# another. Each thread has a folder, /root/.bops/agents/<thread>:
+# itself, reading each message as it comes; for Codex, OpenCode and DeepSeek Harness, a small runner here that
+# gives each message to a `codex exec` (or `opencode run`, or `dsh --profile headless`) of its own on the thread
+# (resumed after the first), one after another. Each thread has a folder, /root/.bops/agents/<thread>:
 #   in.jsonl   what Bops sends, one line per message (a stream-json user line for Claude Code; {"text"} for Codex and OpenCode)
 #   out.jsonl  what the CLI says (Claude Code's stream-json events, Codex's exec --json ones), which Bops reads
 #              on from where it got to (read)
@@ -16,6 +16,8 @@
 #   term.pid   the thread's CLI open in a terminal for the user (terminal), when it is
 #   oc.json    OpenCode's settings for this thread (its MCP servers, its briefing): nothing secret
 #   oc-session OpenCode's session for the thread, once a turn of it went through
+#   dsh.json   DeepSeek Harness's settings for this thread (its MCP servers, its briefing), as a patch for its
+#              profile: nothing secret
 # The CLI runs through bops-brain run: from an empty environment, in the brain's own folder, with no
 # Anthropic or OpenAI key or token but the brain's own key, if it has one. A thread of a bot's agent (the
 # --bot flags, lib/agents.ts) runs as that bot's agent: its own settings, its own commands, and on a key, a
@@ -25,14 +27,16 @@
 # Usage:
 #   bops-agent put <thread> mcp.json|prompt.md|key
 #       write stdin to that file, readable by root only
-#   bops-agent start <thread> <brain|-> claude|codex|opencode <display> <computer> <session>
+#   bops-agent start <thread> <brain|-> claude|codex|opencode|dsh <display> <computer> <session>
 #                    [--bot <bot> --agent <agent> --model <m> [--effort <e>] [--route <r>] [--also <agents>] [--label <w>]]
 #                    [-- <more CLI args>...]
 #       stop the thread's process left from before, if there is one (and close its terminal), and start
 #       the CLI on that screen, in /workspace. It picks <session> back up when the brain's folder has it,
 #       else starts it fresh (Claude Code as <session>; Codex under an id of its own, which it says;
-#       OpenCode as <session>, an id that starts "ses_", in the bot's own OpenCode folder). OpenCode runs
-#       only as a bot's agent, with no brain ("-"). Prints "started resumed" or "started fresh".
+#       OpenCode as <session>, an id that starts "ses_", in the bot's own OpenCode folder; DeepSeek Harness
+#       under an id of its own, "session-" and a UUID, which it says, in the agent's own DSH_HOME). OpenCode
+#       and DeepSeek Harness run only as a bot's agent, with no brain ("-"). Prints "started resumed" or
+#       "started fresh".
 #   bops-agent send <thread>
 #       append stdin (one line) to in.jsonl while its process runs; "gone" and exit 3 when it doesn't
 #   bops-agent read <thread> <offset> [bytes]
@@ -69,7 +73,7 @@ DIR="$AGENTS/$T"
 
 # The flags that make a run a bot's agent's (bops-brain run --bot ...): read into PROF, checked, and BOT,
 # MODEL and ROUTE kept for what this script needs of them. Shifts them off; ARGN is how many there were.
-PROF=(); BOT=""; MODEL=""; ROUTE=""; KINDF=""
+PROF=(); BOT=""; AGENT=""; MODEL=""; ROUTE=""; KINDF=""
 prof() {
   ARGN=0
   while [ $# -gt 0 ]; do
@@ -77,7 +81,7 @@ prof() {
       --bot|--agent|--model|--effort|--route|--also|--label)
         [[ "${2:-}" =~ ^[A-Za-z0-9._:/,-]+$ && ${#2} -le 600 ]] || usage
         PROF+=("$1" "$2")
-        case "$1" in --bot) BOT="$2" ;; --model) MODEL="$2" ;; --route) ROUTE="$2" ;; esac
+        case "$1" in --bot) BOT="$2" ;; --agent) AGENT="$2" ;; --model) MODEL="$2" ;; --route) ROUTE="$2" ;; esac
         shift 2; ARGN=$((ARGN + 2)) ;;
       --kind) KINDF="${2:-}"; shift 2; ARGN=$((ARGN + 2)) ;;
       *) break ;;
@@ -175,11 +179,13 @@ case "$CMD" in
     case "$KIND" in
       claude|codex) [[ "$SID" =~ ^[0-9a-f-]{36}$ && "$B" != - ]] || usage ;;
       opencode) [[ "$SID" =~ ^ses_[A-Za-z0-9]{8,40}$ && "$B" = - ]] || usage ;;
+      dsh) [[ "$SID" =~ ^session-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ && "$B" = - ]] || usage ;;
       *) usage ;;
     esac
     shift 7
     prof "$@"; shift "$ARGN"
     [ "$KIND" != opencode ] || [[ -n "$BOT" && -n "$MODEL" && -n "$ROUTE" ]] || usage
+    [ "$KIND" != dsh ] || [[ -n "$BOT" && -n "$AGENT" && -n "$MODEL" && -n "$ROUTE" ]] || usage
     [ "${1:-}" = -- ] && shift
     [ -f "$DIR/mcp.json" ] && [ -f "$DIR/prompt.md" ] || { echo "its tools or briefing aren't there" >&2; exit 1; }
     # A key file that came with this start is kept for the new process; anything else from the last one goes.
@@ -200,6 +206,10 @@ case "$CMD" in
       # OpenCode keeps each session in the bot's own OpenCode folder; the thread knows it began it (oc-session).
       if [ "$(cat "$DIR/oc-session" 2>/dev/null)" = "$SID" ] && [ -f "$BOTS/$BOT/opencode/data/opencode/opencode.db" ]; then MODE=resumed; fi
       DISPLAY=":$N" setsid nohup "$HERE/bops-agent" _opencode "$T" "$C" "$MODE" "$SID" "${PROF[*]:-}" "$@" < /dev/null > /dev/null 2>> "$DIR/err.log" &
+    elif [ "$KIND" = dsh ]; then
+      # DeepSeek Harness keeps each session in the agent's own DSH_HOME (sessions/<its folder>/<session>/).
+      if [ -n "$(find "$BOTS/$BOT/agents/$AGENT/dsh/sessions" -mindepth 2 -maxdepth 2 -type d -name "$SID" -print -quit 2>/dev/null)" ]; then MODE=resumed; fi
+      DISPLAY=":$N" setsid nohup "$HERE/bops-agent" _dsh "$T" "$C" "$MODE" "$SID" "${PROF[*]:-}" "$@" < /dev/null > /dev/null 2>> "$DIR/err.log" &
     else
       # Codex keeps each thread in its folder (sessions/<date>/rollout-<time>-<thread>.jsonl).
       if [ -d "$BRAINS/$B/sessions" ] && [ -n "$(find "$BRAINS/$B/sessions" -name "rollout-*$SID*.jsonl" -print -quit 2>/dev/null)" ]; then MODE=resumed; fi
@@ -646,6 +656,195 @@ with open(out_path, "ab", buffering=0) as out, open(err_path, "ab", buffering=0)
     out.write((json.dumps({"type": "bops", "subtype": "exited", "code": 130 if stopping else code}) + "\n").encode())
 PY
     ;;
+  _dsh)
+    # Behind start, detached: DeepSeek Harness's runner, as Codex's. Each message in in.jsonl is a
+    # `dsh --profile headless --json` of its own, on the thread's session from its second on (--session-id, by
+    # the id the first said: it can't be given one to make), one after another, its message on stdin. Its events
+    # go to out.jsonl as they come; it ends its turn with its final event (or error, when the run itself failed),
+    # and one that's gone without either ends it there as failed, with its last words. Its settings are the bot's
+    # agent's (bops-brain run: its DSH_HOME, the gate, the run's model, approvals off in a sandbox that writes in
+    # /workspace only); this thread's (Bops' MCP servers and briefing) are in dsh.json, a patch for its profile,
+    # which bops-brain checks and puts in the run's own, since one bot's threads run side by side.
+    C="$3"; MODE="$4"; SID="$5"; P="$6"; shift 6
+    cd "$WORK"
+    echo $$ > "$DIR/pid"
+    BOPS_BOTS_DIR="$BOTS" BOPS_WORK="$WORK" exec python3 - "$DIR/" "$C" "$MODE" "$SID" "$HERE" "$P" "$@" <<'PY'
+import json, os, re, signal, subprocess, sys, time
+
+d, computer, mode, sid, here, prof = sys.argv[1:7]
+prof = prof.split()
+more = [a for a in sys.argv[7:] if re.fullmatch(r"[A-Za-z0-9=_.:/-]+", a)]
+SESSION = re.compile(r"session-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
+# The bot's other agents for its wrappers, as its profile has them now (as Codex's runner reads them).
+ALSO_RE = re.compile(r"[a-z]+:[a-z]+(:[A-Za-z0-9_-]*(:[A-Za-z0-9._:/-]*)?)?(,[a-z]+:[a-z]+(:[A-Za-z0-9_-]*(:[A-Za-z0-9._:/-]*)?)?)*")
+began = time.time()
+
+
+def flags():
+    bot = prof[prof.index("--bot") + 1] if "--bot" in prof and prof.index("--bot") + 1 < len(prof) else ""
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", bot):
+        return prof
+    f = os.path.join(os.environ.get("BOPS_BOTS_DIR", "/root/.bops/bots"), bot, "also")
+    try:
+        if os.path.getmtime(f) <= began:
+            return prof
+        with open(f) as fh:
+            spec = fh.read().strip()
+    except OSError:
+        return prof
+    if spec and not ALSO_RE.fullmatch(spec):
+        return prof
+    out, i = [], 0
+    while i < len(prof):
+        if prof[i] == "--also":
+            i += 2
+            continue
+        out.append(prof[i])
+        i += 1
+    return out + (["--also", spec] if spec else [])
+
+inp, out_path, err_path = (os.path.join(d, f) for f in ("in.jsonl", "out.jsonl", "err.log"))
+key = None
+if os.path.exists(os.path.join(d, "key")):
+    with open(os.path.join(d, "key")) as f:
+        key = f.read()
+    os.remove(os.path.join(d, "key"))
+child = None
+stopping = False
+thread = sid if mode == "resumed" else None
+
+
+def stop(sig, _frame):
+    global stopping
+    stopping = True
+    if child is not None and child.poll() is None:
+        try:
+            child.send_signal(sig)
+        except OSError:
+            pass
+
+
+signal.signal(signal.SIGINT, stop)
+signal.signal(signal.SIGTERM, stop)
+
+
+def config():
+    """This thread's settings for DeepSeek Harness, as a patch for its profile: Bops' MCP servers (its mcp-client
+    rows) and Bops' briefing after its own system prompt. The briefing's {{ and }} are spaced apart: the system
+    prompt reads those as its own placeholders, and one it doesn't know would stop the run."""
+    try:
+        with open(os.path.join(d, "mcp.json")) as f:
+            servers = json.load(f).get("mcpServers", {})
+    except (OSError, ValueError, AttributeError):
+        servers = {}
+    rows = []
+    for name, x in servers.items():
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", name) or not isinstance(x, dict) or not isinstance(x.get("command"), str):
+            continue
+        args = [a for a in x.get("args", []) if isinstance(a, str)]
+        env = {k: v for k, v in (x.get("env") or {}).items() if isinstance(k, str) and isinstance(v, str)}
+        # The screen's app tools wait up to 20 minutes for the user's OK (screen_mcp.py): it waits longer.
+        rows.append({"id": f"bops-mcp-{name}", "name": "@deepseek-ai/dsh-mcp-client", "config": {"serverName": name, "transport": "stdio", "command": x["command"], "args": args, "env": env, "cwd": os.environ.get("BOPS_WORK", "/workspace"), "toolCallTimeoutMs": 1260000 if name == "screen" else 300000}})
+    patch = [{"insert": rows}] if rows else []
+    try:
+        with open(os.path.join(d, "prompt.md"), encoding="utf-8", errors="replace") as f:
+            brief = f.read()[:60000].replace("{{", "{ {").replace("}}", "} }")
+        patch.append({"id": "system-prompt", "config": {"personaPrefix": "You are a coding agent powered by the {{model}} model.", "personaSuffix": brief}})
+    except OSError:
+        pass
+    path = os.path.join(d, "dsh.json")
+    fd = os.open(path + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.write(fd, json.dumps(patch).encode())
+    os.close(fd)
+    os.replace(path + ".tmp", path)
+    return path
+
+
+def last_words(at):
+    """What it printed on stderr since `at`, its last line (not its reasoning): why a run that never ended its turn stopped."""
+    try:
+        with open(err_path, "rb") as f:
+            f.seek(at)
+            lines = [x.strip() for x in f.read().decode("utf-8", "replace").splitlines()]
+    except OSError:
+        return ""
+    lines = [x for x in lines if x and not x.startswith("dsh: reasoning")]
+    return lines[-1][:300] if lines else ""
+
+
+def turn(text, out, err, conf):
+    """One message: a `dsh --profile headless --json` (on the thread's session, once it has one) with it on stdin, its events into out.jsonl."""
+    global child, thread
+    kf = None
+    if key is not None:
+        kf = os.path.join(d, "key.run")
+        fd = os.open(kf, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        os.write(fd, key.encode())
+        os.close(fd)
+    at = os.path.getsize(err_path) if os.path.exists(err_path) else 0
+    args = ["--json", *(["--session-id", thread] if thread else []), *more, "-"]
+    child = subprocess.Popen([os.path.join(here, "bops-brain"), "run", "-", "dsh", "--computer", computer, *(["--key-file", kf] if kf else []), *flags(), "--dsh-patch", conf, "--", *args], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err)
+    try:
+        child.stdin.write(text.encode("utf-8", "replace"))
+        child.stdin.close()
+    except OSError:
+        pass
+    ended = False
+    for raw in iter(child.stdout.readline, b""):
+        out.write(raw if raw.endswith(b"\n") else raw + b"\n")
+        try:
+            ev = json.loads(raw)
+        except ValueError:
+            continue
+        kind = ev.get("type") if isinstance(ev, dict) else None
+        if kind == "session" and isinstance(ev.get("sessionId"), str) and SESSION.fullmatch(ev["sessionId"]):
+            thread = ev["sessionId"]
+        elif kind in ("final", "error"):
+            ended = True
+    code = child.wait()
+    if kf and os.path.exists(kf):
+        os.remove(kf)
+    if not ended and not stopping:
+        why = last_words(at) or f"it stopped (exit {code})"
+        out.write((json.dumps({"type": "error", "message": why}) + "\n").encode())
+    return code
+
+
+offset, code = 0, 0
+with open(out_path, "ab", buffering=0) as out, open(err_path, "ab", buffering=0) as err:
+    conf = config()
+    while not stopping:
+        try:
+            with open(inp, "rb") as f:
+                f.seek(offset)
+                chunk = f.read()
+        except OSError:
+            chunk = b""
+        end = chunk.rfind(b"\n")
+        if end < 0:
+            if os.path.exists(os.path.join(d, "closed")):
+                break
+            time.sleep(0.2)
+            continue
+        offset += end + 1
+        for raw in chunk[: end + 1].splitlines():
+            if stopping:
+                break
+            try:
+                text = json.loads(raw).get("text")
+            except (ValueError, AttributeError):
+                continue
+            if isinstance(text, str) and text.strip():
+                code = turn(text, out, err, conf)
+    for f in ("key", "key.run"):
+        try:
+            os.remove(os.path.join(d, f))
+        except OSError:
+            pass
+    out.write((json.dumps({"type": "bops", "subtype": "exited", "code": 130 if stopping else code}) + "\n").encode())
+PY
+    ;;
   send)
     alive || { echo gone; exit 3; }
     cat >> "$DIR/in.jsonl"
@@ -696,6 +895,9 @@ def event(ev):
     part = ev.get("part")
     if ev.get("type") == "text" and isinstance(part, dict) and isinstance(part.get("text"), str):
         out["part"]["text"] = part["text"][:WHOLE]
+    # DeepSeek Harness's own words: its answer (final) and what it says as it goes (text).
+    if ev.get("type") in ("final", "text") and isinstance(ev.get("text"), str):
+        out["text"] = ev["text"][:WHOLE]
     return out
 
 

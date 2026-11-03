@@ -28,6 +28,8 @@
 #  on Bops' own engine (OpenAI); these models do the bots' tasks.
 #  A bot whose AI you've already set up in its AI section keeps its own setup:
 #  these show up there as models you can pick.
+#  They work for DeepSeek Harness agents too: add DeepSeek Harness in a bot's AI
+#  section and these show up as its models (it starts on DeepSeek Chat).
 # ─────────────────────────────────────────────────────────────────────────────
 
 llms:

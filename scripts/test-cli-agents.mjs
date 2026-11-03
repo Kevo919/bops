@@ -345,6 +345,76 @@ const heardBy = (pid) => lines(HEARD).filter((h) => h.pid === pid);
 const flagOn = (f) => writeFileSync(join(FLAGS, f), "");
 const flagOff = (f) => rmSync(join(FLAGS, f), { force: true });
 
+/* ---------------- A fake DeepSeek Harness ---------------- */
+
+const DSH_RUNS = join(LOG, "dsh-runs.jsonl");
+// DeepSeek Harness 0.2.2-alpha.2's `dsh --profile headless --json` as bops-brain runs it (by its Node's path:
+// here this Node): the launcher's flags, then the app's, the task on stdin (-), its sessions kept in
+// $DSH_HOME/sessions/<the folder it ran in>/<session>/, its events as packages/bundle/headless/src/json-stream.ts
+// writes them (the shapes a real run against a fake provider wrote: scripts/fixtures/dsh-run.jsonl).
+const fakeDsh = join(scratch, "fake-dsh.mjs");
+writeFileSync(
+  fakeDsh,
+  `import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { join } from "node:path";
+const RUNS = ${JSON.stringify(DSH_RUNS)}, HEARD = ${JSON.stringify(HEARD)}, FLAGS = ${JSON.stringify(FLAGS)};
+const args = process.argv.slice(2);
+const pid = process.pid;
+const flag = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
+const patch = flag("--patch") && existsSync(flag("--patch")) ? JSON.parse(readFileSync(flag("--patch"), "utf8")) : null;
+appendFileSync(RUNS, JSON.stringify({ pid, ppid: process.ppid, at: Date.now(), args, env: process.env, cwd: process.cwd(), patch }) + "\\n");
+const TEST = ${process.pid};
+setInterval(() => { try { process.kill(TEST, 0); } catch (e) { if (e.code === "ESRCH") process.exit(0); } }, 1000).unref();
+const heard = (x) => appendFileSync(HEARD, JSON.stringify({ pid, at: Date.now(), ...x }) + "\\n");
+if (args[0] === "--version") { console.log("0.2.2-alpha.2"); process.exit(0); }
+const out = (e) => process.stdout.write(JSON.stringify(e) + "\\n");
+const folder = join(process.env.DSH_HOME, "sessions", "--workspace--");
+const asked = flag("--session-id");
+if (asked && !existsSync(join(folder, asked))) { out({ type: "error", message: 'session "' + asked + '" does not exist; omit --session-id to start a new Session' }); console.error("dsh: session does not exist"); process.exit(1); }
+const sid = asked ?? "session-" + randomUUID();
+process.on("SIGINT", () => { heard({ interrupted: true }); process.exit(130); });
+process.on("exit", (code) => heard({ exit: code }));
+const wait = async (f) => { while (!existsSync(join(FLAGS, f))) await new Promise((r) => setTimeout(r, 15)); };
+let text = "";
+process.stdin.on("data", (d) => (text += d));
+process.stdin.on("end", () => void go());
+async function go() {
+  heard({ got: text, session: sid, resumed: !!asked });
+  mkdirSync(join(folder, sid), { recursive: true });
+  appendFileSync(join(folder, sid, "session.v4.jsonl"), JSON.stringify({ type: "user", text }) + "\\n");
+  out({ type: "session", sessionId: sid, cwd: process.cwd() });
+  out({ type: "status", phase: "turn_start", turn: 1 });
+  out({ type: "status", phase: "step_start", turn: 1, step: 1 });
+  if (text.includes("DSHAUTH")) {
+    const reason = { kind: "error", error: { message: '401: {"message":"Authentication Fails, Your api key: ****abcd is invalid","type":"authentication_error"}', code: "AUTH" } };
+    out({ type: "status", phase: "turn_end", turn: 1, reason });
+    out({ type: "final", sessionId: sid, reason, text: "" });
+    console.error("dsh: AUTH: 401");
+    process.exit(1);
+  }
+  if (text.includes("DSHCRASH")) { console.error("dsh: the run died before it finished"); process.exit(1); }
+  out({ type: "thinking", text: "Checking the cart totals first.\\nThen the tests." });
+  out({ type: "text", text: "Looking at the cart." });
+  out({ type: "tool_call", callId: "call_1", tool: "bash", input: { command: "npm test", description: "Runs the tests" } });
+  out({ type: "tool_result", callId: "call_1", status: "completed", result: "12 passing\\n" });
+  out({ type: "tool_call", callId: "call_2", tool: "edit", input: { file_path: "/workspace/src/cart.ts", old_string: "a", new_string: "b" } });
+  out({ type: "tool_result", callId: "call_2", status: "completed", result: "ok" });
+  out({ type: "tool_call", callId: "call_3", tool: "mcp__screen__click", input: { x: 10, y: 20 } });
+  out({ type: "tool_result", callId: "call_3", status: "completed", result: "" });
+  out({ type: "status", phase: "step_end", turn: 1, step: 1, usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } });
+  if (text.includes("HANG")) await new Promise(() => setInterval(() => {}, 1000));
+  const done = text.includes("LONG") ? "Summary: " + "word ".repeat(1200) + "the end." : "Done: " + text.split("\\n")[0];
+  out({ type: "text", text: done });
+  out({ type: "status", phase: "turn_end", turn: 1, reason: { kind: "completed" } });
+  out({ type: "final", sessionId: sid, reason: { kind: "completed" }, text: done });
+  process.exit(0);
+}
+`,
+);
+/** Every `dsh --profile headless` the fake computers ran for a thread, oldest first. */
+const dshRuns = () => lines(DSH_RUNS).filter((r) => r.args.includes("headless"));
+
 /* ---------------- Bops Cloud, OpenAI behind it, and Orgo: fakes ---------------- */
 
 process.env.BOPS_CLOUD_URL = "https://cloud.test";
@@ -362,6 +432,7 @@ const said = (text) => ({ id: `msg_${asked.length}`, type: "message", role: "ass
 const response = (id, output) => ({ id, object: "response", model: "gpt-6.1-sol", status: "completed", output, usage: { input_tokens: 100, output_tokens: 5, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } });
 const KEY = "sk-ant-api03-VAULT-KEY-7Qx9";
 const OPENAI_KEY = "sk-proj-VAULT-OPENAI-4Kd2";
+const DEEPSEEK_KEY = "sk-VAULT-DEEPSEEK-9Zp1";
 /** What the computer's environment has besides Bops' own: keys and tokens Claude Code or Codex would use first, and Codex's own folder. */
 const PLANTED = {
   ANTHROPIC_API_KEY: "sk-ant-api03-PLANTED",
@@ -402,6 +473,9 @@ const runHere = (c, command) =>
           BOPS_WORKSPACE: join(c.dir, "workspace"),
           BOPS_CLAUDE: c.claude,
           BOPS_CODEX: join(fakebin, "codex"),
+          // DeepSeek Harness by its Node's path (bops-brain runs it so): this Node, and the fake.
+          BOPS_DSH: fakeDsh,
+          BOPS_DSH_NODE: process.execPath,
           BOPS_LOGS: join(c.dir, "logs"),
           BOPS_HOME: c.home,
           ...PLANTED,
@@ -426,6 +500,11 @@ async function bash(id, command) {
     return { output: "ok\n", exit_code: 0 };
   }
   if (command.includes("npm install -g --prefix /opt/bops/claude")) return { output: "claude 2.1.292\n", exit_code: 0 };
+  // DeepSeek Harness's install (brains.ts dshInstallCommand): there already, at its version.
+  if (command.includes("@deepseek-ai/dsh@")) {
+    c.dshInstalls = (c.dshInstalls ?? 0) + 1;
+    return { output: "dsh 0.2.2-alpha.2\n", exit_code: 0 };
+  }
   // The image's Codex is there (codexInstallCommand would fetch it otherwise).
   if (command.includes("/usr/local/bin/codex --version")) {
     c.codexChecks = (c.codexChecks ?? 0) + 1;
@@ -442,6 +521,7 @@ async function bash(id, command) {
 const vault = new Map([
   ["ANTHROPIC_API_KEY", KEY],
   ["OPENAI_API_KEY", OPENAI_KEY],
+  ["DEEPSEEK_API_KEY", DEEPSEEK_KEY],
 ]);
 let reveals = 0;
 /** The Vault has given all the keys it allows this hour. */
@@ -1417,6 +1497,126 @@ await test("a routine whose brain waits on the user isn't a run that went fine, 
   });
 });
 
+/* ---------------- DeepSeek Harness ---------------- */
+
+const DSH_AGENT = { id: "ag_dshboppy01", kind: "dsh", pays: "key" };
+let dshAiBefore;
+let ds1;
+let dshSession;
+await test("a bot's DeepSeek Harness agent runs its thread: dsh --profile headless --json on its computer, on a run token for the gate that holds its DeepSeek key, in its own DSH_HOME, with Bops' tools and briefing", async () => {
+  dshAiBefore = structuredClone(S.bot(main.id).ai);
+  S.update(() => void (S.bot(main.id).ai = { agents: [{ id: "bops", kind: "bops", pays: "credit" }, DSH_AGENT], default: DSH_AGENT.id }));
+  const before = reveals;
+  const s = X.startSession({ botId: main.id, goal: "Fix the totals", title: "Totals", where: "cloud", fresh: true });
+  ds1 = s.id;
+  assert.deepEqual(thread(ds1).agent, { id: DSH_AGENT.id, kind: "dsh", model: "deepseek/deepseek-chat" }, "on the Default, on DeepSeek Chat");
+  const t = await ended(ds1);
+  assert.equal(t.status, "done", `it finished (${t.error ?? ""}; ${warned.join(" | ")})`);
+  assert.equal(t.answer, "Done: Fix the totals", "its final is its answer");
+  assert.equal(t.brainRun.kind, "dsh");
+  assert.equal(t.brainRun.brainId, "-", "no account: its key is its model's provider's");
+  assert.ok(pc(PC).dshInstalls >= 1, "Bops made sure it's installed");
+  assert.equal(reveals, before + 1, "its key, revealed once for its start");
+  const [r] = dshRuns();
+  // Its own session id, as it said it, is the thread's (Bops' placeholder never reached it: a first run starts fresh).
+  dshSession = t.brainRun.cli;
+  assert.match(dshSession, /^session-[0-9a-f-]{36}$/);
+  assert.equal(heardBy(r.pid).find((h) => h.got).session, dshSession);
+  assert.ok(!r.args.includes("--session-id"), "a new thread: no session to pick up yet");
+  // The launcher's flags, then the app's: headless, the run's own patch, unattended in its workspace-write sandbox, JSON events, the task on stdin.
+  assert.deepEqual(r.args.slice(0, 2), ["--profile", "headless"]);
+  assert.equal(r.args[2], "--patch");
+  assert.deepEqual(r.args.slice(4), ["--permission-mode", "workspace-write", "--approval-policy", "never", "--json", "-"]);
+  assert.ok(!r.args.join(" ").includes("Fix the totals"), "its message comes on stdin, not its command line");
+  assert.match(heardBy(r.pid).find((h) => h.got).got, /^Fix the totals\n\n<computer_state /, "the goal, then the computer's briefing, as Bops agent's");
+  // Its environment: its own DSH_HOME in the bot's agent's folder, a run token in DeepSeek's key variable, the gate, no telemetry, nothing planted.
+  const home = join(pc(PC).brains, "..", "bots", main.id, "agents", DSH_AGENT.id, "dsh");
+  assert.equal(r.env.DSH_HOME, home);
+  assert.match(r.env.DEEPSEEK_API_KEY, /^bopsrun_[0-9a-f]{64}$/);
+  assert.match(r.env.BOPS_GATE, /^http:\/\/127\.0\.0\.1:\d+$/);
+  assert.equal(r.env.DSH_TELEMETRY_DISABLED, "1");
+  assert.ok(!Object.values(r.env).includes(DEEPSEEK_KEY), "the key is nowhere in its environment");
+  for (const k of Object.keys(PLANTED)) assert.equal(r.env[k], undefined, `no ${k}`);
+  assert.ok(r.env.PATH.split(":").at(-1) === join(process.execPath, ".."), "its Node's folder last on PATH: what it runs finds the computer's own first");
+  assert.equal(r.env.DISPLAY, `:${t.lastDisplay}`);
+  assert.equal(realpathSync(r.cwd), realpathSync(join(pc(PC).dir, "workspace")));
+  // The run's patch: Bops' MCP servers and briefing (the thread's), then its provider at the gate (the variable named,
+  // never the key), its model, and DeepSeek's own routes around the gate off.
+  const p = r.patch;
+  const ins = p.find((x) => x.insert).insert;
+  assert.deepEqual(ins.map((x) => x.config.serverName).sort(), ["browser", "screen"]);
+  const screen = ins.find((x) => x.config.serverName === "screen");
+  assert.equal(screen.name, "@deepseek-ai/dsh-mcp-client");
+  assert.equal(screen.config.command, "/opt/bops/venv/bin/python");
+  assert.deepEqual(screen.config.args, ["/opt/bops/screen_mcp.py", "stdio", "--session", ds1, "--bot", main.id]);
+  assert.equal(screen.config.toolCallTimeoutMs, 1260000, "longer than an app's wait for the user's OK");
+  const sys = p.find((x) => x.id === "system-prompt").config;
+  assert.match(sys.personaSuffix, /^You are Boppy, the .* bot in Bops\./);
+  assert.match(sys.personaSuffix, /You run as DeepSeek Harness on this computer, for Bops\./);
+  assert.ok(!/\{\{|\}\}/.test(sys.personaSuffix), "nothing its system prompt would read as a placeholder");
+  const provider = p.find((x) => x.id === "llm-pi-ai").config.providers;
+  assert.deepEqual(Object.keys(provider), ["deepseek"]);
+  assert.equal(provider.deepseek.apiKeyEnv, "DEEPSEEK_API_KEY");
+  assert.equal(provider.deepseek.api, "openai-completions");
+  assert.equal(provider.deepseek.baseURL, `${r.env.BOPS_GATE}/deepseek/v1`);
+  assert.deepEqual(provider.deepseek.models, [{ id: "deepseek-chat", name: "deepseek-chat" }]);
+  assert.deepEqual(p.find((x) => x.id === "agent-default-model").config, { provider: "deepseek", model: "deepseek-chat" });
+  assert.deepEqual(p.filter((x) => x.disabled).map((x) => x.id), ["llm-deepseek", "llm-deepseek-account", "web-search-deepseek", "web-deepseek-api"]);
+  assert.ok(!JSON.stringify(p).includes(DEEPSEEK_KEY) && !JSON.stringify(p).includes("bopsrun_"), "nothing secret in it");
+  // Its events are the thread's steps, worded as Bops agent's are.
+  const d = details(ds1);
+  for (const x of ["Looking at the cart.", "ran npm test", "edited cart.ts", "clicked (10, 20)"]) assert.ok(d.includes(x), `a step says ${JSON.stringify(x)}: ${JSON.stringify(d)}`);
+  assert.ok(!d.includes("Done: Fix the totals"), "its answer isn't a step too");
+  // Its key: never on a command line, its files gone.
+  assert.ok(!pc(PC).commands.some((x) => x.includes(DEEPSEEK_KEY)), "no command Bops ran had the key in it");
+  assert.ok(!readdirSync(agentDir(ds1)).some((f) => f.startsWith("key")));
+  assert.ok(existsSync(join(agentDir(ds1), "dsh.json")), "the thread's own settings, as a patch");
+});
+
+await test("a reply picks the DeepSeek Harness thread back up: --session-id on the session it began", async () => {
+  X.replyToSession(ds1, "Now add a test for it");
+  await until(() => thread(ds1).status !== "done", "it to start again");
+  const t = await ended(ds1);
+  assert.equal(t.status, "done", t.error);
+  assert.equal(t.answer, "Done: Now add a test for it");
+  const r = dshRuns().at(-1);
+  assert.deepEqual(r.args.slice(-4), ["--json", "--session-id", dshSession, "-"]);
+  assert.equal(heardBy(r.pid).find((h) => h.got).resumed, true);
+  assert.equal(t.brainRun.cli, dshSession);
+});
+
+await test("Stop interrupts DeepSeek Harness", async () => {
+  X.replyToSession(ds1, "HANG on this one");
+  await until(() => heardBy(dshRuns().at(-1).pid).some((h) => h.got?.startsWith("HANG")), "it to start working");
+  const r = dshRuns().at(-1);
+  X.stopSession(ds1);
+  const t = await ended(ds1);
+  assert.equal(t.status, "failed");
+  assert.equal(t.error, "Stopped by you");
+  await until(() => heardBy(r.pid).some((h) => h.interrupted), "SIGINT");
+  await until(() => !alive(r.pid), "it to be gone");
+});
+
+await test("its DeepSeek key turned down: the thread waits on the user with Finish on Bops agent and Wait; a run that died says why", async () => {
+  const s = X.startSession({ botId: main.id, goal: "DSHAUTH: the report", title: "Report", where: "cloud", fresh: true });
+  let t = await ended(s.id);
+  assert.equal(t.status, "done", t.error);
+  assert.equal(t.answer, "DeepSeek turned down your key for DeepSeek Harness. I can finish this on Bops agent, on your credit, or wait.");
+  assert.deepEqual(t.options, ["Finish on Bops agent", "Wait"]);
+  assert.equal(t.brainRun.waits, "limit", "it waits as a key at its limit does: a reply carries it on");
+  assert.equal(A.needsYou(t), true);
+  const c = X.startSession({ botId: main.id, goal: "DSHCRASH: the chart", title: "Chart", where: "cloud", fresh: true });
+  t = await ended(c.id);
+  assert.equal(t.status, "failed");
+  assert.equal(t.error, "DeepSeek Harness stopped: dsh: the run died before it finished");
+  // Its own terminal isn't there for it: Bops runs it headless only.
+  assert.throws(() => X.openInTerminal(ds1), /A thread DeepSeek Harness runs doesn't open in a terminal: Bops runs it headless only\./);
+  S.update(() => {
+    if (dshAiBefore === undefined) delete S.bot(main.id).ai;
+    else S.bot(main.id).ai = dshAiBefore;
+  });
+});
+
 await test("the thread's words have no long dashes", () => {
   for (const id of [t1]) for (const x of [thread(id).answer, ...thread(id).steps.map((y) => y.detail)]) assert.ok(!/[–—]/.test(x), x);
   const plan = { kind: "claude", model: "claude-opus-5-5", agent: { id: "ag_planplan01", kind: "claude", pays: "plan" } };
@@ -1429,7 +1629,7 @@ await test("the thread's words have no long dashes", () => {
     ...["limit", "auth", "model", "down", "vault"].flatMap((why) => [C.stoppedWords(plan, why, "x", "Boppy's computer", "max"), C.stoppedWords(key, why, "x", "Boppy's computer"), C.stoppedWords(oc, why, "x", "Boppy's computer")]),
   ];
   for (const w of shown) assert.ok(!/[–—]|\bOrbit\b/.test(w) && !/[A-Za-z]-[A-Za-z]/.test(w.replaceAll("some-model", "")), w);
-  for (const w of [C.claudeDriver.note("Maya"), C.codexDriver.note("Maya"), C.opencodeDriver.note("Maya")]) assert.ok(!/[–—]|\bOrbit\b/.test(w), w);
+  for (const w of [C.claudeDriver.note("Maya"), C.codexDriver.note("Maya"), C.opencodeDriver.note("Maya"), C.dshDriver.note("Maya")]) assert.ok(!/[–—]|\bOrbit\b/.test(w), w);
   assert.equal(C.stoppedWords(plan, "model", "x", "Boppy's computer", "pro", "Rook"), "Your Pro plan can't use Opus 5.5. Pick another model for new threads in Rook's profile. I can finish this on Bops agent, on your credit, or wait.\n\nOptions: Finish on Bops agent | Wait");
   assert.equal(C.stoppedWords(oc, "down", "x", "Boppy's computer"), "DeepInfra isn't answering right now. I can try again, or finish this on Bops agent, on your credit.\n\nOptions: Try again | Finish on Bops agent");
   assert.match(C.stoppedWords(key, "vault", "x", "Boppy's computer"), /^Waiting for your Vault\. It allows 30 key uses an hour, so this starts again by itself in a few minutes\. .*\n\nOptions: Finish on Bops agent \| Wait$/);

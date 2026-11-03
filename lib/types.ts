@@ -541,9 +541,9 @@ export function workBot(b: Bot, bots: Bot[]): Bot {
  */
 export type BrainKind = "claude" | "codex";
 /** The agents a thread can run on (lib/agents.ts AGENTS). "bops" is Bops' own agent, on OpenAI. */
-export type AgentKind = "bops" | "claude" | "codex" | "opencode" | "agy";
+export type AgentKind = "bops" | "claude" | "codex" | "opencode" | "dsh" | "agy";
 /** The CLI agents this build drives on a bot's computer (lib/server/cli-agents.ts DRIVERS). */
-export type CliKind = "claude" | "codex" | "opencode";
+export type CliKind = "claude" | "codex" | "opencode" | "dsh";
 /** Who pays for a thread's AI: Bops AI credit, the user's own plan signed in on the computer, or their own key from the Vault. */
 export type AgentPays = "credit" | "plan" | "key";
 /**
@@ -555,7 +555,7 @@ export type BotAgent = {
   id: string;
   kind: AgentKind;
   pays: AgentPays;
-  /** The AI account (Brain.id) for Claude Code and Codex. Never for Bops agent or OpenCode. */
+  /** The AI account (Brain.id) for Claude Code and Codex. Never for Bops agent, OpenCode or DeepSeek Harness. */
   account?: string;
   /** For new threads (lib/agents.ts MODELS). Unset: the kind's default (Bops agent: Auto). */
   model?: string;
@@ -575,7 +575,7 @@ export type BotAi = { agents: BotAgent[]; default: string };
 export const BRAINS_ON = process.env.NEXT_PUBLIC_BOPS_BRAINS === "1";
 export const BRAIN_NAMES: Record<BrainKind, string> = { claude: "Claude Code", codex: "Codex" };
 /** The CLI agents' names (lib/agents.ts AGENTS has them all). */
-export const CLI_NAMES: Record<CliKind, string> = { claude: "Claude Code", codex: "Codex", opencode: "OpenCode" };
+export const CLI_NAMES: Record<CliKind, string> = { claude: "Claude Code", codex: "Codex", opencode: "OpenCode", dsh: "DeepSeek Harness" };
 /** The Vault key a key brain runs on (lib/server/keys.ts KEY_PROVIDERS): the user's own Anthropic or OpenAI key. */
 export const BRAIN_KEYS: Record<BrainKind, string> = { claude: "ANTHROPIC_API_KEY", codex: "OPENAI_API_KEY" };
 /**

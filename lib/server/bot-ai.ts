@@ -1,5 +1,5 @@
 import "server-only";
-import { AGENTS, agentOn, aiOf, cleanAi, cleanJobs, hasProfile, isCli, MAX_AGENTS, modelOk, newAgentId, PAYS_SOON, paysOk, threadAgent } from "@/lib/agents";
+import { AGENTS, agentOn, aiOf, anyModel, cleanAi, cleanJobs, hasProfile, isCli, MAX_AGENTS, modelOk, newAgentId, PAYS_SOON, paysOk, threadAgent } from "@/lib/agents";
 import { BRAINS_ON, workspaceOf, type AgentKind, type AgentPays, type Bot, type BotAi, type BotAgent } from "@/lib/types";
 import { addBrain, BrainError, ensureBrainTools } from "./brains";
 import { alsoSpec } from "./cli-agents";
@@ -73,7 +73,7 @@ export function setBotAi(botId: string, o: AiOp, out: { added?: string } = {}): 
       modelCheck(o.kind, o.model);
       if (agents.length >= MAX_AGENTS) throw new BrainError(`A bot runs at most ${MAX_AGENTS} agents.`, 400);
       const account = o.kind === "claude" || o.kind === "codex" ? accountFor(o.kind, o.pays, wsId, !!o.newAccount, takenBy(o.kind), b.name) : undefined;
-      if (o.kind !== "opencode" && agents.some((x) => x.kind === o.kind && x.pays === o.pays && x.account === account))
+      if (!anyModel(o.kind) && agents.some((x) => x.kind === o.kind && x.pays === o.pays && x.account === account))
         throw new BrainError(`${b.name} has ${AGENTS[o.kind].name} on that account already.`, 400);
       out.added = newAgentId();
       agents.push({ id: out.added, kind: o.kind, pays: o.pays, ...(account ? { account } : {}), ...(o.model ? { model: o.model } : {}) });

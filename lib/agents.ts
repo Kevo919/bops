@@ -19,6 +19,7 @@ export const AGENTS: Record<AgentKind, { name: string; maker: string; pays: Agen
   claude: { name: "Claude Code", maker: "Anthropic", pays: ["plan", "key"] },
   codex: { name: "Codex", maker: "OpenAI", pays: ["key"] },
   opencode: { name: "OpenCode", maker: "Any model", pays: ["key"] },
+  dsh: { name: "DeepSeek Harness", maker: "Any model", pays: ["key"] },
   agy: { name: "agy", maker: "Google Antigravity", pays: [], soon: "agy signs in with a Google account, which Bops can't use for you yet." },
 };
 
@@ -27,12 +28,13 @@ export const PAYS_SOON: Partial<Record<AgentKind, Partial<Record<AgentPays, stri
   claude: { credit: "Credit for Claude Code needs Bops Cloud to carry it first." },
   codex: { credit: "Credit for Codex needs Bops Cloud to carry it first.", plan: "A ChatGPT plan for Codex needs a check of OpenAI's terms first." },
   opencode: { credit: "Credit for OpenCode needs Bops Cloud to carry it first." },
+  dsh: { credit: "Credit for DeepSeek Harness needs Bops Cloud to carry it first." },
 };
 /** The ways to pay each kind shows in its editor, in order. */
-export const PAYS_SHOWN: Record<AgentKind, AgentPays[]> = { bops: ["credit"], claude: ["credit", "plan", "key"], codex: ["credit", "plan", "key"], opencode: ["credit", "key"], agy: [] };
+export const PAYS_SHOWN: Record<AgentKind, AgentPays[]> = { bops: ["credit"], claude: ["credit", "plan", "key"], codex: ["credit", "plan", "key"], opencode: ["credit", "key"], dsh: ["credit", "key"], agy: [] };
 export const PAYS_NAMES: Record<AgentPays, string> = { credit: "Credit", plan: "Plan", key: "Your key" };
 
-/** The models an agent can be told to use, the kind's default first. OpenCode's name their provider; any other `provider/model` of those three works too. */
+/** The models an agent can be told to use, the kind's default first. OpenCode's and DeepSeek Harness's name their provider; any other `provider/model` of those providers works too (OPENCODE_OTHER). */
 export const MODELS: { id: string; kind: AgentKind; label: string; short: string; note?: string }[] = [
   { id: "auto", kind: "bops", label: "Auto", short: "Auto", note: "Picks per task" },
   { id: "gpt-6.1-sol", kind: "bops", label: "GPT 6.1 Sol", short: "GPT 6.1 Sol" },
@@ -47,6 +49,12 @@ export const MODELS: { id: string; kind: AgentKind; label: string; short: string
   { id: "openai/gpt-6.1-sol", kind: "opencode", label: "GPT 6.1 Sol", short: "GPT 6.1 Sol" },
   { id: "zai-coding/glm-5.3", kind: "opencode", label: "GLM 5.3 (Z.ai Coding Plan)", short: "GLM 5.3", note: "Your Z.ai Coding Plan" },
   { id: "zai/glm-5.2", kind: "opencode", label: "GLM 5.2 (Z.ai)", short: "GLM 5.2", note: "Z.ai, pay as you go" },
+  // DeepSeek Harness is DeepSeek's own agent, so it starts on DeepSeek; it runs the other providers' models too, on their keys.
+  { id: "deepseek/deepseek-chat", kind: "dsh", label: "DeepSeek Chat", short: "DeepSeek Chat" },
+  { id: "deepseek/deepseek-reasoner", kind: "dsh", label: "DeepSeek Reasoner", short: "DeepSeek Reasoner", note: "Thinks before it answers" },
+  { id: "anthropic/claude-sonnet-5-5", kind: "dsh", label: "Claude Sonnet 5.5", short: "Sonnet 5.5" },
+  { id: "openai/gpt-6.1-sol", kind: "dsh", label: "GPT 6.1 Sol", short: "GPT 6.1 Sol" },
+  { id: "zai-coding/glm-5.3", kind: "dsh", label: "GLM 5.3 (Z.ai Coding Plan)", short: "GLM 5.3", note: "Your Z.ai Coding Plan" },
 ];
 
 /* ---------------- Jobs ---------------- */
@@ -95,7 +103,7 @@ export const cleanJobs = (jobs: unknown): Job[] | undefined => {
   const out = JOBS.filter((j) => jobs.includes(j));
   return out.length ? out : undefined;
 };
-/** Any other model OpenCode can run on a key of these providers ("Other model" in its editor). */
+/** Any other model OpenCode (or DeepSeek Harness) can run on a key of these providers ("Other model" in its editor). */
 export const OPENCODE_OTHER = /^(anthropic|openai|deepinfra|zai|zai-coding|deepseek|openrouter)\/[A-Za-z0-9._:/-]{1,120}$/;
 
 /** The Vault key each provider's agents run on (lib/server/keys.ts KEY_PROVIDERS). */
@@ -117,7 +125,8 @@ const AGENT_ID = /^ag_[A-Za-z0-9]{10}$/;
 /**
  * The LLMs in config/llms.yaml: each a provider and model, the one new bots start on (`starter`), and the jobs
  * it takes. The server reads the file as it starts (lib/server/llms.ts) and sends the list to the window with the
- * state (AppState.llms), and both keep it here. They run on OpenCode, on the provider's key from the Vault.
+ * state (AppState.llms), and both keep it here. They run on OpenCode, on the provider's key from the Vault, and
+ * show as DeepSeek Harness's models too.
  */
 export type Llm = { name: string; provider: AgentRoute; model: string; starter?: boolean; useFor?: Job[] };
 const g = globalThis as unknown as { __bopsLlms?: Llm[] };
@@ -137,10 +146,10 @@ export function setLlms(list: unknown) {
   g.__bopsLlms = out;
 }
 const llmModel = (l: Llm) => `${l.provider}/${l.model}`;
-/** The LLMs as models of OpenCode (and the Claude ones of Claude Code too), the starter first. */
+/** The LLMs as models of OpenCode and DeepSeek Harness (and the Claude ones of Claude Code too), the starter first. */
 const llmModels = (kind: AgentKind): (typeof MODELS)[number][] => {
   const list = [...llms()].sort((a, b) => Number(!!b.starter) - Number(!!a.starter));
-  if (kind === "opencode") return list.map((l) => ({ id: llmModel(l), kind, label: l.name, short: l.name }));
+  if (anyModel(kind)) return list.map((l) => ({ id: llmModel(l), kind, label: l.name, short: l.name }));
   if (kind === "claude") return list.filter((l) => l.provider === "anthropic").map((l) => ({ id: l.model, kind, label: l.name, short: l.name }));
   return [];
 };
@@ -161,13 +170,22 @@ export function starterAi(): BotAi | undefined {
 
 export const modelsFor = (kind: AgentKind) => {
   const mine = llmModels(kind);
+  // DeepSeek Harness keeps DeepSeek's own models first (DeepSeek Chat is its default), then the LLMs, then the rest;
+  // the others start on the LLMs' starter.
+  if (kind === "dsh") {
+    const own = MODELS.filter((m) => m.kind === kind);
+    const first = own.filter((m) => m.id.startsWith("deepseek/"));
+    const ids = (list: { id: string }[]) => new Set(list.map((m) => m.id));
+    const lead = [...first, ...mine.filter((x) => !ids(first).has(x.id))];
+    return [...lead, ...own.filter((m) => !ids(lead).has(m.id))];
+  }
   return [...mine, ...MODELS.filter((m) => m.kind === kind && !mine.some((x) => x.id === m.id))];
 };
 /** The model a kind's threads start on when its agent names none. */
 export const defaultModel = (kind: AgentKind) => modelsFor(kind)[0]?.id;
 /** A model an agent of this kind may be told to use. */
-export const modelOk = (kind: AgentKind, model: string | undefined) => !!model && (modelsFor(kind).some((m) => m.id === model) || (kind === "opencode" && OPENCODE_OTHER.test(model)));
-/** A model's short name ("Opus 5.5"), or for another OpenCode model, its own name. */
+export const modelOk = (kind: AgentKind, model: string | undefined) => !!model && (modelsFor(kind).some((m) => m.id === model) || (anyModel(kind) && OPENCODE_OTHER.test(model)));
+/** A model's short name ("Opus 5.5"), or for another OpenCode or DeepSeek Harness model, its own name. */
 export const modelShort = (kind: AgentKind, model: string | undefined) => {
   const m = model ?? defaultModel(kind);
   return modelsFor(kind).find((x) => x.id === m)?.short ?? (m ? (m.split("/").pop() ?? m) : "");
@@ -178,7 +196,7 @@ export function gateRoute(x: Pick<BotAgent, "kind" | "pays" | "model">): AgentRo
   if (x.pays !== "key") return undefined;
   if (x.kind === "claude") return "anthropic";
   if (x.kind === "codex") return "openai";
-  if (x.kind === "opencode") return (x.model ?? defaultModel("opencode"))?.split("/")[0] as AgentRoute;
+  if (anyModel(x.kind)) return (x.model ?? defaultModel(x.kind))?.split("/")[0] as AgentRoute;
   return undefined;
 }
 /** The Vault key an agent on a key runs on. */
@@ -189,7 +207,17 @@ export const agentKeyName = (x: Pick<BotAgent, "kind" | "pays" | "model">) => {
 
 /** The kinds this build runs: Bops agent always; the CLI agents with brains on (BRAINS_ON). */
 export const agentOn = (kind: AgentKind) => kind === "bops" || (BRAINS_ON && !AGENTS[kind].soon);
-export const isCli = (kind: AgentKind): kind is CliKind => kind === "claude" || kind === "codex" || kind === "opencode";
+export const isCli = (kind: AgentKind): kind is CliKind => kind === "claude" || kind === "codex" || kind === "opencode" || kind === "dsh";
+/**
+ * The kinds that run any provider's model on its key, named "provider/model" (OpenCode, DeepSeek Harness): a bot
+ * may have several of one, each on its own model, and their key is their model's provider's.
+ */
+export const anyModel = (kind: AgentKind) => kind === "opencode" || kind === "dsh";
+/**
+ * The CLI agents whose session opens in a terminal for the user (Open in terminal, and the bot's own shell). Not
+ * DeepSeek Harness: Bops runs it headless only (dsh --profile headless), and it ships no terminal app to resume a session in.
+ */
+export const hasTerminal = (kind: AgentKind): kind is CliKind => isCli(kind) && kind !== "dsh";
 
 /** Which ways to pay an agent of this kind can use in this build. */
 export const paysOk = (kind: AgentKind, pays: AgentPays) => AGENTS[kind].pays.includes(pays) && !PAYS_SOON[kind]?.[pays];
@@ -220,7 +248,7 @@ export function cleanAi(ai: unknown, brains: Brain[] = [], wsId?: string): BotAi
       account = acct.id;
     }
     const key = `${kind}:${pays}:${account ?? ""}`;
-    if (seen.has(x.id) || (kind !== "opencode" && seen.has(key))) continue;
+    if (seen.has(x.id) || (!anyModel(kind) && seen.has(key))) continue;
     seen.add(x.id);
     seen.add(key);
     const model = typeof x.model === "string" && modelOk(kind, x.model) && !(kind === "bops" && x.model === "auto") ? x.model : undefined;
@@ -308,13 +336,13 @@ export type AgentIn = { bot: Bot; state: Pick<AppState, "bots" | "brains"> };
 /**
  * What tells an agent from another of its kind in its bot's profile, when one would read the same: how it pays
  * ("Max plan", "Anthropic key"), and a number when that's the same too ("Max plan 2"). None when it's the only
- * one of its kind (or, for OpenCode, the only one on its model): its name says it.
+ * one of its kind (or, for OpenCode and DeepSeek Harness, the only one on its model): its name says it.
  */
 export function agentTag(x: Pick<BotAgent, "id" | "kind" | "pays" | "model" | "account">, at?: AgentIn): string | undefined {
   if (!at) return undefined;
   const agents = aiOf(at.bot, at.state).agents;
   const model = (y: Pick<BotAgent, "kind" | "model">) => y.model ?? defaultModel(y.kind);
-  const same = agents.filter((y) => y.kind === x.kind && (x.kind !== "opencode" || model(y) === model(x)));
+  const same = agents.filter((y) => y.kind === x.kind && (!anyModel(x.kind) || model(y) === model(x)));
   if (same.length < 2 || !same.some((y) => y.id === x.id)) return undefined;
   const host = workBot(at.bot, at.state.bots).computerId;
   const word = (y: Pick<BotAgent, "kind" | "pays" | "model" | "account">) => (y.pays === "credit" ? "Credit" : y.pays === "key" ? `${keyVendor(y)} key` : planName(planOf(y, at.state, host)));
@@ -365,9 +393,9 @@ export function agentState(x: BotAgent, b: Bot, state: Pick<AppState, "bots" | "
   if (state.host === "mac") return { ready: false, line: `${name} runs on a cloud computer. Your bots work on this Mac.` };
   if (b.runsOn === "mac") return { ready: false, line: `${b.name} works on your Mac, so its threads use Bops agent.` };
   if (x.pays === "key") {
-    const want = x.kind === "opencode" ? agentKeyName(x) : (accountOf(x, state)?.keyName ?? agentKeyName(x));
+    const want = anyModel(x.kind) ? agentKeyName(x) : (accountOf(x, state)?.keyName ?? agentKeyName(x));
     if (keys && want && !keys.has(want)) return { ready: false, line: `No ${keyVendor(x)} key in your Vault yet.`, button: "add_key" };
-    const m = x.kind === "opencode" ? `${modelShort("opencode", x.model)} · your ${keyVendor(x)} key` : `Your ${keyVendor(x)} key`;
+    const m = anyModel(x.kind) ? `${modelShort(x.kind, x.model)} · your ${keyVendor(x)} key` : `Your ${keyVendor(x)} key`;
     return { ready: true, line: upper(m) };
   }
   // A Claude plan: signed in on the computer this bot works on, or not yet.
@@ -460,7 +488,7 @@ export function threadAgent(s: Pick<Session, "agent" | "brainRun" | "onBopsAgent
   const account = accountOf(x, state);
   if ((x.kind === "claude" || x.kind === "codex") && !account) return bopsRun(b, state, { what: `${b.name}'s ${name(x.kind)} account`, why: "isn't there anymore" });
   const route = gateRoute({ ...x, model });
-  return { agent: x, kind: x.kind, model, ...(account ? { account } : {}), ...(route ? { route, keyName: x.kind === "opencode" ? ROUTE_KEYS[route] : (account?.keyName ?? ROUTE_KEYS[route]) } : {}) };
+  return { agent: x, kind: x.kind, model, ...(account ? { account } : {}), ...(route ? { route, keyName: anyModel(x.kind) ? ROUTE_KEYS[route] : (account?.keyName ?? ROUTE_KEYS[route]) } : {}) };
 }
 
 /**

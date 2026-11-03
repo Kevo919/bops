@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent as KeyEvent, type RefObject } from "react";
-import { AGENTS, agentLabel, agentName, agentState, aiOf, modelsFor, modelShort, OPENCODE_OTHER, paysLabel, readyAgents, upper, type AgentState } from "@/lib/agents";
+import { AGENTS, agentLabel, agentName, agentState, aiOf, anyModel, modelsFor, modelShort, OPENCODE_OTHER, paysLabel, readyAgents, upper, type AgentState } from "@/lib/agents";
 import { workBot, workspaceOf, type AppState, type Bot, type BotAgent, type Session } from "@/lib/types";
 import { AgentMark } from "./agent-marks";
 import { useVaultKeyNames } from "./keys";
@@ -185,7 +185,7 @@ export function NewThread({
                 {m.label}
               </option>
             ))}
-            {agent.kind === "opencode" && model && !models.some((m) => m.id === model) && OPENCODE_OTHER.test(model) && <option value={model}>{model}</option>}
+            {anyModel(agent.kind) && model && !models.some((m) => m.id === model) && OPENCODE_OTHER.test(model) && <option value={model}>{model}</option>}
           </select>
           <span aria-hidden className="text-[10px] text-[#9A9A98]">
             ▾

@@ -54,6 +54,16 @@ export function OpenCodeMark({ size = 16 }: Size) {
   );
 }
 
+/** DeepSeek Harness: a plain mark of Bops' own (a whale's tail on DeepSeek's blue), not DeepSeek's logo. */
+export function DshMark({ size = 16 }: Size) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden>
+      <rect x="1.5" y="1.5" width="21" height="21" rx="5" fill="#4D6BFE" />
+      <path d="M12 18.5 C12 14.5 11 12 7 9.5 C9.5 9.5 11.2 10.6 12 12.2 C12.8 10.6 14.5 9.5 17 9.5 C13 12 12 14.5 12 18.5 Z" fill="#FFFFFF" />
+    </svg>
+  );
+}
+
 export function AgyMark({ size = 16 }: Size) {
   const id = useId();
   return (
@@ -80,7 +90,7 @@ function PlainMark({ size = 16 }: Size) {
   );
 }
 
-const MARKS: Record<AgentKind, (p: Size) => React.ReactElement> = { bops: OpenAiMark, claude: ClaudeMark, codex: CodexMark, opencode: OpenCodeMark, agy: AgyMark };
+const MARKS: Record<AgentKind, (p: Size) => React.ReactElement> = { bops: OpenAiMark, claude: ClaudeMark, codex: CodexMark, opencode: OpenCodeMark, dsh: DshMark, agy: AgyMark };
 
 /** How a thread is, for the dot on its mark: herdr's words, worst first. */
 export type MarkState = "needs" | "failed" | "working" | "done";

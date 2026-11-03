@@ -56,7 +56,7 @@ import { watching } from "./presence";
 import { computerOutOfCredit, freeHoursUsed, sayInUse, START_SAY_MS, wakeForUser } from "./free-hours";
 import { brainById, ensureBrainTools, signInStatus } from "./brains";
 import { alsoSpec, brainName, BrainStopped, cliCompact, cliDriver, cliTurn, closeCli, closeTerminal, limitPick, openRun, openShell, openTerminal, signInWords, stoppedWords } from "./cli-agents";
-import { aiOf, hasProfile, isCli, pickAgent, threadAgent, type AgentRun } from "@/lib/agents";
+import { aiOf, hasProfile, hasTerminal, isCli, pickAgent, threadAgent, type AgentRun } from "@/lib/agents";
 
 /**
  * Session runner. A session is one long-running task on one screen of the computer its bot works on
@@ -1556,6 +1556,7 @@ const COPIED_BRAINS = [
   "pkill -KILL -f '[b]ops-ai-gate'",
   "pkill -KILL -f '[/]opt/bops/claude/'",
   "pkill -KILL -f '[/]opt/bops/opencode/'",
+  "pkill -KILL -f '[/]opt/bops/dsh/'",
   "pkill -KILL -f '[c]odex exec (resume )?--json'",
   "pkill -KILL -f '[b]ops-brain sign-in '",
   "rm -rf /root/.bops/brains /root/.bops/agents /root/.bops/bots && echo cleaned",
@@ -2493,6 +2494,7 @@ export function openInTerminal(sessionId: string): { botId: string; display: num
   const r = s.brainRun;
   const kind = threadRunner(s);
   if (!r || !kind || kind === "agent") throw new Error("Only a thread Claude Code, Codex or OpenCode runs opens in a terminal.");
+  if (!hasTerminal(kind)) throw new Error(`A thread ${CLI_NAMES[kind]} runs doesn't open in a terminal: Bops runs it headless only.`);
   if (getState().host === "mac" || s.runsOn === "mac") throw new Error("Your bots work in browsers on this Mac, so there's no terminal to open.");
   const b = bot(s.botId);
   if (!b) throw new Error("Its bot isn't there anymore.");
@@ -2566,7 +2568,7 @@ export function openBotTerminal(botId: string): { botId: string; display: number
   if (getState().host === "mac" || b.runsOn === "mac") throw new Error(`${b.name} works on your Mac, so there's no terminal to open.`);
   const ai = aiOf(b, getState());
   const def = ai.agents.find((x) => x.id === ai.default);
-  const x = def && isCli(def.kind) ? def : ai.agents.find((y) => isCli(y.kind));
+  const x = def && hasTerminal(def.kind) ? def : ai.agents.find((y) => hasTerminal(y.kind));
   if (!x) throw new Error(`${b.name} has no Claude Code, Codex or OpenCode to open a terminal for.`);
   const run = threadAgent({ agent: { id: x.id, kind: x.kind, ...(x.model ? { model: x.model } : {}) } }, b, getState());
   if (run.gone || !isCli(run.kind)) throw new Error(`${b.name} can't open its terminal right now.`);
