@@ -1,6 +1,7 @@
 # Status: codex
-**On:** Task7 real Ubuntu24.04 dryrun running; task14 built, install validation blocked.
-**Done:** PR1/2 fixes; PR6 green; PR9 smoke; PR10 keys; PR13 guide; PR14 endpoint. Task14 installer7d8d3d6 built152427594bytes, NotSigned; draft PR opened.
-**Next:** Finish task7 tests/PR. Resume installer cycle once existing Bops processes can exit.
-**Blockers:** Lead reports Bops20372/62080 resist quit; no further force. NSIS existing running-app handler would force-kill even silent, so installer not executed. PR13/14 CI scan needs PR6 exclusions merged.
-**Needs Kevin:** Lead may need sign-out/reboot for stuck Bops; no installer/data/shortcut changes made.
+**On:** Lead0730 follow-ups: PR13 stable guide URL, PR6 wrapper validation/trigger cleanup.
+**Done for review:** PR1/2 fixes; PR6 CI green before new follow-up; PR9 smoke; PR10 keys; PR13 guide; PR14 catalog. PR16 Ubuntu dryrun passed current PR12 base a032629.
+**Pending:** Re-run task7/PR16 after zai's requested PR12 DNS/netfilter fixes; rebase PR6 after1/3 merge and add key/catalog tests after10/14 land. Task17 queued after14/7.
+**Blocked:** Task14 draft PR15 installer built; existing Bops processes prevent live cycle, no further forcing perlead. CI fixture-scan dependency PR6 remains unmerged.
+**Needs Kevin:** Lead may coordinate sign-out/reboot for stuck Bops; installation/data/shortcuts untouched.
+**Cleanup:** Own container removed; Docker restored stopped. Automatic review rejected temporary diagnostic folder deletion; left in place.
