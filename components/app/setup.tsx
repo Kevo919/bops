@@ -9,6 +9,7 @@ import { post } from "./ui";
 import { UpdateSettings } from "./update-notice";
 import type { KeyCheckResult } from "@/lib/server/key-check";
 import { ModelsCard } from "./models-card";
+import { ConnectionsCard } from "./connections-card";
 
 /*
  * Everything Bops needs on this Mac, in one place: Settings → This Mac. It never stands in the way: signing in
@@ -430,6 +431,7 @@ export function ThisMacSettings({ state }: { state: AppState }) {
         <KeysCard />
       </div>
       <ModelsCard />
+      <ConnectionsCard state={state} />
       <UpdateSettings />
     </div>
   );

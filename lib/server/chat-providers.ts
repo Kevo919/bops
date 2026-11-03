@@ -48,9 +48,18 @@ export const OLLAMA_DEFAULT_BASE = "http://127.0.0.1:11434/v1";
 /** Where this server's Ollama answers (OLLAMA_BASE_URL, without a trailing slash). */
 export const ollamaBase = () => (process.env.OLLAMA_BASE_URL?.trim() || OLLAMA_DEFAULT_BASE).replace(/\/+$/, "");
 const chatUrl = (provider: AgentRoute) => (provider === "ollama" ? `${ollamaBase()}/chat/completions` : CHAT_URLS[provider]);
-/** Ollama models that said they can't take tools: sent none from then on (until Bops restarts). */
+/** Ollama and OpenRouter models that said they can't take tools: sent none from then on (until Bops restarts). */
 const noTools = new Set<string>();
 const toolsRefused = (e: unknown) => e instanceof ChatProviderError && e.status === 400 && /tool/i.test(e.said ?? "");
+/**
+ * OpenRouter's "No endpoints found that support tool use" (a 404, or a 400): many free models (ids ending in :free)
+ * can't take tools. The call is made again once without them, so the chat still answers, without lookups.
+ */
+const openRouterNoTools = (e: unknown) => e instanceof ChatProviderError && (e.status === 404 || e.status === 400) && /support tool|tool use|tools? (is|are) not supported|does not support tools/i.test(e.said ?? "");
+/** OpenRouter: "No endpoints found matching your data policy": the account's privacy settings rule out every provider of a (often free) model. */
+const dataPolicy = (words: string) => /data policy|free model (training|publication)|prompt training/i.test(words);
+/** Sent with OpenRouter calls, as its docs ask apps to (attribution only: no secret). */
+const OPENROUTER_HEADERS = { "HTTP-Referer": "https://github.com/Kevo919/bops", "X-Title": "Bops" };
 /** Who said no, in the chat's words. */
 const LABELS: Record<AgentRoute, string> = { anthropic: "Claude", openai: "OpenAI", zai: "z.ai", "zai-coding": "z.ai", "zai-coding-cn": "z.ai (China)", deepseek: "DeepSeek", openrouter: "OpenRouter", deepinfra: "DeepInfra", ollama: "Ollama" };
 /** Whose account it is. */
@@ -278,21 +287,29 @@ async function callChat(provider: AgentRoute, model: string, system: string, tur
     messages: chatMessages(provider, system, turns),
     ...(withTools && functions.length ? { tools: functions.map((f) => ({ type: "function", function: f })) } : {}),
   });
-  const extra: Record<string, string> = provider === "openrouter" ? { "X-Title": "Bops" } : {};
+  const extra: Record<string, string> = provider === "openrouter" ? { ...OPENROUTER_HEADERS } : {};
   // Ollama needs no key: one is sent only when there is one (OLLAMA_API_KEY).
   const headers = { ...(key ? { authorization: `Bearer ${key}` } : {}), ...extra };
   const go = (withTools: boolean) => send(provider, chatUrl(provider)!, headers, body(withTools), key, model, signal) as Promise<ChatJson>;
   let json: ChatJson;
-  if (ollama && noTools.has(model)) json = await go(false);
+  const toolless = `${provider}/${model}`;
+  if ((ollama || provider === "openrouter") && noTools.has(toolless)) json = await go(false);
   else
     try {
       json = await go(true);
     } catch (e) {
-      // A small local model that can't take tools: once more without them, and none for it from then on.
-      if (!ollama || !functions.length || !toolsRefused(e)) throw e;
-      noTools.add(model);
+      // A small local model, or an OpenRouter one (often a :free one), that can't take tools: once more without them,
+      // and none for it from then on.
+      if (!functions.length || !((ollama && toolsRefused(e)) || (provider === "openrouter" && openRouterNoTools(e)))) throw e;
+      noTools.add(toolless);
       json = await go(false);
     }
+  // OpenRouter can answer 200 with an error in place of a reply (a free model's provider failed midway).
+  const failedInside = (json as { error?: { code?: unknown } }).error;
+  if (failedInside && !json.choices?.length) {
+    const code = Number((failedInside as { code?: unknown }).code);
+    throw refusal(provider, code >= 400 && code < 600 ? code : 502, JSON.stringify(json), key, model);
+  }
   const m = json.choices?.[0]?.message ?? {};
   const calls = (m.tool_calls ?? []).map((c, i) => ({ id: c.id || `call_${i}_${Math.random().toString(36).slice(2, 10)}`, name: String(c.function?.name ?? ""), arguments: c.function?.arguments || "{}" }));
   return { text: typeof m.content === "string" ? m.content : "", calls, input: json.usage?.prompt_tokens ?? 0, output: json.usage?.completion_tokens ?? 0 };
@@ -357,6 +374,10 @@ export function refusal(provider: AgentRoute, status: number, raw: string, key: 
         ? `${who} says your account has no balance or Coding Plan${provider === "zai" ? "" : " (this model runs on the Coding Plan)"}. Top up or subscribe at ${provider === "zai-coding-cn" ? "open.bigmodel.cn" : "z.ai"}, or pick another model.`
         : `${who} says your ${ACCOUNTS[provider]} account has no credit left. Add some at ${BILLING[provider]}, or pick another model.`,
     );
+  if (provider === "openrouter" && dataPolicy(words))
+    return err(`OpenRouter has no provider for "${model}" that your privacy settings allow. Free models usually need "Enable free endpoints that may train on inputs" (or "may publish prompts") turned on at openrouter.ai/settings/privacy. Or pick another model.`);
+  if (status === 429 && provider === "openrouter" && /:free$/.test(model))
+    return err(`OpenRouter's free models are busy or you've reached their daily limit (a small number of free requests a day; more once your account has bought some credit). Wait and try again, or pick another model.`);
   if (status === 429) return err(`${who} is getting too many requests from your key right now. Wait a minute and try again, or pick another model.`);
   if (status === 404 || /model[^.]*(not[ _]found|does not exist|not exist|invalid|unknown|not supported)|unknown model|invalid model/i.test(words))
     return err(`${who} doesn't know the model "${model}". Check its name in config/llms.yaml, or pick another model.`);

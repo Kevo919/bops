@@ -262,7 +262,9 @@ export async function connectApp(app: string, label?: string, replaces?: string,
     s.connecting = (s.connecting ?? []).filter((c) => !(c.app === app && c.status === "failed"));
     s.connecting.push({ id: waitId, app, appName, label: label?.trim() || undefined, status: "waiting", at: Date.now(), replaces, grant });
   });
-  if (req.redirectUrl) execFile("open", [req.redirectUrl]);
+  // On the Mac the sign-in opens in the browser from here; on Windows, Linux or a server the window opens it (opened: false).
+  const opened = !!req.redirectUrl && process.platform === "darwin" && !process.env.BOPS_DATABASE_URL;
+  if (opened) execFile("open", [req.redirectUrl!]);
   void req
     .waitForConnection(15 * 60_000)
     .then(async (ca: { id: string }) => {
@@ -303,7 +305,7 @@ export async function connectApp(app: string, label?: string, replaces?: string,
         if (c) Object.assign(c, { status: "failed", error: /timed out/i.test(e.message) ? "The sign-in wasn't finished." : e.message.slice(0, 200) });
       }),
     );
-  return { redirectUrl: req.redirectUrl };
+  return { redirectUrl: req.redirectUrl, opened };
 }
 
 /**

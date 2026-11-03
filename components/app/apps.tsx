@@ -88,6 +88,15 @@ export function botApps(state: AppState, b: Bot) {
   return [...seen.values()];
 }
 
+/**
+ * The app's sign-in page (Composio's link), when the server didn't open it itself: on Windows, Linux or a hosted
+ * Bops the window opens it (the desktop app sends it to the default browser). Only an https link.
+ */
+export function openSignIn(j: { redirectUrl?: string | null; opened?: boolean }) {
+  if (j.opened !== false || !j.redirectUrl || !/^https:\/\//i.test(j.redirectUrl)) return;
+  window.open(j.redirectUrl, "_blank", "noopener");
+}
+
 /* ---------------- Pieces of the Vault (vault.tsx) ---------------- */
 
 /** Accounts being connected: each waits for its sign-in in the browser, or says why it didn't connect. */
@@ -104,7 +113,7 @@ export function Connecting({ state }: { state: AppState }) {
             </span>
           </span>
           {c.status === "waiting" ? <Spinner size={14} /> : (
-            <button onClick={() => void post("/api/apps", { app: c.app, label: c.label, grant: c.grant, replaces: c.replaces })} className="shrink-0 rounded-full bg-ink px-3 py-1 text-[12px] font-medium leading-4 text-white">
+            <button onClick={() => void post("/api/apps", { app: c.app, label: c.label, grant: c.grant, replaces: c.replaces }).then((r) => r.json()).then(openSignIn).catch(() => {})} className="shrink-0 rounded-full bg-ink px-3 py-1 text-[12px] font-medium leading-4 text-white">
               Try again
             </button>
           )}
@@ -654,11 +663,14 @@ export function ConnectStep({ state, app: a, replaces, hasOne, onBack, onDone }:
     setBusy(true);
     setError(null);
     const res = await post("/api/apps", { app: a.app, label: label || undefined, replaces, grant: grantOf(bots, level, check, replaces) });
-    const j = (await res.json()) as { error?: string };
+    const j = (await res.json()) as { error?: string; redirectUrl?: string | null; opened?: boolean };
     if (j.error) {
       setError(j.error);
       setBusy(false);
-    } else onDone();
+    } else {
+      openSignIn(j);
+      onDone();
+    }
   };
   const how =
     a.auth === "open"
