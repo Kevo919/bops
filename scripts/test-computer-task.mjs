@@ -288,7 +288,7 @@ assert.equal(s.owed, undefined, "nothing owed after an answer");
 assert.equal(asked.length, 3);
 // What the model is given: the screen, web search, a shell, signing in from the vault, the user's CRM (crm.ts), its instructions; each call follows the last.
 // (read_skill always: every bot has Bops' own skills, under their labels. Its workspace's: see "Skills" below.)
-assert.deepEqual(asked[0].tools.map((t) => t.name ?? t.type), ["computer", "web_search", "run_command", "page_script", "sign_in_from_vault", "split_task", "check_parts", "read_skill", "crm_files", "crm_read", "crm_save_rows", "crm_create_file"]);
+assert.deepEqual(asked[0].tools.map((t) => t.name ?? t.type), ["computer", "web_search", "run_command", "page_script", "sign_in_from_vault", "split_task", "check_parts", "read_skill", "crm_files", "crm_read", "crm_save_rows", "crm_create_file", "list_repos", "open_repo", "run_repo", "repo_status"]);
 assert.match(asked[0].instructions, /Your skills: [^\n]*open it with read_skill and label[^\n]*\nApps and source control \(7\): [^\n]+$/, "only Bops' own skills, by label");
 assert.doesNotMatch(asked[0].instructions, /wants you to work/, "no \"How I work\" yet");
 assert.match(asked[0].instructions, /call split_task with those parts: each runs as a thread of its own on another screen of your computer, at the same time/, "told it can split");
@@ -671,7 +671,7 @@ assert.match(copy, /'\/workspace\/capabilities\/skills\/weekly-invoice-summary\/
 const procAsk = asked[procAt];
 assert.deepEqual(
   procAsk.tools.map((t) => t.name ?? t.type),
-  ["computer", "web_search", "run_command", "page_script", "sign_in_from_vault", "split_task", "check_parts", "read_skill", "crm_files", "crm_read", "crm_save_rows", "crm_create_file"],
+  ["computer", "web_search", "run_command", "page_script", "sign_in_from_vault", "split_task", "check_parts", "read_skill", "crm_files", "crm_read", "crm_save_rows", "crm_create_file", "list_repos", "open_repo", "run_repo", "repo_status"],
   "read_skill, as before",
 );
 const readTool = procAsk.tools.find((t) => t.name === "read_skill");

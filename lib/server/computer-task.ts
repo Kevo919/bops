@@ -8,10 +8,11 @@ import { computerAsleepError, computerWakingError, orgo, OrgoTimeout, screenId }
 import { APP_TOOLS, findAppActions, runAppAction } from "./composio";
 import { askFor, declined, NeedsOk, Paused, type AskSpec } from "./permission";
 import { DATA_TOOL_NAMES, DATA_TOOLS, runDataTool } from "./treg";
+import { REPO_TOOL_NAMES, repoTaskTools, repoTool } from "./repos";
 import { CRM_TOOL_NAMES, CRM_TOOLS, crmStep, runCrmTool } from "./crm";
 import { callApi, callApiTool, usableKeys } from "./keys";
 import { readSkill, READ_SKILL_TOOL } from "./workspace-skills";
-import { bot, patchSession, session, stateEpoch } from "./store";
+import { bot, ownerName, patchSession, session, stateEpoch } from "./store";
 import { recordTokens, usageTags } from "./usage";
 import { othersThread, outsideThread, type AppApproval, type Session } from "@/lib/types";
 
@@ -157,6 +158,8 @@ async function steps(t: ComputerTurn, ws: { socket?: ResponsesSocket | null }): 
     ...DATA_TOOLS(b),
     ...(others ? [] : CRM_TOOLS(b)),
     ...(keyed.length ? [callApiTool(keyed, { getOnly: true })] : []),
+    // GitHub repos (lib/server/repos.ts): run_repo only on the owner's own task (never a stranger's or a member's).
+    ...(outside ? [] : repoTaskTools(ownerName(), { run: !others })),
   ];
   const guard = newPageGuard();
   // A turn that was stopped mid-step, or paused at a call that needed the user's OK, owes OpenAI the outputs of the
@@ -761,6 +764,9 @@ async function runFunction(t: ComputerTurn, o: OutputItem, guard: PageGuard = ne
     } else if (o.name && DATA_TOOL_NAMES.has(o.name)) {
       t.step(o.name, o.name === "business_search" ? `looked up ${String(args.job ?? "business data")}` : o.name === "find_data" ? `looked for "${String(args.query ?? "").slice(0, 60)}" in business data` : `got ${String(args.endpoint_id ?? "data")}`);
       output = await orStop(t, runDataTool(s.botId, o.name, args, { sessionId: t.sessionId }, { approved: opts.approved }));
+    } else if (o.name && REPO_TOOL_NAMES.has(o.name) && !outside) {
+      t.step(o.name, o.name === "run_repo" ? `asked to run ${String(args.repo_id ?? args.url ?? "a repo")}` : o.name === "open_repo" ? `opened ${String(args.repo_id ?? args.url ?? "a repo")}` : "checked the repos");
+      output = await orStop(t, repoTool(s.botId, o.name, args, { owner: !others, threadId: t.sessionId, approved: opts.approved }));
     } else if (o.name && CRM_TOOL_NAMES.has(o.name) && !others) {
       t.step(o.name, crmStep(o.name, args));
       output = await orStop(t, runCrmTool(s.botId, o.name, args, { sessionId: t.sessionId }));

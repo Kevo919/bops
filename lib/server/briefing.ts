@@ -7,6 +7,7 @@ import { bot, getState, ownerName } from "./store";
 import { asksNow } from "./chart";
 import { belowOf } from "@/lib/chain";
 import { appsOpen } from "@/lib/apps-access";
+import { reposLine } from "./repos";
 
 /**
  * A bot's computer, in a few lines, for the bot itself: what each screen is doing (its threads,
@@ -116,6 +117,8 @@ export async function computerBriefing(botId: string, opts: { thread?: string; s
     ...(waiting.length ? [`Waiting on ${owner}: ${waiting.join("; ")}.`] : []),
     ...(queued.length ? [`Up next: ${queued.join(", ")}.`] : []),
     ...(recent.length ? [`Finished in the last half hour: ${recent.join(", ")}.`] : []),
+    // What's installed or running from the Repos section (lib/server/repos.ts), from the state alone.
+    ...(reposLine(botId) ? [reposLine(botId)] : []),
     ...(ownersMac ? ["", ownersMac] : []),
   ].join("\n");
 }

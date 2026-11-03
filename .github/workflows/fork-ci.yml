@@ -60,6 +60,10 @@ jobs:
         run: node --conditions=react-server scripts/test-look.mjs
       - name: Repo recipe tests
         run: node scripts/test-repo-recipes.mjs
+      - name: Repos and repo tools tests
+        run: node --conditions=react-server scripts/test-repos.mjs
+      - name: bops-repo script syntax
+        run: bash -n vm/bin/bops-repo
 
   android:
     if: github.repository != 'OrgoAI/bops'

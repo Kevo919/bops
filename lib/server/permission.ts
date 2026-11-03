@@ -2,6 +2,7 @@ import "server-only";
 import { allows as rulesAllow, alwaysRule, ruleFor } from "@/lib/permission";
 import { computerStaysDown, live, type AppApproval, type AskAnswer, type AskReply, type AskResume, type Bot } from "@/lib/types";
 import type { MemberWho } from "@/lib/member-access";
+import { REPO_ASK_ACTION } from "@/lib/repos";
 import { onRunner } from "./persist";
 import { addMessage, bot, changeLanded, getState, id, ownerName, pullState, session, stateDevice, update, watchArrivals, watchLoads } from "./store";
 
@@ -139,6 +140,9 @@ export function replyToAsk(askId: string, reply: AskReply, message?: string, mem
   if (onRunner()) return "A bot's computer can't answer for you.";
   const a = getState().appApprovals?.find((x) => x.id === askId);
   if (!a || a.reply) return "That isn't waiting on you anymore.";
+  // A repo's first run (lib/server/repos.ts) is the owner's own yes to that one plan: never a member's, and Always allow counts as once.
+  if (a.action === REPO_ASK_ACTION && member) return "Only the owner can approve running a repo.";
+  if (a.action === REPO_ASK_ACTION && reply === "always") reply = "once";
   const me = stateDevice();
   const at = Date.now();
   const said = reply === "reject" ? message?.trim().slice(0, 2000) : undefined;
@@ -155,7 +159,7 @@ export function replyToAsk(askId: string, reply: AskReply, message?: string, mem
     const added = alwaysRule(x.action, b.permissions);
     if (added) b.permissions = [...(b.permissions ?? []), added];
     for (const y of s.appApprovals ?? [])
-      if (!y.reply && y.botId === x.botId && ruleFor(b, y.action) === "allow") {
+      if (!y.reply && y.botId === x.botId && y.action !== REPO_ASK_ACTION && ruleFor(b, y.action) === "allow") {
         y.reply = { reply: "always", ...(me ? { by: me } : {}), at, ...(member ? { member } : {}) };
         answered.push(y);
       }

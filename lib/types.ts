@@ -5,6 +5,7 @@ import type { Chain } from "./chain";
 import type { ComputerSize } from "./bops-billing";
 import type { MemberAccessMap, MemberWho } from "./member-access";
 import type { Ping } from "./pings";
+import type { RepoState } from "./repos";
 import type { SharedOpen } from "./shared";
 import { botHasSkill, type SkillLabelInfo } from "./skill-labels";
 
@@ -1802,6 +1803,12 @@ export type AppState = {
    * never sees it: the look is the owner's, on their own screens.
    */
   look?: LookState;
+  /**
+   * GitHub repos run on the bots' computers (lib/server/repos.ts, config/repos/*.yaml): each run's status
+   * (installed, running, failed, its last health check) and the plans the owner approved. Never a key: the
+   * recipes name keys, and v1 hands none to a repo.
+   */
+  repos?: RepoState;
   /**
    * Whether the computers' other screens stream live through Orgo too, not only over the tailnet
    * (BOPS_SCREEN_STREAM=1, screenStreamWanted in lib/server/orgo.ts). Filled in by /api/state for the
