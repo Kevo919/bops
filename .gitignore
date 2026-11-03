@@ -21,6 +21,7 @@
 /build/*
 !/build/entitlements.mac.plist
 !/build/entitlements.mac.inherit.plist
+!/build/installer.nsh
 
 # misc
 .DS_Store
