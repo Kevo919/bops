@@ -8,6 +8,7 @@ import { RestartAsk } from "./restart";
 import { post } from "./ui";
 import { UpdateSettings } from "./update-notice";
 import type { KeyCheckResult } from "@/lib/server/key-check";
+import { ModelsCard } from "./models-card";
 
 /*
  * Everything Bops needs on this Mac, in one place: Settings → This Mac. It never stands in the way: signing in
@@ -425,7 +426,10 @@ export function ThisMacSettings({ state }: { state: AppState }) {
       <FullAccessCard items={items} />
       <PhoneCard />
       <ModulesCard />
-      <KeysCard />
+      <div id="settings-keys" className="scroll-mt-4">
+        <KeysCard />
+      </div>
+      <ModelsCard />
       <UpdateSettings />
     </div>
   );

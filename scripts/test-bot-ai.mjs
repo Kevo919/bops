@@ -73,7 +73,7 @@ writeFileSync(
 
 /* ---------------- Loading the app's modules ---------------- */
 
-const fileUrl = (p) => pathToFileURL(`${root}/${p}`).href;
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 // sessions.ts is a stand in: what setBotAi asks of it is recorded.
 const SESSIONS_OWN = `
 const calls = (globalThis.__sessionCalls ??= []);
@@ -86,7 +86,7 @@ const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -180,7 +180,9 @@ if (OFF) {
     assert.ok(!/Claude Code|Codex|OpenCode|agy|\+ Add|Open its terminal/.test(section), section);
     assert.match(section, /Chat, threads, memory and calls run on credit\./);
   });
-  rmSync(scratch, { recursive: true, force: true });
+  try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
   process.stdout.write(`brains off: ${passed} passed\n`);
   process.exit(0);
 }
@@ -300,6 +302,30 @@ await test("one account is one agent of the bot's: the editor never offers the o
   assert.equal(A.agentLabel(bot("boppy").ai.agents.find((x) => x.id === codexAgent), { bot: bot("boppy"), state: st }), "Codex · GPT 6.1 Sol");
 });
 
+await test("Codex ChatGPT plans use only the self-hosted owner's account, never credit", () => {
+  const before = structuredClone(S.getState());
+  try {
+    const profile = BA.setBotAi("rook", { op: "add", kind: "codex", pays: "plan" });
+    const agent = profile.agents.find((x) => x.kind === "codex");
+    const account = S.getState().brains.find((x) => x.id === agent.account);
+    assert.equal(account.auth, "plan");
+    assert.equal(account.keyName, undefined);
+    assert.equal(A.gateRoute(agent), undefined);
+    assert.equal(A.paysOk("codex", "credit"), false);
+    assert.equal(A.agentState(agent, bot("rook"), S.getState()).button, "sign_in");
+    assert.match(A.paysLabel(agent, S.getState()), /ChatGPT plan/);
+    delete process.env.BOPS_SELF_HOSTED;
+    assert.throws(() => BA.setBotAi("kai", { op: "add", kind: "codex", pays: "plan" }), /self-hosted owner/);
+    assert.throws(() => BA.setBotAi("boppy", { op: "add", kind: "codex", pays: "plan" }), /self-hosted owner/, "existing account reuse is refused too");
+    process.env.BOPS_SELF_HOSTED = "1";
+    S.update((s) => void (s.shared = { ownerName: "Maya" }));
+    assert.throws(() => BA.setBotAi("rook", { op: "update", agentId: agent.id, model: "gpt-6.1-sol" }), /Only Maya/);
+  } finally {
+    process.env.BOPS_SELF_HOSTED = "1";
+    S.update((s) => { Object.assign(s, before); delete s.shared; });
+  }
+});
+
 await test("what isn't in Bops yet answers Soon, with why; a bad model, a seventh agent, or Bops agent's removal are turned down", () => {
   const err = (op) => {
     try {
@@ -310,7 +336,7 @@ await test("what isn't in Bops yet answers Soon, with why; a bad model, a sevent
     return "ok";
   };
   assert.match(err({ op: "add", kind: "agy", pays: "key" }), /^400 Soon: agy signs in with a Google account/);
-  assert.match(err({ op: "add", kind: "codex", pays: "plan" }), /^400 Soon: A ChatGPT plan for Codex needs a check of OpenAI's terms first\./);
+  assert.match(err({ op: "add", kind: "codex", pays: "credit" }), /^400 Soon: Credit for Codex/);
   assert.match(err({ op: "add", kind: "claude", pays: "credit" }), /^400 Soon: Credit for Claude Code needs Bops Cloud to carry it first\./);
   assert.match(err({ op: "add", kind: "opencode", pays: "key", model: "evil.example/x" }), /^400 OpenCode can't use that model\./);
   assert.match(err({ op: "add", kind: "bops", pays: "credit" }), /^400 Bops agent is always there/);
@@ -452,6 +478,37 @@ await test("a new thread's agent: the owner's pick, then one named, then the Def
 /* ---------------- On the computer: flags, stops, OpenCode ---------------- */
 
 const C = await import(fileUrl("lib/server/cli-agents.ts"));
+assert.match(C.signInWords({ name: "Codex", kind: "codex" }, "this computer", false), /ChatGPT plan/);
+assert.match(C.stoppedWords({ kind: "codex", agent: { kind: "codex", pays: "plan" } }, "auth", "", "this computer"), /ChatGPT plan/);
+await test("an imported Codex plan is refused at the execution boundary outside self-hosting", async () => {
+  const before = structuredClone(S.getState());
+  try {
+    const profile = BA.setBotAi("rook", { op: "add", kind: "codex", pays: "plan" });
+    const agent = profile.agents.find((x) => x.kind === "codex");
+    const task = { id: "codex_plan_guard", botId: "rook", agent: { id: agent.id, kind: "codex" }, host: "orgo" };
+    S.update((s) => s.sessions.push(task));
+    const run = A.threadAgent(task, bot("rook"), S.getState());
+    assert.equal(C.agentNow({ sessionId: task.id, agent: run, name: "Codex" }).run.agent.pays, "plan");
+    delete process.env.BOPS_SELF_HOSTED;
+    assert.throws(() => C.agentNow({ sessionId: task.id, agent: run, name: "Codex" }), /self-hosted owner/);
+    assert.ok(!C.alsoSpec(bot("rook")).includes("codex:plan"));
+    // Only what reaches Rook's computer counts: an earlier test's cleanup (bot-clear on another computer) may still land meanwhile.
+    const toRook = () => commands.filter((c) => c.computer === "pc-rook").length;
+    const sentBefore = toRook();
+    const shell = { botId: "rook", computerId: "pc-rook", display: 100, agent: run, bot: bot("rook") };
+    await assert.rejects(C.openShell(shell), /self-hosted owner/);
+    assert.equal(toRook(), sentBefore, "denied before remote prepare or write");
+    process.env.BOPS_SELF_HOSTED = "1";
+    S.update((s) => void (s.shared = { ownerName: "Maya" }));
+    await assert.rejects(C.openShell(shell), /self-hosted owner/);
+    assert.equal(toRook(), sentBefore);
+    assert.throws(() => C.agentNow({ sessionId: task.id, agent: run, name: "Codex" }), /self-hosted owner/);
+  } finally {
+    process.env.BOPS_SELF_HOSTED = "1";
+    S.update((s) => { Object.assign(s, before); delete s.shared; });
+  }
+});
+
 
 await test("jobs: a thread nobody picked an agent for goes to the agent set for its kind of work; a pick still wins", () => {
   assert.equal(A.jobOf("Fix the bug in my React app and deploy it"), "coding");
@@ -471,6 +528,16 @@ await test("jobs: a thread nobody picked an agent for goes to the agent set for 
   assert.equal(A.gateRoute(zai), "zai-coding");
   assert.equal(A.agentKeyName(zai), "ZAI_API_KEY");
   assert.ok(A.modelOk("opencode", "zai/glm-5.2") && A.modelOk("opencode", "zai-coding/glm-9") && !A.modelOk("opencode", "zaix/glm"));
+  // The GLM Coding Plan in the China region (open.bigmodel.cn): a route and a key of its own.
+  const cn = { id: "ag_zaicncode1", kind: "opencode", pays: "key", model: "zai-coding-cn/glm-5.3", jobs: ["coding"] };
+  assert.equal(A.gateRoute(cn), "zai-coding-cn");
+  assert.equal(A.agentKeyName(cn), "ZAI_CODING_CN_API_KEY");
+  assert.equal(A.ROUTE_NAMES["zai-coding-cn"], "Z.ai Coding Plan (China)");
+  assert.equal(A.keyVendor(cn), "Z.ai Coding Plan (China)");
+  assert.ok(A.modelOk("opencode", "zai-coding-cn/glm-5.3") && A.modelOk("opencode", "zai-coding-cn/glm-5.2") && A.modelOk("opencode", "zai-coding-cn/glm-9"));
+  assert.ok(A.modelOk("dsh", "zai-coding-cn/glm-5.3") && !A.modelOk("opencode", "zai-coding-cnx/glm-5.3"));
+  assert.deepEqual(A.modelsFor("opencode").filter((m) => m.id.startsWith("zai-coding-cn/")).map((m) => m.id), ["zai-coding-cn/glm-5.3", "zai-coding-cn/glm-5.2"]);
+  assert.deepEqual(A.cleanAi({ agents: [{ id: "bops", kind: "bops", pays: "credit" }, cn], default: "bops" }).agents[1], cn, "a profile keeps a China Coding Plan agent");
 });
 
 await test("your LLMs (config/llms.yaml): a bot with no AI of its own starts on the starter; each shows as a model; a pick still wins", () => {
@@ -588,6 +655,8 @@ await test("DeepSeek Harness: a profile keeps it (on a key, by its model, severa
   assert.equal(A.agentKeyName(dsh), "DEEPSEEK_API_KEY");
   assert.equal(A.gateRoute({ kind: "dsh", pays: "key", model: "anthropic/claude-sonnet-5-5" }), "anthropic");
   assert.equal(A.agentKeyName({ kind: "dsh", pays: "key", model: "zai-coding/glm-5.3" }), "ZAI_API_KEY");
+  assert.equal(A.gateRoute({ kind: "dsh", pays: "key", model: "zai-coding-cn/glm-5.3" }), "zai-coding-cn");
+  assert.equal(A.agentKeyName({ kind: "dsh", pays: "key", model: "zai-coding-cn/glm-5.3" }), "ZAI_CODING_CN_API_KEY");
   // Your LLMs (config/llms.yaml) are its models too, after DeepSeek's own: its default stays DeepSeek Chat.
   A.setLlms([{ name: "Claude Sonnet 5.5", provider: "anthropic", model: "claude-sonnet-5-5", starter: true }, { name: "Kimi", provider: "openrouter", model: "moonshotai/kimi-k3" }]);
   try {
@@ -694,6 +763,9 @@ await test("DeepSeek Harness's stop words: its key, its limit, its provider down
   assert.equal(C.stoppedWords(r, "down", "Connection error.", "x"), "DeepSeek isn't answering right now. I can try again, or finish this on Bops agent, on your credit.\n\nOptions: Try again | Finish on Bops agent");
   assert.match(C.stoppedWords({ ...r, model: "deepseek/deepseek-reasoner" }, "model", "", "x", undefined, "Dee"), /^Your DeepSeek key can't use DeepSeek Reasoner\. Pick another model for new threads in Dee's profile\./);
   assert.equal(C.stoppedWords({ ...r, model: "zai-coding/glm-5.3" }, "down", "", "x").split(" isn't")[0], "Z.ai Coding Plan");
+  const cnDown = C.stoppedWords({ ...r, model: "zai-coding-cn/glm-5.3" }, "down", "", "x");
+  assert.equal(cnDown.split(" isn't")[0], "Z.ai Coding Plan (China)");
+  plain(cnDown, "a stop's words");
   for (const w of [auth, C.stoppedWords(r, "limit", "", "x"), C.stoppedWords(r, "down", "", "x")]) plain(w, "a stop's words");
 });
 
@@ -719,12 +791,12 @@ await test("the AI section: its agents as tiles with the Default marked, agy Soo
   plain(out, "the AI section");
   // A tile's editor: model, how it pays (Soon ones say why), its account, Make default and Remove.
   const ed = render(h(BotAiSection, { state: S.getState(), bot: bot("boppy"), editing: codexAgent, onShowScreen() {} }));
-  // The editor calls Codex's plan "OpenAI plan" (bot-ai.tsx); "Use for" (the jobs it takes) shows on a bot with more than one agent.
-  assert.match(ed, /Model GPT 6\.1 Sol GPT 6 Astra ▾ (Use for Coding Planning Thinking Research Writing Web tasks )?Pays with Credit (ChatGPT|OpenAI) plan Your key/);
-  assert.match(renderToStaticMarkup(h(BotAiSection, { state: S.getState(), bot: bot("boppy"), editing: codexAgent })), /title="Soon: A ChatGPT plan for Codex needs a check of OpenAI&#x27;s terms first\."/);
+  // The editor calls Codex's plan "ChatGPT plan" (bot-ai.tsx); "Use for" (the jobs it takes) shows on a bot with more than one agent.
+  assert.match(ed, /Model GPT 6\.1 Sol GPT 6 Astra ▾ (Use for Coding Planning Thinking Research Writing Web tasks )?Pays with Credit ChatGPT plan Your key/);
+  assert.doesNotMatch(renderToStaticMarkup(h(BotAiSection, { state: S.getState(), bot: bot("boppy"), editing: codexAgent })), /title="Soon: A ChatGPT plan/);
   assert.match(ed, /Your OpenAI key Make default Remove/);
   // What's Soon says why, in words on the page, not only on hover.
-  assert.match(ed, /Soon: Credit for Codex needs Bops Cloud to carry it first\. A ChatGPT plan for Codex needs a check of OpenAI's terms first\./);
+  assert.match(ed, /Soon: Credit for Codex needs Bops Cloud to carry it first\./);
   plain(ed, "the editor");
   // No key for it in the Vault (when the window has read the Vault's names): not ready, with Add key.
   const noKey = render(h(BotAiSection, { state: S.getState(), bot: bot("boppy"), editing: codexAgent, onAddKey() {} }));
@@ -816,7 +888,9 @@ await test("a build without brains (a release): the --off pass", async () => {
   assert.match(out, /brains off: 1 passed/, out);
 });
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 assert.ok(!logged.some((l) => /bopsrun_[0-9a-f]{16}|sk-ant-|sk-proj-/.test(l)), "nothing secret in what Bops logged");
 process.stdout.write(`bot ai: ${passed} passed\n`);
 process.exit(0);

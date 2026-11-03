@@ -1,7 +1,7 @@
 import "server-only";
 import { AGENTS, agentOn, aiOf, anyModel, cleanAi, cleanJobs, hasProfile, isCli, MAX_AGENTS, modelOk, newAgentId, PAYS_SOON, paysOk, threadAgent } from "@/lib/agents";
 import { BRAINS_ON, workspaceOf, type AgentKind, type AgentPays, type Bot, type BotAi, type BotAgent } from "@/lib/types";
-import { addBrain, BrainError, ensureBrainTools } from "./brains";
+import { addBrain, BrainError, ensureBrainTools, requireCodexPlan } from "./brains";
 import { alsoSpec } from "./cli-agents";
 import { orgo } from "./orgo";
 import { workComputer } from "./screens";
@@ -29,6 +29,7 @@ const soonWords = (kind: AgentKind, pays?: AgentPays) => `Soon: ${(pays && PAYS_
  * workspace (its Vault key is the workspace's): another one adds nothing, so a second agent on it is turned down.
  */
 function accountFor(kind: "claude" | "codex", pays: AgentPays, wsId: string, fresh: boolean, taken: Set<string | undefined>, botName: string) {
+  requireCodexPlan(kind, pays);
   const all = (getState().brains ?? []).filter((x) => x.kind === kind && x.auth === pays && x.workspaceId === wsId);
   const free = all.filter((x) => !taken.has(x.id));
   if (pays === "key" && all[0]) {
@@ -57,6 +58,7 @@ export function setBotAi(botId: string, o: AiOp, out: { added?: string } = {}): 
   };
   const cliOk = (kind: AgentKind, pays?: AgentPays) => {
     if (kind === "bops") return;
+    if (pays) requireCodexPlan(kind, pays);
     if (!BRAINS_ON) throw new BrainError("This version of Bops runs Bops agent only.", 404);
     if (AGENTS[kind].soon || !agentOn(kind)) throw new BrainError(soonWords(kind), 400);
     if (pays && !paysOk(kind, pays)) throw new BrainError(PAYS_SOON[kind]?.[pays] ? soonWords(kind, pays) : `${AGENTS[kind].name} doesn't run that way.`, 400);
@@ -81,6 +83,7 @@ export function setBotAi(botId: string, o: AiOp, out: { added?: string } = {}): 
     }
     case "update": {
       const x = find(o.agentId);
+      requireCodexPlan(x.kind, o.pays ?? x.pays);
       if (o.pays !== undefined && o.pays !== x.pays) {
         cliOk(x.kind, o.pays);
         if (x.kind === "bops") throw new BrainError("Bops agent runs on your credit.", 400);
@@ -130,6 +133,7 @@ export function setBotAi(botId: string, o: AiOp, out: { added?: string } = {}): 
     }
     case "default": {
       const x = find(o.agentId);
+      requireCodexPlan(x.kind, x.pays);
       cliOk(x.kind);
       def = x.id;
       break;

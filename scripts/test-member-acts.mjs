@@ -13,11 +13,13 @@
 // Usage: node --conditions=react-server scripts/test-member-acts.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
-import { pathToFileURL } from "node:url";
+
 import { fill } from "./fake-exports.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 const forward = (mod, names) => names.map((n) => `export const ${n} = (...a) => globalThis.__fake[${JSON.stringify(mod)}].${n}(...a);`).join("\n");
 const FAKES = {
@@ -32,7 +34,7 @@ const FAKES = {
 };
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -184,7 +186,7 @@ let compactSays = { ok: true };
 const kept = [];
 let appFails = null;
 
-const { memberEvent, resetAdmins } = await import(`${root}/lib/server/member-acts.ts`);
+const { memberEvent, resetAdmins } = await import(`${rootUrl}/lib/server/member-acts.ts`);
 // `computer`: Bops Cloud vouched for their Use its computer (as orgo-web keeps it), unless `computer: false`.
 const event = (act, o = {}) => ({
   projectId: "proj_acme",
@@ -441,7 +443,7 @@ await check("on a bot's computer, or for a payload of another shape, nothing", a
 
 /* ---------------- The team chart (lib/chain.ts): it narrows a member's reach, never widens it ---------------- */
 
-const Chain = await import(`${root}/cloud/chain.ts`);
+const Chain = await import(`${rootUrl}/cloud/chain.ts`);
 const levelFor = (who) => (id) => {
   const a = state.workspaces[1].memberAccess[who.email];
   return (Object.hasOwn(a.bots, id) ? a.bots[id] : a.others) ?? "none";

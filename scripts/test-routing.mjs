@@ -10,18 +10,20 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.OPENAI_API_KEY = "sk-test-routing";
 process.env.TYPESAFE_API_KEY = "ts-test-routing";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-routing-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
@@ -31,7 +33,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -80,12 +82,12 @@ globalThis.fetch = async (input, init) => {
 const warned = [];
 console.warn = (...a) => warned.push(a.join(" "));
 
-const M = await import(`${root}/lib/server/models.ts`);
-const R = await import(`${root}/lib/server/routing.ts`);
-const P = await import(`${root}/lib/server/presence.ts`);
-const S = await import(`${root}/lib/server/store.ts`);
-const Chat = await import(`${root}/lib/server/chat.ts`);
-const { botChatId } = await import(`${root}/lib/types.ts`);
+const M = await import(`${rootUrl}/lib/server/models.ts`);
+const R = await import(`${rootUrl}/lib/server/routing.ts`);
+const P = await import(`${rootUrl}/lib/server/presence.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const Chat = await import(`${rootUrl}/lib/server/chat.ts`);
+const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
 
 /** Jev's answers: a difficulty (the most likely choice and how sure), and the noul questions' probabilities. */
 const jev = ({ difficulty, sure = 0.8, stakes = 0.1, long = 0.1, hard = 0.1, oneShot = 0.1 }) => () => ({
@@ -302,7 +304,7 @@ const post = async (mod, body) => {
 };
 // What Bops would run a task on: the old rule's pick and the router's, whatever BOPS_ROUTER says.
 process.env.BOPS_ROUTER = "off";
-const RouteApi = await import(`${root}/app/api/route/route.ts`);
+const RouteApi = await import(`${rootUrl}/app/api/route/route.ts`);
 jevAnswers = jev({ difficulty: "deep", hard: 0.5 });
 let res = await post(RouteApi, { goal: "Compare three CRMs" });
 assert.deepEqual(res.body, { rule: { model: "gpt-6-astra", effort: "high" }, router: { model: "gpt-6.1-sol", effort: "high", tier: "deep", why: "deep (80%)" } });
@@ -310,7 +312,7 @@ assert.equal((await post(RouteApi, {})).status, 400);
 delete process.env.BOPS_ROUTER;
 
 // A task started on a set configuration: checked, kept on the session as forced, and always a new thread.
-const SessionsApi = await import(`${root}/app/api/sessions/route.ts`);
+const SessionsApi = await import(`${rootUrl}/app/api/sessions/route.ts`);
 assert.equal((await post(SessionsApi, { botId: "boppy", goal: "x", model: "gpt 6; rm" })).status, 400, "not a model name");
 assert.equal((await post(SessionsApi, { botId: "boppy", goal: "x", model: "gpt-6.1-sol", effort: "huge" })).status, 400);
 assert.equal((await post(SessionsApi, { botId: "boppy", goal: "x", model: "gpt-6.1-sol", speed: "warp" })).status, 400);
@@ -320,10 +322,10 @@ assert.deepEqual(S.session(res.body.id).route, { by: "forced", model: "gpt-6-ast
 assert.equal(S.session(res.body.id).effort, "xhigh");
 const again = await post(SessionsApi, { botId: "boppy", goal: "Grid case", title: "Grid: a", model: "gpt-6-astra", effort: "xhigh" });
 assert.notEqual(again.body.id, res.body.id, "the same goal again is a new thread, not the one running");
-for (const id of [res.body.id, again.body.id]) (await import(`${root}/lib/server/sessions.ts`)).stopSession(id);
+for (const id of [res.body.id, again.body.id]) (await import(`${rootUrl}/lib/server/sessions.ts`)).stopSession(id);
 
 // The grader: pass or fail and why, from a strong model; an empty answer fails without asking.
-const JudgeApi = await import(`${root}/app/api/judge/route.ts`);
+const JudgeApi = await import(`${rootUrl}/app/api/judge/route.ts`);
 answers.push((b) => {
   assert.deepEqual([b.model, b.reasoning, b.text.format.name], ["gpt-6.1-sol", { effort: "high" }, "grade"]);
   assert.match(b.input, /"rubric":"Says A6 shows 15/);
@@ -336,6 +338,8 @@ res = await post(JudgeApi, { task: "Make a sheet", rubric: "Says A6 shows 15.", 
 assert.deepEqual([res.body.pass, asked.length], [false, n1], "nothing to grade");
 assert.equal((await post(JudgeApi, { answer: "x" })).status, 400);
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log("routing: all tests passed");
 process.exit(0);

@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { AGENTS, agentLabel, aiOf, anyModel, hasTerminal, isCli, keyVendor, ROUTE_NAMES, shellLabel, threadAgent, type AgentRun } from "@/lib/agents";
 import { redactDeep } from "@/lib/secret-patterns";
 import { BRAINS_ON, CLI_NAMES, live, planName, workspaceOf, type Bot, type Brain, type CliKind } from "@/lib/types";
-import { ensureBrainTools, ensureClaudeCode, ensureCodex, ensureDsh, ensureOpenCode, revealBrainKey, revealNamedKey } from "./brains";
+import { requireCodexPlan, ensureBrainTools, ensureClaudeCode, ensureCodex, ensureDsh, ensureOpenCode, revealBrainKey, revealNamedKey } from "./brains";
 import { KeysError } from "./keys";
 import { heldAsk } from "./permission";
 import { orgo } from "./orgo";
@@ -550,6 +550,7 @@ export function agentNow(o: Pick<CliRun, "sessionId" | "agent" | "name">): { run
   const b = s && bot(s.botId);
   if (!s || !b) throw new Error("That thread isn't there anymore");
   const now = threadAgent(s, b, getState());
+  requireCodexPlan(now.kind, now.agent.pays);
   if (now.gone || now.kind !== o.agent.kind || now.agent.id !== o.agent.agent.id || now.agent.pays !== o.agent.agent.pays || now.account?.id !== o.agent.account?.id)
     throw new Error(`${b.name} doesn't run ${o.name} anymore, so this stopped`);
   return { run: now, bot: b };
@@ -565,7 +566,7 @@ const safe = (v: string | undefined) => (v && /^[A-Za-z0-9._:/-]+$/.test(v) ? v 
 /** The bot's CLI agents but `except`, for its wrappers (bops-brain --also: "claude:plan:<account>:<model>,codex:key:<account>:"). */
 export function alsoSpec(b: Bot, except?: string) {
   return aiOf(b, getState())
-    .agents.filter((x) => isCli(x.kind) && x.id !== except)
+    .agents.filter((x) => isCli(x.kind) && x.id !== except && !(x.kind === "codex" && x.pays === "plan" && (process.env.BOPS_SELF_HOSTED !== "1" || getState().shared)))
     .map((x) => `${x.kind}:${x.pays}:${safe(x.account) ?? "-"}:${safe(x.model) ?? ""}`)
     .filter((x) => /^[a-z]+:[a-z]+:[A-Za-z0-9_-]+:[A-Za-z0-9._:/-]*$/.test(x))
     .join(",");
@@ -703,6 +704,7 @@ export async function openTerminal(o: { sessionId: string; computerId: string; d
  * along as a file the run reads and deletes, for the gate that holds it while the terminal is open.
  */
 export async function openShell(o: { botId: string; computerId: string; display: number; agent: AgentRun; bot: Bot }) {
+  requireCodexPlan(o.agent.kind, o.agent.agent.pays);
   const driver = hasTerminal(o.agent.kind) ? cliDriver(o.agent.kind) : undefined;
   if (!driver) throw new Error("Only Claude Code, Codex or OpenCode opens a terminal");
   await driver.prepare(o.computerId);
@@ -1025,7 +1027,7 @@ function resetsAt(text: string) {
 }
 
 /** What a thread waiting for its Claude plan's sign in says (sessions.ts brainTurns). `where`: "Sam's computer". */
-export const signInWords = (x: Pick<Brain, "name">, where: string, began: boolean) => `${x.name} isn't signed in on ${where}. Sign in with your Claude plan there and I'll ${began ? "carry on" : "start"}.`;
+export const signInWords = (x: Pick<Brain, "name"> & Partial<Pick<Brain, "kind">>, where: string, began: boolean) => `${x.name} isn't signed in on ${where}. Sign in with your ${x.kind === "codex" ? "ChatGPT plan" : "Claude plan"} there and I'll ${began ? "carry on" : "start"}.`;
 
 /**
  * What a thread says when its CLI agent stopped (BrainStopped), with the replies it offers (tidyAnswer makes them
@@ -1037,12 +1039,13 @@ export const signInWords = (x: Pick<Brain, "name">, where: string, began: boolea
 export function stoppedWords(r: Pick<AgentRun, "kind" | "agent" | "model">, why: CliStop, said: string, where: string, plan?: string, bot?: string) {
   const name = AGENTS[r.kind].name;
   const onPlan = r.agent.pays === "plan";
+  const planWords = r.kind === "codex" ? "ChatGPT plan" : planName(plan);
   const vendor = keyVendor({ ...r.agent, model: r.model });
   const resets = why === "limit" ? resetsAt(said) : undefined;
   const until = resets ? ` until ${resets}` : "";
   const finish = "I can finish this on Bops agent, on your credit";
   if (why === "model")
-    return `Your ${onPlan ? planName(plan) : `${vendor} key`} can't use ${agentLabel({ kind: r.kind, model: r.model }).replace(`${name} · `, "")}. Pick another model for new threads in ${bot ? `${bot}'s` : "the bot's"} profile. ${finish}, or wait.\n\nOptions: ${FINISH_ON_BOPS} | ${WAIT}`;
+    return `Your ${onPlan ? planWords : `${vendor} key`} can't use ${agentLabel({ kind: r.kind, model: r.model }).replace(`${name} · `, "")}. Pick another model for new threads in ${bot ? `${bot}'s` : "the bot's"} profile. ${finish}, or wait.\n\nOptions: ${FINISH_ON_BOPS} | ${WAIT}`;
   if (why === "vault") return `Waiting for your Vault. It allows 30 key uses an hour, so this starts again by itself in a few minutes. Or I can finish it on Bops agent, on your credit.\n\nOptions: ${FINISH_ON_BOPS} | ${WAIT}`;
   if (why === "down") {
     const who = r.kind === "claude" ? "Claude" : r.kind === "codex" ? "OpenAI" : (ROUTE_NAMES[r.model?.split("/")[0] as keyof typeof ROUTE_NAMES] ?? "Its provider");
@@ -1051,10 +1054,10 @@ export function stoppedWords(r: Pick<AgentRun, "kind" | "agent" | "model">, why:
   const what =
     why === "limit"
       ? onPlan
-        ? `${name} reached your ${planName(plan)}'s usage limit${until}.`
+        ? `${name} reached your ${planWords}'s usage limit${until}.`
         : `${name} reached what your ${vendor} key allows${until}.`
       : onPlan
-        ? `${name} isn't signed in to your Claude plan on ${where} anymore.`
+        ? `${name} isn't signed in to your ${r.kind === 'codex' ? 'ChatGPT plan' : 'Claude plan'} on ${where} anymore.`
         : `${vendor} turned down your key for ${name}.`;
   return `${what} ${finish}, or wait.\n\nOptions: ${FINISH_ON_BOPS} | ${WAIT}`;
 }

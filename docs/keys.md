@@ -1,6 +1,6 @@
 # Set up your provider keys
 
-This guide covers the seven keys shown in **Settings → This Mac → Keys** when you run your own Bops server. A key is a password that lets Bops use your provider account. Only configure the providers you use. Provider API usage and cloud computers can cost money; a chat-app subscription does not automatically include API credits.
+This guide covers the eight keys, plus the free Ollama setting, shown in **Settings → This Mac → Keys** when you run your own Bops server. A key is a password that lets Bops use your provider account. Only configure the providers you use. Provider API usage and cloud computers can cost money; a chat-app subscription does not automatically include API credits.
 
 ## Put keys on the machine running Bops
 
@@ -55,7 +55,15 @@ Claude API billing is separate from a Claude chat subscription.
 
 Bops uses this variable for both `zai` and `zai-coding` routes. **GLM Coding Plan is a separate product with a dedicated endpoint and usage limits**; make sure the selected route matches your key's product. Its extra-usage spending limits are not the same as standard API balance. See the quickstart and [documented balance/plan errors](https://docs.z.ai/api-reference/api-code). Do not assume a Coding Plan subscription pays for every standard API call.
 
-## 6. DeepSeek — `DEEPSEEK_API_KEY`
+## 6. Z.ai Coding Plan (China) — `ZAI_CODING_CN_API_KEY`
+
+1. Sign in to [open.bigmodel.cn](https://open.bigmodel.cn) with the account that holds your GLM Coding Plan for the China region, open **API keys**, and create a key for Bops.
+2. Put it in `ZAI_CODING_CN_API_KEY=`. No stable prefix was verified; copy the complete key as issued.
+3. Bops uses this variable only for the `zai-coding-cn` route, which sends requests to `https://open.bigmodel.cn/api/coding/paas/v4` (OpenAI-compatible chat completions), the China-region counterpart of `zai-coding`. A key from z.ai does not work here, and this key does not work on the `zai` or `zai-coding` routes.
+
+The **Check** button for this key requests the model list at `open.bigmodel.cn/api/paas/v4/models`; **unavailable** there does not prove the key is invalid. A plan without balance answers chat requests with z.ai's code `1113`, which Bops reports as no balance or Coding Plan. The open.bigmodel.cn pages, plan quotas and billing for the China region were not checked for this guide.
+
+## 7. DeepSeek — `DEEPSEEK_API_KEY`
 
 1. Sign in to [DeepSeek API keys](https://platform.deepseek.com/api_keys) and create a key. This is the key-management link supplied by the [official API documentation](https://api-docs.deepseek.com/).
 2. Put it in `DEEPSEEK_API_KEY=`. No stable prefix was verified in the official documentation.
@@ -63,7 +71,7 @@ Bops uses this variable for both `zai` and `zai-coding` routes. **GLM Coding Pla
 
 The official key and top-up pages loaded DeepSeek's sign-in screen in a browser. Their authenticated controls were not inspected.
 
-## 7. OpenRouter — `OPENROUTER_API_KEY`
+## 8. OpenRouter — `OPENROUTER_API_KEY`
 
 1. Sign in to [OpenRouter keys](https://openrouter.ai/settings/keys) and create a key for Bops.
 2. Put it in `OPENROUTER_API_KEY=`. The [official tutorial](https://openrouter.ai/blog/tutorials/image-generation/) illustrates `sk-or-v1-…`.
@@ -71,8 +79,32 @@ The official key and top-up pages loaded DeepSeek's sign-in screen in a browser.
 
 Choose models with prices you are comfortable paying and review account top-up settings as well as the key limit.
 
+## 9. Ollama (free, local) — `OLLAMA_BASE_URL`
+
+Ollama runs open models on your own server, so chats on it cost nothing and need no account or key. Use it when you want a free model for everyday chat; small models are slower and less capable than the paid ones above.
+
+1. Install Ollama on the server that runs Bops and pull a model, for example `ollama pull qwen2.5:3b`.
+2. Put Ollama's address in `OLLAMA_BASE_URL=`, ending in `/v1` (Ollama's OpenAI-compatible API). The usual address is `http://127.0.0.1:11434/v1`; use whatever port your install listens on.
+3. Restart Bops. The chat model menu by the Send button now shows **Ollama (free, local)**. Without `OLLAMA_BASE_URL` it doesn't show at all.
+4. Optional: `OLLAMA_API_KEY=` only if your Ollama sits behind a proxy that wants a key; Bops sends it as `Bearer`. Plain Ollama needs none.
+
+To use other Ollama models, add them to `config/llms.yaml` with `provider: ollama` and the model name exactly as `ollama list` shows it (for example `qwen2.5:3b`). Ollama is for chats only: bots' agents run on cloud computers that can't reach your server's Ollama. An Ollama chat can't search the web or see images. If a small model can't use tools, Bops asks it again without them, so it can still answer but can't look things up for you.
+
+**Check** for this row asks Ollama for its model list at `OLLAMA_BASE_URL/models`. **works** with zero models means Ollama is running but you still need to pull one.
+
 ## After setup
 
 Restart Bops, check the configured keys in **Settings → This Mac → Keys**, then select the corresponding provider/model in Bops. Keep spending alerts enabled where available, but use an enforced cap when you need requests to stop. Rate limits control request speed; they are not spending budgets.
+
+## Adding models
+
+Once a key is set, add the provider's models in **Settings → This Mac → Models** (right under Keys). No file editing or restart is needed.
+
+1. **Add a model** → pick a provider. For **OpenRouter (hundreds of models)**, search its list (for example `qwen coder` or `deepseek`) and click one: the id and a name are filled in, with its price per million tokens. If OpenRouter's list can't be reached, type the id from [openrouter.ai/models](https://openrouter.ai/models), such as `qwen/qwen3-coder-next`.
+2. **Use for**: pick the kinds of work it takes (Coding, Planning, Thinking, Research, Writing, Web tasks). Each job belongs to one model, so picking a job another model has moves it, and the card says which one it came from. A new thread about that kind of work starts on this model unless you pick another.
+3. **Run by**: the agent that runs it on your bots' computers. OpenCode is the default; DeepSeek Harness runs every provider too. Claude Code and Codex run on an account you connect in a bot's AI section, so they can't be picked here.
+4. **Default for new chats**: chats made from then on start on this model (while its key is set; otherwise Auto, OpenAI). Chats you already have keep their model, and **Auto (OpenAI)** can always be picked again in a chat's model box. **Default for bot tasks**: what new bots start on.
+
+Each row shows whether its provider's key is set on this server (green) or not yet (amber, naming the key). Saving writes `config/llms.yaml`, keeping its comments. That file is tracked by git, so your changes show up as local edits there (`git status`), and an update that also changes it may ask you to keep or merge yours; you can still edit that file by hand (restart Bops after). Bots you have set up in their own AI section keep their own setup.
 
 Provider links and instructions were checked against public official sources on 2026-11-03. Account pages may show a sign-in or JavaScript app shell; that does not verify the controls inside your account. Providers may change their screens, prefixes, prices and billing rules.

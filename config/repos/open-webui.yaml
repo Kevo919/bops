@@ -1,0 +1,48 @@
+id: open-webui
+name: Open WebUI
+repo: open-webui/open-webui
+url: https://github.com/open-webui/open-webui
+license: "custom: Open WebUI License (BSD-3-Clause plus a branding clause)"
+license_note: >-
+  BSD-3-style, but clause 4 forbids removing or altering "Open WebUI" branding unless the deployment has
+  at most 50 end users in any rolling 30 days, or you hold written permission or an enterprise license.
+what: A self-hosted chat web UI for local and hosted LLMs (Ollama and OpenAI-compatible APIs) with RAG and tools.
+good_for: self-hosted LLM chat UI
+stack: [python, svelte]
+requirements:
+  python: ">=3.11,<3.13"
+  docker: false
+  other:
+    - "uv (to make a Python 3.12 venv when the system Python is 3.13)"
+    - "About 7 GB of disk for the venv (pulls PyTorch)"
+keys_optional:
+  - name: OPENAI_API_KEY
+    for: An OpenAI-compatible model connection (can also be added in the UI)
+keys_required: []
+clone: git clone --depth 1 https://github.com/open-webui/open-webui.git open-webui
+install:
+  - uv venv --python 3.12 .venv
+  - uv pip install --python .venv/bin/python open-webui
+  - mkdir -p .owui-data
+run: DATA_DIR="$PWD/.owui-data" .venv/bin/open-webui serve --host 127.0.0.1 --port 8080
+background: true
+kind: web
+port: 8080
+health:
+  http: http://127.0.0.1:8080/health
+  expect: 200
+fits_bot_computer: true
+fits_reason: pip install works without Docker and serves in under 20 s, but the install is about 7 GB; it needs a model backend (Ollama or an API key) to chat.
+verified:
+  date: "2026-11-03"
+  by: claude-agent (Linux sandbox, Python 3.12 venv made by uv)
+  commit: c38885a
+  steps:
+    clone: pass
+    install: "pass: uv pip install open-webui (0.13.0) exit 0; venv 7.0 GB"
+    run: "pass: open-webui serve ran migrations and started uvicorn on 127.0.0.1:8080"
+    health: "pass: GET /health returned 200 {\"status\":true} after about 18 s; GET / returned 200"
+  notes: >-
+    README: pip install open-webui && open-webui serve (Python 3.11-3.12; PyPI requires <3.13), or Docker.
+    The package comes from PyPI; the clone is only for docs and license. DATA_DIR keeps the SQLite database
+    and uploads inside the clone. Stirling-PDF also defaults to port 8080, so don't run both on defaults.

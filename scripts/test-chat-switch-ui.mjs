@@ -1,3 +1,4 @@
+import { join } from "node:path";
 // Tests for the switch in Settings, General that says whether a workspace's bots answer with every Mac closed
 // (components/app/chat-switch.tsx): shown only to the owner, where Bops Cloud says it applies (Workspace.chatOn or
 // chatAuto on the workspace), never with the bots in browsers on the Mac or for a workspace whose bots have no computer
@@ -14,10 +15,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const root = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
+// A file URL for import specifiers, from this OS-path root.
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -53,7 +56,7 @@ globalThis.fetch = async (url, init = {}) => {
   return { ok: answer.ok, status: answer.status, json: async () => answer.body };
 };
 
-const S = await import(pathToFileURL(`${root}/components/app/chat-switch.tsx`).href);
+const S = await import(fileUrl("components/app/chat-switch.tsx"));
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
