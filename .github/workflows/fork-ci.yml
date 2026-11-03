@@ -41,7 +41,13 @@ jobs:
       - name: Bot AI tests
         run: node scripts/test-bot-ai.mjs
       - name: Subscription UI tests
-        run: node scripts/test-subscriptions-ui.mjs
+        run: |
+          node scripts/test-subscriptions-ui.mjs
+          node scripts/test-subscriptions-ui.mjs --brains-off
+      - name: Local subscription authentication tests
+        run: node --conditions=react-server scripts/test-local-subscriptions.mjs
+      - name: Desktop and phone proxy boundary tests
+        run: node --conditions=react-server scripts/test-proxy.mjs
       - name: Brain accounts and sign-in tests
         run: node scripts/test-brains.mjs
       - name: CLI agent tests
