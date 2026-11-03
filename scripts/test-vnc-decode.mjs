@@ -14,11 +14,12 @@ import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -98,8 +99,8 @@ globalThis.Blob = class extends RealBlob {
   }
 };
 
-const { default: Display } = await import(pathToFileURL(`${root}/node_modules/@novnc/novnc/core/display.js`).href);
-const { decodeOffThePage } = await import(`${root}/components/app/live-desktop.tsx`);
+const { default: Display } = await import(`${rootUrl}/node_modules/@novnc/novnc/core/display.js`);
+const { decodeOffThePage } = await import(`${rootUrl}/components/app/live-desktop.tsx`);
 const bytes = (s) => new TextEncoder().encode(s);
 const settle = () => new Promise((r) => setTimeout(r, 80));
 

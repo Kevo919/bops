@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 // Tests for the Mac tools a task with Full access gets (vm/mac-ui-mcp.mjs, lib/server/local.ts macUiMcp):
 // Cua Driver's tools reach any window and take any arguments, so a task reaches them through Bops' own
 // MCP server, which passes on only what a task may do. Its checks are fed calls here (what's refused,
@@ -23,15 +24,15 @@ if (process.platform !== "darwin") {
   console.log("mac ui: skipped (macOS only)");
   process.exit(0);
 }
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
-const script = join(root, "vm/mac-ui-mcp.mjs");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const script = join(rootPath, "vm/mac-ui-mcp.mjs");
 const U = await import(script);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* ---------------- The checks, call by call ---------------- */
 
 // The same tools as the task's MCP server is allowed (local.ts), without drag.
-const local = readFileSync(join(root, "lib/server/local.ts"), "utf8");
+const local = readFileSync(join(rootPath, "lib/server/local.ts"), "utf8");
 const listed = [...local.slice(local.indexOf("export const MAC_UI_TOOLS = ["), local.indexOf("];", local.indexOf("export const MAC_UI_TOOLS = ["))).matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
 assert.deepEqual(listed, U.TOOLS, "local.ts MAC_UI_TOOLS and the server list the same tools");
 assert.ok(!U.TOOLS.includes("drag"), "no drag (Cua only drags in front of the user)");
@@ -471,7 +472,9 @@ try {
   server.kill();
   for (const p of procs) p.kill();
   await sleep(100);
-  rmSync(scratch, { recursive: true, force: true });
+  try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 }
 
 // The task's tools reach Cua through this server, never `cua-driver mcp` itself (lib/server/local.ts;

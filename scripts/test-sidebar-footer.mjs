@@ -16,11 +16,12 @@ import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -50,9 +51,9 @@ globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} }
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
 
-const { footerPageOf, openFooterPage, footerPillOf, canHover, FOOTER_LEAVE_MS } = await import(pathToFileURL(`${root}/components/app/sidebar-footer.tsx`).href);
-const { SidebarFooter, YouMenu, WorkspaceSwitcher, heldNameNote } = await import(pathToFileURL(`${root}/components/app/sidebar.tsx`).href);
-const { newSince, newestOf, markSeen, seenOf } = await import(pathToFileURL(`${root}/components/app/memory-categories.tsx`).href);
+const { footerPageOf, openFooterPage, footerPillOf, canHover, FOOTER_LEAVE_MS } = await import(`${rootUrl}/components/app/sidebar-footer.tsx`);
+const { SidebarFooter, YouMenu, WorkspaceSwitcher, heldNameNote } = await import(`${rootUrl}/components/app/sidebar.tsx`);
+const { newSince, newestOf, markSeen, seenOf } = await import(`${rootUrl}/components/app/memory-categories.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -146,8 +147,8 @@ await test("the button pointed at is the pill over the open page's, which stays 
 });
 
 await test("the footer remembers the page button expanded last, never your account's, in this window's storage", () => {
-  const src = readFileSync(`${root}/components/app/sidebar-footer.tsx`, "utf8");
-  const row = readFileSync(`${root}/components/app/sidebar.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/sidebar-footer.tsx`, "utf8");
+  const row = readFileSync(`${rootPath}/components/app/sidebar.tsx`, "utf8");
   assert.match(src, /export function useLastPill/, "a hook keeps the last one");
   assert.match(src, /if \(!isFooterPage\(k\) \|\| readLastPill\(\) === k\) return;/, "only Logins, Routines, Knowledge or Apps: not your account");
   assert.match(src, /localStorage\.setItem\(LAST_PILL_KEY, k\)/, "kept for the next window");
@@ -194,7 +195,7 @@ await test("no hover expansion where nothing hovers (a touch screen)", () => {
   globalThis.matchMedia = () => ({ matches: false });
   assert.equal(canHover(), true);
   globalThis.matchMedia = was;
-  const src = readFileSync(`${root}/components/app/sidebar-footer.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/sidebar-footer.tsx`, "utf8");
   assert.match(src, /pointerType === "touch" \|\| !canHover\(\)\) return/, "pointer over the row only counts with a hovering pointer");
   // A portal opened from the row (the Restart dialog) is inside it in React's tree but not on the page:
   // pointer and focus there count as outside, and a document listener settles the pill once it's away.
@@ -293,7 +294,7 @@ await test("Knowledge's dot: blue on its corner, softly pulsing (not with reduce
   assert.match(renderNews("knowledge", true), /aria-label="Knowledge"/);
   assert.doesNotMatch(renderNews("vault", false), /data-new-dot/, "nothing new: no dot");
   assert.doesNotMatch(render(base, "vault"), /data-new-dot/, "on the server, before the copy is in: no dot");
-  const css = readFileSync(`${root}/app/globals.css`, "utf8");
+  const css = readFileSync(`${rootPath}/app/globals.css`, "utf8");
   assert.match(css, /\.motion-new-pulse \{\s*animation: new-pulse [^;]*infinite;/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\.motion-new-pulse \{\s*animation: none;/);
 });
@@ -353,7 +354,7 @@ await test("the motion: a flex-grow swap on one curve, inside the row, and none 
   }
   assert.match(html, /active:scale-\[\.96\]/, "a small press");
   assert.match(html, /motion-reduce:transition-none/, "the press too, with reduced motion");
-  const css = readFileSync(`${root}/app/globals.css`, "utf8");
+  const css = readFileSync(`${rootPath}/app/globals.css`, "utf8");
   const curve = "250ms cubic-bezier(0.2, 0.8, 0.2, 1)";
   assert.match(css, new RegExp(`\\.motion-footer-slot \\{\\s*transition: flex-grow ${curve.replace(/[().]/g, "\\$&")};`));
   assert.match(css, /\.motion-footer-label \{[^}]*max-width 250ms[^}]*opacity/);
@@ -366,8 +367,8 @@ await test("all five fit the sidebar, People's room left empty at the end: four 
   const html = renderYou(base, "knowledge");
   assert.equal(slots(html).length, 5);
   assert.match(html, /data-footer-row="true" class="flex items-center gap-1 pb-1 pt-3 pr-10"/, "4px apart, no padding at the left, People's 40px kept empty at the right");
-  const app = readFileSync(`${root}/components/app/bops-app.tsx`, "utf8");
-  const side = readFileSync(`${root}/components/app/sidebar.tsx`, "utf8");
+  const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
+  const side = readFileSync(`${rootPath}/components/app/sidebar.tsx`, "utf8");
   const width = Number(app.match(/grid-cols-\[(\d+)px_minmax/)[1]);
   assert.equal(width, 340, "the sidebar's width");
   assert.match(side, /<aside className="flex min-h-0 w-\[340px\] shrink-0 flex-col [^"]*px-2\.5 /, "the column's width, 10px at each side");
@@ -404,7 +405,7 @@ await test("the workspace switcher says under the default why Orgo still shows b
 
 await test("no em or en dashes in what the footer shows", () => {
   for (const f of ["components/app/sidebar-footer.tsx", "components/app/sidebar.tsx"]) {
-    const shown = readFileSync(`${root}/${f}`, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    const shown = readFileSync(`${rootPath}/${f}`, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     assert.ok(!/[–—]/.test(shown), `${f} shows a dash`);
   }
 });

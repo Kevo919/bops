@@ -9,9 +9,11 @@
 // Pure: nothing here reads a file or the network.
 // Usage: node scripts/test-chain.mjs
 import assert from "node:assert/strict";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
-const C = await import(`${root}/cloud/chain.ts`);
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
+const C = await import(`${rootUrl}/cloud/chain.ts`);
 
 let passed = 0;
 let failed = 0;

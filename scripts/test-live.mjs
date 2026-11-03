@@ -9,12 +9,14 @@
 // Usage: node scripts/test-live.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -28,9 +30,9 @@ registerHooks({
   },
 });
 
-const { LivePublisher, LiveSubscriber, RemoteMoods, localMoods, localSessions, liveRoutine, onLiveRoutine, MOOD_REFRESH_MS, NO_LIVE_MS, PULL_MIN_MS, REFUSED_MS, SILENT_MS } = await import(`${root}/lib/server/live-core.ts`);
-const { LIVE_MOODS } = await import(`${root}/cloud/protocol.ts`);
-const { moodOf, moodSignals } = await import(`${root}/lib/bot-mood.ts`);
+const { LivePublisher, LiveSubscriber, RemoteMoods, localMoods, localSessions, liveRoutine, onLiveRoutine, MOOD_REFRESH_MS, NO_LIVE_MS, PULL_MIN_MS, REFUSED_MS, SILENT_MS } = await import(`${rootUrl}/lib/server/live-core.ts`);
+const { LIVE_MOODS } = await import(`${rootUrl}/cloud/protocol.ts`);
+const { moodOf, moodSignals } = await import(`${rootUrl}/lib/bot-mood.ts`);
 
 let failures = 0;
 let passed = 0;
@@ -493,7 +495,7 @@ await check("a bot's computer waking to answer (Bops Cloud's turn) shows until i
   streams[0].push(`event: snapshot\ndata: {"moods":[]}\n\n${turn("waking")}${mood("thinking")}`);
   await settle();
   assert.deepEqual(rm.forApp(), { max: { mood: "thinking", chatId: "bot:max", waking: true } });
-  const { withRemoteTyping } = await import(`${root}/lib/types.ts`);
+  const { withRemoteTyping } = await import(`${rootUrl}/lib/types.ts`);
   const chat = { id: "bot:max", botIds: ["max"], typing: [] };
   assert.deepEqual(withRemoteTyping(chat, rm.forApp()).typing, ["max"], "its chat shows it typing");
   assert.equal(withRemoteTyping({ id: "bot:dana", botIds: ["dana"], typing: [] }, rm.forApp()).typing.length, 0, "not another chat");

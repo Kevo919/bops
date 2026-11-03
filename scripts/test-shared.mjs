@@ -22,10 +22,11 @@ import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -62,16 +63,16 @@ globalThis.fetch = async (input, init = {}) => {
   return Response.json({ ok: true });
 };
 
-const { SharedCopy, viewState, GONE, actWith, ACT_EXPIRED, ACT_ACCESS_CHANGED, ACT_TOO_LONG } = await import(`${root}/lib/server/shared-core.ts`);
-const { needsYou, repliedSince } = await import(`${root}/lib/asks.ts`);
-const { duePings } = await import(`${root}/lib/pings.ts`);
-const { LiveSubscriber, RemoteMoods } = await import(`${root}/lib/server/live-core.ts`);
-const { readOnlyLine, sharedWsId, sharedBy, roleLabel, canAct, readOnly, saidBy, seesBrowser, browserLine } = await import(`${root}/lib/shared.ts`);
-const { viewOnly, callAllowed } = await import(`${root}/components/app/view-only.ts`);
-const { WorkspaceSwitcher, Sidebar } = await import(pathToFileURL(`${root}/components/app/sidebar.tsx`).href);
-const { ChatView, ThreadSheet } = await import(pathToFileURL(`${root}/components/app/chat-view.tsx`).href);
-const { AutopilotPage } = await import(pathToFileURL(`${root}/components/app/autopilot.tsx`).href);
-const { OpenCrm } = await import(pathToFileURL(`${root}/components/app/crm.tsx`).href);
+const { SharedCopy, viewState, GONE, actWith, ACT_EXPIRED, ACT_ACCESS_CHANGED, ACT_TOO_LONG } = await import(`${rootUrl}/lib/server/shared-core.ts`);
+const { needsYou, repliedSince } = await import(`${rootUrl}/lib/asks.ts`);
+const { duePings } = await import(`${rootUrl}/lib/pings.ts`);
+const { LiveSubscriber, RemoteMoods } = await import(`${rootUrl}/lib/server/live-core.ts`);
+const { readOnlyLine, sharedWsId, sharedBy, roleLabel, canAct, readOnly, saidBy, seesBrowser, browserLine } = await import(`${rootUrl}/lib/shared.ts`);
+const { viewOnly, callAllowed } = await import(`${rootUrl}/components/app/view-only.ts`);
+const { WorkspaceSwitcher, Sidebar } = await import(`${rootUrl}/components/app/sidebar.tsx`);
+const { ChatView, ThreadSheet } = await import(`${rootUrl}/components/app/chat-view.tsx`);
+const { AutopilotPage } = await import(`${rootUrl}/components/app/autopilot.tsx`);
+const { OpenCrm } = await import(`${rootUrl}/components/app/crm.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -265,7 +266,7 @@ await check("a chat's older messages come from Bops Cloud a page at a time, past
   assert.match(renderToStaticMarkup(h(ChatView, props)), /Show earlier messages/, "with only two here");
   const all = viewState(own(), { ...listed, wsId: WS }, cloudState(), {});
   assert.ok(!/Show earlier messages/.test(renderToStaticMarkup(h(ChatView, { ...props, state: all, chat: all.chats[0] }))), "none when it has them all");
-  const src = readFileSync(`${root}/components/app/chat-view.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/chat-view.tsx`, "utf8");
   assert.match(src, /void post\("\/api\/workspaces\/shared", \{ older: c\.id \}\)/);
 });
 
@@ -463,7 +464,7 @@ await check("an older page read while a read of the newest lands goes in where i
 });
 
 await check("two bots' conversation with each other pages back too, so Asked ● Sam opens at an exchange older than its newest page", async () => {
-  const { PairSheet } = await import(pathToFileURL(`${root}/components/app/chat-view.tsx`).href);
+  const { PairSheet } = await import(`${rootUrl}/components/app/chat-view.tsx`);
   const pair = "pair:boppy:sam";
   const msg = (id, at) => ({ id, chatId: pair, role: "bot", botId: at % 2 ? "boppy" : "sam", text: `Message ${id}`, at });
   const withSam = (body) => ({ ...body, state: { ...body.state, bots: [...body.state.bots, { id: "sam", name: "Dana's Sam", role: "Research", color: "#654321", isMain: false, workspaceId: "ws_main", computerStatus: "none" }] } });
@@ -494,13 +495,13 @@ await check("two bots' conversation with each other pages back too, so Asked ●
   assert.equal(await copy.older("pair:boppy:zed"), false);
   assert.equal(f.calls.length, asked);
   // The window asks for a page more while the exchange it opened at isn't there yet (an effect: as written).
-  assert.match(readFileSync(`${root}/components/app/chat-view.tsx`, "utf8"), /if \(olderThere && !found\) void post\("\/api\/workspaces\/shared", \{ older: pairId \}\);/);
+  assert.match(readFileSync(`${rootPath}/components/app/chat-view.tsx`, "utf8"), /if \(olderThere && !found\) void post\("\/api\/workspaces\/shared", \{ older: pairId \}\);/);
   // The user's own: all of it is on their Mac, nothing to read.
   assert.ok(!/Show earlier messages/.test(sheet({ ...own(), bots: v.bots, messages: v.messages.filter((m) => m.chatId === pair) })));
 });
 
 await check("images in a shared workspace's chats are said plainly not to be shown yet, never a broken picture of the viewer's own", async () => {
-  const { MessageImages } = await import(pathToFileURL(`${root}/components/app/attachments.tsx`).href);
+  const { MessageImages } = await import(`${rootUrl}/components/app/attachments.tsx`);
   const images = [{ id: "up_1", type: "image/png", w: 10, h: 10 }];
   viewOnly("View only");
   try {
@@ -560,7 +561,7 @@ await check("while a shared workspace is open, what its bots wait on the owner's
   assert.deepEqual(viewState(mine, { ...listed, wsId: WS }, cloudState(), {}).appApprovals, []);
   // The chat and the thread show their cards whole (chat-view.tsx): who answers one is the card's to say (lib/shared.ts
   // askAnswerer), with a line in place of its buttons for anyone else. Nothing is ever switched off and left looking live.
-  const src = readFileSync(`${root}/components/app/chat-view.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/chat-view.tsx`, "utf8");
   assert.ok(!src.includes("OwnerOnly") && !/\binert\b/.test(src), "no card made inert");
   assert.equal(src.split("<AppApprovalCard key={a.id} state={state} approval={a}").length - 1, 2, "in the chat and in the thread");
   assert.match(src, /const answerer = askAnswerer\(state, a\);/);
@@ -581,19 +582,19 @@ await check("while a shared workspace is open, the user's own news still chimes:
   assert.deepEqual(v.ownPings, duePings(mine), "the same keys the window chimes for in the user's own workspace, so nothing chimes twice");
   assert.ok(!v.messages.some((m) => m.id === "own-2"), "and nothing of theirs shows in the shared workspace");
   // The window chimes for those while one is open (as the whole window renders, which isn't rendered here: read from its source).
-  const src = readFileSync(`${root}/components/app/bops-app.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
   assert.match(src, /const due = state\.shared \? \(state\.ownPings \?\? \[\]\) : duePings\(state\);/);
   assert.ok(!/if \(!state \|\| state\.shared\) return;\n\s*const due/.test(src), "it no longer stops for a shared workspace");
 });
 
 await check("nothing of a shared workspace is ever written into the user's state, saved or synced", () => {
   for (const f of ["lib/server/shared.ts", "lib/server/shared-core.ts"]) {
-    const src = readFileSync(`${root}/${f}`, "utf8");
+    const src = readFileSync(`${rootPath}/${f}`, "utf8");
     assert.ok(!/\b(update|updateUnseen|setState|saveState|writeFile|persist[A-Z]\w*)\s*\(/.test(src.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "")), `${f} writes nothing of the user's`);
     assert.ok(!/from "\.\/(persist-cloud|persist-pg|persist)"/.test(src) || f === "lib/server/shared.ts", `${f} reaches no store`);
   }
   // The state route shows it and keeps it out of what the user's state is.
-  const route = readFileSync(`${root}/app/api/state/route.ts`, "utf8");
+  const route = readFileSync(`${rootPath}/app/api/state/route.ts`, "utf8");
   assert.match(route, /const shared = sharedForApp\(getState\(\)\);/);
   assert.match(route, /forApp\(shared\?\.state \?\? getState\(\)\)/);
 });
@@ -791,14 +792,14 @@ await check("nothing else that would change a shared workspace is offered: a thr
 });
 
 await check("the guard is on as the window renders, before what it draws runs its effects", () => {
-  const src = readFileSync(`${root}/components/app/bops-app.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
   assert.match(src, /\n {2}viewOnly\(state\?\.shared \? readOnlyLine\(\) : null\);/);
   assert.ok(!/useEffect\(\(\) => viewOnly/.test(src), "never in an effect (a child's effect would run first)");
 });
 
 await check("the window never cuts to what waits on a shared workspace's owner: no jump to a thread's ask, no bringing forward an urgent alert's screen", () => {
   // (Both happen as the whole window renders and runs its effects, which isn't rendered here: read from its source.)
-  const src = readFileSync(`${root}/components/app/bops-app.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
   assert.match(src, /const \[ask\] = state\.shared \? \[\] : chatAsks\(state, chat\.id\);/);
   assert.match(src, /bringForward\.current = \(\) => \{\n(?: *\/\/[^\n]*\n)* *if \(state\.shared\) return;/);
 });
@@ -816,7 +817,7 @@ await check("the sidebar of a shared workspace makes nothing new", () => {
   assert.ok(!shared.includes('aria-keyshortcuts="Alt+ArrowUp'));
   assert.match(mine, /data-favorite="issues" draggable="true" aria-keyshortcuts="Alt\+ArrowUp Alt\+ArrowDown"/, "the user's own: as always");
   // Neither the user's own issues nor this Mac's setup go under its bots as cards: they're the user's, not the owner's.
-  const src = readFileSync(`${root}/components/app/sidebar.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/sidebar.tsx`, "utf8");
   assert.match(src, /useIssues\(ws, user, categoriesOpen\(state\) && !state\.shared\)/);
   assert.match(src, /needsByBot\(state, issues\?\.issues \?\? null, state\.shared \? \[\] : setup\)/);
 });
@@ -954,8 +955,8 @@ await check("nothing in a shared workspace's open chat says the owner's as the v
 });
 
 await check("Bops' own lines in the owner's voice read as the owner's in a shared workspace: why a thread stopped, its notes, the chat's notes; and nothing of the viewer's own (their credit) or that waits on the owner says needs you", async () => {
-  const { ComputerPeek } = await import(pathToFileURL(`${root}/components/app/computer.tsx`).href);
-  const { TabBar } = await import(pathToFileURL(`${root}/components/app/panel-tabs.tsx`).href);
+  const { ComputerPeek } = await import(`${rootUrl}/components/app/computer.tsx`);
+  const { TabBar } = await import(`${rootUrl}/components/app/panel-tabs.tsx`);
   const c = cloudState();
   const t = c.state.sessions[0];
   c.state.sessions = [
@@ -998,7 +999,7 @@ await check("Bops' own lines in the owner's voice read as the owner's in a share
   for (const id of ["stopped", "took", "noted"]) assert.deepEqual(yous(sheetOf(id)), [], id);
   assert.match(text(sheetOf("stopped")), /Stopped by the owner/);
   // Its mark's tip (a chip's, a sidebar row's): why it stopped, as the owner's.
-  const { StatusIcon } = await import(pathToFileURL(`${root}/components/app/ui.tsx`).href);
+  const { StatusIcon } = await import(`${rootUrl}/components/app/ui.tsx`);
   assert.match(renderToStaticMarkup(h(StatusIcon, { session: state.sessions.find((x) => x.id === "stopped"), owner: true })), /data-tip="Didn&#x27;t finish: Stopped by the owner"/);
   assert.match(text(sheetOf("took")), /Paused while the owner took over/);
   for (const said of ["The owner approved $42", "The owner handed control back", "The owner closed the terminal"]) assert.ok(text(sheetOf("noted")).includes(said), said);
@@ -1020,9 +1021,9 @@ await check("Bops' own lines in the owner's voice read as the owner's in a share
 });
 
 await check("the rest of what Bops says in the owner's voice reads as theirs: an owner's call's card, a routine's last run, a thread's steps, a credit stop; a thread the owner stopped asks nothing; the page and tips name the owner's bots", async () => {
-  const { ComputerView } = await import(pathToFileURL(`${root}/components/app/computer.tsx`).href);
-  const { KnowledgeButton } = await import(pathToFileURL(`${root}/components/app/sidebar.tsx`).href);
-  const { needsYou } = await import(`${root}/lib/asks.ts`);
+  const { ComputerView } = await import(`${rootUrl}/components/app/computer.tsx`);
+  const { KnowledgeButton } = await import(`${rootUrl}/components/app/sidebar.tsx`);
+  const { needsYou } = await import(`${rootUrl}/lib/asks.ts`);
   const c = cloudState();
   const t = c.state.sessions[0];
   c.state.sessions = [
@@ -1075,10 +1076,10 @@ await check("the rest of what Bops says in the owner's voice reads as theirs: an
 });
 
 await check("every shape a shared thread, routine and watch can take, rendered everywhere a shared workspace reaches: nothing reads as the viewer's, nothing offers to change it", async () => {
-  const { ComputerView, ComputerPeek } = await import(pathToFileURL(`${root}/components/app/computer.tsx`).href);
-  const { TabBar } = await import(pathToFileURL(`${root}/components/app/panel-tabs.tsx`).href);
-  const { AutopilotButton } = await import(pathToFileURL(`${root}/components/app/autopilot.tsx`).href);
-  const { BotPanel } = await import(pathToFileURL(`${root}/components/app/bot-panel.tsx`).href);
+  const { ComputerView, ComputerPeek } = await import(`${rootUrl}/components/app/computer.tsx`);
+  const { TabBar } = await import(`${rootUrl}/components/app/panel-tabs.tsx`);
+  const { AutopilotButton } = await import(`${rootUrl}/components/app/autopilot.tsx`);
+  const { BotPanel } = await import(`${rootUrl}/components/app/bot-panel.tsx`);
   const c = cloudState();
   const t = c.state.sessions[0];
   // Every state of a thread (its status by its blocker, lib/types.ts SessionStatus and Blocker), every state of a routine's last run, every kind of watch.
@@ -1127,9 +1128,9 @@ await check("every shape a shared thread, routine and watch can take, rendered e
 });
 
 await check("a New tab carried over, a watch's Edit and its sheet, clicking into the screen, the Skills, Memory and Phone tabs, a helper's task and Bops' own lines in a bot's voice, as a viewer reads them", async () => {
-  const { tabsShown } = await import(`${root}/components/app/tabs-shown.ts`);
-  const { ComputerView } = await import(pathToFileURL(`${root}/components/app/computer.tsx`).href);
-  const { BotPanel } = await import(pathToFileURL(`${root}/components/app/bot-panel.tsx`).href);
+  const { tabsShown } = await import(`${rootUrl}/components/app/tabs-shown.ts`);
+  const { ComputerView } = await import(`${rootUrl}/components/app/computer.tsx`);
+  const { BotPanel } = await import(`${rootUrl}/components/app/bot-panel.tsx`);
   const shown = shownState();
   const opts = (st) => ({ chatBotId: "boppy", ws: st.workspace, crm: false, memory: false, apps: false });
   // A New tab opened in the user's own workspace doesn't stay once a shared one is open: it lists their own things as theirs.
@@ -1168,7 +1169,7 @@ await check("a New tab carried over, a watch's Edit and its sheet, clicking into
   assert.deepEqual(v2.sessions[0].steps.map((x) => x.detail), ["brought in a helper for You are a research helper. Check your calendar access first", 'looked for "your invoices" in the owner\'s apps']);
   assert.deepEqual(v2.messages.map((m) => m.text), ["I couldn't finish Weekly report on the owner's Mac: It needs more AI credit than the owner has left, so it's stopped.", "Should I do this on the owner's Mac or in the cloud?", "I'll check your inbox for you."]);
   // Bops Cloud sends a member that mark (cloud/ws-slice.ts MESSAGE), so their window can read those lines as the owner's.
-  const { sharedMessage } = await import(`${root}/cloud/ws-slice.ts`);
+  const { sharedMessage } = await import(`${rootUrl}/cloud/ws-slice.ts`);
   assert.equal(sharedMessage(c2.messages[0])?.bops, true);
   assert.equal(sharedMessage(c2.messages[2])?.bops, undefined);
 });
@@ -1265,7 +1266,7 @@ await check("what a thread typed, searched for or ran is shown as it was, never 
 });
 
 await check("a shared workspace's Favorites and bots' chips are never fed by what waits on its owner: no Needs your attention, no needs you mark, no alert cards", async () => {
-  const S = await import(pathToFileURL(`${root}/components/app/sidebar-sections.tsx`).href);
+  const S = await import(`${rootUrl}/components/app/sidebar-sections.tsx`);
   const base = shownState();
   // The owner's thread asked them something (s1), and an urgent alert came in for them.
   const state = { ...base, watches: [{ id: "w1", botId: "boppy", display: 1, site: "bank.test", lookFor: "a reply", since: 1, alert: { text: "A reply from the bank", at: 5, level: "now" } }] };
@@ -1334,11 +1335,11 @@ await check("while one is open, every write to the app's server is answered View
 });
 
 await check("the viewer's own Mac is never a shared workspace's: no Your Mac tab carried over or opened for the owner's work on their Mac, no Working dot, no screen of the viewer's own as the owner's bot's, and Details never says this Mac", async () => {
-  const { tabsShown, opensMacTab } = await import(`${root}/components/app/tabs-shown.ts`);
-  const { TabBar } = await import(pathToFileURL(`${root}/components/app/panel-tabs.tsx`).href);
-  const { ComputerView, ComputerSummary } = await import(pathToFileURL(`${root}/components/app/computer.tsx`).href);
-  const { BotPanel } = await import(pathToFileURL(`${root}/components/app/bot-panel.tsx`).href);
-  const { readAllowed } = await import(`${root}/components/app/view-only.ts`);
+  const { tabsShown, opensMacTab } = await import(`${rootUrl}/components/app/tabs-shown.ts`);
+  const { TabBar } = await import(`${rootUrl}/components/app/panel-tabs.tsx`);
+  const { ComputerView, ComputerSummary } = await import(`${rootUrl}/components/app/computer.tsx`);
+  const { BotPanel } = await import(`${rootUrl}/components/app/bot-panel.tsx`);
+  const { readAllowed } = await import(`${rootUrl}/components/app/view-only.ts`);
   const opts = (st) => ({ chatBotId: "boppy", ws: st.workspace, crm: false, memory: false, apps: false });
   // The owner's Boppy at work on the owner's Mac, with the viewer's own app on their Mac.
   const c = cloudState();
@@ -1349,7 +1350,7 @@ await check("the viewer's own Mac is never a shared workspace's: no Your Mac tab
   assert.deepEqual(tabsShown([mac], st, opts(st)), []);
   assert.equal(opensMacTab(st, st.sessions[0]), false, "a lead or a thread on the owner's Mac");
   // (As the window has it: the follower and an opened thread go by opensMacTab.)
-  const app = readFileSync(`${root}/components/app/bops-app.tsx`, "utf8");
+  const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
   assert.match(app, /if \(opensMacTab\(state, lead\)\) \{/);
   assert.match(app, /if \(opensMacTab\(state, s\)\) \{/);
   assert.equal((app.match(/kind: "mac" \}\]\)/g) ?? []).length, 2, "nowhere else opens it on its own");
@@ -1378,7 +1379,7 @@ await check("the viewer's own Mac is never a shared workspace's: no Your Mac tab
   assert.equal(readAllowed("/api/state?v=1"), true);
   viewOnly(null);
   assert.equal(readAllowed("/api/mirror?bot=boppy&display=100"), true, "back in the user's own");
-  for (const f of ["mirror-screen", "live-screen"]) assert.match(readFileSync(`${root}/components/app/${f}.tsx`, "utf8"), /if \(!readAllowed\(url\)\)/, f);
+  for (const f of ["mirror-screen", "live-screen"]) assert.match(readFileSync(`${rootPath}/components/app/${f}.tsx`, "utf8"), /if \(!readAllowed\(url\)\)/, f);
   // Details: the Computer card and its choice go by the owner's bot, never the viewer's own host or plan.
   const details = (state) => renderToStaticMarkup(h(BotPanel, { state: { ...state, vault: [] }, bot: state.bots[0], section: "details", onSection: noop, onOpenChat: noop, onOpenThread: noop, onOpenVault: noop, onOpenComputer: noop, onOpenKeys: noop, onShowScreen: noop, onOpenAutopilot: noop, onOpenSkills: noop, onAsk: noop, onUpgrade: noop, onClose: noop }));
   assert.ok(!/this Mac/.test(text(details(st))), text(details(st)));
@@ -1395,11 +1396,11 @@ await check("the viewer's own Mac is never a shared workspace's: no Your Mac tab
 });
 
 await check("nor anywhere else: no full width Your Mac carried over or kept capturing hidden, no read of the viewer's own windows for the owner's watch, and Settings and the tabs never say this Mac for the owner's bots", async () => {
-  const { MacComputer } = await import(pathToFileURL(`${root}/components/app/mac-computer.tsx`).href);
-  const { BotComputersList } = await import(pathToFileURL(`${root}/components/app/bot-computers.tsx`).href);
-  const { TabBar } = await import(pathToFileURL(`${root}/components/app/panel-tabs.tsx`).href);
-  const { readAllowed } = await import(`${root}/components/app/view-only.ts`);
-  const { computerOf } = await import(`${root}/lib/screens.ts`);
+  const { MacComputer } = await import(`${rootUrl}/components/app/mac-computer.tsx`);
+  const { BotComputersList } = await import(`${rootUrl}/components/app/bot-computers.tsx`);
+  const { TabBar } = await import(`${rootUrl}/components/app/panel-tabs.tsx`);
+  const { readAllowed } = await import(`${rootUrl}/components/app/view-only.ts`);
+  const { computerOf } = await import(`${rootUrl}/lib/screens.ts`);
   // The owner's Boppy watching a Messages window on the owner's Mac, with news, and a helper sharing its
   // computer; the viewer's own app on their Mac.
   const c = cloudState();
@@ -1415,7 +1416,7 @@ await check("nor anywhere else: no full width Your Mac carried over or kept capt
   const mine = { ...own(), host: "mac", watches: c.state.watches };
   assert.match(text(renderToStaticMarkup(h(MacComputer, { state: mine, mode: "focus", onBack: noop, onOpenThread: noop }))), /Your Mac/, "the user's own: as always");
   // (As the window has it: full width on the Mac goes when a shared workspace opens, and the hidden one isn't kept.)
-  const app = readFileSync(`${root}/components/app/bops-app.tsx`, "utf8");
+  const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
   assert.match(app, /if \(state\.shared && macFocus\) \{\n\s*setMacFocus\(false\);/);
   assert.match(app, /\) : focus && macFocus && !state\.shared \? \(/);
   assert.match(app, /const macHeld = [^;\n]*&& !state\.shared;/);
@@ -1433,7 +1434,7 @@ await check("nor anywhere else: no full width Your Mac carried over or kept capt
   const onMac = viewState({ ...own(), host: "mac" }, { ...listed, role: "member", wsId: WS }, { ...c, state: { ...c.state, bots: [{ ...c.state.bots[0], runsOn: "mac" }] } }, {});
   assert.match(text(renderToStaticMarkup(h(BotComputersList, { state: onMac, keys: null, padded: false }))), /Dana's Boppy Works on the owner's Mac/);
   assert.match(text(renderToStaticMarkup(h(BotComputersList, { state: { ...own(), host: "mac" }, keys: null, padded: false }))), /Your bots' computers Sam's Boppy Uses this Mac/, "the user's own: as always");
-  assert.match(readFileSync(`${root}/components/app/bops-app.tsx`, "utf8"), /<BotComputers state=\{state\} padded=\{!selfHosted\} askKeys=\{!selfHosted && !state\.shared\} \/>/, "nor asked about the owner's computers' keys");
+  assert.match(readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8"), /<BotComputers state=\{state\} padded=\{!selfHosted\} askKeys=\{!selfHosted && !state\.shared\} \/>/, "nor asked about the owner's computers' keys");
   // The tabs: a helper's computer tab is its main bot's, as its Details say.
   const helper = st.bots.find((b) => b.id === "helper");
   assert.equal(computerOf(st, helper).id, "boppy");
@@ -1493,9 +1494,9 @@ await check("the owner's messages, thread replies and calls come in on the left,
 });
 
 await check("the owner's Boppy's profile never shows the viewer's own logins, keys or channels as its own, though the viewer's first bot is \"boppy\" too", async () => {
-  const { BotPanel } = await import(pathToFileURL(`${root}/components/app/bot-panel.tsx`).href);
-  const { BotKeys } = await import(pathToFileURL(`${root}/components/app/keys.tsx`).href);
-  const { WhereToFind } = await import(pathToFileURL(`${root}/components/app/channels.tsx`).href);
+  const { BotPanel } = await import(`${rootUrl}/components/app/bot-panel.tsx`);
+  const { BotKeys } = await import(`${rootUrl}/components/app/keys.tsx`);
+  const { WhereToFind } = await import(`${rootUrl}/components/app/channels.tsx`);
   // The viewer's own: a login for every bot, and their Boppy on Telegram, paired.
   const mine = {
     ...own(),
@@ -1518,7 +1519,7 @@ await check("the owner's Boppy's profile never shows the viewer's own logins, ke
 });
 
 await check("a bot's Keys card has one row per key, the workspace's where it has one by that name too, and each row says whose it is, as the Vault does", async () => {
-  const { botKeyRows } = await import(pathToFileURL(`${root}/components/app/keys.tsx`).href);
+  const { botKeyRows } = await import(`${rootUrl}/components/app/keys.tsx`);
   const rows = botKeyRows([
     { name: "STRIPE_SECRET_KEY", scope: "all" },
     { name: "OPENAI_API_KEY", scope: "all" },
@@ -1527,7 +1528,7 @@ await check("a bot's Keys card has one row per key, the workspace's where it has
   assert.deepEqual(rows.map((k) => `${k.name}:${k.scope}`), ["OPENAI_API_KEY:all", "STRIPE_SECRET_KEY:workspace"]);
   assert.deepEqual(botKeyRows([{ name: "A", scope: "all" }, { name: "B", scope: "all" }]).map((k) => k.name), ["A", "B"]);
   // The row's label and tip are the Vault's own ("All workspaces", "This workspace").
-  const card = readFileSync(`${root}/components/app/keys.tsx`, "utf8").split("function BotKeysCard")[1].split("/* ---------------- In the chat")[0];
+  const card = readFileSync(`${rootPath}/components/app/keys.tsx`, "utf8").split("function BotKeysCard")[1].split("/* ---------------- In the chat")[0];
   assert.match(card, /data-tip=\{scopeLabel\(k\.scope\)\.tip\}[^>]*>\s*\{scopeLabel\(k\.scope\)\.label\}/);
 });
 
@@ -1538,7 +1539,7 @@ await check("a thread of the user's own that ended waiting for a sign in on its 
   const shown = text(sheet(mine, waits));
   assert.match(shown, /Sign in for Sam's Boppy/);
   assert.match(shown, /I signed in/);
-  const src = readFileSync(`${root}/components/app/chat-view.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/chat-view.tsx`, "utf8");
   assert.match(src, /sign_in: \["I signed in", "I signed in\. Carry on\."\]/, "the reply it sends");
   // Still at work (its screen hit the sign in a moment ago): nothing to carry on.
   const working = { ...waits, status: "running", endedAt: undefined };
@@ -1570,7 +1571,7 @@ await check("a thread of the user's own that ended waiting for a sign in on its 
 });
 
 await check("an @orgo.ai owner's app work never reaches the window of anyone they share the workspace with, whatever their email; an app line shows only where apps are shown", async () => {
-  const { appThreadsOf, botsOf, handedByOthers, sharedMessages, sharedSlice } = await import(`${root}/cloud/ws-slice.ts`);
+  const { appThreadsOf, botsOf, handedByOthers, sharedMessages, sharedSlice } = await import(`${rootUrl}/cloud/ws-slice.ts`);
   const goal = "Work on Dana's app recipe-box. It's the Ingot repo p1/recipe-box (Ingot is Orgo's source control). Dana puts it live from the Apps page.";
   // The owner's state as Bops Cloud keeps it: Boppy worked on an app (chat.ts work_on_app) and made one (made-apps.ts).
   const blob = {
@@ -1608,7 +1609,7 @@ await check("an @orgo.ai owner's app work never reaches the window of anyone the
   assert.match(text(renderToStaticMarkup(h(ChatView, chatProps(ownWith("tess@orgo.ai"), "bot:boppy")))), /Building Tip calculator/);
   assert.doesNotMatch(text(renderToStaticMarkup(h(ChatView, chatProps(ownWith("sam@x.test"), "bot:boppy")))), /Tip calculator/);
   // What the state route gives the window (lib/apps-access.ts appsForWindow): the apps an account has, only where they're shown.
-  const { appsForWindow } = await import(`${root}/lib/apps-access.ts`);
+  const { appsForWindow } = await import(`${rootUrl}/lib/apps-access.ts`);
   const kept = (email) => ({
     ...ownWith(email),
     madeApps: [{ id: "app_tip", title: "Tip calculator", botId: "boppy", ws: "ws_main", versions: [] }],
@@ -1626,16 +1627,16 @@ await check("an @orgo.ai owner's app work never reaches the window of anyone the
     assert.ok(w.messages.every((m) => !m.madeApp), `${who}: no app's line`);
     assert.ok(!/Tip calculator|"shop"|ingotTokens/.test(JSON.stringify(w)), who);
   }
-  assert.match(readFileSync(`${root}/app/api/state/route.ts`, "utf8"), /const state = appsForWindow\(all\);/, "the state route gives the window that");
+  assert.match(readFileSync(`${rootPath}/app/api/state/route.ts`, "utf8"), /const state = appsForWindow\(all\);/, "the state route gives the window that");
 });
 
 await check("Team says what members see: the bots the owner picks, never the saved logins or keys", () => {
-  const src = readFileSync(`${root}/components/app/members.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/members.tsx`, "utf8");
   assert.match(src, /In Bops they see everything of the bots you pick, your chats with them too\./);
   assert.ok(!/They see everything in the workspace/.test(src));
   assert.match(src, /"Never your saved logins\." : "Never your saved logins or keys\."/, "the keys only while Bops put none of its own on the computers");
   assert.ok(!/never this Mac, your chats/.test(src));
-  assert.ok(!/never this Mac, the chats or the vault/.test(readFileSync(`${root}/lib/members.ts`, "utf8")));
+  assert.ok(!/never this Mac, the chats or the vault/.test(readFileSync(`${rootPath}/lib/members.ts`, "utf8")));
 });
 
 /* ---------------- Write: acting in a shared workspace ---------------- */
@@ -1876,7 +1877,7 @@ await check("Write: what Bops Cloud said: a Read bot reads again, no access drop
 });
 
 await check("Your Apps in a shared workspace: shown with the apps the owner gave, an act on one lands by its key or fails when Write goes", async () => {
-  const A = await import(`${root}/lib/apps-access.ts`);
+  const A = await import(`${rootUrl}/lib/apps-access.ts`);
   const shop = { name: "shop", url: "https://shop.orgo.dev", sites: [{ name: "shop", url: "https://shop.orgo.dev", serving: "cs-2", live: { id: "d2", state: "succeeded", when: 9 } }], commits: [], deploys: [] };
   const withApps = (level, acts) => ({ ...cloudState(), hash: `h-apps-${level}-${acts?.length ?? 0}`, state: { ...cloudState().state, apps: { level, at: 10, list: [{ ...shop, ...(acts ? { acts } : {}) }] } } });
   let answer = { status: 200, body: withApps("write") };
@@ -1923,7 +1924,7 @@ await check("Your Apps in a shared workspace: shown with the apps the owner gave
 });
 
 await check("the bot's browser in a shared workspace: a Member with Write and Use its computer has it in place of the computer, an Admin beside it, anyone else one line saying why; its route goes out", async () => {
-  const { browserBeside, browsesHere } = await import(pathToFileURL(`${root}/components/app/panel-tabs.tsx`).href);
+  const { browserBeside, browsesHere } = await import(`${rootUrl}/components/app/panel-tabs.tsx`);
   const at = (levels, computer, role = "member", screens) => ({ shared: { projectId: "p1", name: "Acme", owner: "o@example.com", role, wsId: "shared_p1", levels, computer, ...(screens ? { screens } : {}) } });
   const max = { id: "max", name: "Max" };
   assert.equal(seesBrowser(at({ max: "write" }, true), max), true);
@@ -1954,8 +1955,8 @@ await check("the bot's browser in a shared workspace: a Member with Write and Us
 });
 
 await check("an Admin sees a bot's computer live, with Take control and orgo.ai; a Member with Use its computer is pointed at orgo.ai; anyone else reads where its work shows; the role is said under the name", async () => {
-  const { ComputerView } = await import(pathToFileURL(`${root}/components/app/computer.tsx`).href);
-  const { roleHere, SHARED_SCREEN_WORDS } = await import(`${root}/lib/shared.ts`);
+  const { ComputerView } = await import(`${rootUrl}/components/app/computer.tsx`);
+  const { roleHere, SHARED_SCREEN_WORDS } = await import(`${rootUrl}/lib/shared.ts`);
   const orgoUrl = `https://orgo.test/workspaces?project_id=${PROJECT}`;
   const c = cloudState();
   // Bops Cloud names the computer for an Admin alone; the window keeps only which bots, never the computer's id.
@@ -1992,7 +1993,7 @@ await check("an Admin sees a bot's computer live, with Take control and orgo.ai;
 /* ---------------- Every card: live for whoever may answer it, else one line saying who can ---------------- */
 
 await check("every card kind, for every role: live buttons for whoever may answer it, else exactly one line saying who can; never a card switched off", async () => {
-  const L = await import(`${root}/lib/shared.ts`);
+  const L = await import(`${rootUrl}/lib/shared.ts`);
   const base = { id: "s1", botId: "boppy", chatId: "bot:boppy", title: "Find leads", goal: "g", replies: [], steps: [], createdAt: 2, host: "orgo", sentVia: "you" };
   const kinds = {
     question: { ...base, status: "done", answer: "Which list should I use?", options: ["The new one", "The old one"] },
@@ -2103,7 +2104,7 @@ await check("every card kind, for every role: live buttons for whoever may answe
 });
 
 await check("where a thread runs: an Admin picks the bot's computer (never the owner's Mac), a Member reads who can; refused here first otherwise, and it lands once picked", async () => {
-  const L = await import(`${root}/lib/shared.ts`);
+  const L = await import(`${rootUrl}/lib/shared.ts`);
   const where = { id: "s-where", botId: "boppy", chatId: "bot:boppy", title: "Plan a trip", goal: "g", status: "queued", askWhere: true, replies: [], steps: [], createdAt: 2, host: "orgo", sentVia: "you" };
   const view = (role, slice) => {
     const c = cloudState();
@@ -2165,7 +2166,7 @@ await check("an answer waits as long as its ask: a Member's or an Admin's is sti
 });
 
 await check("the owner's app work: an app thread's ask or question is answered only with Your Apps at Write (an Admin has it), else one line; refused here first; a reply waiting says only that it waits", async () => {
-  const L = await import(`${root}/lib/shared.ts`);
+  const L = await import(`${rootUrl}/lib/shared.ts`);
   const t = { id: "t-app", botId: "boppy", app: { name: "site" } };
   const st = (shared) => ({ shared: { projectId: "p", name: "W", owner: "", wsId: WS, levels: { boppy: "write" }, computer: true, ...shared }, sessions: [t], bots: [{ id: "boppy" }] });
   const ask = { botId: "boppy", kind: "email", threadId: "t-app" };
@@ -2184,7 +2185,7 @@ await check("the owner's app work: an app thread's ask or question is answered o
   assert.deepEqual(copy.refusal({ act: "answer", askId: "apr-app", reply: "once" }), { status: 403, error: L.APP_WORK_LINE, code: "member_apps_read_only" });
   assert.equal(copy.refusal({ act: "reply", sessionId: "t-app", text: "x" }).code, "member_apps_read_only");
   // A reply or Dismiss on its way waits only a while: its card never makes the answer's promise.
-  const src = readFileSync(`${root}/components/app/chat-view.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/chat-view.tsx`, "utf8");
   const from = src.indexOf("function NeedsYouCard(");
   const card = src.slice(from, src.indexOf("\nfunction ", from + 1));
   assert.ok(card.includes("REPLY_WAITS_LINE") && !card.includes("ANSWER_WAITS_LINE"));

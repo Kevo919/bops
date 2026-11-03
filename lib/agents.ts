@@ -17,7 +17,7 @@ export type AgentRoute = "anthropic" | "openai" | "deepinfra" | "zai" | "zai-cod
 export const AGENTS: Record<AgentKind, { name: string; maker: string; pays: AgentPays[]; soon?: string }> = {
   bops: { name: "Bops agent", maker: "OpenAI", pays: ["credit"] },
   claude: { name: "Claude Code", maker: "Anthropic", pays: ["plan", "key"] },
-  codex: { name: "Codex", maker: "OpenAI", pays: ["key"] },
+  codex: { name: "Codex", maker: "OpenAI", pays: ["plan", "key"] },
   opencode: { name: "OpenCode", maker: "Any model", pays: ["key"] },
   dsh: { name: "DeepSeek Harness", maker: "Any model", pays: ["key"] },
   agy: { name: "agy", maker: "Google Antigravity", pays: [], soon: "agy signs in with a Google account, which Bops can't use for you yet." },
@@ -26,7 +26,7 @@ export const AGENTS: Record<AgentKind, { name: string; maker: string; pays: Agen
 /** Ways to pay that show in an agent's Pays with, disabled, and why. */
 export const PAYS_SOON: Partial<Record<AgentKind, Partial<Record<AgentPays, string>>>> = {
   claude: { credit: "Credit for Claude Code needs Bops Cloud to carry it first." },
-  codex: { credit: "Credit for Codex needs Bops Cloud to carry it first.", plan: "A ChatGPT plan for Codex needs a check of OpenAI's terms first." },
+  codex: { credit: "Credit for Codex needs Bops Cloud to carry it first." },
   opencode: { credit: "Credit for OpenCode needs Bops Cloud to carry it first." },
   dsh: { credit: "Credit for DeepSeek Harness needs Bops Cloud to carry it first." },
 };
@@ -327,7 +327,7 @@ const planOf = (x: Pick<BotAgent, "account">, state: Pick<AppState, "brains">, c
 export function paysLabel(x: Pick<BotAgent, "kind" | "pays" | "model" | "account">, state: Pick<AppState, "brains">, computerId?: string) {
   if (x.pays === "credit") return "credit";
   if (x.pays === "key") return `your ${keyVendor(x)} key`;
-  return `your ${planName(planOf(x, state, computerId))}`;
+  return `your ${(x.kind === "codex" ? "ChatGPT plan" : planName(planOf(x, state, computerId)))}`;
 }
 
 /** Where an agent's words come from: the bot it belongs to, so two agents of one kind can be told apart. */
@@ -345,7 +345,7 @@ export function agentTag(x: Pick<BotAgent, "id" | "kind" | "pays" | "model" | "a
   const same = agents.filter((y) => y.kind === x.kind && (!anyModel(x.kind) || model(y) === model(x)));
   if (same.length < 2 || !same.some((y) => y.id === x.id)) return undefined;
   const host = workBot(at.bot, at.state.bots).computerId;
-  const word = (y: Pick<BotAgent, "kind" | "pays" | "model" | "account">) => (y.pays === "credit" ? "Credit" : y.pays === "key" ? `${keyVendor(y)} key` : planName(planOf(y, at.state, host)));
+  const word = (y: Pick<BotAgent, "kind" | "pays" | "model" | "account">) => (y.pays === "credit" ? "Credit" : y.pays === "key" ? `${keyVendor(y)} key` : (y.kind === "codex" ? "ChatGPT plan" : planName(planOf(y, at.state, host))));
   const mine = word(x);
   const before = same.slice(0, same.findIndex((y) => y.id === x.id)).filter((y) => word(y) === mine).length;
   return before ? `${mine} ${before + 1}` : mine;
@@ -408,7 +408,7 @@ export function agentState(x: BotAgent, b: Bot, state: Pick<AppState, "bots" | "
     return { ready: false, line: "Sign in is open on its screen.", button: "show" };
   }
   const on = signInOn(acct, host.computerId);
-  if (on) return { ready: true, line: `${planName(on.account?.plan)} · signed in here` };
+  if (on) return { ready: true, line: `${x.kind === "codex" ? "ChatGPT plan" : planName(on.account?.plan)} · signed in here` };
   return { ready: false, line: `Not signed in on ${host.name}'s computer yet.`, button: "sign_in" };
 }
 

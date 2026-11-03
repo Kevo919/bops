@@ -30,7 +30,7 @@ import { createHash, createHmac } from "node:crypto";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 // A self-hosted install: the state is a file in the working folder, memory is Honcho on its own key
@@ -41,13 +41,14 @@ process.env.OPENAI_API_KEY = "sk-test-categories";
 process.env.HONCHO_API_KEY = "hc-test-categories";
 process.env.BOPS_MEMORY_MODEL = "gpt-test-memory";
 const HONCHO_KEY = process.env.HONCHO_API_KEY;
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-categories-"));
 // The Keychain is never read: `security` is a stand-in that has nothing, and HOME is empty.
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
@@ -64,7 +65,7 @@ Date.now = () => realNow() + skew;
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -298,12 +299,12 @@ process.emitWarning = (warning, ...rest) => (rest[0]?.code === "MODULE_TYPELESS_
 const rejections = [];
 process.on("unhandledRejection", (e) => rejections.push(String(e?.stack ?? e)));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const Mem = await import(`${root}/lib/server/memory.ts`);
-const MC = await import(`${root}/lib/server/memory-categories.ts`);
-const R = await import(`${root}/app/api/memory/categories/route.ts`);
-const Cat = await import(`${root}/lib/memory-categories.ts`);
-const { botChatId, MAIN_WORKSPACE } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const Mem = await import(`${rootUrl}/lib/server/memory.ts`);
+const MC = await import(`${rootUrl}/lib/server/memory-categories.ts`);
+const R = await import(`${rootUrl}/app/api/memory/categories/route.ts`);
+const Cat = await import(`${rootUrl}/lib/memory-categories.ts`);
+const { botChatId, MAIN_WORKSPACE } = await import(`${rootUrl}/lib/types.ts`);
 
 /* ---------------- Helpers ---------------- */
 
@@ -2586,7 +2587,7 @@ await section("Categories changed in an update: items in one that's gone go, and
 });
 
 await section("Orbit for the bots: orbit_read lists, orbit_update changes, orbit_forget asks first, only what was asked", async () => {
-  const O = await import(`${root}/lib/server/orbit.ts`);
+  const O = await import(`${rootUrl}/lib/server/orbit.ts`);
   const boppy = S.getState().bots.find((b) => b.id === "boppy");
   await refresh(MAIN);
   assert.deepEqual(O.ORBIT_TOOLS(boppy).map((t) => t.name), ["orbit_read", "orbit_update", "orbit_forget", "orbit_issue_open", "orbit_issue_update", "orbit_issue_list"]);
@@ -2765,7 +2766,7 @@ await section("The shared helpers: what's coming up, what's settled, and dates i
 /* ---------------- A bot that keeps its memory to itself (lib/chain.ts) ---------------- */
 
 await section("Knowledge is built from the team's bank only: a bot that keeps its memory to itself only reads it and adds nothing, and one that doesn't read the team's has no Knowledge", async () => {
-  const O = await import(`${root}/lib/server/orbit.ts`);
+  const O = await import(`${rootUrl}/lib/server/orbit.ts`);
   S.update((s) => {
     for (const [id, name] of [["kit", "Kit"], ["lou", "Lou"]]) s.bots.push({ id, name, role: "Assistant", color: "#4F7BF7", isMain: false, computerStatus: "none" });
     s.workspaces.find((w) => w.id === MAIN).chain = { bots: { kit: { memory: "own", readsTeam: false }, lou: { memory: "own" } } };
@@ -2818,7 +2819,7 @@ await section("Plain words: no dashes in anything the user reads", async () => {
   // Every line the engine and the route can show, the ones no test reaches too (out of AI credit is the cloud's
   // alone): nothing in their source has a dash, but clip()'s pattern that takes dashes out.
   for (const file of ["lib/server/memory-categories.ts", "app/api/memory/categories/route.ts", "lib/memory-categories.ts"])
-    readFileSync(join(root, file), "utf8")
+    readFileSync(join(rootPath, file), "utf8")
       .split("\n")
       .forEach((line, n) => {
         if (/[\u2013\u2014]/.test(line) && !/\.replace\(\/[^/]*[\u2013\u2014][^/]*\/[gimsuy]*,/.test(line)) assert.fail(`${file}:${n + 1} has a dash: ${line.trim()}`);
@@ -2846,5 +2847,7 @@ console.log(`\nMemory categories: ${results.length - failed.length} of ${results
 const failing = failed.flatMap((r) => r.checks);
 if (failing.length) console.log(`Checks that fail:\n${failing.map((c) => `  * ${c}`).join("\n")}`);
 if (failed.length) console.log(`The throwaway folder is kept for a look: ${scratch}`);
-else rmSync(scratch, { recursive: true, force: true });
+else try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(failed.length ? 1 : 0);

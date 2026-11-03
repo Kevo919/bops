@@ -1,3 +1,4 @@
+import { join } from "node:path";
 // Tests for apps on the web in the window (components/app/hosted-apps.tsx), each one an Ingot repo worked
 // on on a bot's Bops computer: the Apps page's "On the web" list, one line per app with its state (live,
 // deploying, failed, never deployed), its public address as a link that opens in the browser, the short
@@ -51,10 +52,12 @@ import ts from "typescript";
 
 // (As a path, not a URL's: a folder with a space in its name would be %20, then %2520 once made a URL again.)
 const root = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
+// A file URL for import specifiers, from this OS-path root.
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -96,10 +99,10 @@ globalThis.fetch = async (url, init = {}) => {
   return { ok: status < 400, status, json: async () => body };
 };
 
-const H = await import(pathToFileURL(`${root}/components/app/hosted-apps.tsx`).href);
-const { MadeAppsHome } = await import(pathToFileURL(`${root}/components/app/made-apps.tsx`).href);
-const { NewTab, TabBar, isReading } = await import(pathToFileURL(`${root}/components/app/panel-tabs.tsx`).href);
-const { footerPageOf } = await import(pathToFileURL(`${root}/components/app/sidebar-footer.tsx`).href);
+const H = await import(fileUrl("components/app/hosted-apps.tsx"));
+const { MadeAppsHome } = await import(fileUrl("components/app/made-apps.tsx"));
+const { NewTab, TabBar, isReading } = await import(fileUrl("components/app/panel-tabs.tsx"));
+const { footerPageOf } = await import(fileUrl("components/app/sidebar-footer.tsx"));
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -1042,7 +1045,7 @@ const posts = (from, path) => calls.slice(from).filter((c) => c.method !== "GET"
 
 /* Buying a domain and Your domains aren't offered on Published now (Cloudflare first, then one the user owns): their code
    stays, so the tests below look at it with every source shown, then the default is put back. */
-const SRC = await import(pathToFileURL(`${root}/components/app/app-settings.tsx`).href);
+const SRC = await import(fileUrl("components/app/app-settings.tsx"));
 SRC.domainSources.now = ["cloudflare", "own", "buy", "owned"];
 
 await test("Get a new domain: a search, a name picked with its price for its term and after, who it's registered to (filled from what Orgo has of the last one), then the exact charge in Orgo credits and what it renews for, and Buy, which sends that price; nothing bought before Buy; a new price shown to buy at again; once bought, it's checked until it's live", async () => {
@@ -1394,7 +1397,7 @@ await test("Its settings saved: only what changed; Roll back puts an earlier dep
 
 /* ---------------- Add a domain from the user's Cloudflare, and Set it in Cloudflare ---------------- */
 
-const AS = await import(pathToFileURL(`${root}/components/app/app-settings.tsx`).href);
+const AS = await import(fileUrl("components/app/app-settings.tsx"));
 const CF_Z = "7e".repeat(16);
 const CF_ZONES = {
   zones: [
@@ -1784,7 +1787,7 @@ await test("Every word of it plain: no dashes, never Orbit (a record's name like
 
 /* ---------------- One app, several sites; its end: Add a site, Remove one, Remove app ---------------- */
 
-const A = await import(pathToFileURL(`${root}/components/app/app-settings.tsx`).href);
+const A = await import(fileUrl("components/app/app-settings.tsx"));
 const SUITE_SITES = [
   { name: "suite", projectId: "p_suite", url: null, domain: "https://suite.example", serving: id("c3"), live: live("succeeded", id("c3"), { url: "https://suite.example" }) },
   { name: "suite-admin", projectId: "p_admin", url: null, domain: null, serving: id("b2"), live: live("failed", id("d4"), { error: "npm run build exited with 1" }) },
@@ -2314,8 +2317,8 @@ await test("Remove app: the domains Orgo kept on its computer said where the tab
 
 /* ---------------- Settings, Domains: the workspace's domains ---------------- */
 
-const W = await import(pathToFileURL(`${root}/components/app/workspace-domains.tsx`).href);
-const { Settings } = await import(pathToFileURL(`${root}/components/app/bops-app.tsx`).href);
+const W = await import(fileUrl("components/app/workspace-domains.tsx"));
+const { Settings } = await import(fileUrl("components/app/bops-app.tsx"));
 const BAKES_ID = "7d7d7d7d-1111-4222-8333-444455556666";
 const SHOP_ID = "5e1f2a3b-6c7d-4e8f-9a0b-1c2d3e4f5a6b";
 const OFF = { ...RENEWS, on: false, payer: null, state: "off" };
@@ -2697,7 +2700,7 @@ await test("Settings stays open while a domain is being bought: its Back, the si
 });
 
 await test("Your Apps in a workspace shared with the user: the apps as the owner gave them, Deploy and the rest at Write only, never variables, logs or buying", async () => {
-  const { SharedAppsPage, SHARED_APPS_WORDS, actLine } = await import(pathToFileURL(`${root}/components/app/shared-apps.tsx`).href);
+  const { SharedAppsPage, SHARED_APPS_WORDS, actLine } = await import(fileUrl("components/app/shared-apps.tsx"));
   const shopShared = {
     name: "shop",
     url: "https://shop.orgo.dev",
@@ -2770,7 +2773,7 @@ await test("Your Apps in a workspace shared with the user: the apps as the owner
 });
 
 await test("Your Apps shared with the user: each site's Preview, where their Deploy goes, its state and link (up top too); at Write its password with Copy, as the owner sees it, at Read who to ask; Go back on a Preview deploy only; an owner's Bops from before as it was", async () => {
-  const { SharedAppsPage } = await import(pathToFileURL(`${root}/components/app/shared-apps.tsx`).href);
+  const { SharedAppsPage } = await import(fileUrl("components/app/shared-apps.tsx"));
   const LINK = "https://k7p2qxm4wr3d.orgo.dev";
   const PASSWORD = "Mx4tR8q";
   // Published never went out (no domain yet): its Preview is all there is to open.
@@ -2839,7 +2842,7 @@ await test("Your Apps shared with the user: each site's Preview, where their Dep
 
 /* ---------------- Local, Staging and Prod, all on the app's computer ---------------- */
 
-const E = await import(pathToFileURL(`${root}/components/app/app-envs.tsx`).href);
+const E = await import(fileUrl("components/app/app-envs.tsx"));
 const STAGING = (extra = {}) => ({ projectId: "p_st", url: "https://k7p2qxm4wr3d.orgo.dev", label: "k7p2qxm4wr3d", serving: id("e5"), live: live("succeeded", id("e5"), { url: "https://k7p2qxm4wr3d.orgo.dev" }), ...extra });
 const LOCAL = { sites: { shop: { state: "running", port: 3000, devPort: 3000, command: "npm run dev", since: min(3), error: null, env: ["DEBUG"] } } };
 /** One environment's line (Local, Staging or Prod) in a piece of HTML. */
@@ -2939,7 +2942,7 @@ await test("more bots on one app: a Local line for each bot's copy, named for it
   assert.ok(!envsOf({ app: shopApp(), local: LOCAL }).includes("data-local-bot"), "one bot alone: no names, as before");
   assert.ok(!NO_DASHES.test(text(html)), "plain words");
   // Clicked: each line's acts name its bot; Open preview opens that bot's copy beside its chat.
-  const { OpenPreview } = await import(pathToFileURL(`${root}/components/app/panel-tabs.tsx`).href);
+  const { OpenPreview } = await import(fileUrl("components/app/panel-tabs.tsx"));
   routes = { "/api/hosted-apps/shop/local": { body: COPIES } };
   const asked = [];
   const m = await mount(h(OpenPreview.Provider, { value: async (...a) => (asked.push(a), {}) }, h(E.AppEnvs, { ws: "ws_copies", answer: { enabled: true }, app: shopApp(), sites: [shopApp()], local: COPIES, onLocal: noop, onChanged: noop })));
@@ -3132,7 +3135,7 @@ await test("its tab: the three lines under its title, a line pressed picks what 
 });
 
 await test("Each site's preview in a session of its own on this Mac (cookies don't go by port): the app's own site keeps the name it always had; on its screen, the screen it opened on", async () => {
-  const { previewPartition } = await import(pathToFileURL(`${root}/components/app/panel-tabs.tsx`).href);
+  const { previewPartition } = await import(fileUrl("components/app/panel-tabs.tsx"));
   assert.equal(previewPartition("u_1", "ws_main", "shop"), "persist:bops-preview-u_1-ws_main-shop", "as before");
   assert.equal(previewPartition("u_1", "ws_main", "shop", "shop"), "persist:bops-preview-u_1-ws_main-shop", "its own site: the same");
   assert.equal(previewPartition("u_1", "ws_main", "shop", "shop-admin"), "persist:bops-preview-u_1-ws_main-shop-shop_admin");
@@ -3147,7 +3150,7 @@ await test("Each site's preview in a session of its own on this Mac (cookies don
 });
 
 await test("Open preview: the app's preview beside its bot's chat (bops-app.tsx openPreview); when this Mac can't reach its computer, on its screen, said under the line; with no panel, on its computer's screen", async () => {
-  const { OpenPreview } = await import(pathToFileURL(`${root}/components/app/panel-tabs.tsx`).href);
+  const { OpenPreview } = await import(fileUrl("components/app/panel-tabs.tsx"));
   routes = { "/api/hosted-apps/shop/local": (url, init) => ({ body: { sites: { shop: { ...LOCAL.sites.shop } }, ...(JSON.parse(init.body).action === "open" ? { opened: true, display: 101 } : {}) } }) };
   const asked = [];
   const bots = [];
