@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Plain http is allowed because Bops on a home computer answers on http (http://100.x.y.z:3210 over
+  Tailscale, which encrypts the connection itself, or the home wifi). A Bops on the internet should be
+  reached over https (a VPS behind a reverse proxy with a certificate).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

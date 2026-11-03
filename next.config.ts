@@ -1,12 +1,21 @@
 import { readFileSync } from "node:fs";
+import { networkInterfaces } from "node:os";
 import { join } from "node:path";
 import type { NextConfig } from "next";
 
 // This app's version, built in: the server tells Bops Cloud which app is calling (lib/server/app-version.ts).
 const { version } = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8")) as { version: string };
 
+// The development server answers pages to this computer's own addresses too (a paired phone reaches it over
+// Tailscale or the home wifi, lib/server/remote.ts): Next blocks its dev files to other origins otherwise.
+const ownAddresses = Object.values(networkInterfaces())
+  .flat()
+  .filter((a) => !!a && a.family === "IPv4" && !a.internal)
+  .map((a) => a!.address);
+
 const nextConfig: NextConfig = {
   env: { BOPS_APP_VERSION: version },
+  allowedDevOrigins: ownAddresses,
   // The desktop app is the product; Next's floating dev badge sat on top of the sidebar footer.
   devIndicators: false,
   // Loaded by Node, not bundled: the AgentMail SDK lazily imports optional payment packages
