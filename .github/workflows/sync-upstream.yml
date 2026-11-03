@@ -1,0 +1,51 @@
+# Keeps this fork up with OrgoAI/bops: every Monday (or when you run it from the Actions tab) it merges
+# OrgoAI's main into a branch, and opens a pull request into windows-port for you to look over. When
+# their changes clash with this fork's, the pull request says so and you (or Claude) settle it there.
+name: Sync with OrgoAI
+
+on:
+  schedule:
+    - cron: "17 14 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    # Only in a fork: OrgoAI's own repository has nothing to sync with.
+    if: github.repository != 'OrgoAI/bops'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: windows-port
+          fetch-depth: 0
+      - name: Merge OrgoAI's main into a sync branch
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/OrgoAI/bops.git
+          git fetch upstream main
+          if git merge-base --is-ancestor upstream/main HEAD; then echo "up to date"; echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git checkout -B sync/orgo-main
+          if git merge --no-edit upstream/main; then echo "clean=true" >> "$GITHUB_OUTPUT"; else
+            git merge --abort
+            git checkout -B sync/orgo-main upstream/main
+            echo "clean=false" >> "$GITHUB_OUTPUT"
+          fi
+          git push -f origin sync/orgo-main
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+      - name: Open a pull request
+        if: steps.merge.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ steps.merge.outputs.clean }}" = "true" ]; then
+            body="OrgoAI's latest main, merged into windows-port with no clashes. Look it over, then merge."
+          else
+            body="OrgoAI's latest main clashes with this fork's changes. This branch is their main as it is: merge it into windows-port by hand (npm run sync:upstream on your PC shows where it clashes)."
+          fi
+          gh pr create --base windows-port --head sync/orgo-main --title "Sync with OrgoAI ($(date +%Y-%m-%d))" --body "$body" || gh pr edit sync/orgo-main --body "$body"

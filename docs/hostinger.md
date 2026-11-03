@@ -4,6 +4,19 @@ Bops can run on a Linux server (a Hostinger **VPS**, KVM plan), always on, so yo
 
 What you get on a server: chat, your bots and their cloud computers (Orgo), routines, Slack/Telegram/Discord, email and phone. What you don't: bots working on your own PC (there is no PC there). The desktop app on your PC and the server are separate Bops; pick one as the one your phone uses.
 
+## The quick way
+
+On the VPS, as root (replace the domain and your fork's address):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/<you>/bops/windows-port/scripts/vps-setup.sh -o vps-setup.sh
+sudo bash vps-setup.sh bops.example.com https://github.com/<you>/bops.git
+```
+
+It does every step below and prints a pairing code for your phone. Then add your keys to `/home/bops/bops/.env.local` and `systemctl restart bops`. Run it again any time to update.
+
+The steps it takes, if you'd rather do them by hand:
+
 ## 1. The server
 
 Ubuntu 24.04 on the VPS, then as root:

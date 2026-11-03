@@ -18,7 +18,8 @@
     "setup:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-windows.ps1",
     "app:build:win": "next build && node -e \"require('fs').writeFileSync('desktop/repo.json', JSON.stringify({ path: process.cwd(), built: true }))\" && electron-builder --win --dir",
     "app:dev:win": "node -e \"require('fs').writeFileSync('desktop/repo.json', JSON.stringify({ path: process.cwd() }))\" && electron-builder --win --dir",
-    "modules:example": "node scripts/modules-example.cjs"
+    "modules:example": "node scripts/modules-example.cjs",
+    "sync:upstream": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-upstream.ps1"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
