@@ -492,14 +492,16 @@ await test("an imported Codex plan is refused at the execution boundary outside 
     delete process.env.BOPS_SELF_HOSTED;
     assert.throws(() => C.agentNow({ sessionId: task.id, agent: run, name: "Codex" }), /self-hosted owner/);
     assert.ok(!C.alsoSpec(bot("rook")).includes("codex:plan"));
-    const sentBefore = commands.length;
+    // Only what reaches Rook's computer counts: an earlier test's cleanup (bot-clear on another computer) may still land meanwhile.
+    const toRook = () => commands.filter((c) => c.computer === "pc-rook").length;
+    const sentBefore = toRook();
     const shell = { botId: "rook", computerId: "pc-rook", display: 100, agent: run, bot: bot("rook") };
     await assert.rejects(C.openShell(shell), /self-hosted owner/);
-    assert.equal(commands.length, sentBefore, "denied before remote prepare or write");
+    assert.equal(toRook(), sentBefore, "denied before remote prepare or write");
     process.env.BOPS_SELF_HOSTED = "1";
     S.update((s) => void (s.shared = { ownerName: "Maya" }));
     await assert.rejects(C.openShell(shell), /self-hosted owner/);
-    assert.equal(commands.length, sentBefore);
+    assert.equal(toRook(), sentBefore);
     assert.throws(() => C.agentNow({ sessionId: task.id, agent: run, name: "Codex" }), /self-hosted owner/);
   } finally {
     process.env.BOPS_SELF_HOSTED = "1";
@@ -526,6 +528,16 @@ await test("jobs: a thread nobody picked an agent for goes to the agent set for 
   assert.equal(A.gateRoute(zai), "zai-coding");
   assert.equal(A.agentKeyName(zai), "ZAI_API_KEY");
   assert.ok(A.modelOk("opencode", "zai/glm-5.2") && A.modelOk("opencode", "zai-coding/glm-9") && !A.modelOk("opencode", "zaix/glm"));
+  // The GLM Coding Plan in the China region (open.bigmodel.cn): a route and a key of its own.
+  const cn = { id: "ag_zaicncode1", kind: "opencode", pays: "key", model: "zai-coding-cn/glm-5.3", jobs: ["coding"] };
+  assert.equal(A.gateRoute(cn), "zai-coding-cn");
+  assert.equal(A.agentKeyName(cn), "ZAI_CODING_CN_API_KEY");
+  assert.equal(A.ROUTE_NAMES["zai-coding-cn"], "Z.ai Coding Plan (China)");
+  assert.equal(A.keyVendor(cn), "Z.ai Coding Plan (China)");
+  assert.ok(A.modelOk("opencode", "zai-coding-cn/glm-5.3") && A.modelOk("opencode", "zai-coding-cn/glm-5.2") && A.modelOk("opencode", "zai-coding-cn/glm-9"));
+  assert.ok(A.modelOk("dsh", "zai-coding-cn/glm-5.3") && !A.modelOk("opencode", "zai-coding-cnx/glm-5.3"));
+  assert.deepEqual(A.modelsFor("opencode").filter((m) => m.id.startsWith("zai-coding-cn/")).map((m) => m.id), ["zai-coding-cn/glm-5.3", "zai-coding-cn/glm-5.2"]);
+  assert.deepEqual(A.cleanAi({ agents: [{ id: "bops", kind: "bops", pays: "credit" }, cn], default: "bops" }).agents[1], cn, "a profile keeps a China Coding Plan agent");
 });
 
 await test("your LLMs (config/llms.yaml): a bot with no AI of its own starts on the starter; each shows as a model; a pick still wins", () => {
@@ -643,6 +655,8 @@ await test("DeepSeek Harness: a profile keeps it (on a key, by its model, severa
   assert.equal(A.agentKeyName(dsh), "DEEPSEEK_API_KEY");
   assert.equal(A.gateRoute({ kind: "dsh", pays: "key", model: "anthropic/claude-sonnet-5-5" }), "anthropic");
   assert.equal(A.agentKeyName({ kind: "dsh", pays: "key", model: "zai-coding/glm-5.3" }), "ZAI_API_KEY");
+  assert.equal(A.gateRoute({ kind: "dsh", pays: "key", model: "zai-coding-cn/glm-5.3" }), "zai-coding-cn");
+  assert.equal(A.agentKeyName({ kind: "dsh", pays: "key", model: "zai-coding-cn/glm-5.3" }), "ZAI_CODING_CN_API_KEY");
   // Your LLMs (config/llms.yaml) are its models too, after DeepSeek's own: its default stays DeepSeek Chat.
   A.setLlms([{ name: "Claude Sonnet 5.5", provider: "anthropic", model: "claude-sonnet-5-5", starter: true }, { name: "Kimi", provider: "openrouter", model: "moonshotai/kimi-k3" }]);
   try {
@@ -749,6 +763,9 @@ await test("DeepSeek Harness's stop words: its key, its limit, its provider down
   assert.equal(C.stoppedWords(r, "down", "Connection error.", "x"), "DeepSeek isn't answering right now. I can try again, or finish this on Bops agent, on your credit.\n\nOptions: Try again | Finish on Bops agent");
   assert.match(C.stoppedWords({ ...r, model: "deepseek/deepseek-reasoner" }, "model", "", "x", undefined, "Dee"), /^Your DeepSeek key can't use DeepSeek Reasoner\. Pick another model for new threads in Dee's profile\./);
   assert.equal(C.stoppedWords({ ...r, model: "zai-coding/glm-5.3" }, "down", "", "x").split(" isn't")[0], "Z.ai Coding Plan");
+  const cnDown = C.stoppedWords({ ...r, model: "zai-coding-cn/glm-5.3" }, "down", "", "x");
+  assert.equal(cnDown.split(" isn't")[0], "Z.ai Coding Plan (China)");
+  plain(cnDown, "a stop's words");
   for (const w of [auth, C.stoppedWords(r, "limit", "", "x"), C.stoppedWords(r, "down", "", "x")]) plain(w, "a stop's words");
 });
 

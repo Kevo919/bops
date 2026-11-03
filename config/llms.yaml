@@ -4,24 +4,42 @@
 #
 #  New bots start on the one marked  starter: true  (Claude, to begin with).
 #
-#  TO ADD AN LLM
+#  THE EASY WAY: Settings → This Mac → Models (the same on Windows). Add, change or remove a model
+#  there, pick what each one is for, and it saves here (keeping these notes) and
+#  works at once, with no restart. (This file is part of Bops' code, so those
+#  changes show up in git as local edits.)
+#
+#  TO ADD AN LLM BY HAND
 #    1. Copy one of the blocks below (from "- name:" down), paste it at the end.
 #    2. Change name, provider and model.
 #    3. Optional: use_for, the kinds of work that go to it when you don't pick one:
 #         coding, planning, thinking, research, writing, browsing
-#    4. Save this file, then restart Bops (tray icon by the clock → Quit Bops, then open it again).
-#    5. Add that provider's key in Bops (Keys → Add a key), under the key name in the list below.
+#       Each job goes to one LLM: if two have it, the first one in the list gets it.
+#    4. Optional: run_by, the agent that runs it for your bots' tasks:
+#         opencode            OpenCode (what runs it when you leave run_by out)
+#         dsh                 DeepSeek Harness
+#       (Claude Code and Codex run on an account you connect in a bot's AI section.
+#        Ollama runs chats only, so it takes no use_for, run_by or starter.)
+#    5. Optional: chat_default: true  on one of them ("Default for new chats"): chats
+#       made from then on start on it (when its key is set). Chats you already have keep
+#       their model, and you can still pick Auto (OpenAI) in any chat.
+#    6. Save this file, then restart Bops (tray icon by the clock → Quit Bops, then open it again).
+#    7. Add that provider's key in Bops (Keys → Add a key), under the key name in the list below.
 #       Never paste a key into this file.
 #
 #  PROVIDERS (what to write after "provider:", and the key it needs)
 #    anthropic    Claude                          ANTHROPIC_API_KEY
 #    openai       OpenAI GPT                      OPENAI_API_KEY
 #    zai-coding   Z.ai GLM, on your Coding Plan   ZAI_API_KEY
+#    zai-coding-cn  Z.ai GLM, on your Coding Plan, China region (open.bigmodel.cn)
+#                                                 ZAI_CODING_CN_API_KEY
 #    zai          Z.ai GLM, pay as you go         ZAI_API_KEY
 #    deepseek     DeepSeek                        DEEPSEEK_API_KEY
 #    openrouter   OpenRouter (hundreds of models; model looks like "deepseek/deepseek-chat")
 #                                                 OPENROUTER_API_KEY
 #    deepinfra    DeepInfra                       DEEPINFRA_API_KEY
+#    ollama       Ollama, free, on your own server (chats only; model looks like "qwen2.5:3b")
+#                                                 no key: set OLLAMA_BASE_URL in .env.local
 #
 #  WHERE THEY RUN: on your bots' cloud computers, through OpenCode. They need
 #  Settings → Modules → Agent harnesses turned on. A chat can run on them too:
@@ -55,6 +73,24 @@ llms:
   #   provider: deepseek
   #   model: deepseek-chat
   #
+  # Through OpenRouter, one key for hundreds of models (the model is OpenRouter's id).
+  # - name: DeepSeek V4 Pro (OpenRouter)
+  #   provider: openrouter
+  #   model: deepseek/deepseek-v4-pro
+  #   use_for: [research]
+  #
+  # - name: Qwen3 Coder Next (OpenRouter)
+  #   provider: openrouter
+  #   model: qwen/qwen3-coder-next
+  #   use_for: [coding]
+  #   run_by: dsh
+  #
   # - name: GPT 6.1 Sol
   #   provider: openai
   #   model: gpt-6.1-sol
+  #
+  # Free, on your own server: Ollama. Chats only (pick it by a chat's Send button), not bots' agents.
+  # Pull the model there first (ollama pull qwen2.5:3b), and set OLLAMA_BASE_URL in .env.local.
+  # - name: Qwen 2.5 3B (local)
+  #   provider: ollama
+  #   model: qwen2.5:3b

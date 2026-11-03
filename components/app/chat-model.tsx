@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import type { AppState, Chat } from "@/lib/types";
-import { chatKeyName, chatModels, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
+import { chatKeyName, chatModels, chatModelShown, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
 import type { AgentRoute } from "@/lib/agents";
 import { post } from "./ui";
+// The default for new chats (Settings, Models), named in the box's hint.
+import { chatDefault } from "@/lib/chat-models";
 
 /**
  * The model a chat's replies run on (Chat.model), picked in its message box: Auto (OpenAI, as before) first, then
@@ -14,18 +16,21 @@ import { post } from "./ui";
 export function ChatModelPick({ state, chat: c, onError }: { state: AppState; chat: Chat; onError?: (line: string | null) => void }) {
   const [saving, setSaving] = useState(false);
   if (state.shared) return null;
-  const models = chatModels();
   const keys = state.chatKeys ?? {};
   const value = c.model ?? "";
+  // Ollama's models only where it's set up; the chat's own pick stays shown either way.
+  const models = chatModels().filter((m) => m.id === value || chatModelShown(m, keys));
   const groups = new Map<AgentRoute, ChatModel[]>();
   for (const m of models) groups.set(m.provider, [...(groups.get(m.provider) ?? []), m]);
   // One no longer in the list (taken out of config/llms.yaml): still shown, so the box says what the chat is on.
   const gone = value && !models.some((m) => m.id === value) ? value : null;
   const current = models.find((m) => m.id === value);
+  // What new chats start on (Settings, Models), for the box's hint; this chat's own pick, or Auto, is what it runs on.
+  const fallback = chatDefault(keys);
   return (
     <select
       aria-label="Model for this chat"
-      title={current ? `Replies in this chat run on ${current.name}` : "Replies in this chat run on Auto (OpenAI)"}
+      title={`${current ? `Replies in this chat run on ${current.name}` : "Replies in this chat run on Auto (OpenAI)"}${fallback ? `. Default for new chats: ${fallback.name}` : ""}`}
       value={value}
       disabled={saving}
       onChange={async (e) => {
@@ -63,5 +68,6 @@ export function ChatModelPick({ state, chat: c, onError }: { state: AppState; ch
 export function chatModelHint(state: Pick<AppState, "chatKeys" | "shared">, c: Pick<Chat, "model">): string | null {
   const p = providerOf(c.model);
   if (!p || state.shared || state.chatKeys?.[p]) return null;
+  if (p === "ollama") return `Ollama isn't set up on this server: add OLLAMA_BASE_URL (its address, like http://127.0.0.1:11434/v1) to .env.local, then restart Bops.`;
   return `${providerName(p)} has no key on this server yet: add ${chatKeyName(p)} to .env.local, then restart Bops.`;
 }

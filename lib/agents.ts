@@ -11,7 +11,12 @@ import { BRAINS_ON, planName, signInOn, threadRunner, workBot, workspaceOf, type
  * its folder on the bot's computer (vm/bin/bops-brain), each bot's agents with their own settings there.
  */
 
-export type AgentRoute = "anthropic" | "openai" | "deepinfra" | "zai" | "zai-coding" | "deepseek" | "openrouter";
+export type AgentRoute = "anthropic" | "openai" | "deepinfra" | "zai" | "zai-coding" | "zai-coding-cn" | "deepseek" | "openrouter" | "ollama";
+/**
+ * Providers a chat can run on but a bot's agents can't: Ollama runs on this server (OLLAMA_BASE_URL), out of
+ * reach of a bot's cloud computer, so its models aren't offered to OpenCode or DeepSeek Harness.
+ */
+export const CHAT_ONLY: ReadonlySet<AgentRoute> = new Set<AgentRoute>(["ollama"]);
 
 /** What each kind of agent is. `soon`: shown, dimmed, with why it isn't in Bops yet. */
 export const AGENTS: Record<AgentKind, { name: string; maker: string; pays: AgentPays[]; soon?: string }> = {
@@ -49,12 +54,15 @@ export const MODELS: { id: string; kind: AgentKind; label: string; short: string
   { id: "openai/gpt-6.1-sol", kind: "opencode", label: "GPT 6.1 Sol", short: "GPT 6.1 Sol" },
   { id: "zai-coding/glm-5.3", kind: "opencode", label: "GLM 5.3 (Z.ai Coding Plan)", short: "GLM 5.3", note: "Your Z.ai Coding Plan" },
   { id: "zai/glm-5.2", kind: "opencode", label: "GLM 5.2 (Z.ai)", short: "GLM 5.2", note: "Z.ai, pay as you go" },
+  { id: "zai-coding-cn/glm-5.3", kind: "opencode", label: "GLM 5.3 (Z.ai Coding Plan, China)", short: "GLM 5.3", note: "Your Z.ai Coding Plan, China region" },
+  { id: "zai-coding-cn/glm-5.2", kind: "opencode", label: "GLM 5.2 (Z.ai Coding Plan, China)", short: "GLM 5.2", note: "Your Z.ai Coding Plan, China region" },
   // DeepSeek Harness is DeepSeek's own agent, so it starts on DeepSeek; it runs the other providers' models too, on their keys.
   { id: "deepseek/deepseek-chat", kind: "dsh", label: "DeepSeek Chat", short: "DeepSeek Chat" },
   { id: "deepseek/deepseek-reasoner", kind: "dsh", label: "DeepSeek Reasoner", short: "DeepSeek Reasoner", note: "Thinks before it answers" },
   { id: "anthropic/claude-sonnet-5-5", kind: "dsh", label: "Claude Sonnet 5.5", short: "Sonnet 5.5" },
   { id: "openai/gpt-6.1-sol", kind: "dsh", label: "GPT 6.1 Sol", short: "GPT 6.1 Sol" },
   { id: "zai-coding/glm-5.3", kind: "dsh", label: "GLM 5.3 (Z.ai Coding Plan)", short: "GLM 5.3", note: "Your Z.ai Coding Plan" },
+  { id: "zai-coding-cn/glm-5.3", kind: "dsh", label: "GLM 5.3 (Z.ai Coding Plan, China)", short: "GLM 5.3", note: "Your Z.ai Coding Plan, China region" },
 ];
 
 /* ---------------- Jobs ---------------- */
@@ -104,12 +112,14 @@ export const cleanJobs = (jobs: unknown): Job[] | undefined => {
   return out.length ? out : undefined;
 };
 /** Any other model OpenCode (or DeepSeek Harness) can run on a key of these providers ("Other model" in its editor). */
-export const OPENCODE_OTHER = /^(anthropic|openai|deepinfra|zai|zai-coding|deepseek|openrouter)\/[A-Za-z0-9._:/-]{1,120}$/;
+export const OPENCODE_OTHER = /^(anthropic|openai|deepinfra|zai|zai-coding|zai-coding-cn|deepseek|openrouter)\/[A-Za-z0-9._:/-]{1,120}$/;
 
 /** The Vault key each provider's agents run on (lib/server/keys.ts KEY_PROVIDERS). */
 // Z.ai: one key for both. "zai-coding" is its GLM Coding Plan (the plan's own address and allowance), "zai" pay as you go.
-export const ROUTE_KEYS: Record<AgentRoute, string> = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", deepinfra: "DEEPINFRA_API_KEY", zai: "ZAI_API_KEY", "zai-coding": "ZAI_API_KEY", deepseek: "DEEPSEEK_API_KEY", openrouter: "OPENROUTER_API_KEY" };
-export const ROUTE_NAMES: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", deepinfra: "DeepInfra", zai: "Z.ai", "zai-coding": "Z.ai Coding Plan", deepseek: "DeepSeek", openrouter: "OpenRouter" };
+// "zai-coding-cn" is the GLM Coding Plan in the China region (open.bigmodel.cn): an account and key of its own.
+// Ollama: no key, its address. OLLAMA_BASE_URL being set is what makes it show (OLLAMA_API_KEY, if any, is sent as Bearer).
+export const ROUTE_KEYS: Record<AgentRoute, string> = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", deepinfra: "DEEPINFRA_API_KEY", zai: "ZAI_API_KEY", "zai-coding": "ZAI_API_KEY", "zai-coding-cn": "ZAI_CODING_CN_API_KEY", deepseek: "DEEPSEEK_API_KEY", openrouter: "OPENROUTER_API_KEY", ollama: "OLLAMA_BASE_URL" };
+export const ROUTE_NAMES: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", deepinfra: "DeepInfra", zai: "Z.ai", "zai-coding": "Z.ai Coding Plan", "zai-coding-cn": "Z.ai Coding Plan (China)", deepseek: "DeepSeek", openrouter: "OpenRouter", ollama: "Ollama (free, local)" };
 
 /** Bops agent: every bot has it, always first, and it is every thread's fallback. */
 export const BOPS_AGENT: BotAgent = { id: "bops", kind: "bops", pays: "credit" };
@@ -128,7 +138,13 @@ const AGENT_ID = /^ag_[A-Za-z0-9]{10}$/;
  * state (AppState.llms), and both keep it here. They run on OpenCode, on the provider's key from the Vault, and
  * show as DeepSeek Harness's models too.
  */
-export type Llm = { name: string; provider: AgentRoute; model: string; starter?: boolean; useFor?: Job[] };
+export type Llm = { name: string; provider: AgentRoute; model: string; starter?: boolean; useFor?: Job[]; runBy?: RunBy; chatDefault?: boolean };
+/**
+ * The agents that may run an LLM for bots' tasks (config/llms.yaml run_by; config/llms.cjs RUN_BY says which
+ * providers each runs). OpenCode when it says none. Claude Code and Codex run on an account connected to a bot.
+ */
+export const RUN_BY_KINDS = ["opencode", "dsh"] as const;
+export type RunBy = (typeof RUN_BY_KINDS)[number];
 const g = globalThis as unknown as { __bopsLlms?: Llm[] };
 export const llms = (): Llm[] => g.__bopsLlms ?? [];
 const LLM_PROVIDERS = new Set<string>(Object.keys(ROUTE_KEYS));
@@ -141,20 +157,35 @@ export function setLlms(list: unknown) {
       const l = x as Partial<Llm>;
       if (typeof l.provider !== "string" || !LLM_PROVIDERS.has(l.provider) || typeof l.model !== "string" || !/^[A-Za-z0-9._:/-]{1,120}$/.test(l.model)) continue;
       const jobs = cleanJobs(l.useFor);
-      out.push({ name: typeof l.name === "string" && l.name.trim() ? l.name.trim().slice(0, 60) : l.model, provider: l.provider as AgentRoute, model: l.model, ...(l.starter === true && !out.some((y) => y.starter) ? { starter: true } : {}), ...(jobs ? { useFor: jobs } : {}) });
+      const runBy = (RUN_BY_KINDS as readonly string[]).includes(l.runBy as string) && l.runBy !== "opencode" ? l.runBy : undefined;
+      out.push({
+        name: typeof l.name === "string" && l.name.trim() ? l.name.trim().slice(0, 60) : l.model,
+        provider: l.provider as AgentRoute,
+        model: l.model,
+        ...(l.starter === true && !out.some((y) => y.starter) ? { starter: true } : {}),
+        ...(jobs ? { useFor: jobs } : {}),
+        ...(runBy ? { runBy } : {}),
+        ...(l.chatDefault === true && !out.some((y) => y.chatDefault) ? { chatDefault: true } : {}),
+      });
     }
   g.__bopsLlms = out;
 }
 const llmModel = (l: Llm) => `${l.provider}/${l.model}`;
 /** The LLMs as models of OpenCode and DeepSeek Harness (and the Claude ones of Claude Code too), the starter first. */
 const llmModels = (kind: AgentKind): (typeof MODELS)[number][] => {
-  const list = [...llms()].sort((a, b) => Number(!!b.starter) - Number(!!a.starter));
+  const list = llms().filter((l) => !CHAT_ONLY.has(l.provider)).sort((a, b) => Number(!!b.starter) - Number(!!a.starter));
   if (anyModel(kind)) return list.map((l) => ({ id: llmModel(l), kind, label: l.name, short: l.name }));
   if (kind === "claude") return list.filter((l) => l.provider === "anthropic").map((l) => ({ id: l.model, kind, label: l.name, short: l.name }));
   return [];
 };
-/** The agent an LLM is in a bot with no AI profile of its own: the same id on every bot, from its provider and model. */
-const llmAgent = (l: Llm): BotAgent => ({ id: agentIdFor("llm", llmModel(l)), kind: "opencode", pays: "key", model: llmModel(l), ...(l.useFor ? { jobs: l.useFor } : {}) });
+/**
+ * The agent an LLM is in a bot with no AI profile of its own: the same id on every bot, from its provider and model
+ * (and the agent that runs it, its run_by: OpenCode unless it says DeepSeek Harness).
+ */
+export const llmAgent = (l: Llm): BotAgent => {
+  const kind: AgentKind = l.runBy === "dsh" ? "dsh" : "opencode";
+  return { id: agentIdFor("llm", kind === "opencode" ? llmModel(l) : `${kind}:${llmModel(l)}`), kind, pays: "key", model: llmModel(l), ...(l.useFor ? { jobs: l.useFor } : {}) };
+};
 /**
  * The AI a bot with no profile of its own starts on, from config/llms.yaml: Bops agent, the starter as its
  * Default, and each LLM set to take some jobs. Undefined without brains, or with no starter and none with jobs:
@@ -162,7 +193,7 @@ const llmAgent = (l: Llm): BotAgent => ({ id: agentIdFor("llm", llmModel(l)), ki
  */
 export function starterAi(): BotAi | undefined {
   if (!BRAINS_ON) return undefined;
-  const list = llms().filter((l) => l.starter || l.useFor?.length).slice(0, MAX_AGENTS - 1);
+  const list = llms().filter((l) => !CHAT_ONLY.has(l.provider) && (l.starter || l.useFor?.length)).slice(0, MAX_AGENTS - 1);
   if (!list.length) return undefined;
   const starter = list.find((l) => l.starter);
   return { agents: [BOPS_AGENT, ...list.map(llmAgent)], default: starter ? llmAgent(starter).id : "bops" };

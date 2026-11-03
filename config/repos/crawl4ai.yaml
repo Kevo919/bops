@@ -1,0 +1,46 @@
+id: crawl4ai
+name: Crawl4AI
+repo: unclecode/crawl4ai
+url: https://github.com/unclecode/crawl4ai
+license: "custom: Apache-2.0 plus an attribution requirement"
+license_note: >-
+  The LICENSE adds an "Attribution Requirement" to Apache-2.0: any distribution or public use must
+  credit "UncleCode ... as part of the Crawl4AI project" in a NOTICE/README, About page or CLI help.
+what: A web crawler and scraper that turns pages into clean Markdown for LLMs, driven by a headless Chromium.
+good_for: crawling pages into Markdown
+stack: [python, playwright]
+requirements:
+  python: ">=3.10"
+  other:
+    - "Playwright Chromium, installed by crawl4ai-setup (a fresh Ubuntu may need python -m playwright install --with-deps chromium)"
+keys_optional:
+  - name: OPENAI_API_KEY
+    for: LLM extraction and crwl -q questions (any LiteLLM provider key works)
+keys_required: []
+env:
+  CRAWL4AI_NO_CLOUD_NOTICE: "1"
+clone: git clone --depth 1 https://github.com/unclecode/crawl4ai.git crawl4ai
+install:
+  - python3 -m venv .venv
+  - .venv/bin/pip install .
+  - .venv/bin/crawl4ai-setup
+run: .venv/bin/crwl crawl https://example.com -o markdown
+kind: cli
+health:
+  cmd: .venv/bin/crwl --help
+  expect_exit: 0
+fits_bot_computer: true
+fits_reason: Pip install plus a Playwright Chromium download (734 MB venv, browser cached under ~/.cache/ms-playwright); crawls work without keys.
+verified:
+  date: "2026-11-03"
+  by: claude-agent (Linux sandbox, Python 3.13.18)
+  commit: 888299f
+  steps:
+    clone: pass
+    install: "pass: pip install . and crawl4ai-setup ('Post-installation setup completed!'), exit 0"
+    run: "pass: crwl crawl https://example.com -o markdown printed the Example Domain page as Markdown, exit 0"
+    health: "pass: crwl --help exit 0"
+  notes: >-
+    crawl4ai-setup also creates ~/.crawl4ai/crawl4ai.db. The CLI prints a Crawl4AI Cloud banner unless
+    CRAWL4AI_NO_CLOUD_NOTICE=1, which the recipe sets. The README installs from PyPI (pip install -U
+    crawl4ai); this recipe installs from the clone.

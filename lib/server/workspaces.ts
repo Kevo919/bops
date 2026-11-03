@@ -8,6 +8,7 @@ import { freeBotId } from "./bots";
 import { getState, id, stateEpoch, stateReady, stateTooNew, update } from "./store";
 import { onRunner } from "./persist";
 import { ensureInbox } from "./mail";
+import { newChatModel } from "./chat-default";
 import {
   bindProject,
   bopsAppsGate,
@@ -100,7 +101,8 @@ export async function createWorkspace(name: string): Promise<CreateResult> {
       ...(made ? { orgoProjectId: made.id, orgoName: made.name, ...(made.updatedAt ? { orgoUpdatedAt: made.updatedAt } : {}) } : {}),
     });
     s.bots.push(main);
-    s.chats.push({ id: botChatId(mainId), kind: "bot", botIds: [mainId], createdAt: Date.now(), typing: [], workspaceId: ws });
+    const model = newChatModel();
+    s.chats.push({ id: botChatId(mainId), kind: "bot", botIds: [mainId], createdAt: Date.now(), typing: [], workspaceId: ws, ...(model ? { model } : {}) });
     s.workspace = ws;
   });
   void ensureInbox(mainId).catch((e: Error) => console.warn(`[mail] inbox for ${mainId}: ${e.message}`));
