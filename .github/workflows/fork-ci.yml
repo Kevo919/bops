@@ -56,6 +56,8 @@ jobs:
         run: node --conditions=react-server scripts/test-cli-agents.mjs
       - name: Windows fuse and authenticated shutdown tests
         run: node scripts/test-windows-fuses.mjs
+      - name: Agents API Windows path serialization tests
+        run: node scripts/test-agent-api-path.mjs
       - name: Config tests
         run: node scripts/test-config.mjs
       - name: Chat provider tests
