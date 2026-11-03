@@ -367,7 +367,9 @@ const toolsChecked = new Map<string, string>();
 /** Put the brain scripts (vm/bin/bops-brain, bops-brain-browser, bops-agent, bops-ai-gate, bops-exec) on a computer that's missing them or behind, as sessions.ts does the screen tools. */
 export async function ensureBrainTools(computerId: string) {
   const files = BRAIN_TOOLS.map(([src, dst]) => {
-    const body = readFileSync(join(/*turbopackIgnore: true*/ process.cwd(), src));
+    // These are UTF-8 Linux scripts. Windows checkouts can have CRLF, including
+    // the shebang; normalize before hashing so broken remote copies are replaced.
+    const body = Buffer.from(readFileSync(join(/*turbopackIgnore: true*/ process.cwd(), src), "utf8").replace(/\r\n/g, "\n"));
     return { dst, body, md5: createHash("md5").update(body).digest("hex") };
   });
   const want = files.map((f) => f.md5).join(" ");
