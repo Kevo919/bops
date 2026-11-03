@@ -128,4 +128,3 @@ assert.deepEqual(calls, [{ path: "/api/bots/ai", method: "POST", body: { botId: 
 await m.done();
 console.log("ok Coding Plan disconnect removes only its selected agent, never the shared key");
 console.log("subscriptions ui: 5 passed");
-
