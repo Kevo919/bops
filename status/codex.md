@@ -1,8 +1,8 @@
 # Status: codex
-**On:** Task9 CI live verification: draft PR #6; deliberate failing-test proof draft PR #7 (never merge).
-**Done:** Required workflow running on GitHub; npm ci local passed (934 packages), next typegen and tsc exit0; 15 config tests PASS. PR1/2 review fixes pushed and tested.
-**Next:** Capture clean workflow success and intentional Config tests failure; close #7, update #6 Verified/Not verified; then Windows smoke task10. Read-only task10 preflight while runners work.
-**Blockers:** Local pre-existing bot-ai harness fails Windows temp cleanup EPERM after assertions, CLI-agent harness fails C:/C:/ path resolution. Workflow uses Linux; awaiting its authoritative output. Local lint still running. No production edits to bypass failures.
-**Needs Kevin:** Nothing currently; lead/Kevin controls merge policy.
-**Updated (UTC):** 2026-11-03T05:54:51.8369202Z
+**On:** Task10 Windows smoke implementation/preflight.
+**Done:** Task9 draft PR #6 implemented/proven: Fork CI run41586435327 both jobs SUCCESS; negative-control #7 Config tests FAIL as intended, #7 closed. All required steps ran. PR1/2 fixes complete and pushed.
+**Next:** Task10 then11,12,7,13,14. Existing Bops session will be quit through tray before smoke and restarted afterward as authorized. Smoke itself must reject preexisting sessions and pairings.
+**Blockers:** #6 remains DRAFT because separate existing CI whole-history secret scan reports 3 findings (run41586435317); not bypassed. Needs lead triage. Local harness Windows EPERM / C:/C:/ issues documented; Linux tests all pass.
+**Needs Kevin:** No implementation action currently. Merge policy/secret-history owner decisions go through lead.
+**Updated (UTC):** 2026-11-03T05:57:35.8167726Z
 **Read through:** 2026-11-03-0600-lead-to-all-windows-port-bb1b244.md
