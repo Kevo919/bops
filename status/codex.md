@@ -1,24 +1,17 @@
 # Codex status
+Updated 2026-11-03T21:06:37.1588180Z. Kevin explicitly authorized Codex to merge/deploy while lead offline. Build IN PROGRESS; hourly schedule active.
 
-Updated 2026-11-03T20:32:59.9576757Z. Hourly automation bops-hourly-build-check active; run codex-heartbeat-20261103-2027 checked board fe7838e. Build IN PROGRESS; lead alone merges.
+## Merged and deployed
+PR46 Models refresh and PR47 Windows cwd fix merged. PC checkout0d9eea3 production build passed, app started, healthbuild matches. Dirty config/llms.yaml hash preserved. VPS also built0d9eea3, systemdactive and health200; original dirty package-lock preserved. First VPSbuild failed because backup output inside scan root; restored priorbuild, moved owned backups outside repo, retrycompiled and completed. No other VPSservices changed.
 
-## Ready now
-- Models refresh PR46 https://github.com/Kevo919/bops/pull/46 headfe78a9c. Successful model saves now invalidate state version and refresh existing chat pickers via sharedpost helper. Fourfiles only; config/llms.cjs and local modeldata untouched. Route12/renderedUI9/actualheadlessEdge3 PASS, typegen+tscPASS, lint0errors14warnings. BothCI41705547826/Fork41705548153 PASS, independentreviewclear. MarkedREADY. Browser used realcomponents with syntheticAPI; no productionlogin/provider/config edits. Screenshots/evidence in C:/Users/MBV3n/bops-models-refresh/.scratch/models-browser/. Ownedfixture andEdge closed; ownheavylockreleased.
-- PR37 subscription followup and PR33 installer followup remainopen, unchangedheads, ready forleadreview. Prior evidence and limits remain in PRs. No repeated installedapp/inspector probe after prior policy blocks.
+## Merged, next PC deployment
+PR33 installer followups, PR37 subscription followups, PR48 executor lifecycle are merged, all current CI green. PR37 legacybrainDISPLAY assertion failedonce and passedunchangedrerun, rootcauseunproven. PR48 7focusedtests andindependentreviewpass; monitors lateexecutor exits and cancels turns, no provenreadinesssignal.
 
-## Next
-Respond to lead review of46/37/33. Lead presets/accounts builders own broader Models changes; refresh patch is additive and small. Dockerrecipes35-37 remain unrun due lowRAM window (2.1GiB atstart, daemon previouslystopped). Asklead for window alreadyposted; neverstopKevinapp/foreignresources. Currentlead HANDOVER/PROGRESS/LOG read; realchat success and composerfix live reported bylead, not retested here.
+## Current work
+PR49 Windows identity implemented, independentreviewclear, latestbase merge/CI pending. It uses actualserverplatform and Windows-specific taskinstructions, preservesusertext/macOS. DeployPC aftergreen then verifyvisiblePC labels. Runtimeoriginaltaskretryclearedimmediate400 butafter~19minreturned500; underlyingexecutorstartfailure stillnotproven. FullDeepSeekintegration NOT complete.
 
-## Verification/handoff
-Freshnative redacted gitleaks8.30.1 --all afterfetchallforkbranches:615commits,zero findings. No newexclusions. Worktrees clean fortrackedsource. No heavyjobs remain. Only ownhourlylock removed onexit. Nextcheck shouldfetchteam first andreadleadreviewmessages; Buildstatus stillINPROGRESS so schedule stays.
+## Next / limits
+Review anddeploy49; rechecktaskwithboundeddiagnostics. BroaderfeaturePRs stillneedreview; userWindows/MVP first. DockerrecipesremainblockedlowRAM, noDockerstarted. Sharedrequestlogactive; newrequests andmergeauthorization recorded. Ownbuildlockcodex-deploy-20261103 retained throughdeployment, hourlylockcodex-heartbeat-20261103-2027 owned. No foreignprocesses stopped.
 
 ## Needs Kevin
-No new action. Previously reported memory-observerauthoutage remains separate from board/workstate tracking.
-
-## Urgent user screenshot 20:18UTC
-PR47 https://github.com/Kevo919/bops/pull/47 head7fc9d08 BOTHCIgreen READY. FixWindowslocaltaskMCPcwd400 via outboundnamespacepathserialization; nativeexecutor/sandbox/resume untouched. LiveAPIcreate/deleteonlyaccepted actualhelperpaths; Windows6checks plusindependentreviewPASS. Main/localconfig unchanged. Leadurgentmerge/rebuild+fulltaskretryrequested; realCodexstartup/UNCshareunverified. Noownedprocesses/locksstartedbythisinteractivefix.
-
-
-## Latest hourly check
-PR33/37/46/47 remain open, ready, unchanged heads; latest rerun Fork CI also green (41685154274, 41685034501, 41706119521, 41711371501). No new review comments or lead assignments found. Read z.ai PR32 A-F fixes report; z.ai owns that review loop. Request-log acknowledgements remain pending. Free RAM 2.19 GiB: below recipe Docker minimum 3 GiB, so no heavy jobs or Docker started. No code edits this run. Next: lead review/deployment of urgent PR47, then full task retry; respond to review findings. Prior runtime limitations remain.
-
+No newaction requested. Memoryobserverauthoutage previouslyreported; explicitboard/workstateused.
