@@ -12,6 +12,7 @@ import { closeMirrors, mirroredTarget } from "./mirror";
 import { writeSkillFiles } from "./workspace-skills";
 import { userChrome, userHome } from "./store";
 import { bopsHome, chromeRoot } from "./user-paths";
+import { botChromesRunning, onWindows, stopBotChromes, windowsChrome, windowsChromeVersion, windowsHome, windowsUserAgent } from "./windows-host";
 
 /**
  * Local Mac host. Each bot's "screen" is its own background Chrome on the user's Mac, with its own
@@ -26,7 +27,7 @@ import { bopsHome, chromeRoot } from "./user-paths";
  * before another's bot uses its port.
  */
 
-export const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+export const CHROME = onWindows ? windowsChrome() : "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 /**
  * Where the signed-in user's Mac tasks keep their folders: ~/.bops/users/<id>/tasks, beside their
  * Chrome profiles' own folder (~/.bops/tasks on a self-hosted install running on its own key). Signed
@@ -53,6 +54,7 @@ export const taskSockets = (dir: string) => join(/*turbopackIgnore: true*/ bopsH
 /** A Mac task's workspace: the agent session's workspace_directory, and where its browser tools run. */
 export const taskWorkspace = (sessionId: string) => join(taskDir(sessionId), "workspace");
 const CHROME_VERSION = (() => {
+  if (onWindows) return windowsChromeVersion() ?? "154.0.0.0";
   try {
     // Bounded: it runs as the server starts, and a stalled read would hold up everything after it.
     return execFileSync("defaults", ["read", "/Applications/Google Chrome.app/Contents/Info", "CFBundleShortVersionString"], { timeout: 2000 })
@@ -63,7 +65,9 @@ const CHROME_VERSION = (() => {
   }
 })();
 /** Headless Chrome announces itself as "HeadlessChrome"; present as the normal Mac browser. */
-const USER_AGENT = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_VERSION.split(".")[0]}.0.0.0 Safari/537.36`;
+const USER_AGENT = onWindows
+  ? windowsUserAgent(CHROME_VERSION)
+  : `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_VERSION.split(".")[0]}.0.0.0 Safari/537.36`;
 const real = (p: string) => (existsSync(p) ? realpathSync(p) : p);
 /** The browser tools' package folder, at its real path: in the app, the server's node_modules links into the app bundle. */
 const nodeModules = () => real(join(process.cwd(), "node_modules"));
@@ -108,6 +112,14 @@ export async function quitBotChromes({ switching = true } = {}) {
   if (switching) gq.bopsChromeQuits = quits() + 1;
   // The screens' mirrors keep the last page they saw: they go too.
   closeMirrors();
+  if (onWindows) {
+    // Their profiles are under chromeRoot(): found by command line (windows-host.ts), never the user's own Chrome.
+    const root = join(chromeRoot(), "");
+    if (!(await botChromesRunning(root))) return;
+    await stopBotChromes(root);
+    for (let i = 0; i < 20 && (await botChromesRunning(root)); i++) await new Promise((r) => setTimeout(r, 150));
+    return;
+  }
   const pattern = `--user-data-dir=${chromeRoot()}/`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const running = () => new Promise<boolean>((r) => execFile("pgrep", ["-f", "--", pattern], (e) => r(!e)));
   if (!(await running())) return;
@@ -150,7 +162,7 @@ export async function ensureChrome(botId: string, port: number) {
       ...(process.env.BOPS_CHROME_WINDOWS ? [] : ["--headless=new", `--user-agent=${USER_AGENT}`]),
       "about:blank",
     ],
-    { detached: true, stdio: "ignore" },
+    { detached: true, stdio: "ignore", windowsHide: true },
   )
     // No Chrome here: the wait below says so, rather than the server going down with it.
     .on("error", () => {})
@@ -208,6 +220,10 @@ export const browserMcp = (port: number, dir: string) => {
   // Bops window's token (ui-token.ts), since this list doesn't hold against redirects.
   const self = process.env.PORT ?? "3210";
   const blocked = `PLAYWRIGHT_MCP_BLOCKED_ORIGINS=http://localhost:${self};http://127.0.0.1:${self};http://[::1]:${self}`;
+  // Windows has no /usr/bin/env to set them with: the blocked origins go as Playwright's own flag, and
+  // its sockets are named pipes there, which have no path-length limit to work around.
+  if (onWindows)
+    return { type: "stdio", command: process.execPath, args: [...args, "--blocked-origins", blocked.slice(blocked.indexOf("=") + 1)], cwd: join(dir, "workspace") };
   const env = [`PWTEST_SOCKETS_DIR=${taskSockets(dir)}`, blocked, ...(asNode ? ["ELECTRON_RUN_AS_NODE=1"] : [])];
   return { type: "stdio", command: "/usr/bin/env", args: [...env, process.execPath, ...args], cwd: join(dir, "workspace") };
 };
@@ -284,6 +300,7 @@ const KEPT_ENV = ["USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "LC_CTYPE"];
  */
 export function executorCommand(sessionId: string, codex: string, args: string[], opts: { key: string; cdpPort: number; remotePort: number; dir?: string; fullAccess?: boolean }) {
   const dir = opts.dir ?? taskDir(sessionId);
+  if (onWindows) return windowsExecutor(dir, codex, args, opts);
   if (opts.fullAccess) {
     const env: Record<string, string> = Object.fromEntries(KEPT_ENV.flatMap((k) => (process.env[k] ? [[k, process.env[k]!]] : [])));
     const path = [...new Set([...codexPath().split(delimiter), "/usr/bin", "/bin", "/usr/sbin", "/sbin"])].join(delimiter);
@@ -327,7 +344,7 @@ export function prepareTaskDir(sessionId: string, dir = taskDir(sessionId), keep
  * writeSkillFiles), fresh each run, so Codex finds them as skills. A folder it can't write costs the task nothing.
  */
 export async function startExecutor(sessionId: string, envId: string, remoteUrl: string, port: number, dir = taskDir(sessionId), fullAccess = false, botId?: string, keep = false): Promise<ChildProcess> {
-  if (!fullAccess && !existsSync(SANDBOX_EXEC)) throw new Error("this Mac has no sandbox for bots (/usr/bin/sandbox-exec)");
+  if (!fullAccess && !onWindows && !existsSync(SANDBOX_EXEC)) throw new Error("this Mac has no sandbox for bots (/usr/bin/sandbox-exec)");
   const codex = findCodex();
   if (!codex) throw new Error("the Codex CLI isn't on this Mac yet");
   prepareTaskDir(sessionId, dir, keep);
@@ -344,7 +361,7 @@ export async function startExecutor(sessionId: string, envId: string, remoteUrl:
     dir,
     fullAccess,
   });
-  const child = spawn(run.command, run.args, { cwd: run.cwd, env: run.env, stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(run.command, run.args, { cwd: run.cwd, env: run.env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
   return new Promise((resolve, reject) => {
     let log = "";
     const onData = (d: Buffer) => {
@@ -374,7 +391,10 @@ export async function startExecutor(sessionId: string, envId: string, remoteUrl:
  * folder once they answer (prepareTaskDir): only its sockets go.
  */
 export function stopExecutor(sessionId: string, child?: ChildProcess, dir?: string, keep = false) {
-  if (child && child.exitCode === null && child.signalCode === null) {
+  if (child && child.exitCode === null && child.signalCode === null && onWindows && child.pid) {
+    // On Windows kill() stops Codex alone, and its browser tools (node) would go on: its whole tree goes.
+    execFile("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true }, () => {});
+  } else if (child && child.exitCode === null && child.signalCode === null) {
     const kill = setTimeout(() => child.kill("SIGKILL"), 5000).unref();
     child.once("exit", () => clearTimeout(kill));
     child.kill();
@@ -657,4 +677,59 @@ export async function input(
     for (const type of [enter ? "keyDown" : "rawKeyDown", "keyUp"])
       await cdp(ep, "Input.dispatchKeyEvent", { type, key: k.key, code: k.code, windowsVirtualKeyCode: k.keyCode, ...(enter && type === "keyDown" ? { text: "\r", unmodifiedText: "\r" } : {}) });
   }
+}
+
+/** What a Windows program needs from the environment to start at all (Windows itself, its folders, how it finds programs). */
+const WINDOWS_KEPT = ["SystemRoot", "SystemDrive", "windir", "ComSpec", "PATHEXT", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS", "OS", "USERNAME", "USERDOMAIN", "ProgramData", "ProgramFiles", "ProgramFiles(x86)", "CommonProgramFiles"];
+
+/**
+ * How to start `codex exec-server` for a task on a Windows PC. Windows has no sandbox-exec, so:
+ *
+ * - Chrome only (Full access off, the default): Codex runs inside its own Windows sandbox, set in the
+ *   task's Codex home (config.toml below). In "elevated" mode Codex runs each command as a separate,
+ *   restricted Windows user it sets up once (Windows asks the user for an admin OK the first time):
+ *   that user can't read this user's files and writes only in the task's folder. The task's home and temp are its own folder, its environment carries
+ *   nothing of the server's, and its browser tools are the stay-in-the-browser list (MAC_BROWSER_TOOLS).
+ * - Full access on (Settings, This computer): no sandbox, as on the Mac. Codex runs as the user, with
+ *   their home, a shell and their programs. Its Codex home and temp folder are still the task's own.
+ */
+function windowsExecutor(dir: string, codex: string, args: string[], opts: { key: string; cdpPort: number; fullAccess?: boolean }) {
+  const env: Record<string, string> = Object.fromEntries(WINDOWS_KEPT.flatMap((k) => (process.env[k] ? [[k, process.env[k]!]] : [])));
+  const codexHome = join(dir, "codex");
+  Object.assign(env, {
+    PATH: codexPath(),
+    TEMP: join(dir, "tmp"),
+    TMP: join(dir, "tmp"),
+    CODEX_HOME: codexHome,
+    CODEX_API_KEY: opts.key,
+    BOPS_CDP_PORT: String(opts.cdpPort),
+  });
+  if (opts.fullAccess) {
+    const home = windowsHome();
+    Object.assign(env, { USERPROFILE: home, HOME: home, ...(process.env.APPDATA ? { APPDATA: process.env.APPDATA } : {}), ...(process.env.LOCALAPPDATA ? { LOCALAPPDATA: process.env.LOCALAPPDATA } : {}) });
+  } else {
+    Object.assign(env, { USERPROFILE: dir, HOME: dir, APPDATA: join(dir, "tmp"), LOCALAPPDATA: join(dir, "tmp") });
+    mkdirSync(codexHome, { recursive: true });
+    const toml = (p: string) => JSON.stringify(p);
+    writeFileSync(
+      join(codexHome, "config.toml"),
+      [
+        "# Written by Bops for one task on this PC (lib/server/local.ts windowsExecutor): Chrome only.",
+        'sandbox_mode = "workspace-write"',
+        'approval_policy = "never"',
+        "",
+        "[sandbox_workspace_write]",
+        `writable_roots = [${toml(join(dir, "workspace"))}, ${toml(join(dir, "tmp"))}]`,
+        // On: the browser tools talk to the bot's Chrome over this PC's loopback, which the sandbox's
+        // offline firewall rules would cut. What it guards is the user's files, and that holds either way.
+        "network_access = true",
+        "",
+        "[windows]",
+        'sandbox = "elevated"',
+        "",
+      ].join("\n"),
+      { mode: 0o600 },
+    );
+  }
+  return { command: codex, args, cwd: join(dir, "workspace"), env: env as NodeJS.ProcessEnv };
 }

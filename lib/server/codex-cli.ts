@@ -2,7 +2,7 @@ import "server-only";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { accessSync, constants, createWriteStream } from "node:fs";
-import { chmod, mkdir, mkdtemp, rename, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, rename, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import { Readable, Transform } from "node:stream";
@@ -22,12 +22,23 @@ import { loopHere } from "./persist";
 
 const RELEASE = "https://api.github.com/repos/openai/codex/releases/latest";
 
-/** Bops' own folder for the CLI it installs. */
-export const binDir = () => join(homedir(), "Library", "Application Support", "Bops", "bin");
+const onWindows = process.platform === "win32";
+
+/** Bops' own folder for the CLI it installs (on Windows, %LOCALAPPDATA%\Bops\bin). */
+export const binDir = () =>
+  onWindows ? join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "Bops", "bin") : join(homedir(), "Library", "Application Support", "Bops", "bin");
+
+/**
+ * On Windows Bops installs Codex's whole package (codex.exe and the helpers its Windows sandbox runs,
+ * codex-resources/), into binDir()/codex: the binary is in its bin folder.
+ */
+const windowsPackageBin = () => join(binDir(), "codex", "bin");
 
 /** The PATH Codex runs with: the server's, where Codex's installers put it, and Bops' own copy last. */
 export const codexPath = () =>
-  [...new Set([...(process.env.PATH ?? "").split(delimiter), join(homedir(), ".local/bin"), "/usr/local/bin", "/opt/homebrew/bin", binDir()].filter(Boolean))].join(delimiter);
+  onWindows
+    ? [...new Set([...(process.env.PATH ?? process.env.Path ?? "").split(delimiter), process.env.APPDATA && join(process.env.APPDATA, "npm"), windowsPackageBin()].filter(Boolean) as string[])].join(delimiter)
+    : [...new Set([...(process.env.PATH ?? "").split(delimiter), join(homedir(), ".local/bin"), "/usr/local/bin", "/opt/homebrew/bin", binDir()].filter(Boolean))].join(delimiter);
 
 const runnable = (path: string) => {
   try {
@@ -40,7 +51,9 @@ const runnable = (path: string) => {
 
 /** The `codex` Bops runs: the first one on that PATH, if there is one. */
 export function findCodex() {
-  for (const dir of codexPath().split(delimiter)) if (runnable(join(dir, "codex"))) return join(dir, "codex");
+  // On Windows only a real codex.exe: npm's codex.cmd is a script for cmd, which the executor can't start directly.
+  const name = onWindows ? "codex.exe" : "codex";
+  for (const dir of codexPath().split(delimiter)) if (dir && runnable(join(dir, name))) return join(dir, name);
 }
 
 export type CodexInstall = { state: "installing" | "installed" | "failed"; error?: string; version?: string };
@@ -74,6 +87,7 @@ const run = (file: string, args: string[]) =>
  * one that's there. The work happens in a folder next to it, removed at the end.
  */
 export async function download(dir: string) {
+  if (onWindows) return downloadWindows(dir);
   const target = `${process.arch === "arm64" ? "aarch64" : "x86_64"}-apple-darwin`;
   const name = `codex-${target}.tar.gz`;
   const res = await fetch(RELEASE, { headers: { Accept: "application/vnd.github+json", "User-Agent": "Bops" }, signal: AbortSignal.timeout(30_000) });
@@ -102,5 +116,47 @@ export async function download(dir: string) {
     return version;
   } finally {
     await rm(work, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Windows: the latest release's package for this PC (codex-package-<arch>-pc-windows-msvc.tar.gz:
+ * bin/codex.exe, and codex-resources/ with the helpers Codex's Windows sandbox runs), checked against
+ * GitHub's SHA-256, unpacked with Windows' own tar, and put in `dir`/codex in place of an older one.
+ */
+async function downloadWindows(dir: string) {
+  const triple = `${process.arch === "arm64" ? "aarch64" : "x86_64"}-pc-windows-msvc`;
+  const name = `codex-package-${triple}.tar.gz`;
+  const res = await fetch(RELEASE, { headers: { Accept: "application/vnd.github+json", "User-Agent": "Bops" }, signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) throw new Error(`GitHub answered ${res.status} for the latest Codex release.`);
+  const release = (await res.json()) as { tag_name?: string; assets?: { name: string; browser_download_url: string; digest?: string | null }[] };
+  const asset = release.assets?.find((a) => a.name === name);
+  if (!asset) throw new Error(`The latest Codex release (${release.tag_name ?? "unknown"}) has no download for this PC.`);
+  const want = /^sha256:([0-9a-f]{64})$/i.exec(asset.digest ?? "")?.[1]?.toLowerCase();
+  if (!want) throw new Error("GitHub listed no checksum for the Codex download.");
+  await mkdir(dir, { recursive: true });
+  const work = await mkdtemp(join(dir, ".install-"));
+  try {
+    const file = join(work, name);
+    const got = await fetch(asset.browser_download_url, { headers: { "User-Agent": "Bops" }, signal: AbortSignal.timeout(20 * 60_000) });
+    if (!got.ok || !got.body) throw new Error(`The Codex download failed (${got.status}).`);
+    const hash = createHash("sha256");
+    const tap = new Transform({ transform: (chunk: Buffer, _, done) => (hash.update(chunk), done(null, chunk)) });
+    await pipeline(Readable.fromWeb(got.body as unknown as NodeReadableStream), tap, createWriteStream(file));
+    if (hash.digest("hex") !== want) throw new Error("The Codex download didn't match its checksum.");
+    const unpacked = join(work, "codex");
+    await mkdir(unpacked);
+    await run(join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe"), ["-xzf", file, "-C", unpacked]);
+    const bin = join(unpacked, "bin", "codex.exe");
+    const version = (await run(bin, ["--version"]).catch(() => "")).trim();
+    if (!/codex/i.test(version)) throw new Error("The downloaded Codex didn't run on this PC.");
+    const place = join(dir, "codex");
+    await rm(place, { recursive: true, force: true });
+    await rename(unpacked, place);
+    return version;
+  } finally {
+    await rm(work, { recursive: true, force: true });
+    // Leftovers of an install cut short (the app quit mid-download).
+    for (const left of await readdir(dir).catch(() => [] as string[])) if (left.startsWith(".install-")) await rm(join(dir, left), { recursive: true, force: true }).catch(() => {});
   }
 }

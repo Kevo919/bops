@@ -477,17 +477,20 @@ function FullAccessSetup({ items }: { items: Items }) {
 /** Full access for bots on this Mac (MacState.fullAccess): off by default, and only here, with what it means. */
 function FullAccessCard({ items }: { items: Items }) {
   const on = !!items.state.mac?.fullAccess;
-  const set = items.perms.status?.fullDisk === "granted" && items.perms.status?.automation === "granted";
+  // Windows has no Full Disk Access or Automation to grant: Full access needs nothing more there.
+  const windows = typeof navigator !== "undefined" && /Windows/.test(navigator.userAgent);
+  const here = windows ? "this PC" : "this Mac";
+  const set = windows || (items.perms.status?.fullDisk === "granted" && items.perms.status?.automation === "granted");
   if (!items.state.mac?.ready && !on) return null;
   return (
     <Card
       icon={ICONS.fullAccess}
       title="Full access for bots"
       chip={on ? "On" : undefined}
-      line="Bots' tasks on this Mac get a shell, your files and your apps, outside Bops' sandbox. Anything you could do here, they can."
+      line={`Bots' tasks on ${here} get a shell, your files and your apps, outside ${windows ? "Codex's sandbox" : "Bops' sandbox"}. Anything you could do here, they can.`}
       tone={on ? (set || !items.perms.inApp ? "ok" : "todo") : "off"}
-      status={on ? (set || !items.perms.inApp ? "Bots can use your files and apps" : "Two steps left, so macOS never stops a bot mid-task") : "Off: bots on this Mac only browse, in a Chrome of their own"}
-      below={on && items.perms.inApp ? <FullAccessSetup items={items} /> : undefined}
+      status={on ? (set || !items.perms.inApp ? "Bots can use your files and apps" : "Two steps left, so macOS never stops a bot mid-task") : `Off: bots on ${here} only browse, in a Chrome of their own`}
+      below={on && items.perms.inApp && !windows ? <FullAccessSetup items={items} /> : undefined}
     >
       <button onClick={() => void post("/api/mac", { fullAccess: !on }, "PATCH")} className={on ? light : dark}>
         {on ? "Turn off" : "Turn on"}
