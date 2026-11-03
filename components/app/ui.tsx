@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { live, MAIN_WORKSPACE, WAITING_FOR_OK, waitingAsks, waitsForOk, workspaceOf, type AppState, type Bot, type Chat, type Logo, type Session } from "@/lib/types";
 import { Mascot, Spinner } from "./mascot";
 import { stateArrived } from "./state-arrival";
+import { setLlms } from "@/lib/agents";
 import { answersAsk, readOnlyLine, writesThread } from "@/lib/shared";
 export { botBezel, botOnInk, botWash, DESKTOP_BG } from "@/lib/look";
 
@@ -75,6 +76,8 @@ export function useAppState() {
         if (json.state && json.version !== version.current) {
           version.current = json.version;
           stateArrived(Date.now());
+          // Your LLMs (config/llms.yaml) as the server read them: the AI section's models and a new bot's starter.
+          setLlms(json.state.llms);
           setState(json.state);
         }
       } catch {

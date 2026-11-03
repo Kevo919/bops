@@ -11,7 +11,7 @@ import { BRAINS_ON, planName, signInOn, threadRunner, workBot, workspaceOf, type
  * its folder on the bot's computer (vm/bin/bops-brain), each bot's agents with their own settings there.
  */
 
-export type AgentRoute = "anthropic" | "openai" | "deepinfra" | "zai" | "zai-coding";
+export type AgentRoute = "anthropic" | "openai" | "deepinfra" | "zai" | "zai-coding" | "deepseek" | "openrouter";
 
 /** What each kind of agent is. `soon`: shown, dimmed, with why it isn't in Bops yet. */
 export const AGENTS: Record<AgentKind, { name: string; maker: string; pays: AgentPays[]; soon?: string }> = {
@@ -96,12 +96,12 @@ export const cleanJobs = (jobs: unknown): Job[] | undefined => {
   return out.length ? out : undefined;
 };
 /** Any other model OpenCode can run on a key of these providers ("Other model" in its editor). */
-export const OPENCODE_OTHER = /^(anthropic|openai|deepinfra|zai|zai-coding)\/[A-Za-z0-9._:/-]{1,120}$/;
+export const OPENCODE_OTHER = /^(anthropic|openai|deepinfra|zai|zai-coding|deepseek|openrouter)\/[A-Za-z0-9._:/-]{1,120}$/;
 
 /** The Vault key each provider's agents run on (lib/server/keys.ts KEY_PROVIDERS). */
 // Z.ai: one key for both. "zai-coding" is its GLM Coding Plan (the plan's own address and allowance), "zai" pay as you go.
-export const ROUTE_KEYS: Record<AgentRoute, string> = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", deepinfra: "DEEPINFRA_API_KEY", zai: "ZAI_API_KEY", "zai-coding": "ZAI_API_KEY" };
-export const ROUTE_NAMES: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", deepinfra: "DeepInfra", zai: "Z.ai", "zai-coding": "Z.ai Coding Plan" };
+export const ROUTE_KEYS: Record<AgentRoute, string> = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", deepinfra: "DEEPINFRA_API_KEY", zai: "ZAI_API_KEY", "zai-coding": "ZAI_API_KEY", deepseek: "DEEPSEEK_API_KEY", openrouter: "OPENROUTER_API_KEY" };
+export const ROUTE_NAMES: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", deepinfra: "DeepInfra", zai: "Z.ai", "zai-coding": "Z.ai Coding Plan", deepseek: "DeepSeek", openrouter: "OpenRouter" };
 
 /** Bops agent: every bot has it, always first, and it is every thread's fallback. */
 export const BOPS_AGENT: BotAgent = { id: "bops", kind: "bops", pays: "credit" };
@@ -112,7 +112,57 @@ export const MAX_AGENTS = 6;
 
 const AGENT_ID = /^ag_[A-Za-z0-9]{10}$/;
 
-export const modelsFor = (kind: AgentKind) => MODELS.filter((m) => m.kind === kind);
+/* ---------------- Your LLMs (config/llms.yaml) ---------------- */
+
+/**
+ * The LLMs in config/llms.yaml: each a provider and model, the one new bots start on (`starter`), and the jobs
+ * it takes. The server reads the file as it starts (lib/server/llms.ts) and sends the list to the window with the
+ * state (AppState.llms), and both keep it here. They run on OpenCode, on the provider's key from the Vault.
+ */
+export type Llm = { name: string; provider: AgentRoute; model: string; starter?: boolean; useFor?: Job[] };
+const g = globalThis as unknown as { __bopsLlms?: Llm[] };
+export const llms = (): Llm[] => g.__bopsLlms ?? [];
+const LLM_PROVIDERS = new Set<string>(Object.keys(ROUTE_KEYS));
+/** Keep the list (from the file, or from the state the window got): only what Bops can run. */
+export function setLlms(list: unknown) {
+  const out: Llm[] = [];
+  if (Array.isArray(list))
+    for (const x of list.slice(0, 20)) {
+      if (!x || typeof x !== "object") continue;
+      const l = x as Partial<Llm>;
+      if (typeof l.provider !== "string" || !LLM_PROVIDERS.has(l.provider) || typeof l.model !== "string" || !/^[A-Za-z0-9._:/-]{1,120}$/.test(l.model)) continue;
+      const jobs = cleanJobs(l.useFor);
+      out.push({ name: typeof l.name === "string" && l.name.trim() ? l.name.trim().slice(0, 60) : l.model, provider: l.provider as AgentRoute, model: l.model, ...(l.starter === true && !out.some((y) => y.starter) ? { starter: true } : {}), ...(jobs ? { useFor: jobs } : {}) });
+    }
+  g.__bopsLlms = out;
+}
+const llmModel = (l: Llm) => `${l.provider}/${l.model}`;
+/** The LLMs as models of OpenCode (and the Claude ones of Claude Code too), the starter first. */
+const llmModels = (kind: AgentKind): (typeof MODELS)[number][] => {
+  const list = [...llms()].sort((a, b) => Number(!!b.starter) - Number(!!a.starter));
+  if (kind === "opencode") return list.map((l) => ({ id: llmModel(l), kind, label: l.name, short: l.name }));
+  if (kind === "claude") return list.filter((l) => l.provider === "anthropic").map((l) => ({ id: l.model, kind, label: l.name, short: l.name }));
+  return [];
+};
+/** The agent an LLM is in a bot with no AI profile of its own: the same id on every bot, from its provider and model. */
+const llmAgent = (l: Llm): BotAgent => ({ id: agentIdFor("llm", llmModel(l)), kind: "opencode", pays: "key", model: llmModel(l), ...(l.useFor ? { jobs: l.useFor } : {}) });
+/**
+ * The AI a bot with no profile of its own starts on, from config/llms.yaml: Bops agent, the starter as its
+ * Default, and each LLM set to take some jobs. Undefined without brains, or with no starter and none with jobs:
+ * then Bops agent only, as before. Changing that bot's AI keeps these as its own from then on (bot-ai.ts).
+ */
+export function starterAi(): BotAi | undefined {
+  if (!BRAINS_ON) return undefined;
+  const list = llms().filter((l) => l.starter || l.useFor?.length).slice(0, MAX_AGENTS - 1);
+  if (!list.length) return undefined;
+  const starter = list.find((l) => l.starter);
+  return { agents: [BOPS_AGENT, ...list.map(llmAgent)], default: starter ? llmAgent(starter).id : "bops" };
+}
+
+export const modelsFor = (kind: AgentKind) => {
+  const mine = llmModels(kind);
+  return [...mine, ...MODELS.filter((m) => m.kind === kind && !mine.some((x) => x.id === m.id))];
+};
 /** The model a kind's threads start on when its agent names none. */
 export const defaultModel = (kind: AgentKind) => modelsFor(kind)[0]?.id;
 /** A model an agent of this kind may be told to use. */
@@ -219,7 +269,7 @@ export function legacyAi(b: Pick<Bot, "id" | "brain">, brains: Brain[] = []): Bo
  * Bops agent only: CLI agents stay in the state for a build that has them, and nothing shows or runs on them.
  */
 export function aiOf(b: Pick<Bot, "id" | "ai" | "brain" | "workspaceId">, state: Pick<AppState, "brains">): BotAi {
-  const ai = cleanAi(b.ai ?? legacyAi(b, state.brains), state.brains ?? []) ?? DEFAULT_AI;
+  const ai = cleanAi(b.ai ?? legacyAi(b, state.brains), state.brains ?? []) ?? starterAi() ?? DEFAULT_AI;
   const agents = ai.agents.filter((x) => agentOn(x.kind));
   return { agents, default: agents.some((x) => x.id === ai.default) ? ai.default : "bops" };
 }
@@ -422,7 +472,7 @@ export function threadAgent(s: Pick<Session, "agent" | "brainRun" | "onBopsAgent
  * written on its threads.
  */
 export function pickAgent(b: Bot, state: Pick<AppState, "brains">, picks: (string | undefined | null)[], model?: string, goal?: string): Session["agent"] | undefined {
-  if (!hasProfile(b, state)) return undefined;
+  if (!hasProfile(b, state) && !starterAi()) return undefined;
   const ai = aiOf(b, state);
   const picked = picks.map((p) => (p ? ai.agents.find((y) => y.id === p) : undefined)).find(Boolean);
   // Nobody picked one: the agent set to take this kind of job (the Default first, when it's one of them).

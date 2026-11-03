@@ -10,7 +10,7 @@
 # request and never prints the token or the key. When the process that started it goes (bops-brain execs
 # the CLI, so that is the CLI, or the bot's shell after it), it exits and the token is worth nothing.
 #
-# Usage: bops-ai-gate --route anthropic|openai|deepinfra|zai|zai-coding --port-file <file>
+# Usage: bops-ai-gate --route anthropic|openai|deepinfra|zai|zai-coding|deepseek|openrouter --port-file <file>
 import hmac
 import http.client
 import json
@@ -31,6 +31,8 @@ UPSTREAMS = {
     # Z.ai's OpenAI shaped API has no /v1: the run asks for /zai/v1/..., the gate sends /api/paas/v4/...
     "zai": "https://api.z.ai/api/paas/v4",
     "zai-coding": "https://api.z.ai/api/coding/paas/v4",
+    "deepseek": "https://api.deepseek.com",
+    "openrouter": "https://openrouter.ai/api",
 }
 # Routes whose upstream path takes the place of the run's /v1.
 NO_V1 = {"zai", "zai-coding"}
@@ -48,7 +50,7 @@ def arg(name):
 route = arg("--route")
 port_file = arg("--port-file")
 if route not in UPSTREAMS or not port_file:
-    sys.stderr.write("usage: bops-ai-gate --route anthropic|openai|deepinfra|zai|zai-coding --port-file <file>\n")
+    sys.stderr.write("usage: bops-ai-gate --route anthropic|openai|deepinfra|zai|zai-coding|deepseek|openrouter --port-file <file>\n")
     sys.exit(2)
 upstream = UPSTREAMS[route]
 # Tests only: a fake provider on this machine instead of the real one.

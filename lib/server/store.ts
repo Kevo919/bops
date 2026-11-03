@@ -2,6 +2,7 @@ import "server-only";
 import { stamp } from "./turn-context";
 import { randomBytes } from "node:crypto";
 import { cleanAi, isCli, legacyAi } from "@/lib/agents";
+import "./llms";
 import { lastWorkOf, live, pausedForOk, workspaceOf, MAIN_WORKSPACE, botChatId, type AppState, type Bot, type Chat, type Message, type Session, type Reaction, type Tapback } from "@/lib/types";
 import { fileStore, onPostgres, onRunner, selfHosted, type Persistence, type StateAccess, type Went } from "./persist";
 import { cloudStore } from "./persist-cloud";

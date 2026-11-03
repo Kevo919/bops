@@ -1,0 +1,57 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  YOUR LLMs: every AI model your bots can use, in one place.
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#  New bots start on the one marked  starter: true  (Claude, to begin with).
+#
+#  TO ADD AN LLM
+#    1. Copy one of the blocks below (from "- name:" down), paste it at the end.
+#    2. Change name, provider and model.
+#    3. Optional: use_for, the kinds of work that go to it when you don't pick one:
+#         coding, planning, thinking, research, writing, browsing
+#    4. Save this file, then restart Bops (tray icon by the clock → Quit Bops, then open it again).
+#    5. Add that provider's key in Bops (Keys → Add a key), under the key name in the list below.
+#       Never paste a key into this file.
+#
+#  PROVIDERS (what to write after "provider:", and the key it needs)
+#    anthropic    Claude                          ANTHROPIC_API_KEY
+#    openai       OpenAI GPT                      OPENAI_API_KEY
+#    zai-coding   Z.ai GLM, on your Coding Plan   ZAI_API_KEY
+#    zai          Z.ai GLM, pay as you go         ZAI_API_KEY
+#    deepseek     DeepSeek                        DEEPSEEK_API_KEY
+#    openrouter   OpenRouter (hundreds of models; model looks like "deepseek/deepseek-chat")
+#                                                 OPENROUTER_API_KEY
+#    deepinfra    DeepInfra                       DEEPINFRA_API_KEY
+#
+#  WHERE THEY RUN: on your bots' cloud computers, through OpenCode. They need
+#  Settings → Modules → Agent harnesses turned on. Chat with a bot itself stays
+#  on Bops' own engine (OpenAI); these models do the bots' tasks.
+#  A bot whose AI you've already set up in its AI section keeps its own setup:
+#  these show up there as models you can pick.
+# ─────────────────────────────────────────────────────────────────────────────
+
+llms:
+  - name: Claude Sonnet 5.5
+    provider: anthropic
+    model: claude-sonnet-5-5
+    starter: true
+
+  - name: Claude Opus 5.5
+    provider: anthropic
+    model: claude-opus-5-5
+    use_for: [thinking, planning]
+
+  # Examples: take the "# " off the start of each line to turn one on.
+  #
+  # - name: GLM 5.3 (Coding Plan)
+  #   provider: zai-coding
+  #   model: glm-5.3
+  #   use_for: [coding]
+  #
+  # - name: DeepSeek
+  #   provider: deepseek
+  #   model: deepseek-chat
+  #
+  # - name: GPT 6.1 Sol
+  #   provider: openai
+  #   model: gpt-6.1-sol

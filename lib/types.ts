@@ -1753,6 +1753,8 @@ export type AppState = {
   screenStream?: boolean;
   /** Whether business data (treg) is there for the bots: lib/server/treg.ts tregOn. Filled in by /api/state for the app; never stored. */
   businessData?: boolean;
+  /** The LLMs in config/llms.yaml (lib/agents.ts Llm). Filled in by /api/state for the app; never stored. */
+  llms?: { name: string; provider: string; model: string; starter?: boolean; useFor?: string[] }[];
   /**
    * What the user's bots are doing on their other devices right now (thinking, working…; and the chat,
    * when typing), by bot id, from Bops Cloud's live stream (lib/server/live.ts). Filled in by /api/state

@@ -18,6 +18,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
 
 const OFF = process.argv.includes("--off");
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|ORGO|CODEX|ANTHROPIC|CLAUDE_CODE)_/.test(k)) delete process.env[k];
@@ -469,6 +471,39 @@ await test("jobs: a thread nobody picked an agent for goes to the agent set for 
   assert.equal(A.gateRoute(zai), "zai-coding");
   assert.equal(A.agentKeyName(zai), "ZAI_API_KEY");
   assert.ok(A.modelOk("opencode", "zai/glm-5.2") && A.modelOk("opencode", "zai-coding/glm-9") && !A.modelOk("opencode", "zaix/glm"));
+});
+
+await test("your LLMs (config/llms.yaml): a bot with no AI of its own starts on the starter; each shows as a model; a pick still wins", () => {
+  const L = require(`${root}/config/llms.cjs`);
+  const problems = [];
+  const list = L.clean({ llms: [
+    { name: "Claude Sonnet 5.5", provider: "anthropic", model: "claude-sonnet-5-5", starter: true },
+    { name: "GLM", provider: "zai-coding", model: "glm-5.3", use_for: ["coding", "nope"], starter: true },
+    { provider: "nowhere", model: "x" },
+  ] }, problems);
+  assert.equal(list.length, 2);
+  assert.equal(list[1].starter, undefined, "one starter: the first marked");
+  assert.deepEqual(list[1].useFor, ["coding"]);
+  assert.match(problems[0], /provider "nowhere"/);
+  A.setLlms(list);
+  try {
+    const ai = A.starterAi();
+    assert.equal(ai.agents.length, 3);
+    assert.deepEqual(ai.agents[1], { id: ai.default, kind: "opencode", pays: "key", model: "anthropic/claude-sonnet-5-5" });
+    assert.equal(ai.agents[2].model, "zai-coding/glm-5.3");
+    const b = { id: "bot_llms", name: "Fresh" };
+    assert.equal(A.aiOf(b, { brains: [] }).default, ai.default, "a new bot starts on the starter");
+    assert.deepEqual(A.pickAgent(b, { brains: [] }, [], undefined, "Fix the bug in my script"), { id: ai.agents[2].id, kind: "opencode", model: "zai-coding/glm-5.3" });
+    assert.deepEqual(A.pickAgent(b, { brains: [] }, [], undefined, "Draft a letter"), { id: ai.default, kind: "opencode", model: "anthropic/claude-sonnet-5-5" });
+    assert.deepEqual(A.pickAgent(b, { brains: [] }, ["bops"], undefined, "Fix the bug"), { id: "bops", kind: "bops" });
+    assert.equal(A.modelsFor("opencode")[0].id, "anthropic/claude-sonnet-5-5", "the starter first");
+    assert.ok(A.modelsFor("claude").some((m) => m.label === "Claude Sonnet 5.5"));
+    assert.equal(A.agentKeyName(ai.agents[1]), "ANTHROPIC_API_KEY");
+    assert.ok(A.modelOk("opencode", "openrouter/deepseek/deepseek-chat") && A.modelOk("opencode", "deepseek/deepseek-chat"));
+  } finally {
+    A.setLlms([]);
+  }
+  assert.equal(A.starterAi(), undefined, "no LLMs: Bops agent only, as before");
 });
 
 await test("a run's flags for the computer: its bot, agent, model, thinking, gate route, the bot's other agents, its shell's name", () => {
