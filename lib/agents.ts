@@ -11,7 +11,7 @@ import { BRAINS_ON, planName, signInOn, threadRunner, workBot, workspaceOf, type
  * its folder on the bot's computer (vm/bin/bops-brain), each bot's agents with their own settings there.
  */
 
-export type AgentRoute = "anthropic" | "openai" | "deepinfra" | "zai" | "zai-coding" | "deepseek" | "openrouter";
+export type AgentRoute = "anthropic" | "openai" | "deepinfra" | "zai" | "zai-coding" | "zai-coding-cn" | "deepseek" | "openrouter";
 
 /** What each kind of agent is. `soon`: shown, dimmed, with why it isn't in Bops yet. */
 export const AGENTS: Record<AgentKind, { name: string; maker: string; pays: AgentPays[]; soon?: string }> = {
@@ -49,12 +49,15 @@ export const MODELS: { id: string; kind: AgentKind; label: string; short: string
   { id: "openai/gpt-6.1-sol", kind: "opencode", label: "GPT 6.1 Sol", short: "GPT 6.1 Sol" },
   { id: "zai-coding/glm-5.3", kind: "opencode", label: "GLM 5.3 (Z.ai Coding Plan)", short: "GLM 5.3", note: "Your Z.ai Coding Plan" },
   { id: "zai/glm-5.2", kind: "opencode", label: "GLM 5.2 (Z.ai)", short: "GLM 5.2", note: "Z.ai, pay as you go" },
+  { id: "zai-coding-cn/glm-5.3", kind: "opencode", label: "GLM 5.3 (Z.ai Coding Plan, China)", short: "GLM 5.3", note: "Your Z.ai Coding Plan, China region" },
+  { id: "zai-coding-cn/glm-5.2", kind: "opencode", label: "GLM 5.2 (Z.ai Coding Plan, China)", short: "GLM 5.2", note: "Your Z.ai Coding Plan, China region" },
   // DeepSeek Harness is DeepSeek's own agent, so it starts on DeepSeek; it runs the other providers' models too, on their keys.
   { id: "deepseek/deepseek-chat", kind: "dsh", label: "DeepSeek Chat", short: "DeepSeek Chat" },
   { id: "deepseek/deepseek-reasoner", kind: "dsh", label: "DeepSeek Reasoner", short: "DeepSeek Reasoner", note: "Thinks before it answers" },
   { id: "anthropic/claude-sonnet-5-5", kind: "dsh", label: "Claude Sonnet 5.5", short: "Sonnet 5.5" },
   { id: "openai/gpt-6.1-sol", kind: "dsh", label: "GPT 6.1 Sol", short: "GPT 6.1 Sol" },
   { id: "zai-coding/glm-5.3", kind: "dsh", label: "GLM 5.3 (Z.ai Coding Plan)", short: "GLM 5.3", note: "Your Z.ai Coding Plan" },
+  { id: "zai-coding-cn/glm-5.3", kind: "dsh", label: "GLM 5.3 (Z.ai Coding Plan, China)", short: "GLM 5.3", note: "Your Z.ai Coding Plan, China region" },
 ];
 
 /* ---------------- Jobs ---------------- */
@@ -104,12 +107,13 @@ export const cleanJobs = (jobs: unknown): Job[] | undefined => {
   return out.length ? out : undefined;
 };
 /** Any other model OpenCode (or DeepSeek Harness) can run on a key of these providers ("Other model" in its editor). */
-export const OPENCODE_OTHER = /^(anthropic|openai|deepinfra|zai|zai-coding|deepseek|openrouter)\/[A-Za-z0-9._:/-]{1,120}$/;
+export const OPENCODE_OTHER = /^(anthropic|openai|deepinfra|zai|zai-coding|zai-coding-cn|deepseek|openrouter)\/[A-Za-z0-9._:/-]{1,120}$/;
 
 /** The Vault key each provider's agents run on (lib/server/keys.ts KEY_PROVIDERS). */
 // Z.ai: one key for both. "zai-coding" is its GLM Coding Plan (the plan's own address and allowance), "zai" pay as you go.
-export const ROUTE_KEYS: Record<AgentRoute, string> = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", deepinfra: "DEEPINFRA_API_KEY", zai: "ZAI_API_KEY", "zai-coding": "ZAI_API_KEY", deepseek: "DEEPSEEK_API_KEY", openrouter: "OPENROUTER_API_KEY" };
-export const ROUTE_NAMES: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", deepinfra: "DeepInfra", zai: "Z.ai", "zai-coding": "Z.ai Coding Plan", deepseek: "DeepSeek", openrouter: "OpenRouter" };
+// "zai-coding-cn" is the GLM Coding Plan in the China region (open.bigmodel.cn): an account and key of its own.
+export const ROUTE_KEYS: Record<AgentRoute, string> = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", deepinfra: "DEEPINFRA_API_KEY", zai: "ZAI_API_KEY", "zai-coding": "ZAI_API_KEY", "zai-coding-cn": "ZAI_CODING_CN_API_KEY", deepseek: "DEEPSEEK_API_KEY", openrouter: "OPENROUTER_API_KEY" };
+export const ROUTE_NAMES: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", deepinfra: "DeepInfra", zai: "Z.ai", "zai-coding": "Z.ai Coding Plan", "zai-coding-cn": "Z.ai Coding Plan (China)", deepseek: "DeepSeek", openrouter: "OpenRouter" };
 
 /** Bops agent: every bot has it, always first, and it is every thread's fallback. */
 export const BOPS_AGENT: BotAgent = { id: "bops", kind: "bops", pays: "credit" };

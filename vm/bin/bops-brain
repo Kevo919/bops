@@ -263,6 +263,7 @@ opencode_config() {
     "deepinfra": { "options": { "baseURL": "{env:BOPS_GATE}/deepinfra/v1/openai", "apiKey": "{env:DEEPINFRA_API_KEY}" } },
     "zai": { "npm": "@ai-sdk/openai-compatible", "name": "Z.ai", "options": { "baseURL": "{env:BOPS_GATE}/zai/v1", "apiKey": "{env:ZAI_API_KEY}" } },
     "zai-coding": { "npm": "@ai-sdk/openai-compatible", "name": "Z.ai Coding Plan", "options": { "baseURL": "{env:BOPS_GATE}/zai-coding/v1", "apiKey": "{env:ZAI_API_KEY}" } },
+    "zai-coding-cn": { "npm": "@ai-sdk/openai-compatible", "name": "Z.ai Coding Plan (China)", "options": { "baseURL": "{env:BOPS_GATE}/zai-coding-cn/v1", "apiKey": "{env:ZAI_CODING_CN_API_KEY}" } },
     "deepseek": { "npm": "@ai-sdk/openai-compatible", "name": "DeepSeek", "options": { "baseURL": "{env:BOPS_GATE}/deepseek/v1", "apiKey": "{env:DEEPSEEK_API_KEY}" } },
     "openrouter": { "npm": "@ai-sdk/openai-compatible", "name": "OpenRouter", "options": { "baseURL": "{env:BOPS_GATE}/openrouter/v1", "apiKey": "{env:OPENROUTER_API_KEY}" } }
   }
@@ -300,7 +301,7 @@ import json, os, re, sys
 model, route, gate, out = sys.argv[1:5]
 API = {"anthropic": "anthropic-messages", "openai": "openai-responses"}
 BASE = {"anthropic": "/anthropic", "deepinfra": "/deepinfra/v1/openai"}
-KEYS = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "deepinfra": "DEEPINFRA_API_KEY", "zai": "ZAI_API_KEY", "zai-coding": "ZAI_API_KEY", "deepseek": "DEEPSEEK_API_KEY", "openrouter": "OPENROUTER_API_KEY"}
+KEYS = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "deepinfra": "DEEPINFRA_API_KEY", "zai": "ZAI_API_KEY", "zai-coding": "ZAI_API_KEY", "zai-coding-cn": "ZAI_CODING_CN_API_KEY", "deepseek": "DEEPSEEK_API_KEY", "openrouter": "OPENROUTER_API_KEY"}
 try:
     given = json.loads(sys.stdin.read() or "[]")
 except ValueError:
@@ -429,7 +430,7 @@ case "$CMD" in
       [[ "$BOT" =~ ^[A-Za-z0-9_-]+$ && "$AGENT" =~ ^[A-Za-z0-9_-]+$ ]] || bad "which bot and agent?"
       [ -z "$MODEL" ] || [[ "$MODEL" =~ ^[A-Za-z0-9._:/-]{1,120}$ ]] || bad "that model"
       [ -z "$EFFORT" ] || [[ "$EFFORT" =~ ^(low|medium|high)$ ]] || bad "that effort"
-      [ -z "$ROUTE" ] || [[ "$ROUTE" =~ ^(anthropic|openai|deepinfra|zai|zai-coding|deepseek|openrouter)$ ]] || bad "that route"
+      [ -z "$ROUTE" ] || [[ "$ROUTE" =~ ^(anthropic|openai|deepinfra|zai|zai-coding|zai-coding-cn|deepseek|openrouter)$ ]] || bad "that route"
       [ -z "$ALSO" ] || [[ "$ALSO" =~ ^[a-z]+:[a-z]+(:[A-Za-z0-9_-]*(:[A-Za-z0-9._:/-]*)?)?(,[a-z]+:[a-z]+(:[A-Za-z0-9_-]*(:[A-Za-z0-9._:/-]*)?)?)*$ ]] || bad "those agents"
       [[ "$LABEL" =~ ^[A-Za-z0-9._-]{1,30}$ ]] || bad "that label"
       [ -z "$OCC" ] || [[ "$OCC" =~ ^/[A-Za-z0-9._/\ -]+\.json$ ]] || bad "that OpenCode config"
@@ -517,6 +518,7 @@ case "$CMD" in
           openai) export OPENAI_API_KEY="$TOKEN" OPENAI_BASE_URL="$GURL/openai/v1" ;;
           deepinfra) export DEEPINFRA_API_KEY="$TOKEN" ;;
           zai | zai-coding) export ZAI_API_KEY="$TOKEN" ;;
+          zai-coding-cn) export ZAI_CODING_CN_API_KEY="$TOKEN" ;;
           deepseek) export DEEPSEEK_API_KEY="$TOKEN" ;;
           openrouter) export OPENROUTER_API_KEY="$TOKEN" ;;
         esac
@@ -535,6 +537,7 @@ case "$CMD" in
           openai) export OPENAI_API_KEY="$TOKEN" ;;
           deepinfra) export DEEPINFRA_API_KEY="$TOKEN" ;;
           zai | zai-coding) export ZAI_API_KEY="$TOKEN" ;;
+          zai-coding-cn) export ZAI_CODING_CN_API_KEY="$TOKEN" ;;
           deepseek) export DEEPSEEK_API_KEY="$TOKEN" ;;
           openrouter) export OPENROUTER_API_KEY="$TOKEN" ;;
         esac

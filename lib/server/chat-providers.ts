@@ -5,7 +5,7 @@ import type { AgentRoute } from "@/lib/agents";
 import { chatKeyName, providerOf } from "@/lib/chat-models";
 
 /**
- * A chat on another provider than OpenAI (Chat.model "anthropic/…", "zai/…", "deepseek/…"): the part of
+ * A chat on another provider than OpenAI (Chat.model "anthropic/…", "zai/…", "zai-coding-cn/…", "deepseek/…"): the part of
  * OpenAI's Responses API that chat.ts uses, answered by that provider. Anthropic speaks its Messages API; z.ai,
  * DeepSeek, OpenRouter and DeepInfra speak OpenAI's Chat Completions. What comes back is shaped like a Responses
  * result as chat.ts reads it: an id, the output (the reply as a message with output_text, and function calls
@@ -33,20 +33,22 @@ const CHAT_URLS: Partial<Record<AgentRoute, string>> = {
   anthropic: "https://api.anthropic.com/v1/messages",
   zai: "https://api.z.ai/api/paas/v4/chat/completions",
   "zai-coding": "https://api.z.ai/api/coding/paas/v4/chat/completions",
+  "zai-coding-cn": "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
   deepseek: "https://api.deepseek.com/v1/chat/completions",
   openrouter: "https://openrouter.ai/api/v1/chat/completions",
   deepinfra: "https://api.deepinfra.com/v1/openai/chat/completions",
 };
 /** Who said no, in the chat's words. */
-const LABELS: Record<AgentRoute, string> = { anthropic: "Claude", openai: "OpenAI", zai: "z.ai", "zai-coding": "z.ai", deepseek: "DeepSeek", openrouter: "OpenRouter", deepinfra: "DeepInfra" };
+const LABELS: Record<AgentRoute, string> = { anthropic: "Claude", openai: "OpenAI", zai: "z.ai", "zai-coding": "z.ai", "zai-coding-cn": "z.ai (China)", deepseek: "DeepSeek", openrouter: "OpenRouter", deepinfra: "DeepInfra" };
 /** Whose account it is. */
-const ACCOUNTS: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", zai: "z.ai", "zai-coding": "z.ai", deepseek: "DeepSeek", openrouter: "OpenRouter", deepinfra: "DeepInfra" };
+const ACCOUNTS: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", zai: "z.ai", "zai-coding": "z.ai", "zai-coding-cn": "open.bigmodel.cn", deepseek: "DeepSeek", openrouter: "OpenRouter", deepinfra: "DeepInfra" };
 /** Where to add credit. */
 const BILLING: Record<AgentRoute, string> = {
   anthropic: "console.anthropic.com, Billing",
   openai: "platform.openai.com, Billing",
   zai: "z.ai, Billing",
   "zai-coding": "z.ai, Billing",
+  "zai-coding-cn": "open.bigmodel.cn, Billing",
   deepseek: "platform.deepseek.com, Top up",
   openrouter: "openrouter.ai, Credits",
   deepinfra: "deepinfra.com, Billing",
@@ -310,8 +312,8 @@ export function refusal(provider: AgentRoute, status: number, raw: string, key: 
     return err(`${who} turned this down: your ${ACCOUNTS[provider]} key isn't valid. Check ${keyName} in .env.local, then restart Bops.`);
   if (balance)
     return err(
-      provider === "zai" || provider === "zai-coding"
-        ? `z.ai says your account has no balance or Coding Plan${provider === "zai-coding" ? " (this model runs on the Coding Plan)" : ""}. Top up or subscribe at z.ai, or pick another model.`
+      provider === "zai" || provider === "zai-coding" || provider === "zai-coding-cn"
+        ? `${who} says your account has no balance or Coding Plan${provider === "zai" ? "" : " (this model runs on the Coding Plan)"}. Top up or subscribe at ${provider === "zai-coding-cn" ? "open.bigmodel.cn" : "z.ai"}, or pick another model.`
         : `${who} says your ${ACCOUNTS[provider]} account has no credit left. Add some at ${BILLING[provider]}, or pick another model.`,
     );
   if (status === 429) return err(`${who} is getting too many requests from your key right now. Wait a minute and try again, or pick another model.`);

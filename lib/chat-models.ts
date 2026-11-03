@@ -15,6 +15,7 @@ export const BUILTIN_CHAT_MODELS: ChatModel[] = [
   { id: "anthropic/claude-haiku-5-5", name: "Claude Haiku 5.5", provider: "anthropic" },
   { id: "zai-coding/glm-5.3", name: "GLM 5.3 (Coding Plan)", provider: "zai-coding" },
   { id: "zai/glm-5.2", name: "GLM 5.2", provider: "zai" },
+  { id: "zai-coding-cn/glm-5.3", name: "GLM 5.3 (Coding Plan, China)", provider: "zai-coding-cn" },
   { id: "deepseek/deepseek-chat", name: "DeepSeek Chat", provider: "deepseek" },
   { id: "deepseek/deepseek-reasoner", name: "DeepSeek Reasoner", provider: "deepseek" },
 ];

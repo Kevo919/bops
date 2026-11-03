@@ -106,6 +106,22 @@ try {
     assert.match(warnings[0], /left out.*unknown/);
   });
 
+  test("LLMs: the China Coding Plan (zai-coding-cn) is its own provider, next to zai-coding, in the code and the file's list", () => {
+    assert.ok(llms.PROVIDERS.includes("zai-coding-cn") && llms.PROVIDERS.includes("zai-coding"));
+    const root = fixture("read-llms-cn", "llms.yaml", "llms:\n  - name: GLM China\n    provider: zai-coding-cn\n    model: glm-5.3\n    use_for: [coding]\n  - provider: ZAI-Coding-CN\n    model: glm-5.2\n  - provider: zai-coding-cnx\n    model: glm-5.3\n");
+    const warnings = [];
+    assert.deepEqual(llms.read(root, (text) => warnings.push(text)), [
+      { name: "GLM China", provider: "zai-coding-cn", model: "glm-5.3", useFor: ["coding"] },
+      { name: "glm-5.2", provider: "zai-coding-cn", model: "glm-5.2" },
+    ]);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /provider "zai-coding-cnx"/);
+    const yaml = readFileSync(new URL("../config/llms.yaml", import.meta.url), "utf8");
+    assert.match(yaml, /^#    zai-coding-cn .*open\.bigmodel\.cn/m, "the file's provider list names it");
+    assert.match(yaml, /ZAI_CODING_CN_API_KEY/, "and its key");
+    for (const p of llms.PROVIDERS) assert.match(yaml, new RegExp(`^#    ${p.replace(/[-]/g, "\\-")}\\s`, "m"), `${p} in the file's provider list`);
+  });
+
   test("Modules: missing, empty and malformed YAML safely read as empty", () => {
     assert.deepEqual(modules.read(fixture("missing-modules")), {});
     assert.deepEqual(modules.read(fixture("empty-modules", "bops.yaml", "# empty\n")), {});
