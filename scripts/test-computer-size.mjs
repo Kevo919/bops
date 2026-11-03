@@ -22,10 +22,12 @@ process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 process.env.BOPS_WAKE_WAIT_MS = "2000";
 // A path, not a URL's: a checkout under a folder with a space in its name works too.
 const root = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
+// A file URL for import specifiers, from this OS-path root.
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -132,13 +134,13 @@ globalThis.fetch = async (input, init = {}) => {
 };
 const asked = (method, path) => calls.filter((c) => c.method === method && c.path === path);
 
-const B = await import(`${root}/lib/bops-billing.ts`);
-const W = await import(`${root}/lib/computer-size.ts`);
-const S = await import(`${root}/lib/server/store.ts`);
-const L = await import(`${root}/lib/server/plan.ts`);
-const O = await import(`${root}/lib/server/orgo.ts`);
-const Z = await import(`${root}/lib/server/computer-size.ts`);
-const R = await import(`${root}/app/api/computer/size/route.ts`);
+const B = await import(fileUrl("lib/bops-billing.ts"));
+const W = await import(fileUrl("lib/computer-size.ts"));
+const S = await import(fileUrl("lib/server/store.ts"));
+const L = await import(fileUrl("lib/server/plan.ts"));
+const O = await import(fileUrl("lib/server/orgo.ts"));
+const Z = await import(fileUrl("lib/server/computer-size.ts"));
+const R = await import(fileUrl("app/api/computer/size/route.ts"));
 Z.sizeWait.pollMs = 5;
 // The Mac app's ways from here (cloud.ts cloudOn), with the state still in the test's file store.
 delete process.env.BOPS_SELF_HOSTED;
@@ -485,5 +487,7 @@ await test("Bops' plans never switch; one switch at a time", async () => {
 });
 
 console.log(`computer size: ${passed} passed (${calls.length} fake Orgo calls, none to the network)`);
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

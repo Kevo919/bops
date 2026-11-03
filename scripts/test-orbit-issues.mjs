@@ -17,19 +17,20 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.TZ = "America/New_York";
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.OPENAI_API_KEY = "sk-test-issues";
 process.env.HONCHO_API_KEY = "hc-test-issues";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-issues-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
@@ -40,7 +41,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -203,19 +204,19 @@ process.emitWarning = (warning, ...rest) => (rest[0]?.code === "MODULE_TYPELESS_
 const rejections = [];
 process.on("unhandledRejection", (e) => rejections.push(String(e?.stack ?? e)));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const Mem = await import(`${root}/lib/server/memory.ts`);
-const I = await import(`${root}/lib/server/orbit-issues.ts`);
-const O = await import(`${root}/lib/server/orbit.ts`);
-const Chat = await import(`${root}/lib/server/chat.ts`);
-const C = await import(`${root}/lib/routine-catalog.ts`);
-const R = await import(`${root}/app/api/orbit/issues/route.ts`);
-const R1 = await import(`${root}/app/api/orbit/issues/[id]/route.ts`);
-const RS = await import(`${root}/app/api/orbit/issues/[id]/source/route.ts`);
-const RDS = await import(`${root}/app/api/drafts/source/route.ts`);
-const IS = await import(`${root}/lib/server/issue-source.ts`);
-const RD = await import(`${root}/lib/server/reply-drafts.ts`);
-const { botChatId, MAIN_WORKSPACE } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const Mem = await import(`${rootUrl}/lib/server/memory.ts`);
+const I = await import(`${rootUrl}/lib/server/orbit-issues.ts`);
+const O = await import(`${rootUrl}/lib/server/orbit.ts`);
+const Chat = await import(`${rootUrl}/lib/server/chat.ts`);
+const C = await import(`${rootUrl}/lib/routine-catalog.ts`);
+const R = await import(`${rootUrl}/app/api/orbit/issues/route.ts`);
+const R1 = await import(`${rootUrl}/app/api/orbit/issues/[id]/route.ts`);
+const RS = await import(`${rootUrl}/app/api/orbit/issues/[id]/source/route.ts`);
+const RDS = await import(`${rootUrl}/app/api/drafts/source/route.ts`);
+const IS = await import(`${rootUrl}/lib/server/issue-source.ts`);
+const RD = await import(`${rootUrl}/lib/server/reply-drafts.ts`);
+const { botChatId, MAIN_WORKSPACE } = await import(`${rootUrl}/lib/types.ts`);
 clearInterval(globalThis.__bopsRoutines);
 
 /* ---------------- Helpers ---------------- */
@@ -921,7 +922,7 @@ await check("memory off, or signed out: no issues, and the routes say so", async
 await check("plain words, and nothing unexpected: no dashes, no stray warnings, no unknown Honcho calls about sessions, no rejections", () => {
   for (const s of spoken) noDashes(s, "in what was said");
   for (const file of ["lib/server/orbit-issues.ts", "lib/orbit-issues.ts", "lib/server/orbit.ts", "app/api/orbit/issues/route.ts", "app/api/orbit/issues/[id]/route.ts", "lib/server/issue-source.ts", "app/api/orbit/issues/[id]/source/route.ts", "app/api/drafts/source/route.ts"])
-    readFileSync(join(root, file), "utf8")
+    readFileSync(join(rootPath, file), "utf8")
       .split("\n")
       .forEach((line, n) => assert.ok(!/[–—]/.test(line), `${file}:${n + 1} has a dash`));
   assert.deepEqual(warned.filter((w) => /^\[issues\]/.test(w) && !/list: /.test(w)), []);
@@ -932,5 +933,7 @@ await check("plain words, and nothing unexpected: no dashes, no stray warnings, 
 
 console.log(`\nOrbit issues: ${passed} passed, ${failures} failed`);
 if (failures) console.log(`The throwaway folder is kept for a look: ${scratch}`);
-else rmSync(scratch, { recursive: true, force: true });
+else try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(failures ? 1 : 0);

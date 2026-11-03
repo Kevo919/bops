@@ -17,17 +17,19 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 
 for (const k of ["ORGO_API_KEY", "BOPS_ORGO_WORKSPACE", "BOPS_ORGO_TEMPLATE", "BOPS_DATABASE_URL", "AGENTMAIL_API_KEY", "OPENAI_API_KEY", "TAILSCALE_AUTH_KEY", "BOPS_WEBRTC", "BOPS_SCREEN_STREAM"]) delete process.env[k];
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 // Modules that would start processes when loaded (the Mac check, the relay's agent) or that Node can't load are
 // stand-ins: each of their exports does nothing.
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -82,10 +84,10 @@ globalThis.fetch = async (input, init = {}) => {
 };
 const asked = (method, path) => calls.filter((c) => c.method === method && c.path === path).length;
 
-const S = await import(`${root}/lib/server/store.ts`);
-const V = await import(`${root}/app/api/vnc/route.ts`);
-const R = await import(`${root}/lib/rtc.ts`);
-const T = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const V = await import(`${rootUrl}/app/api/vnc/route.ts`);
+const R = await import(`${rootUrl}/lib/rtc.ts`);
+const T = await import(`${rootUrl}/lib/types.ts`);
 
 S.update((s) => {
   s.host = "orgo";
@@ -119,7 +121,7 @@ p = await plan(99);
 assert.deepEqual([p.rtc, !!p.vnc], [undefined, true]);
 assert.equal(asked("POST", "/api/computers/c1/webrtc"), 1);
 assert.equal(orgo.madeRecord, undefined, "a stopped computer's record left alone");
-const O = await import(`${root}/lib/server/orgo.ts`);
+const O = await import(`${rootUrl}/lib/server/orgo.ts`);
 assert.equal(await O.orgo.webrtc("c1"), false, "setting a computer up doesn't turn it on while it's stopped either");
 assert.equal(asked("POST", "/api/computers/c1/webrtc"), 1);
 orgo.status = "running";
@@ -235,12 +237,12 @@ orgo.screens = [
   { id: "screen-100", display: ":100", width: 1280, height: 960, default: false },
   { id: "s-101", display: ":101", width: 1280, height: 960, default: false },
 ];
-const C = await import(`${root}/app/api/computer/route.ts`);
+const C = await import(`${rootUrl}/app/api/computer/route.ts`);
 const viewed = await (await C.GET(new Request(`http://localhost:3210/api/computer?bot=${main().id}`))).json();
 assert.equal(viewed.screens, undefined, "the computer view doesn't read the list");
 assert.equal(asked("GET", "/api/computers/c1/screens"), 1);
 // A minute on (or a click read it fresh): the new list.
-const SC = await import(`${root}/lib/server/screens.ts`);
+const SC = await import(`${rootUrl}/lib/server/screens.ts`);
 await SC.screensOf("c1", true);
 p = await plan(101);
 assert.deepEqual([p.screen, p.vnc], ["s-101", `wss://orgo.test/desktops/c1/ws/websockify?${token}&screen=s-101`], "Orgo's id from the list the app has");
@@ -339,5 +341,7 @@ assert.equal(R.wheelClicks(0, 5000, 0).clicks, 10, "at most 10 clicks an event")
 console.log("client: retry waits, a stream smaller than the screen, what a VNC stream does by its close code, Orgo's frames, clicks onto the picture, buttons and the wheel");
 
 console.log(`all stream tests passed (${calls.length} fake Orgo calls, none to the network)`);
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

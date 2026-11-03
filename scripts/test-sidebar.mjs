@@ -19,11 +19,12 @@ import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -68,11 +69,11 @@ globalThis.localStorage = {
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
 
-const { Sidebar } = await import(pathToFileURL(`${root}/components/app/sidebar.tsx`).href);
-const S = await import(pathToFileURL(`${root}/components/app/sidebar-sections.tsx`).href);
-const F = await import(pathToFileURL(`${root}/lib/favorites.ts`).href);
-const Fav = await import(pathToFileURL(`${root}/components/app/favorites.tsx`).href);
-const { MemoryPage } = await import(pathToFileURL(`${root}/components/app/memory-categories.tsx`).href);
+const { Sidebar } = await import(`${rootUrl}/components/app/sidebar.tsx`);
+const S = await import(`${rootUrl}/components/app/sidebar-sections.tsx`);
+const F = await import(`${rootUrl}/lib/favorites.ts`);
+const Fav = await import(`${rootUrl}/components/app/favorites.tsx`);
+const { MemoryPage } = await import(`${rootUrl}/components/app/memory-categories.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -493,7 +494,7 @@ await test("Threads: a search still lists the matching ones flat under Threads",
 /* ---------------- The workspace menu's Team chart row ---------------- */
 
 await test("the workspace menu has a Team chart row for the open workspace, the owner's own only", async () => {
-  const { WorkspaceSwitcher } = await import(pathToFileURL(`${root}/components/app/sidebar.tsx`).href);
+  const { WorkspaceSwitcher } = await import(`${rootUrl}/components/app/sidebar.tsx`);
   const menu = (state, onTeamChart = noop) => renderToStaticMarkup(h(WorkspaceSwitcher, { state, opened: true, sharedList: [], onTeamChart }));
   assert.match(menu(world()), /data-team-chart-row="true"[^>]*>[\s\S]*?Org chart<span[^>]*>[^<]*<\/span><\/button>/);
   // Through the sidebar too.
