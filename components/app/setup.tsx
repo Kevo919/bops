@@ -496,7 +496,7 @@ function FullAccessCard({ items }: { items: Items }) {
       chip={on ? "On" : undefined}
       line={`Bots' tasks on ${here} get a shell, your files and your apps, outside ${windows ? "Codex's sandbox" : "Bops' sandbox"}. Anything you could do here, they can.`}
       tone={on ? (set || !items.perms.inApp ? "ok" : "todo") : "off"}
-      status={on ? (set || !items.perms.inApp ? "Bots can use your files and apps" : "Two steps left, so macOS never stops a bot mid-task") : `Off: bots on ${here} only browse, in a Chrome of their own`}
+      status={on ? (set || !items.perms.inApp ? "Bots can use your files and apps" : "Two steps left, so macOS never stops a bot mid-task") : windows ? "Off: bots browse in a Chrome of their own. On Windows, Codex's sandbox limits what they write, not what they can read" : `Off: bots on ${here} only browse, in a Chrome of their own`}
       below={on && items.perms.inApp && !windows ? <FullAccessSetup items={items} /> : undefined}
     >
       <button onClick={() => void post("/api/mac", { fullAccess: !on }, "PATCH")} className={on ? light : dark}>
@@ -519,7 +519,8 @@ function PhoneCard() {
   const load = useCallback(() => void fetch("/api/remote").then((x) => (x.ok ? x.json() : null)).then(setR).catch(() => {}), []);
   useEffect(load, [load]);
   if (!r) return null;
-  const where = r.addresses.public ?? r.addresses.tailnet[0] ?? r.addresses.home[0] ?? null;
+  // Never a home-network (plain http) address: the code would cross the wifi unencrypted.
+  const where = r.addresses.public ?? r.addresses.tailnet[0] ?? null;
   const pairNow = async () => {
     const res = await post("/api/remote", {});
     const body = (await res.json().catch(() => null)) as Remote | null;
@@ -550,7 +551,7 @@ function PhoneCard() {
           <div className="flex flex-col gap-1.5 text-[12.5px] leading-5">
             <span className="text-pencil">In the Bops app on your phone, enter:</span>
             <span>
-              Address: <code className="select-all font-mono">{where ?? "this computer's address"}</code>
+              Address: <code className="select-all font-mono">{where ?? "none yet: turn on Tailscale on this computer"}</code>
             </span>
             <span>
               Pairing code: <code className="select-all break-all font-mono">{code}</code>

@@ -685,11 +685,13 @@ const WINDOWS_KEPT = ["SystemRoot", "SystemDrive", "windir", "ComSpec", "PATHEXT
 /**
  * How to start `codex exec-server` for a task on a Windows PC. Windows has no sandbox-exec, so:
  *
- * - Chrome only (Full access off, the default): Codex runs inside its own Windows sandbox, set in the
- *   task's Codex home (config.toml below). In "elevated" mode Codex runs each command as a separate,
- *   restricted Windows user it sets up once (Windows asks the user for an admin OK the first time):
- *   that user can't read this user's files and writes only in the task's folder. The task's home and temp are its own folder, its environment carries
- *   nothing of the server's, and its browser tools are the stay-in-the-browser list (MAC_BROWSER_TOOLS).
+ * - Chrome only (Full access off, the default): Codex runs with its own Windows sandbox asked for in the
+ *   task's Codex home (config.toml below): "elevated" runs each command as a separate, restricted Windows
+ *   user (Windows asks for an admin OK the first time) that writes only in the task's folder. This is
+ *   weaker than the Mac's sandbox, which allows no shell at all: on Windows a task's commands may still
+ *   read the user's files and use the network, and whether exec-server takes this config (rather than
+ *   the policy the Agents API sends) is untested. The task's home and temp are its own folder, its
+ *   environment carries nothing of the server's, and its browser tools are the stay-in-the-browser list.
  * - Full access on (Settings, This computer): no sandbox, as on the Mac. Codex runs as the user, with
  *   their home, a shell and their programs. Its Codex home and temp folder are still the task's own.
  */

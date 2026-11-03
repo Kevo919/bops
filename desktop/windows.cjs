@@ -93,17 +93,18 @@ function killBotChrome() {
  * source in development) or the bundled server (BOPS_SERVER_JS), the first of a chain (npx, then node).
  */
 function listener(port, dirs = []) {
-  const like = dirs.map((d) => `$_.CommandLine -like '*${String(d).replace(/'/g, "''")}*'`).join(" -or ") || "$false";
   const script = `$c = Get-NetTCPConnection -LocalPort ${Number(port)} -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 4 } | Select-Object -First 1
 if ($c) { $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($c.OwningProcess)" }
 elseif (Get-NetTCPConnection -LocalPort ${Number(port)} -State Listen -ErrorAction SilentlyContinue) {
-  $all = @(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and (($_.CommandLine -like '*next*' -and (${like})) -or $_.CommandLine -like '*BOPS_SERVER_JS*') })
+  $dirs = @($env:BOPS_FIND_DIRS -split [char]10 | Where-Object { $_ })
+  $all = @(Get-CimInstance Win32_Process | Where-Object { $c = $_.CommandLine; $c -and (($c.Contains('next') -and @($dirs | Where-Object { $c.ToLower().Contains($_.ToLower()) }).Count) -or $c.Contains('BOPS_SERVER_JS')) })
   $ids = $all | ForEach-Object { $_.ProcessId }
   $p = $all | Where-Object { $ids -notcontains $_.ParentProcessId } | Select-Object -First 1
 }
 if ($p) { "$($p.ProcessId)|$($p.ParentProcessId)|$($p.Name)|$($p.CommandLine)" }`;
   return new Promise((resolve) =>
-    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 10000 }, (err, out) => {
+    // The folders go in the environment, never into the script: a path is the user's, not code.
+    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 10000, env: { ...process.env, BOPS_FIND_DIRS: dirs.join("\n") } }, (err, out) => {
       const m = /^(\d+)\|(\d+)\|([^|]*)\|(.*)$/m.exec(String(out ?? "").trim());
       if (err || !m) return resolve(null);
       resolve({ pid: Number(m[1]), ppid: Number(m[2]), name: m[3] || "a program", cmdline: m[4] });

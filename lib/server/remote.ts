@@ -52,5 +52,7 @@ export function addresses(port = process.env.PORT ?? "3210") {
   const tailnet = all.filter((a) => /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a));
   const home = all.filter((a) => !tailnet.includes(a) && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a));
   const url = (a: string) => `http://${a}:${port}`;
-  return { tailnet: tailnet.map(url), home: home.map(url), public: process.env.BOPS_PUBLIC_URL ?? null };
+  // Home-network addresses are listed for what they are, not offered to pair with: plain http on the
+  // wifi would carry the pairing code where anyone on it could read it. Tailscale encrypts its own.
+  return { tailnet: tailnet.map(url), home: home.map(url), public: process.env.BOPS_PUBLIC_URL?.startsWith("https://") ? process.env.BOPS_PUBLIC_URL : null };
 }

@@ -78,6 +78,10 @@ bops.example.com {
 
 On the server: `cd ~/bops && node scripts/pair-phone.mjs`. It prints a pairing code once. In the Bops app on your phone, enter `https://bops.example.com` and that code. Run it again to pair a new phone (the old code stops working), or with `--off` to unpair.
 
+## What the paired phone can do here
+
+On a server there is no Bops window, so the paired phone is the owner: it can do everything, Settings included (on a PC, a few settings stay in the PC's window). Keep the code to yourself. Pages and files bots made are reachable by their long random links, as on a PC.
+
 ## Updating
 
 ```bash

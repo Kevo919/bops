@@ -44,7 +44,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (address == null || code == null) showSetup(null) else open(address!!, code!!)
+        // An address kept by an older version that this one wouldn't take asks again.
+        if (address == null || code == null || safeAddress(address!!) != null) showSetup(null) else open(address!!, code!!)
     }
 
     /** The address and pairing code, checked against the server before they're kept. */
@@ -77,6 +78,7 @@ class MainActivity : Activity() {
         go.setOnClickListener {
             val a = addr.text.toString().trim().trimEnd('/').let { if (it.startsWith("http")) it else "http://$it" }
             val c = pass.text.toString().trim()
+            safeAddress(a)?.let { status.text = it; return@setOnClickListener }
             if (c.length < 32) { status.text = "That pairing code is too short. Copy the whole code."; return@setOnClickListener }
             go.isEnabled = false
             status.setTextColor(Color.DKGRAY); status.text = "Checking…"
@@ -93,6 +95,29 @@ class MainActivity : Activity() {
                 }
             }
         }
+    }
+
+    /**
+     * Null when the code may go to this address: https anywhere, plain http only to a Tailscale address
+     * (100.64.0.0/10), which Tailscale encrypts itself. On the home wifi plain http would carry the code
+     * where anyone on the network could read it.
+     */
+    private fun safeAddress(a: String): String? {
+        val u = Uri.parse(a)
+        val host = u.host ?: return "That isn't an address."
+        if (u.scheme == "https") return null
+        if (u.scheme != "http") return "The address starts with http:// or https://."
+        val parts = host.split(".").mapNotNull { it.toIntOrNull() }
+        val tailnet = parts.size == 4 && parts[0] == 100 && parts[1] in 64..127
+        return if (tailnet) null else "Use your computer's Tailscale address (100.x.y.z) or an https address, so the code isn't sent unencrypted."
+    }
+
+    /** The same site as your Bops: scheme, host and port all equal (not just a matching start). */
+    private fun sameSite(url: String, address: String): Boolean {
+        val a = Uri.parse(address)
+        val b = Uri.parse(url)
+        fun port(u: Uri) = if (u.port != -1) u.port else if (u.scheme == "https") 443 else 80
+        return a.scheme == b.scheme && a.host.equals(b.host, ignoreCase = true) && port(a) == port(b)
     }
 
     /** Null when the server answers as Bops and takes the code; otherwise what's wrong, in words. */
@@ -134,9 +159,17 @@ class MainActivity : Activity() {
             webViewClient = object : WebViewClient() {
                 // Links away from your Bops open in the phone's browser, not inside the app.
                 override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
-                    if (req.url.toString().startsWith(address)) return false
+                    if (sameSite(req.url.toString(), address)) return false
                     startActivity(Intent(Intent.ACTION_VIEW, req.url))
                     return true
+                }
+                // A page that ends up somewhere else (a redirect) is left, not shown in the app.
+                override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                    if (!sameSite(url, address)) {
+                        view.stopLoading()
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        if (view.canGoBack()) view.goBack() else view.loadUrl("$address/")
+                    }
                 }
                 override fun onReceivedHttpError(view: WebView, req: WebResourceRequest, res: WebResourceResponse) {
                     // The code stopped working (unpaired, or paired again elsewhere): back to setup.
@@ -152,7 +185,7 @@ class MainActivity : Activity() {
                 }
                 override fun onPermissionRequest(request: PermissionRequest) {
                     // Only the microphone, only for your own Bops (a call with a bot).
-                    if (!request.origin.toString().startsWith(address) || !request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) return request.deny()
+                    if (!sameSite(request.origin.toString(), address) || !request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) return request.deny()
                     if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
                     else { pendingMic = request; requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC) }
                 }

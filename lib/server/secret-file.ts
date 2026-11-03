@@ -9,9 +9,10 @@ import { dataRoot } from "./user-paths";
  * .data/secrets.enc.json, each value sealed with AES-256-GCM. The file alone is useless: its key is
  * kept somewhere else.
  *
- * - On Windows the key lives in Windows Credential Manager (under "Bops Vault"), which only this
- *   Windows user can read, the way the Mac keeps its secrets in its Keychain. (Credential Manager
- *   caps each entry at about 2.5 KB, which is why only the key goes there and not the secrets.)
+ * - On Windows the key lives in Windows Credential Manager (under "Bops Vault"), out of other Windows
+ *   users' reach. Unlike the Mac's Keychain, Windows doesn't ask before another program of this same
+ *   user reads it: anything running as you (a bot task with Full access among them) could. (Each
+ *   entry holds about 2.5 KB at most, which is why only the key goes there and not the secrets.)
  * - On Linux the key is BOPS_SECRET_KEY (64 hex characters, set it in .env.local or the service's
  *   environment); without it, one is made once in .data/secret.key, readable by this user only.
  *
@@ -31,18 +32,15 @@ let keyPromise: Promise<Buffer> | undefined;
 async function windowsKey(): Promise<Buffer> {
   const { Entry } = (await import("@napi-rs/keyring")) as typeof import("@napi-rs/keyring");
   const entry = new Entry(SERVICE, KEY_ACCOUNT);
-  let hex: string | null = null;
-  try {
-    hex = entry.getPassword() ?? null;
-  } catch {}
-  if (!hex || !/^[0-9a-f]{64}$/i.test(hex)) {
-    // A key made now with no file yet is fine; a key made now for a file that exists means the old
-    // key is gone (another Windows user, a reset), and what the file holds can't be read again.
-    if (existsSync(file())) console.warn("[secrets] the key for .data/secrets.enc.json is missing; saved logins and tokens need entering again");
-    hex = randomBytes(32).toString("hex");
-    entry.setPassword(hex);
-  }
-  return Buffer.from(hex, "hex");
+  // Any error reading it (Credential Manager locked or unavailable) stops here: making a new key then
+  // would leave every saved secret unreadable for good. Only "there is none" makes one.
+  const hex = entry.getPassword() ?? null;
+  if (hex && /^[0-9a-f]{64}$/i.test(hex)) return Buffer.from(hex, "hex");
+  if (hex) throw new Error("The key for Bops' saved secrets in Windows Credential Manager isn't one Bops made.");
+  if (existsSync(file()) && Object.keys(load()).length) throw new Error("The key for Bops' saved secrets is missing from Windows Credential Manager, so .data/secrets.enc.json can't be read.");
+  const made = randomBytes(32).toString("hex");
+  entry.setPassword(made);
+  return Buffer.from(made, "hex");
 }
 
 /** Linux: BOPS_SECRET_KEY, else a key file next to the secrets, made once. */
@@ -52,21 +50,43 @@ function linuxKey(): Buffer {
     if (!/^[0-9a-f]{64}$/i.test(env)) throw new Error("BOPS_SECRET_KEY must be 64 hex characters (openssl rand -hex 32)");
     return Buffer.from(env, "hex");
   }
+  // On the internet the key never sits next to the secrets: a copy of .data would hold both.
+  if (process.env.BOPS_REQUIRE_REMOTE === "1") throw new Error("Set BOPS_SECRET_KEY (openssl rand -hex 32) on a server on the internet.");
+  console.warn("[secrets] no BOPS_SECRET_KEY: the key is kept in .data/secret.key, next to the secrets it opens");
   const keyFile = join(dataRoot(), "secret.key");
-  if (existsSync(keyFile)) return Buffer.from(readFileSync(keyFile, "utf8").trim(), "hex");
+  if (existsSync(keyFile)) {
+    const hex = readFileSync(keyFile, "utf8").trim();
+    if (!/^[0-9a-f]{64}$/i.test(hex)) throw new Error(".data/secret.key isn't a whole key (64 hex characters).");
+    return Buffer.from(hex, "hex");
+  }
   mkdirSync(dirname(keyFile), { recursive: true });
   const hex = randomBytes(32).toString("hex");
   writeFileSync(keyFile, `${hex}\n`, { mode: 0o600 });
   return Buffer.from(hex, "hex");
 }
 
-const key = () => (keyPromise ??= process.platform === "win32" ? windowsKey() : Promise.resolve().then(linuxKey));
+/** The key, read once; a failed read isn't kept, so the next use tries again. */
+const key = () => {
+  keyPromise ??= (process.platform === "win32" ? windowsKey() : Promise.resolve().then(linuxKey)).catch((e) => {
+    keyPromise = undefined;
+    throw e;
+  });
+  return keyPromise;
+};
 
+/**
+ * The sealed secrets. A file that can't be read as such is set aside (secrets.enc.json.corrupt-<time>),
+ * never written over: the next save would otherwise drop every secret it still held.
+ */
 function load(): Record<string, Sealed> {
   if (cache) return cache;
+  if (!existsSync(file())) return (cache = {});
   try {
-    cache = existsSync(file()) ? (JSON.parse(readFileSync(file(), "utf8")) as Record<string, Sealed>) : {};
+    cache = JSON.parse(readFileSync(file(), "utf8")) as Record<string, Sealed>;
   } catch {
+    const aside = `${file()}.corrupt-${Date.now()}`;
+    renameSync(file(), aside);
+    console.warn(`[secrets] .data/secrets.enc.json couldn't be read; set aside as ${aside}`);
     cache = {};
   }
   return cache;
