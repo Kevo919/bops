@@ -8,6 +8,8 @@ import { findCodex } from "./codex-cli";
 export type LocalSubscriptionKind = "codex" | "claude";
 export type LocalSubscriptionStatus = { kind: LocalSubscriptionKind; available: boolean; connected: boolean; state: "missing" | "signed-out" | "connecting" | "connected" | "error"; error?: string; loginUrl?: string; account?: string; plan?: string; checkedAt: number };
 const allowedEnvironment = new Set(["PATH", "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP", "TMPDIR", "APPDATA", "LOCALAPPDATA", "LANG", "LC_ALL", "DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"]);
+// Proxy and certificate overrides (including HTTPS_PROXY/NODE_EXTRA_CA_CERTS)
+// deliberately stay outside this allowlist; managed proxy logins are unsupported.
 export function localSubscriptionRuntime(kind: LocalSubscriptionKind) {
   const env: NodeJS.ProcessEnv = { NODE_ENV: "production" };
   for (const [key, value] of Object.entries(process.env)) if (allowedEnvironment.has(key.toUpperCase()) && value !== undefined) env[key] = value;
@@ -39,10 +41,13 @@ const args = (kind: LocalSubscriptionKind, action: "status" | "login" | "logout"
   return ["-c", 'forced_login_method="chatgpt"', "login", ...(action === "status" ? ["status"] : [])];
 };
 function providerUrl(kind: LocalSubscriptionKind, text: string): string | undefined {
+  // Claude's printed URL requires pasting a code into the CLI, which Bops cannot
+  // accept. Only its automatically opened browser flow can complete here.
+  if (kind === "claude") return undefined;
   for (const candidate of text.match(/https:\/\/[^\s<>"']+/g) ?? []) {
     try {
       const u = new URL(candidate);
-      const hosts = kind === "codex" ? ["auth.openai.com", "chatgpt.com"] : ["claude.ai", "console.anthropic.com", "platform.claude.com"];
+      const hosts = ["auth.openai.com", "chatgpt.com"];
       if (u.protocol === "https:" && !u.username && !u.password && !u.port && hosts.includes(u.hostname) && /(?:oauth|authorize|device)/.test(u.pathname)) return u.href;
     } catch { /* untrusted CLI output */ }
   }

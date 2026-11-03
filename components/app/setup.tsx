@@ -36,33 +36,36 @@ import { HandyCard } from "./handy-card";
 /** The local official CLIs keep their own logins; cloud accounts remain computer-specific. */
 export function AiSubscriptionsCard({ state, onShowScreen, onOpenVault }: { state: AppState; onShowScreen: (botId: string, display: number) => void; onOpenVault: () => void }) {
   const selfHosted = useSelfHosted();
+  const desktop = useMacApp();
+  const localAvailable = selfHosted && desktop;
   const [target, setTarget] = useState<"pc" | "cloud">("pc");
+  const localSelected = localAvailable && target === "pc";
   const bots = teamOf(state).filter((b) => state.host !== "mac" && b.runsOn !== "mac");
   const [selected, setSelected] = useState("");
   const b = bots.find((x) => x.id === selected) ?? bots[0];
-  const keys = useVaultKeyNames(b ? workspaceOf(b) : "", target === "cloud" && BRAINS_ON && !!b && !state.shared);
+  const keys = useVaultKeyNames(b ? workspaceOf(b) : "", !localSelected && BRAINS_ON && !!b && !state.shared);
   if (state.shared) return null;
   return (
     <section aria-label="AI subscriptions" className="mx-[22px] mt-4 flex shrink-0 flex-col gap-3 rounded-2xl bg-[#FAFAF9] p-4 shadow-[0_0_0_1px_#E6E6E3]">
       <h2 className="text-[15px] font-semibold">AI subscriptions</h2>
       <div role="group" aria-label="Where to connect subscriptions" className="flex flex-wrap gap-2">
-        <button type="button" aria-pressed={target === "pc"} onClick={() => setTarget("pc")} className={target === "pc" ? dark : light}>This PC</button>
-        <button type="button" aria-pressed={target === "cloud"} onClick={() => setTarget("cloud")} className={target === "cloud" ? dark : light}>Bot cloud computer</button>
+        {localAvailable && <button type="button" aria-pressed={localSelected} onClick={() => setTarget("pc")} className={localSelected ? dark : light}>This PC</button>}
+        <button type="button" aria-pressed={!localSelected} onClick={() => setTarget("cloud")} className={!localSelected ? dark : light}>Bot cloud computer</button>
       </div>
-      {target === "pc" ? <>
+      {localSelected ? <>
         <p className="text-[12px] leading-5 text-[#6B6B6B]">Sign in through the official CLI in your normal browser. Its login stays on this PC across restarts. No bot computer or AI profile is needed to connect. Tasks with your plan run on a bot&apos;s cloud computer; tasks on this PC are coming later.</p>
         <LocalSubscriptions />
         <div className="rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]"><h3 className="font-semibold">z.ai GLM Coding Plan</h3><p className="my-2">Connect with a key from your Coding Plan account in Keys. This is not a browser sign-in; a saved Z.ai key alone does not verify a subscription.</p><button type="button" onClick={onOpenVault} className={light}>Manage Coding Plan key</button></div>
       </> : <>
         <p className="text-[12px] leading-5 text-[#6B6B6B]">Cloud subscriptions power tasks on the selected bot&apos;s computer. Sign-in opens on that computer&apos;s screen. This does not connect the subscription on your PC.</p>
-        {!BRAINS_ON ? <p role="status" className="text-[12px]">Cloud agent harnesses are off in this build. Enable Agent harnesses in Settings → This Mac → Modules, then rebuild Bops. Local subscription sign-in is available on the This PC tab.</p> : <>
+        {!BRAINS_ON ? <p role="status" className="text-[12px]">Cloud agent harnesses are off in this build. Enable Agent harnesses in Settings → This Mac → Modules, then rebuild Bops. {localAvailable ? "Local subscription sign-in is available on the This PC tab." : "Local subscription sign-in is available in the self-hosted desktop app."}</p> : <>
           <label className="flex flex-wrap items-center gap-2 text-[12px]">Connect on
             <select aria-label="Subscription bot and computer" value={b?.id ?? ""} disabled={!b} onChange={(e) => setSelected(e.target.value)} className="min-w-0 max-w-full rounded-lg border border-[#E6E6E3] bg-white p-2">
               {!b && <option value="">No cloud bot available</option>}
               {bots.map((bot) => <option key={bot.id} value={bot.id}>{bot.name} · {workBot(bot, state.bots).computerId ? `${workBot(bot, state.bots).name}'s computer` : "computer will be set up when you sign in"}</option>)}
             </select>
           </label>
-          {!b && <p className="text-[12px]">No bot is set to work on a cloud computer. Connect on This PC, or change where your bot works first.</p>}
+          {!b && <p className="text-[12px]">No bot is set to work on a cloud computer. {localAvailable ? "Connect on This PC, or change where your bot works first." : "Change where your bot works first."}</p>}
           {(["claude", "codex", "zai"] as const).map((kind) => <SubscriptionRow key={`${b?.id}:${kind}`} kind={kind} state={state} bot={b} keys={keys} selfHosted={selfHosted} onShowScreen={onShowScreen} onOpenVault={onOpenVault} />)}
         </>}
       </>}
@@ -88,17 +91,18 @@ export function LocalSubscriptions() {
   const [logout, setLogout] = useState<LocalSubscription["kind"] | null>(null);
   const pending = useRef<AbortController | null>(null);
   const active = useRef(true);
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (kind?: LocalSubscription["kind"]) => {
     pending.current?.abort();
     const controller = new AbortController(); pending.current = controller;
     const timer = setTimeout(() => controller.abort(), 20000);
     try {
-      const response = await fetch("/api/local-subscriptions", { cache: "no-store", signal: controller.signal });
+      const response = await fetch(`/api/local-subscriptions${kind ? `?kind=${kind}` : ""}`, { cache: "no-store", signal: controller.signal });
       const j = await response.json();
       if (!response.ok) throw new Error(j.error ?? "Couldn't check local subscriptions.");
       if (!Array.isArray(j.subscriptions)) throw new Error("Bops returned no subscription status. Try Check connection.");
       const next = j.subscriptions.map(localSnapshot);
-      if (active.current && pending.current === controller) { setRows(next); setError(null); }
+      if (kind && (next.length !== 1 || next[0].kind !== kind)) throw new Error("Bops returned a different subscription status.");
+      if (active.current && pending.current === controller) { setRows((old) => kind ? [...(old ?? []).filter((r) => r.kind !== kind), ...next] : next); setError(null); }
     } catch (e) { if (active.current && pending.current === controller) setError(controller.signal.aborted ? "Checking local subscriptions timed out. Try Check connection." : e instanceof Error ? e.message : "Couldn't reach Bops."); }
     finally { clearTimeout(timer); if (pending.current === controller) pending.current = null; }
   }, []);
@@ -108,10 +112,12 @@ export function LocalSubscriptions() {
     queueMicrotask(() => { if (!cancelled) void refresh(); });
     return () => { cancelled = true; active.current = false; pending.current?.abort(); };
   }, [refresh]);
-  const connecting = rows?.some((r) => r.state === "connecting");
+  const connecting = rows?.filter((r) => r.state === "connecting").map((r) => r.kind).sort().join(",");
   useEffect(() => {
     if (!connecting || busy) return;
-    const timer = setInterval(() => { if (!pending.current) void refresh(); }, 2000);
+    const kinds = connecting.split(",") as LocalSubscription["kind"][];
+    let next = 0;
+    const timer = setInterval(() => { if (!pending.current) void refresh(kinds[next++ % kinds.length]); }, 2000);
     return () => clearInterval(timer);
   }, [connecting, busy, refresh]);
   const action = async (kind: LocalSubscription["kind"], operation: "login" | "cancel" | "logout") => {
@@ -137,19 +143,20 @@ export function LocalSubscriptions() {
       const provider = kind === "codex" ? "ChatGPT" : "Claude";
       const rawPlan = typeof s?.plan === "string" ? s.plan.trim() : "";
       const knownPlan = rawPlan ? rawPlan.charAt(0).toUpperCase() + rawPlan.slice(1) : "";
-      const link = s?.state === "connecting" ? loginLink(s.loginUrl) : undefined;
+      const link = kind === "codex" && s?.state === "connecting" ? loginLink(s.loginUrl) : undefined;
       return <div key={kind} className="flex flex-col gap-2 rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]">
         <h3 className="text-[13px] font-semibold">{kind === "codex" ? "ChatGPT Plus/Pro" : "Claude Pro/Max"} · This PC</h3>
         <p>{kind === "codex" ? "Connect the official Codex account on this PC. ChatGPT subscription chat and local subscription tasks are not enabled yet." : "Connect Claude Code's own subscription on this PC. Local subscription tasks are not enabled yet. Claude subscriptions do not power Bops chat."}</p>
         <p role="status">{!s ? "Status not checked yet." : s.state === "missing" ? `${kind === "codex" ? "Codex" : "Claude Code"} CLI was not found on this PC.` : s.state === "connecting" ? "Finish signing in in your normal browser. Bops will check automatically." : s.state === "error" ? "The subscription could not be confirmed." : s.connected ? `Connected: your ${provider}${knownPlan ? ` ${knownPlan}` : ""} subscription` : "Not signed in on this PC."}</p>
         {s?.error && <p role="alert" className="text-[#B00020]">{s.error}</p>}
-        {s?.state === "missing" && <p>Install the official {kind === "codex" ? "Codex" : "Claude Code"} CLI on this PC, then check the connection again.</p>}
+        {s?.state === "missing" && <p>{kind === "codex" ? "Install the official Codex CLI on this PC" : "Install Claude Code using its official native installer (the npm claude.cmd launcher is not used)"}, then check the connection again.</p>}
+        {kind === "claude" && <p>Complete sign-in only in the browser opened automatically by Claude Code. Bops cannot accept a pasted authorization code. If no browser opens, cancel and try the native CLI directly.</p>}
         {s?.connected && <p className="text-[#6B6B6B]">{typeof s.account === "string" && s.account ? s.account : "Account details unavailable"}{!knownPlan ? ". The CLI did not report the plan tier." : ""}</p>}
         {typeof s?.checkedAt === "number" && Number.isFinite(s.checkedAt) && <p className="text-[#6B6B6B]">Last checked: {new Date(s.checkedAt).toLocaleString()}</p>}
         {link && <a href={link} target="_blank" rel="noopener noreferrer" className="underline">Open official sign-in page</a>}
         <div className="flex flex-wrap gap-2">
           {s?.state === "connecting" ? <button type="button" disabled={!!busy} onClick={() => void action(kind, "cancel")} className={light}>Cancel {provider} sign-in</button> : s?.connected ? <button type="button" disabled={!!busy} onClick={() => setLogout(kind)} className={light}>Sign out of {provider} on this PC</button> : <button type="button" disabled={!s?.available || !!busy} onClick={() => void action(kind, "login")} className={dark}>{busy === kind ? "Opening sign-in…" : `Sign in with your ${provider} subscription`}</button>}
-          <button type="button" disabled={!!busy} onClick={() => void refresh()} className={light}>Check {provider} connection</button>
+          <button type="button" disabled={!!busy} onClick={() => void refresh(kind)} className={light}>Check {provider} connection</button>
         </div>
         {logout === kind && <div role="alertdialog" aria-label={`Sign out of ${provider}`} className="rounded-lg bg-[#FFF8EB] p-3"><p>This signs the official {kind === "codex" ? "Codex" : "Claude Code"} CLI out on this PC, including its use outside Bops. Existing tasks may lose access.</p><div className="mt-2 flex gap-2"><button type="button" disabled={!!busy} onClick={() => void action(kind, "logout")} className={dark}>Confirm sign out</button><button type="button" disabled={!!busy} onClick={() => setLogout(null)} className={light}>Keep signed in</button></div></div>}
       </div>;
