@@ -40,8 +40,9 @@ globalThis.location = { origin: "http://localhost:3210" };
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { createRoot } = await import("react-dom/client");
 const { createElement: h, act } = await import("react");
-process.env.NEXT_PUBLIC_BOPS_BRAINS = "1";
-const { SubscriptionRow } = await import(pathToFileURL(`${root}/components/app/setup.tsx`).href);
+const BRAINS_OFF = process.argv.includes("--brains-off");
+process.env.NEXT_PUBLIC_BOPS_BRAINS = BRAINS_OFF ? "0" : "1";
+const { SubscriptionRow, AiSubscriptionsCard, LocalSubscriptions } = await import(pathToFileURL(`${root}/components/app/setup.tsx`).href);
 const calls = [], shown = [];
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const bot = { id: "boppy", name: "Boppy", isMain: true, workspaceId: "ws_main", computerId: "pc-main", computerStatus: "ready", ai: { agents: [{ id: "bops", kind: "bops", pays: "credit" }], default: "bops" } };
@@ -57,10 +58,10 @@ globalThis.fetch = async (input, init = {}) => {
 };
 const props = { kind: "codex", state, bot, selfHosted: true, onShowScreen: (...args) => shown.push(args), onOpenVault() {} };
 const settle = () => new Promise((r) => setTimeout(r, 5));
-async function mount(extra = {}) {
+async function mount(extra = {}, Component = SubscriptionRow) {
   const box = document.createElement("div"); document.body.appendChild(box);
   const root = createRoot(box);
-  await act(async () => { root.render(h(SubscriptionRow, { ...props, ...extra })); await settle(); });
+  await act(async () => { root.render(h(Component, { ...props, ...extra })); await settle(); });
   return { box, done: async () => { await act(async () => root.unmount()); box.remove(); } };
 }
 const button = (box, label) => [...box.querySelectorAll("button")].find((b) => b.textContent === label);
@@ -69,6 +70,7 @@ const click = async (box, label) => {
   await act(async () => { b.dispatchEvent(new win.Event("click", { bubbles: true })); await settle(); });
 };
 const addedResponse = () => json({ added: added.id, ai: { agents: [added], default: "bops" } });
+if (!BRAINS_OFF) {
 answer = (path) => path === "/api/bots/ai" ? addedResponse() : json({ botId: bot.id, display: 100 });
 let m = await mount();
 await click(m.box, "Sign in with your subscription");
@@ -128,3 +130,72 @@ assert.deepEqual(calls, [{ path: "/api/bots/ai", method: "POST", body: { botId: 
 await m.done();
 console.log("ok Coding Plan disconnect removes only its selected agent, never the shared key");
 console.log("subscriptions ui: 5 passed");
+}
+
+const local = (kind, state = "signed-out", extra = {}) => ({ kind, state, available: state !== "missing", connected: state === "connected", checkedAt: 1700000000000, ...extra });
+let snapshots = [local("codex"), local("claude", "missing", { error: "Install Claude Code, then check again." })];
+calls.length = 0;
+answer = (path, body) => {
+  if (path === "/api/config") return json({ selfHosted: true });
+  assert.equal(path, "/api/local-subscriptions", "no cloud APIs are needed for local sign-in");
+  if (!body) return json({ subscriptions: snapshots });
+  assert.equal(body.kind, "codex");
+  const subscription = body.action === "login" ? local("codex", "connecting", { loginUrl: "https://auth.openai.com/oauth/authorize?fixture=only" }) : local("codex");
+  snapshots = [subscription, snapshots[1]];
+  return json({ subscription });
+};
+const noHost = { ...state, host: "mac", bots: [{ ...bot, computerId: undefined, ai: undefined }], brains: [] };
+let localMount = await mount({ state: noHost }, AiSubscriptionsCard);
+assert.equal(button(localMount.box, "This PC").getAttribute("aria-pressed"), "true");
+assert.match(localMount.box.textContent, /No bot computer or AI profile is needed/);
+assert.match(localMount.box.textContent, /Claude subscriptions do not power Bops chat/);
+assert.ok(!button(localMount.box, "Sign in with your ChatGPT subscription").disabled);
+assert.ok(button(localMount.box, "Sign in with your Claude subscription").disabled);
+await click(localMount.box, "Sign in with your ChatGPT subscription");
+assert.match(localMount.box.textContent, /Finish signing in in your normal browser/);
+assert.equal(localMount.box.querySelector("a").href, "https://auth.openai.com/oauth/authorize?fixture=only");
+await click(localMount.box, "Cancel ChatGPT sign-in");
+assert.deepEqual(calls.filter((c) => c.method === "POST").map((c) => c.body), [{ kind: "codex", action: "login" }, { kind: "codex", action: "cancel" }]);
+if (BRAINS_OFF) {
+  await click(localMount.box, "Bot cloud computer");
+  assert.match(localMount.box.textContent, /Cloud agent harnesses are off in this build/);
+}
+await localMount.done();
+console.log(`ok local subscription sign-in and cancel work with no brains, computer or AI profile (harnesses ${BRAINS_OFF ? "off" : "on"})`);
+
+calls.length = 0;
+answer = (_path, body) => body ? json({ error: "Official CLI could not start. Check its installation." }, 502) : json({ subscriptions: [local("codex"), local("claude", "error", { error: "Could not check Claude account." })] });
+localMount = await mount({}, LocalSubscriptions);
+await click(localMount.box, "Sign in with your ChatGPT subscription");
+assert.match(localMount.box.textContent, /Official CLI could not start/);
+assert.match(localMount.box.textContent, /Could not check Claude account/);
+assert.ok(!button(localMount.box, "Sign in with your ChatGPT subscription").disabled, "failure leaves a retry path");
+await localMount.done();
+console.log("ok provider status and start failures are visible, with retry");
+
+calls.length = 0;
+answer = (_path, body) => body ? json({ subscription: local("codex") }) : json({ subscriptions: [local("codex", "connected"), local("claude")] });
+localMount = await mount({}, LocalSubscriptions);
+assert.match(localMount.box.textContent, /Connected: your ChatGPT subscription/);
+assert.match(localMount.box.textContent, /Account details unavailable. The CLI did not report the plan tier/);
+assert.doesNotMatch(localMount.box.textContent, /Connected: your ChatGPT (Plus|Pro)/);
+await click(localMount.box, "Sign out of ChatGPT on this PC");
+assert.match(localMount.box.textContent, /including its use outside Bops/);
+assert.equal(calls.filter((c) => c.method === "POST").length, 0);
+await click(localMount.box, "Confirm sign out");
+assert.deepEqual(calls.at(-1).body, { kind: "codex", action: "logout" });
+await localMount.done();
+console.log("ok local logout warns about the official CLI outside Bops, and unknown plan metadata stays unknown");
+
+calls.length = 0;
+answer = () => json({ error: "Local subscriptions are available only to the self-hosted owner." }, 403);
+localMount = await mount({}, LocalSubscriptions);
+assert.match(localMount.box.textContent, /only to the self-hosted owner/);
+await localMount.done();
+console.log("ok API access failure is visible rather than a silent empty card");
+console.log("local subscriptions ui: 4 passed");
+if (!BRAINS_OFF) {
+  const { execFileSync } = await import("node:child_process");
+  const output = execFileSync(process.execPath, [fileURLToPath(import.meta.url), "--brains-off"], { encoding: "utf8", env: process.env });
+  process.stdout.write(output);
+}
