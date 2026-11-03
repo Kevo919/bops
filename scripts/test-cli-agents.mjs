@@ -127,12 +127,12 @@ if (process.argv[2] === "--render") {
   console.log("ok render: a brain's approval says what it wants to run");
   // Open in the terminal (the takeover the server made): it says where, and a reply closes it; done, it offers to open; a Codex thread has its badge and no terminal.
   const term = text(renderToStaticMarkup(h(ThreadSheet, { state: state(v.terminal, { takeover: v.takeover }), session: v.terminal, onClose: noop, onShowComputer: noop, onShowScreen: noop })));
-  assert.match(term, new RegExp(`^Migration Claude Code · Opus 5\\.5 Your Max plan Boppy · in the terminal · \\d+ steps · left off on screen ${v.screenNo} `), term);
+  assert.match(term, new RegExp(`^Migration Claude Code · Opus 5\\.5 Your Claude Max plan Boppy · in the terminal · \\d+ steps · left off on screen ${v.screenNo} `), term);
   assert.match(term, new RegExp(`Open in the terminal on screen ${v.screenNo}\\. Your next reply closes it, and it carries on here\\. Show`));
   assert.ok(!/Open in terminal|Paused while/.test(term), term);
   console.log("ok render: open in the terminal, the thread says where, and that a reply closes it");
   const done = sheet(v.done);
-  assert.match(done, /^Notes Claude Code · Opus 5\.5 Your Max plan Boppy · finished .* Open in terminal Delete/, done);
+  assert.match(done, /^Notes Claude Code · Opus 5\.5 Your Claude Max plan Boppy · finished .* Open in terminal Delete/, done);
   const codex = sheet(v.codex);
   assert.match(codex, /^Totals Codex · GPT 6\.1 Sol (Your OpenAI key )?Boppy · /, codex);
   console.log("ok render: a thread says which agent ran it, and one Claude Code ran opens in a terminal");
