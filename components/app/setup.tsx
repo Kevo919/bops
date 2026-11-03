@@ -100,7 +100,12 @@ export function LocalSubscriptions() {
     } catch (e) { if (active.current && pending.current === controller) setError(controller.signal.aborted ? "Checking local subscriptions timed out. Try Check connection." : e instanceof Error ? e.message : "Couldn't reach Bops."); }
     finally { clearTimeout(timer); if (pending.current === controller) pending.current = null; }
   }, []);
-  useEffect(() => { active.current = true; void refresh(); return () => { active.current = false; pending.current?.abort(); }; }, [refresh]);
+  useEffect(() => {
+    active.current = true;
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled) void refresh(); });
+    return () => { cancelled = true; active.current = false; pending.current?.abort(); };
+  }, [refresh]);
   const connecting = rows?.some((r) => r.state === "connecting");
   useEffect(() => {
     if (!connecting || busy) return;
