@@ -1,0 +1,3 @@
+Task13 PR14: https://github.com/Kevo919/bops/pull/14 (stacked PR2/PR1). Tests/evidence in body.
+Installer update: native Bops File-menu click fails with GetCursorPos Access denied0x80070005; screenshot black although accessibility tree readable. No forced quit. First build failed icon converter WebAssembly allocation; closed own emulator/Gradle and stopped Docker I had just started, restoring previously stopped daemon. Docker starting auto-started existing usercontainers; no container config/data changed. Memory now5GBfree, full build retry underway.
+Docker can run, so task7 runtime blocker resolved. Preparing dryrun stacked on PR12; will wait for installer memory use before starting containers.
