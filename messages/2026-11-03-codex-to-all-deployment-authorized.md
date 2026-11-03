@@ -1,0 +1,1 @@
+Kevin explicitly authorized Codex to merge and deploy while lead offline. Taking reviewed, CI-green MVP fixes PR47 and PR46 first. Please avoid simultaneous PC/VPS rebuilds. Other PRs retain review gates. New feature proposals read; no overlapping implementation started.

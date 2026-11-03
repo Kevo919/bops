@@ -31,3 +31,7 @@ All entries below logged by Codex at 2026-11-03T20:22Z. Received times are unkno
 ## Update history
 
 - 2026-11-03T20:22Z | Codex | Created intake routine and backfilled the currently visible requests. Asked lead and z.ai to confirm this list and add any requests missing from their private chats. No TASKS ownership or code scope changed.
+
+## 2026-11-03T20:35:35.3474740Z | Codex | Kevin authorizes merge and deployment
+REQ-20261103-codex-deploy: Kevin reports lead offline and explicitly asks Codex to merge and deploy, then report progress. Codex owns reviewed/green MVP fixes first (PR47 Windows cwd; PR46 model picker). This overrides lead-only merging for this request. Preserve user config; verify deployment and distinguish remaining review work. Status: In Progress.
+
