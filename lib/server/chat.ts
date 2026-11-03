@@ -16,11 +16,11 @@ import { ORBIT_OWNER_ONLY, ORBIT_TOOL_NAMES, ORBIT_TOOLS, orbitNote, orbitNowLin
 import type { ResponseInputItem } from "openai/resources/responses/responses";
 import { openaiClient } from "./openai-client";
 import { respond } from "./chat-providers";
-import { providerOf } from "@/lib/chat-models";
+import { chatDefault, providerOf } from "@/lib/chat-models";
 import { contactLine, createBot, namesTheUser } from "./bots";
 import { creditsOut, noteOutOfCredit, outOfCreditWords } from "./cloud";
 import { noOwnComputer } from "./plan";
-import { agentLabel, agentName, agentNamed, aiOf, modelShort, paysLabel, readyAgents } from "@/lib/agents";
+import { agentLabel, agentName, agentNamed, aiOf, modelShort, paysLabel, readyAgents, ROUTE_KEYS } from "@/lib/agents";
 import { botChatId, live, MAX_PERSONA_CHARS, MIN_EVERY_MINUTES, pairChatId, routineSent, settingsOf, TAPBACK_EMOJI, TAPBACKS, saidOf, workBot, workspaceOf, type AppApproval, type Bot, type ChannelKind, type Delivery, type MemberTurn, type Message, type ReplyDraft, type Routine, type RoutineRun, type Schedule, type Session, type SkillProposal, type Tapback } from "@/lib/types";
 import { computerBriefing, teamBriefing } from "./briefing";
 import { belowOf, directOf, entryOf, inLine, mayAskIn, ownMemory, reachOf, readsTeam, worksForNow } from "@/lib/chain";
@@ -78,9 +78,13 @@ const CHAT_REASONING = { effort: setting("low", "BOPS_CHAT_EFFORT") as "low" | "
  * answers in it all run on that model (chat-providers.ts respond). Threads and routines' tasks don't.
  */
 const chatModelOf = (chatId: string | undefined) => {
-  const m = chatId ? chat(chatId)?.model : undefined;
+  const c = chatId ? chat(chatId) : undefined;
+  // None picked: Your LLMs' chat default (Settings, Models), when its key is set here; else Auto.
+  const m = c ? (c.model ?? chatDefault(envKeys())?.id) : undefined;
   return m && providerOf(m) ? m : undefined;
 };
+/** Which providers have a key in this server's environment (only whether: never a key). OpenAI is Auto's own. */
+const envKeys = () => Object.fromEntries(Object.entries(ROUTE_KEYS).map(([p, name]) => [p, p === "openai" || !!process.env[name]?.trim()]));
 
 const SCHEDULE_PARAMS = {
   type: "object",
