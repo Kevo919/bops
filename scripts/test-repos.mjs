@@ -169,7 +169,9 @@ R.repoTiming.pollMs = 0;
 /** A computer: what bops-repo answers, by line. `fail` makes one command fail as bops-repo would. */
 const computers = { "comp-1": [], "comp-2": [] };
 let fail = null;
-let pollTail = "Vite ready on http://localhost:4173\nleaked ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD";
+// (Made up at run time, so no token-shaped string sits in this file.)
+const fakeToken = `ghp_${"abcdefghijklmnopqrstuvwxyz0123456789ABCD"}`;
+let pollTail = `Vite ready on http://localhost:4173\nleaked ${fakeToken}`;
 R.repoDeps.bash = async (computerId, command) => {
   computers[computerId].push(command);
   const line = command.split("\n").find((l) => l.includes("bops-repo")) ?? command;
@@ -214,7 +216,7 @@ await check("recipes: every config/repos recipe loads checked; a broken folder's
   writeFileSync(join(bad, "schema.json"), readFileSync(join(rootPath, "config", "repos", "schema.json")));
   const good = readFileSync(join(rootPath, "config", "repos", "rea.yaml"), "utf8");
   writeFileSync(join(bad, "rea.yaml"), good);
-  writeFileSync(join(bad, "leaky.yaml"), good.replace(/^id: rea$/m, "id: leaky").replace("install:", "install:\n  - echo ghp_abcdefghijklmnopqrstuvwxyz0123456789"));
+  writeFileSync(join(bad, "leaky.yaml"), good.replace(/^id: rea$/m, "id: leaky").replace("install:", `install:\n  - echo ${fakeToken}`));
   writeFileSync(join(bad, "broken.yaml"), "id: [unterminated\n");
   process.env.BOPS_REPOS_ROOT = join(scratch, "badroot");
   try {
