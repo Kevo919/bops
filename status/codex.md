@@ -1,15 +1,22 @@
 # Codex status
 
-Updated 2026-11-03T17:14Z. Hourly check bops-hourly-build-check active, owner codex-heartbeat-20261103-1708. Build IN PROGRESS, PC HOLD lifted. Lead alone merges.
+Updated 2026-11-03T17:34Z. Hourly automation bops-hourly-build-check active; this run ending with both MVP follow-ups ready. Lead alone merges. Build status IN PROGRESS.
 
-## This run
-- Completed prior dirty auth followup and opened draft PR37 https://github.com/Kevo919/bops/pull/37. Head d0f030c normal-merges latest windows-port1b2a061 without conflicts. All five PR30 review nits handled. Local auth15 PASS; subscription UI regression suite PASS harnesses on/off, including phone/hosted gating, provider-only polling and Claude URL suppression. Merged Handy UI6 PASS. Full typecheck/lint pending CI; no live auth/browser visual check claimed.
-- PR17 merged in latest base. Its prior CI green; new combined package remains unverified.
-- PR33 installer nits c557cb0 both CI green; draft pending fresh package/upgrade checks.
-- Shared build lock still belongs to lead (16:13:54UTC). No heavy builds/Docker/emulators started, no lock stolen. Waiting for lead release before packaging and recipe35-37 Docker verification.
+## Ready
+- PR37 https://github.com/Kevo919/bops/pull/37 head8433857: all5PR30reviewnits. Desktop-only card gating prevents phone/VPS403 alert; provider-only polls; unusable Claude URL suppressed; native installer copy; proxy/CA overrides deliberately excluded; chat prototype remains hard-gated/task47parked. Auth15, actual ReactDOM cloud/local/phone/hosted/poll/link tests on/off, Handy6 PASS. CI41684278534 and ForkCI41684278559 PASS. Marked ready, lead notified. Fresh real login/provider-token/browser visual validation not claimed.
+- PR33 https://github.com/Kevo919/bops/pull/33 heada076e7f: production dir command/versionedartifact/preserved-deletedshortcuts. CI41684416051 and ForkCI41684416136 PASS; marked ready. Real NSIS package build at a995004 PASS (only CI-ignore edits after). Actual Bops.exe fuse8 PASS; installer static/synthetic9 PASS; independent template review clear.
 
-## Next
-Watch PR37 CI, fix failures; obtain browser evidence when shared slot permits. Then PR33/merged17 packaging and byte inspection. No app/inspector probe retry after prior automatic approval blocks. Lead owns Repos/Connections/Handy/cron/soul; Zai owns PR19/27/MCP.
+## Artifact evidence / limits
+C:/Users/MBV3n/bops-installer-followups/dist-desktop/Bops-Setup-0.0.39-x64.exe
+SHA256 E0E42A9AD0F1C5D740FAB760C43176B521632C5C9D982E30BA5D82195737B8E8. NotSigned. Package-only: reused lead's main checkout1b2a061 built server via ignored repo.json. No freshNextbuild; missing optional standalone resources reported. Repository-linked artifact only. No install or app launch; Kevin's runningBops untouched. Live deleted-shortcut upgrade and macOS runtime unverified. Earlier policy-blocked app/inspector probes not retried.
+
+## CI scan incident resolved
+Exact historical Connections documentation-placeholder findings at09d02152 and501534ba line113 added to bothPRs; no broadexclusion/historydeletion. Latest nativegitleaks8.30.1 redacted --all afterfetchallforkbranches:592commits,zero findings. Fingerprints sent tolead.
+
+## Next handoff
+Respond to lead review of37/33, mergebase as needed. Docker recipe verification35-37 next; not started this run (freeRAM1.72GiB at packagingstart,2.63later with Kevinappactive). Acquire sharedlock and recheckRAM before Docker; oneheavyjob. Lead owns Repos/Connections/Handy/cron/soul, Zai owns19/27/MCP and29. Do not duplicate.
 
 ## Needs Kevin
-No new action. Previously reported observer-auth outage remains separate from explicit board/work-state tracking.
+No new action. Previously reported memory-observer authentication outage remains separate from explicit board/work-state tracking.
+
+Owned build lock codex-package-1708 released after package validation. Owned hourlylock released at exit; no foreign process stopped or foreign lock removed.
