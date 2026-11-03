@@ -46,6 +46,34 @@ grep -q 'ss failed' "$scratch/failed-ss.log" || fail 'failed-ss diagnostic'
 [[ ! -e /home/bops && ! -e /etc/systemd/system/bops.service ]] || fail 'failed-ss run mutated installation'
 pass 'failed ss fails closed before installation'
 
+# Docker publishing 80/443 by DNAT has no socket for ss: the docker ps check must catch it, and a docker
+# CLI that can't reach its daemon must fail closed. apt-get aborts if the gate is ever passed.
+mkdir "$scratch/docker-gate"
+for tool in id cat grep; do ln -s "/usr/bin/$tool" "$scratch/docker-gate/$tool"; done
+printf '#!/bin/bash\nexit 0\n' >"$scratch/docker-gate/ss"
+printf '#!/bin/bash\necho PACKAGE_GATE_REACHED\nexit 88\n' >"$scratch/docker-gate/apt-get"
+printf '#!/bin/bash\nprintf "n8n 0.0.0.0:5678->5678/tcp\\ntraefik 0.0.0.0:443->443/tcp, [::]:443->443/tcp\\n"\n' >"$scratch/docker-gate/docker"
+chmod 755 "$scratch/docker-gate/ss" "$scratch/docker-gate/apt-get" "$scratch/docker-gate/docker"
+if PATH="$scratch/docker-gate" /bin/bash "$setup" bops.example.test /unused >"$scratch/docker-443.log" 2>&1; then fail 'docker-published 443 accepted'; fi
+grep -q 'container already publishes' "$scratch/docker-443.log" || fail 'docker-published diagnostic'
+! grep -q PACKAGE_GATE_REACHED "$scratch/docker-443.log" || fail 'docker-published reached mutations'
+printf '#!/bin/bash\nexit 1\n' >"$scratch/docker-gate/docker"
+if PATH="$scratch/docker-gate" /bin/bash "$setup" bops.example.test /unused >"$scratch/docker-down.log" 2>&1; then fail 'failed docker ps accepted'; fi
+grep -q "'docker ps' failed" "$scratch/docker-down.log" || fail 'failed docker ps diagnostic'
+printf '#!/bin/bash\nprintf "n8n 0.0.0.0:5678->5678/tcp\\nweb 0.0.0.0:8080->80/tcp\\n"\n' >"$scratch/docker-gate/docker"
+if PATH="$scratch/docker-gate" /bin/bash "$setup" bops.example.test /unused >"$scratch/docker-free.log" 2>&1; then fail 'package gate did not stop docker-free fixture'; fi
+grep -q PACKAGE_GATE_REACHED "$scratch/docker-free.log" || fail 'unrelated docker ports rejected'
+pass 'docker-published 80/443 and failed docker ps refuse; other ports pass preflight'
+
+# Only Ubuntu and Debian: the Tailscale repo path is built from os-release's ID and VERSION_CODENAME.
+cp /etc/os-release "$scratch/os-release.orig"
+printf 'ID=fedora\nVERSION_ID=40\n' >/etc/os-release
+if BOPS_TAILSCALE=1 PATH="$scratch/docker-gate" /bin/bash "$setup" /unused >"$scratch/os.log" 2>&1; then fail 'unsupported OS accepted'; fi
+cp "$scratch/os-release.orig" /etc/os-release
+grep -q 'Ubuntu and Debian only' "$scratch/os.log" || fail 'unsupported OS diagnostic'
+! grep -q PACKAGE_GATE_REACHED "$scratch/os.log" || fail 'unsupported OS reached mutations'
+pass 'unsupported distribution refused before installation'
+
 # Gate-only fixtures: represent an occupied Caddy socket, and abort at the first
 # package command to prove the owned rerun passes without requesting certificates.
 mkdir "$scratch/caddy-gate"
@@ -118,8 +146,14 @@ cat >"$scratch/tailscale-fixture" <<'SH'
 #!/bin/bash
 printf '%s\n' "$*" >>/tmp/bops-tailscale.calls
 case "$*" in
-  'status --peers=false') exit 0;;
-  'status --json') printf '{"Self":{"DNSName":"fixture.example.ts.net."}}\n';;
+  # Logged out until an unattended up with the required flags and a private key file.
+  'status --peers=false') [[ -f /tmp/bops-tailscale.up ]];;
+  'up --accept-dns=false --netfilter-mode=off --auth-key=file:'*)
+    key=${*##*--auth-key=file:}
+    [[ $(stat -c '%a' "$key") == 600 && $(cat "$key") == tskey-fixture ]] || exit 94
+    printf '%s\n' "$key" >/tmp/bops-tailscale.up;;
+  'debug prefs') printf '{"CorpDNS":false,"NetfilterMode":0}\n';;
+  'status --json') printf '{"Self":{"DNSName":"fixture.example.ts.net."},"CertDomains":["fixture.example.ts.net"]}\n';;
   'serve --bg --https=443 http://127.0.0.1:3210') exit 0;;
   *) exit 92;;
 esac
@@ -169,7 +203,7 @@ run_setup() {
   # never print the log, even on failure. Exit code + last stage are safe diagnostics.
   local log="$scratch/setup-$1.log"
   touch "$log"; chmod 600 "$log"
-  if ! BOPS_TAILSCALE=1 BOPS_BRANCH=windows-port bash "$setup" "$fixture" >"$log" 2>&1; then
+  if ! BOPS_TS_AUTHKEY=tskey-fixture BOPS_TAILSCALE=1 BOPS_BRANCH=windows-port bash "$setup" "$fixture" >"$log" 2>&1; then
     grep '^== ' "$log" >&2 || true
     fail "setup $1 failed (private log in disposable container)"
   fi
@@ -196,6 +230,11 @@ sha256sum --check --status "$scratch/public.sha" || fail 'public service configu
 kill -0 "$listener_pid" || fail 'existing listener stopped'
 [[ $(ss -H -ltn 'sport = :80 or sport = :443' | wc -l) == 2 ]] || fail 'public listeners changed'
 [[ $(grep -c '^serve --bg --https=443 http://127.0.0.1:3210$' /tmp/bops-tailscale.calls) == 2 ]] || fail 'tailnet serve invocation'
+[[ $(grep -c '^up --accept-dns=false --netfilter-mode=off --auth-key=file:' /tmp/bops-tailscale.calls) == 1 ]] || fail 'tailscale up flags / single sign-in'
+! grep -q 'tskey-fixture' /tmp/bops-tailscale.calls || fail 'auth key reached tailscale argv'
+[[ ! -e $(cat /tmp/bops-tailscale.up) ]] || fail 'auth key file left behind'
+grep -q 'https://fixture.example.ts.net' "$scratch/setup-rerun.log" || fail 'tailnet URL not printed'
+grep -q 'MagicDNS and HTTPS Certificates' "$scratch/setup-rerun.log" || fail 'MagicDNS/HTTPS note missing'
 [[ $(grep -c '^restart bops$' /tmp/bops-systemctl.calls) == 2 ]] || fail 'service restart invocation'
 ! command -v caddy >/dev/null || fail 'tailnet mode installed Caddy'
 pass 'rerun preserves env/config/pairing and public service sentinels/listeners'
