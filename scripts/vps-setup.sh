@@ -16,6 +16,9 @@ set -euo pipefail
 
 domain="${1:-}"
 repo="${2:-}"
+# BOPS_SYNC=orgo: this server signs in with your Orgo account (from your phone) and shares one Bops with your
+# PC and any other copy signed in with it (docs/sync.md). Unset: its own Bops, on your own keys.
+sync="${BOPS_SYNC:-}"
 branch="${BOPS_BRANCH:-windows-port}"
 if [ -z "$domain" ] || [ -z "$repo" ]; then
   echo "Usage: sudo bash vps-setup.sh <your domain, e.g. bops.example.com> <your fork's git URL>" >&2
@@ -52,7 +55,7 @@ if [ ! -f .env.local ]; then
   {
     echo ""
     echo "# Set by scripts/vps-setup.sh"
-    echo "BOPS_SELF_HOSTED=1"
+    if [ "$sync" = "orgo" ]; then echo "BOPS_SELF_HOSTED=0"; else echo "BOPS_SELF_HOSTED=1"; fi
     echo "BOPS_REQUIRE_REMOTE=1"
     echo "BOPS_SECRET_KEY=$(openssl rand -hex 32)"
     echo "BOPS_PUBLIC_URL=https://$domain"
@@ -103,7 +106,8 @@ cat <<DONE
 
 Bops is running at https://$domain (give Caddy a minute for the certificate; your domain's DNS must point here).
 Next:
-  1. Add your keys to $home/.env.local (OPENAI_API_KEY, OPENAI_EXECUTOR_API_KEY, ORGO_API_KEY, …).
+  1. Add your keys to $home/.env.local (OPENAI_API_KEY, OPENAI_EXECUTOR_API_KEY, ORGO_API_KEY, …),
+     or, set up with BOPS_SYNC=orgo, open it on your phone and Sign in with Orgo (the same account as your PC).
   2. systemctl restart bops
   3. In the Bops app on your phone: address https://$domain and the pairing code above.
 Logs: journalctl -u bops -f

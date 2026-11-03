@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
  * Bops' modules (config/modules.cjs, config/bops.yaml): what each one is, whether it's on and set up,
  * and its settings. Settings, Modules reads and changes them here; they take effect when Bops restarts.
  * Only the Bops window may (a paired phone, or a bot's Chrome, can't), and only this machine when there
- * is no window. No key or secret is ever read or written here: those stay in .env.local.
+ * is no window; on a server that only lets in the paired phone (BOPS_REQUIRE_REMOTE=1), that phone. No key or secret is ever read or written here: those stay in .env.local.
  */
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const mods = () => require(/* turbopackIgnore: true */ `${process.cwd()}/config/modules.cjs`) as {
@@ -17,8 +17,10 @@ const mods = () => require(/* turbopackIgnore: true */ `${process.cwd()}/config/
 };
 type Module = { id: string; enabled: boolean; settings: { key: string; value: unknown }[] };
 
+const fromPhone = (request: Request) => !!request.headers.get("x-bops-remote") || /(?:^|;\s*)bops_remote=/.test(request.headers.get("cookie") ?? "");
+// On a server (BOPS_REQUIRE_REMOTE=1, no window) proxy.ts lets in only the paired phone, which is the owner there.
 const allowed = (request: Request) =>
-  (process.env.BOPS_UI_TOKEN ? fromBopsWindow(request) : fromThisMac(request)) && !request.headers.get("x-bops-remote") && !/(?:^|;\s*)bops_remote=/.test(request.headers.get("cookie") ?? "");
+  process.env.BOPS_UI_TOKEN ? fromBopsWindow(request) && !fromPhone(request) : process.env.BOPS_REQUIRE_REMOTE === "1" ? fromPhone(request) : fromThisMac(request) && !fromPhone(request);
 const no = () => Response.json({ error: "Modules can only be changed in the Bops app." }, { status: 403 });
 
 export async function GET(request: Request) {

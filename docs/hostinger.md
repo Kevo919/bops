@@ -13,7 +13,7 @@ curl -fsSL https://raw.githubusercontent.com/<you>/bops/windows-port/scripts/vps
 sudo bash vps-setup.sh bops.example.com https://github.com/<you>/bops.git
 ```
 
-It does every step below and prints a pairing code for your phone. Then add your keys to `/home/bops/bops/.env.local` and `systemctl restart bops`. Run it again any time to update.
+It does every step below and prints a pairing code for your phone. To have the server share one Bops with your PC, run it as `sudo BOPS_SYNC=orgo bash vps-setup.sh …` and sign in with Orgo from your phone ([docs/sync.md](sync.md)). Then add your keys to `/home/bops/bops/.env.local` and `systemctl restart bops`. Run it again any time to update.
 
 The steps it takes, if you'd rather do them by hand:
 
