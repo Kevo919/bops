@@ -180,9 +180,8 @@ if (OFF) {
     assert.ok(!/Claude Code|Codex|OpenCode|agy|\+ Add|Open its terminal/.test(section), section);
     assert.match(section, /Chat, threads, memory and calls run on credit\./);
   });
-  try {
+  process.chdir(root); // Windows cannot remove the current working directory.
   rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-} catch {}
   process.stdout.write(`brains off: ${passed} passed\n`);
   process.exit(0);
 }
@@ -287,11 +286,11 @@ await test("one account is one agent of the bot's: the editor never offers the o
   assert.match(ed, new RegExp(`<option value="${first.account}" disabled="">Claude Code · Pip&#x27;s other Claude Code uses it</option>`), ed);
   assert.match(text(ed), /Move to another account/);
   assert.ok(!/Use another account/.test(text(ed)));
-  // Two of one kind, told apart everywhere: on their tiles, in the chip's menu and in chat.
+  // Neither account has a known tier on Pip's computer: don't borrow another computer's Max tier.
   const st = S.getState();
   const at = { bot: bot("pip"), state: st };
-  assert.deepEqual([A.agentLabel(first, at), A.agentLabel(second, at)], ["Claude Code · Max plan · Opus 5.5", "Claude Code · Claude plan · Opus 5.5"]);
-  assert.match(text(renderToStaticMarkup(h(AgentTile, { agent: second, bot: bot("pip"), state: st, isDefault: false }))), /^Claude Code · Claude plan /);
+  assert.deepEqual([A.agentLabel(first, at), A.agentLabel(second, at)], ["Claude Code · Claude plan · Opus 5.5", "Claude Code · Claude plan 2 · Opus 5.5"]);
+  assert.match(text(renderToStaticMarkup(h(AgentTile, { agent: second, bot: bot("pip"), state: st, isDefault: false }))), /^Claude Code · Claude plan 2 /);
   // Both on the same kind of plan: a number tells them apart.
   const same = { ...st, brains: st.brains.map((x) => (x.id === second.account || x.id === first.account ? { ...x, signIns: [{ computerId: "pc-pip", at: now }] } : x)) };
   const sameAt = { bot: bot("pip"), state: same };
@@ -771,6 +770,47 @@ await test("DeepSeek Harness's stop words: its key, its limit, its provider down
 
 /* ---------------- The window ---------------- */
 
+await test("subscription rows show per-computer evidence, failures and honest Coding Plan status", async () => {
+  const { SubscriptionRow } = await import(fileUrl("components/app/setup.tsx"));
+  const state = structuredClone(S.getState());
+  const b = state.bots.find((x) => x.id === "boppy");
+  b.ai = { agents: [{ id: "ag_sub0000001", kind: "claude", pays: "plan", account: "sub_claude" }, { id: "ag_sub0000002", kind: "codex", pays: "plan", account: "sub_codex" }], default: "ag_sub0000001" };
+  const claude = { id: "sub_claude", kind: "claude", auth: "plan", name: "Personal Claude", bots: [b.id], workspaceId: "ws_main", createdAt: 1, signIns: [{ computerId: "pc-main", at: 1700000000000, account: { plan: "max", email: "owner@example.test" } }] };
+  const codex = { id: "sub_codex", kind: "codex", auth: "plan", name: "Personal ChatGPT", bots: [b.id], workspaceId: "ws_main", createdAt: 1 };
+  state.brains = [claude, codex];
+  const props = { state, bot: b, selfHosted: true, onShowScreen() {}, onOpenVault() {} };
+  const row = (kind, more = {}) => render(h(SubscriptionRow, { ...props, kind, ...more }));
+  assert.match(row("claude"), /Connected: your Claude Max subscription/);
+  assert.match(row("claude"), /owner@example.test · Last confirmed:/);
+  assert.doesNotMatch(row("claude"), /Signed in at/);
+  assert.match(row("codex"), /Not signed in on this computer/);
+  codex.signingIn = { botId: b.id, computerId: "pc-main", display: 100, at: 1 };
+  assert.match(row("codex"), /Signing in on this computer.*Show sign-in screen/);
+  codex.signingIn.failed = "Device code expired";
+  codex.signIns = [{ computerId: "pc-main", at: 1, method: "chatgpt" }];
+  assert.match(row("codex"), /Sign-in failed: Device code expired/);
+  assert.match(row("codex"), /Sign in with your subscription/);
+  assert.doesNotMatch(row("codex"), /Connected:|Sign out on this computer/);
+  delete codex.signingIn;
+  codex.signIns = [{ computerId: "pc-main", at: 1700000000000, method: "chatgpt" }];
+  assert.match(row("codex"), /Connected: your ChatGPT subscription/);
+  assert.match(row("codex"), /Account email unavailable.*did not report the subscription tier/);
+  assert.doesNotMatch(row("codex"), /Connected: your ChatGPT (Plus|Pro)/);
+  claude.signIns[0].computerId = "another-computer";
+  assert.match(row("claude"), /Not signed in on this computer/);
+  assert.equal(A.paysLabel(b.ai.agents[0], state, "pc-main"), "your Claude plan", "another computer's Max tier is not attributed here");
+  assert.match(row("zai", { keys: new Set(["ZAI_API_KEY"]) }), /Not configured.*does not confirm a Coding Plan subscription/);
+  b.ai.agents.push({ id: "ag_sub0000003", kind: "opencode", pays: "key", model: "zai-coding/glm-5.3" });
+  assert.match(row("zai", { keys: new Set(["ZAI_API_KEY"]) }), /route configured; key saved. Subscription entitlement is not verified/);
+  assert.match(row("zai", { keys: new Set() }), /add your plan account's key/);
+  assert.match(row("zai"), /key status unavailable/);
+  assert.equal(A.paysLabel(b.ai.agents[2], state), "your Z.ai Coding Plan");
+  assert.equal(A.paysLabel({ ...b.ai.agents[2], model: "zai/glm-5.3" }, state), "your Z.ai key");
+  assert.match(row("codex", { selfHosted: false }), /only to the self-hosted owner/);
+  assert.match(renderToStaticMarkup(h(SubscriptionRow, { ...props, kind: "codex", selfHosted: false })), /disabled=""/);
+  assert.match(row("claude", { bot: undefined }), /Not signed in/);
+});
+
 await test("the AI section: its agents as tiles with the Default marked, agy Soon, Thinking, threads now with their agent, calls, and what stays on credit", () => {
   const st = S.getState();
   S.update((s) => {
@@ -782,7 +822,7 @@ await test("the AI section: its agents as tiles with the Default marked, agy Soo
   const out = render(h(BotAiSection, { state: S.getState(), bot: bot("boppy"), onShowScreen() {} }));
   // Worst first in the header, and the Default by its name (its model would push the rest out of a narrow row).
   assert.match(out, /^▾ AI Default Claude Code · 1 needs you · 1 running Agents it can run /, out);
-  assert.match(out, /Bops agent OpenAI · Credit Claude Code Default Max plan · signed in here Codex Your OpenAI key/);
+  assert.match(out, /Bops agent OpenAI · Credit Claude Code Default Max plan · signed in here · your Claude Max plan Codex Your OpenAI key/);
   assert.match(out, /agy Soon Google Antigravity \+ Add Thinking/);
   assert.match(out, /Threads now Bops agent: Weekly report · needs you Claude Code · Opus 5\.5: Fix the header \+ New thread Open its terminal Calls OpenAI live voice/);
   assert.match(out, /Each thread runs on the agent you pick, with Boppy's own accounts\. Chat, memory and calls stay on credit\./);
@@ -821,14 +861,14 @@ await test("every state of a tile says what it is, with its one button", () => {
   const st = S.getState();
   const tile = (x, b = bot("rook"), state = st) => render(h(AgentTile, { agent: x, bot: b, state, isDefault: false }));
   const rookPlan = bot("rook").ai.agents.find((x) => x.kind === "claude");
-  assert.equal(tile(rookPlan), "Claude Code Not signed in on Rook's computer yet.");
-  assert.equal(render(h(AgentTile, { agent: rookPlan, bot: bot("rook"), state: st, isDefault: true })), "Claude Code Default Not signed in on Rook's computer yet.", "the Default says so whatever its state");
+  assert.equal(tile(rookPlan), "Claude Code Not signed in on Rook's computer yet. · your Claude plan");
+  assert.equal(render(h(AgentTile, { agent: rookPlan, bot: bot("rook"), state: st, isDefault: true })), "Claude Code Default Not signed in on Rook's computer yet. · your Claude plan", "the Default says so whatever its state");
   const going = { ...st, brains: st.brains.map((x) => (x.id === "brain_plan" ? { ...x, signingIn: { botId: "rook", computerId: "pc-rook", display: 2, at: now } } : x)) };
-  assert.equal(tile(rookPlan, bot("rook"), going), "Claude Code Sign in is open on its screen.");
+  assert.equal(tile(rookPlan, bot("rook"), going), "Claude Code Sign in is open on its screen. · your Claude plan");
   const failed = { ...st, brains: st.brains.map((x) => (x.id === "brain_plan" ? { ...x, signingIn: { botId: "rook", computerId: "pc-rook", display: 2, at: now, failed: "it took too long" } } : x)) };
-  assert.equal(tile(rookPlan, bot("rook"), failed), "Claude Code Sign in didn't finish: it took too long.");
-  assert.equal(tile(rookPlan, bot("rook"), { ...st, host: "mac" }), "Claude Code Claude Code runs on a cloud computer. Your bots work on this Mac.");
-  assert.equal(tile(rookPlan, { ...bot("rook"), runsOn: "mac" }), "Claude Code Rook works on your Mac, so its threads use Bops agent.");
+  assert.equal(tile(rookPlan, bot("rook"), failed), "Claude Code Sign in didn't finish: it took too long. · your Claude plan");
+  assert.equal(tile(rookPlan, bot("rook"), { ...st, host: "mac" }), "Claude Code Claude Code runs on a cloud computer. Your bots work on this Mac. · your Claude plan");
+  assert.equal(tile(rookPlan, { ...bot("rook"), runsOn: "mac" }), "Claude Code Rook works on your Mac, so its threads use Bops agent. · your Claude plan");
   assert.equal(tile({ id: "ag_oc00000001", kind: "opencode", pays: "key", model: "anthropic/claude-sonnet-5-5" }), "OpenCode Sonnet 5.5 · your Anthropic key");
   assert.equal(tile({ id: "bops", kind: "bops", pays: "credit", model: "gpt-6-astra" }), "Bops agent GPT 6 Astra · Credit");
   // A bot that shares a computer and keeps a login there is told its logins aren't walled off.
@@ -854,9 +894,9 @@ await test("New thread, in place (never a dialog over the window), and the agent
   const rookState = { ...st, bots: st.bots.map((x) => (x.id === "rook" ? rook : x)) };
   const sheet = renderToStaticMarkup(h(NewThread, { state: rookState, bot: rook, onClose() {}, onStarted() {}, onSetUp() {} }));
   assert.match(sheet, /aria-pressed="true"[^>]*>(?:(?!aria-pressed).)*Bops agent/, "on the one that's ready");
-  assert.match(text(sheet), /Claude Code Default Not signed in on Rook's computer yet\. Set up/);
+  assert.match(text(sheet), /Claude Code Default Not signed in on Rook's computer yet\. · your Claude plan Set up/);
   const chip = text(renderToStaticMarkup(h(AgentChipPick, { state: rookState, bot: rook, value: null, defaultOpen: true, onPick() {} })));
-  assert.equal(chip, "Claude Code · not signed in ▾ Claude Code · Opus 5.5 · not signed in Default Bops agent");
+  assert.equal(chip, "Claude Code · not signed in · your Claude plan ▾ Claude Code · Opus 5.5 · not signed in Default Bops agent");
   // A pick that isn't ready anymore is never the one a message carries.
   assert.equal(boxAgents(rookState, rook, rook.ai.default).picked, undefined);
   assert.equal(boxAgents(rookState, rook, "bops").picked?.id, "bops");
@@ -888,9 +928,8 @@ await test("a build without brains (a release): the --off pass", async () => {
   assert.match(out, /brains off: 1 passed/, out);
 });
 
-try {
-  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-} catch {}
+process.chdir(root);
+rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 assert.ok(!logged.some((l) => /bopsrun_[0-9a-f]{16}|sk-ant-|sk-proj-/.test(l)), "nothing secret in what Bops logged");
 process.stdout.write(`bot ai: ${passed} passed\n`);
 process.exit(0);
