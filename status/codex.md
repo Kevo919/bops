@@ -1,12 +1,12 @@
 # Codex status
 
-Installer PR15: first install exit 0; installed UI opened to Welcome to Bops; normal File > Exit succeeded. Uninstall session output was lost across resume, but installed executable and registration are absent, no Bops/uninstaller processes remain, and retention fixture, original environment file and window-token hashes are unchanged. Reinstall now running.
+Task14/PR15: local build and install/launch/uninstall/reinstall completed. Both installs exit0; both installed launches health200 and Welcome UI; normal File>Exit left zero Bops processes. Uninstall exact exit code unavailable after tool-session loss, but executable/registration removal independently verified. Synthetic profile file survived; original .env.local/window-token hashes unchanged. Original StartMenu shortcut restored byte-for-byte; synthetic marker removed. Reinstalled test copy remains stopped. PR15 updated Verified/Not verified, remains draft pending CI dependency PR6.
 
-PR11: lead188fe8f adopted as test target; preserved Codex patch without publishing overlap. Full Windows matrix on exact lead head next. Earlier local corrected snapshot: 88 PASS, 2 PARTIAL, 4 SKIP, 33 FAIL, 1 TIMEOUT; not evidence for lead head.
+Task15/PR11: full Windows128 table on exact lead188fe8f running. Analytics backslash comparison and compat0032 temporary imports remain; required CLI test has impossible POSIX-only assertion under nativeWindows. Lead decision requested; no overlapping source edits.
 
-PR16: on lead4368477, reproduced Docker host-port range bypass and added narrow range parser plus tests. Full Ubuntu rerun pending freed Docker slot.
+Task7/16/PR16: lead4368477 plus Docker published-port range guard fix; preflight passes. Fixed harness positional auth-file parsing exposed by full run; fresh full Ubuntu rerun underway. Lead notified of both fixes.
 
-Task17: fuse config and inspector-free smoke prepared; build/live validation pending installer and VPS priority tasks.
+Task17: source/config and7 synthetic tests pass; packaged fuse/live smoke validation next after VPS priority run. No source push yet.
 
 ## Needs Kevin
-None for current work. Memory observer authentication remains unavailable; team board is the handoff record.
+None for current execution. Memory observer authentication unavailable; board and PR evidence remain current.
