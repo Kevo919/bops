@@ -1,4 +1,4 @@
-import { cancelLocalLogin, getLocalSubscriptions, logoutLocalSubscription, startLocalLogin } from "@/lib/server/local-subscriptions";
+import { cancelLocalLogin, getLocalSubscriptions, getLocalSubscriptionStatus, logoutLocalSubscription, startLocalLogin } from "@/lib/server/local-subscriptions";
 import { fromThisMac } from "@/lib/server/owner-email";
 import { fromBopsWindow } from "@/lib/server/ui-token";
 import { getState } from "@/lib/server/store";
@@ -13,7 +13,9 @@ function denied(request: Request) {
 }
 export async function GET(request: Request) {
   const blocked = denied(request); if (blocked) return blocked;
-  return Response.json({ subscriptions: await getLocalSubscriptions() }, { headers });
+  const kind = new URL(request.url).searchParams.get("kind");
+  if (kind !== null && kind !== "codex" && kind !== "claude") return Response.json({ error: "Choose Codex or Claude." }, { status: 400, headers });
+  return Response.json({ subscriptions: kind ? [await getLocalSubscriptionStatus(kind)] : await getLocalSubscriptions() }, { headers });
 }
 export async function POST(request: Request) {
   const blocked = denied(request); if (blocked) return blocked;
