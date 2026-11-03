@@ -72,6 +72,9 @@
   "main": "desktop/main.cjs",
   "productName": "Bops",
   "build": {
+    "electronFuses": {
+      "enableNodeCliInspectArguments": false
+    },
     "appId": "ai.orgo.bops",
     "productName": "Bops",
     "publish": [

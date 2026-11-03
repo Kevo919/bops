@@ -1,19 +1,21 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-Smoke-test a built Windows Bops app, its phone boundary, and the real app.quit lifecycle.
+Smoke-test a built Windows Bops app, its phone boundary, and authenticated save/tree shutdown.
 .EXAMPLE
 powershell -NoProfile -File scripts/smoke-windows.ps1 -RepoRoot C:\Users\MBV3n\bops
 .NOTES
 Quit Bops from its tray first. Refuses an existing app, live port, repo Node process or pairing.
-Starts its own hidden Bops with a loopback-only main-process inspector. Pairing output stays in
-memory and is never printed. Does not edit .env.local. Uses Node 24 and Windows PowerShell APIs;
-no npm install, browser automation, keys or additional packages are required.
+Starts its own hidden Bops without an inspector. Pairing and window-token values stay in
+memory and are never printed. Does not edit .env.local. Uses Node 24 and Windows PowerShell APIs;
+no npm install, browser automation or provider-check requests are required. Uses the current user's
+private window-token file for authenticated saving; this does not test the tray/app.quit lifecycle.
 #>
 [CmdletBinding()]
 param(
     [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
     [string]$ExePath,
+    [string]$WindowTokenPath = (Join-Path $env:APPDATA 'Bops\window-token'),
     [ValidateRange(15, 300)][int]$StartupTimeoutSeconds = 90,
     [ValidateRange(15, 120)][int]$QuitTimeoutSeconds = 40
 )
@@ -28,7 +30,7 @@ $pairCode = $null
 $pairHash = $null
 $envHashBefore = $null
 $http = $null
-$inspectorPort = 0
+$metadata = $null
 $repo = $null
 $exe = $null
 $node = $null
@@ -112,9 +114,10 @@ function Invoke-PrivateNode([hashtable]$Options, [int]$TimeoutSeconds = 30) {
     $source = @'
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { syncBuiltinESMExports } from 'node:module';
+import { syncBuiltinESMExports, createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 import { pathToFileURL } from 'node:url';
 const config = JSON.parse(Buffer.from('__CONFIG__', 'base64').toString('utf8'));
 if (Number(process.versions.node.split('.')[0]) < 24) throw new Error('Node 24 or newer is required');
@@ -144,50 +147,37 @@ function bundleInfo(exe) {
     return JSON.parse(body.toString('utf8'));
   } finally { fs.closeSync(fd); }
 }
-async function quit() {
-  const list = await fetch(`http://127.0.0.1:${config.inspectorPort}/json/list`, { signal: AbortSignal.timeout(5000) }).then(r => r.json());
-  const target = list.find(t => t.type === 'node' && /^ws:\/\/127\.0\.0\.1:\d+\//.test(t.webSocketDebuggerUrl ?? ''));
-  if (!target) throw new Error('Main inspector unavailable');
-  const endpoint = new URL(target.webSocketDebuggerUrl);
-  if (Number(endpoint.port) !== config.inspectorPort) throw new Error('Unexpected inspector port');
-  const socket = new WebSocket(endpoint);
-  try {
-    await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Inspector connect timeout')), 5000);
-      socket.addEventListener('open', () => { clearTimeout(timer); resolve(); }, { once: true });
-      socket.addEventListener('error', () => { clearTimeout(timer); reject(new Error('Inspector connect failed')); }, { once: true });
-    });
-    const evaluate = expression => new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { socket.removeEventListener('message', onMessage); reject(new Error('Inspector response timeout')); }, 5000);
-      const onMessage = event => {
-        const message = JSON.parse(event.data);
-        if (message.id !== 1) return;
-        clearTimeout(timer); socket.removeEventListener('message', onMessage);
-        if (message.error || message.result?.exceptionDetails) reject(new Error('Inspector evaluation failed'));
-        else resolve(message.result?.result?.value);
-      };
-      socket.addEventListener('message', onMessage);
-      socket.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression, returnByValue: true } }));
-    });
-    const identity = await evaluate('({pid:process.pid, exe:process.execPath})');
-    if (identity?.pid !== config.pid || fs.realpathSync(identity.exe).toLowerCase() !== fs.realpathSync(config.exe).toLowerCase()) throw new Error('Inspector is not the app we started');
-    // Same Electron lifecycle as tray Quit Bops; will-quit invokes windows.stopServerTree.
-    // Inspector's global context may not have CommonJS `require`. Resolve and validate Electron
-    // synchronously, then capture the bound method; an unavailable app must fail before acceptance.
-    const accepted = await evaluate(`(() => {
-      const load = typeof process.mainModule?.require === 'function'
-        ? process.mainModule.require.bind(process.mainModule)
-        : typeof require === 'function' ? require : null;
-      if (!load) throw new Error('Main-process module loader unavailable');
-      const app = load('electron').app;
-      if (!app || typeof app.quit !== 'function') throw new Error('Electron app.quit unavailable');
-      const quitApp = app.quit.bind(app);
-      setTimeout(quitApp, 100);
-      return true;
-    })()`);
-    if (accepted !== true) throw new Error('Quit not accepted');
-    return { quit: true };
-  } finally { socket.close(); }
+async function savedTreeShutdown() {
+  if (!Number.isSafeInteger(config.pid) || config.pid <= 0) throw new Error('Invalid owned root');
+  function processIdentity(pid) {
+    if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error('Invalid process id');
+    const script = `$p = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; if ($p) { @{ pid=[int]$p.ProcessId; exe=$p.ExecutablePath; created=$p.CreationDate.ToUniversalTime().ToString('o') } | ConvertTo-Json -Compress }`;
+    const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', timeout: 10000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    return output ? JSON.parse(output) : null;
+  }
+  function verifyRoot() {
+    const identity = processIdentity(config.pid);
+    if (!identity || identity.created !== config.created || typeof identity.exe !== 'string' || fs.realpathSync(identity.exe).toLowerCase() !== fs.realpathSync(config.exe).toLowerCase()) throw new Error('Owned app identity changed');
+  }
+  verifyRoot();
+  const token = fs.readFileSync(config.tokenFile, 'utf8').trim();
+  if (!/^[0-9a-f]{64}$/.test(token)) throw new Error('Window token unavailable');
+  const base = `http://127.0.0.1:${config.port}`;
+  const nonce = randomBytes(16).toString('hex');
+  const healthResponse = await fetch(`${base}/api/health?nonce=${nonce}`, { redirect: 'error', signal: AbortSignal.timeout(5000) });
+  const health = await healthResponse.json();
+  const proof = createHmac('sha256', token).update(nonce).digest('hex');
+  if (!healthResponse.ok || health.bops !== true || health.build !== config.build || typeof health.proof !== 'string' || !/^[0-9a-f]{64}$/.test(health.proof) || !timingSafeEqual(Buffer.from(health.proof, 'hex'), Buffer.from(proof, 'hex'))) throw new Error('Server window-token proof failed');
+  const response = await fetch(`${base}/api/restart`, { method: 'POST', redirect: 'error', headers: { 'x-bops-window': token, origin: base }, signal: AbortSignal.timeout(20000) });
+  const saved = await response.json();
+  if (!response.ok || saved.ok !== true) throw new Error('Server save did not succeed');
+  const expected = config.owned.find(item => item.pid === saved.pid);
+  const server = expected && processIdentity(saved.pid);
+  if (!expected || !server || server.created !== expected.created) throw new Error('Saved server is not an owned descendant');
+  verifyRoot(); // Recheck after HTTP awaits, immediately before the existing targeted tree stop.
+  const { stopServerTree } = require(path.join(config.repo, 'desktop', 'windows.cjs'));
+  stopServerTree(config.pid, config.port, token);
+  return { saved: true, stopped: true };
 }
 let result;
 switch (config.mode) {
@@ -244,7 +234,7 @@ switch (config.mode) {
     result = { unpaired: !fs.existsSync(remote) && !fs.existsSync(`${remote}.tmp`) };
     break;
   }
-  case 'quit': result = await quit(); break;
+  case 'save-stop': result = await savedTreeShutdown(); break;
   default: throw new Error('Unknown helper action');
 }
 console.log(JSON.stringify(result));
@@ -286,6 +276,18 @@ console.log(JSON.stringify(result));
     } finally { $helper.Dispose() }
 }
 
+function Stop-OwnedApp {
+    Remember-OwnedProcesses
+    $root = Get-CimInstance Win32_Process -Filter "ProcessId=$($appProcess.Id)"
+    if (-not $root -or $root.CreationDate -ne $owned[$appProcess.Id] -or $root.ExecutablePath -ine $exe) {
+        throw 'Owned app identity changed; refusing tree shutdown.'
+    }
+    $identities = @(Get-OwnedAlive | ForEach-Object {
+        @{ pid = [int]$_.ProcessId; created = $_.CreationDate.ToUniversalTime().ToString('o') }
+    })
+    return Invoke-PrivateNode @{ mode = 'save-stop'; repo = $repo; pid = $appProcess.Id; exe = $exe; created = $root.CreationDate.ToUniversalTime().ToString('o'); owned = $identities; tokenFile = $WindowTokenPath; port = $port; build = $metadata.build } -TimeoutSeconds 100
+}
+
 function Request([string]$Path, [string]$HostHeader, [string]$Code = '') {
     $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Get, "http://127.0.0.1:$port$Path")
     $response = $null
@@ -319,11 +321,7 @@ try {
     $envHashBefore = Get-EnvFingerprint
     Write-Check 'preflight' $true 'Built app points to the requested repo; no app, server listener or pairing exists.'
 
-    $reservation = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
-    $reservation.Start()
-    $inspectorPort = ([Net.IPEndPoint]$reservation.LocalEndpoint).Port
-    $reservation.Stop()
-    $appProcess = Start-Process -FilePath $exe -ArgumentList "--inspect=127.0.0.1:$inspectorPort", '--hidden' -WindowStyle Hidden -PassThru
+    $appProcess = Start-Process -FilePath $exe -ArgumentList '--hidden' -WindowStyle Hidden -PassThru
     $rootProcess = Get-CimInstance Win32_Process -Filter "ProcessId=$($appProcess.Id)"
     if (-not $rootProcess) { throw 'The app exited before startup.' }
     $owned[[int]$rootProcess.ProcessId] = $rootProcess.CreationDate
@@ -377,8 +375,8 @@ try {
     Write-Check 'revoked-code' ($answer.Status -eq 403) "Old code returned HTTP $($answer.Status); expected 403."
     if ($answer.Status -ne 403) { throw 'Revoked code was accepted.' }
     Remember-OwnedProcesses
-    $quit = Invoke-PrivateNode @{ mode = 'quit'; inspectorPort = $inspectorPort; pid = $appProcess.Id; exe = $exe }
-    $quitRequested = $quit.quit
+    $quit = Stop-OwnedApp
+    $quitRequested = $quit.saved -and $quit.stopped
 } catch {
     # Only our controlled PowerShell errors are shown; helper output and response bodies stay private.
     Write-Check 'execution' $false $_.Exception.Message
@@ -395,8 +393,8 @@ try {
             Remember-OwnedProcesses
             $appProcess.Refresh()
             if (-not $appProcess.HasExited -and -not $quitRequested) {
-                $quit = Invoke-PrivateNode @{ mode = 'quit'; inspectorPort = $inspectorPort; pid = $appProcess.Id; exe = $exe }
-                $quitRequested = $quit.quit
+                $quit = Stop-OwnedApp
+                $quitRequested = $quit.saved -and $quit.stopped
             }
             $deadline = [DateTime]::UtcNow.AddSeconds($QuitTimeoutSeconds)
             do {
@@ -406,8 +404,8 @@ try {
                 Start-Sleep -Milliseconds 500
             } while ([DateTime]::UtcNow -lt $deadline)
             $naturalStop = $remaining.Count -eq 0 -and (Test-PortFree $port)
-            Write-Check 'tray-quit-lifecycle' ($quitRequested -and $naturalStop) 'Inspector invoked Electron app.quit(); owned process tree and server port must stop without forced cleanup.'
-        } catch { Write-Check 'tray-quit-lifecycle' $false 'Graceful app.quit could not be verified.' }
+            Write-Check 'saved-tree-shutdown' ($quitRequested -and $naturalStop) 'Authenticated save succeeded; existing stopServerTree stopped only our app tree and freed its port.'
+        } catch { Write-Check 'saved-tree-shutdown' $false 'Authenticated save and owned-tree shutdown could not be verified.' }
         # Fallback is cleanup only, never a passing lifecycle result. Every PID must still have the
         # creation time captured beneath our own app; never kill by process name or repo substring.
         try {
@@ -421,7 +419,7 @@ try {
                     Stop-Process -Id ([int]$item.ProcessId) -Force -ErrorAction Stop
                 }
             }
-            if ($remaining.Count -gt 0) { Write-Check 'forced-cleanup' $false 'Fallback terminated only recorded owned PIDs; graceful shutdown test failed.' }
+            if ($remaining.Count -gt 0) { Write-Check 'forced-cleanup' $false 'Fallback terminated only recorded owned PIDs; saved-tree shutdown test failed.' }
             $clean = @(Get-OwnedAlive).Count -eq 0 -and @(Get-RepoNodes (Get-ProcessSnapshot)).Count -eq 0 -and (Test-PortFree $port)
             Write-Check 'process-cleanup' $clean 'No owned descendants, repository Node processes or live server listener remain.'
         } catch { Write-Check 'process-cleanup' $false 'Could not verify complete cleanup; inspect the app and port before retrying.' }
@@ -434,12 +432,12 @@ try {
     if ($http) { $http.Dispose() }
 }
 
-foreach ($required in @('preflight', 'health', 'pair', 'pings-paired', 'pings-unpaired', 'modules-phone-denied', 'revoked-code', 'pairing-cleanup', 'tray-quit-lifecycle', 'process-cleanup', 'env-unchanged')) {
+foreach ($required in @('preflight', 'health', 'pair', 'pings-paired', 'pings-unpaired', 'modules-phone-denied', 'revoked-code', 'pairing-cleanup', 'saved-tree-shutdown', 'process-cleanup', 'env-unchanged')) {
     if (-not $checks.Contains($required)) { Write-Check $required $false 'Not run because an earlier check failed.' }
 }
 if (@($checks.Values | Where-Object { $_ -eq $false }).Count -gt 0) {
     Write-Host 'FAIL Windows smoke test. No credentials were printed; review the failed checks above.'
     exit 1
 }
-Write-Host 'PASS Windows smoke test: startup, pairing boundaries, revocation, tray quit, cleanup and unchanged environment.'
+Write-Host 'PASS Windows smoke test: startup, pairing boundaries, revocation, saved-tree shutdown, cleanup and unchanged environment.'
 exit 0
