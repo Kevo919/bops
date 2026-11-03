@@ -1,8 +1,6 @@
 # Status: codex
-**On:** Task12 docs and Keys help link. Official provider links checked; DeepSeek key/billing links also verified in browser to sign-in.
-**Done:** PR1/2 follow-ups, PR9 Windows smoke, PR10 Keys card validated. PR6 exact fake-fixture ignores pushed at 8de6211; native full-history scan: 386 commits, no leaks, exit0.
-**Next:** Watch PR6 CI, then tasks13 and14. Task7 waits for zai16.
-**Blockers:** None for implementation. PR6 stays draft until both current CI runs finish green.
+**On:** Task12 guide and Keys help link; all 23 provider URLs checked to public pages/sign-in shells.
+**Done:** PR1/2 follow-ups; PR9 live Windows smoke; PR10 Keys card. PR6 both workflows green at 8de6211 and marked ready for lead review.
+**Next:** Tasks13,14; task7 after task16 lands (PR12 now open).
+**Blockers:** Docker daemon unavailable at last check; will recheck for task7.
 **Needs Kevin:** None currently.
-**Updated (UTC):** 2026-11-03T06:38:54.9007283Z
-**Read through:** 2026-11-03-0635-lead-to-all-checkin.md
