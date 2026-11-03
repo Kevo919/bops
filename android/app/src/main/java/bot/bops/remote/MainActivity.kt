@@ -3,6 +3,7 @@ package bot.bops.remote
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -81,6 +82,7 @@ class MainActivity : Activity() {
     }
 
     private fun choose(server: Server) {
+        if (web != null && current?.id == server.id && current?.code == server.code) return
         if (server.code == null || safeAddress(server.address) != null) showSetup("Pair this server again.", server.address)
         else open(server)
     }
@@ -146,13 +148,13 @@ class MainActivity : Activity() {
         }
         fun label(text: String, size: Float = 15f) = TextView(this).apply { this.text = text; textSize = size; setTextColor(Color.BLACK); setPadding(0, pad / 2, 0, pad / 4) }
         root.addView(label("Connect to your Bops", 24f))
-        root.addView(label(if (offeredAddress != null) "Connect this phone to the Bops at the address below? Only do this if you just scanned the code from your own Bops." else "In the Bops app on your computer, open Settings, then Your phone, and press Pair a phone. Scan its QR code with your camera, or enter what it shows."))
+        root.addView(label(if (offeredCode != null) "Connect this phone to the Bops at the address below? Only do this if you just scanned the code from your own Bops." else if (offeredAddress != null) "Pair this saved server again using a new code from its Bops Settings. Confirm the server below before connecting." else "In the Bops app on your computer, open Settings, then Your phone, and press Pair a phone. Scan its QR code with your camera, or enter what it shows."))
         val addr = EditText(this).apply {
             hint = "Address, like http://100.101.102.103:3210"
             inputType = InputType.TYPE_TEXT_VARIATION_URI
             setText(offeredAddress ?: "")
         }
-        val existing = servers.all().find { it.address == offeredAddress }
+        val existing = servers.all().find { ServerSafety.normalizeAddress(it.address) == offeredAddress?.let { a -> ServerSafety.normalizeAddress(a) } }
         val name = EditText(this).apply { hint = "Name, like My PC"; setText(existing?.name ?: "") }
         root.addView(label("Server name")); root.addView(name)
         val pass = EditText(this).apply {
@@ -162,6 +164,18 @@ class MainActivity : Activity() {
         }
         val status = label(problem ?: "").apply { setTextColor(Color.rgb(176, 0, 32)) }
         val go = Button(this).apply { text = "Connect" }
+        val target = label("", 24f)
+        fun updateTarget() {
+            val uri = Uri.parse(enteredAddress(addr.text.toString()))
+            target.text = "Target server: " + (uri.host?.let { host -> "$host:${if (uri.port != -1) uri.port else if (uri.scheme == "https") 443 else 80}" } ?: "Invalid address")
+        }
+        addr.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { updateTarget() }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        updateTarget()
+        root.addView(target)
         root.addView(label("Address")); root.addView(addr)
         root.addView(label("Pairing code")); root.addView(pass)
         root.addView(go); root.addView(status)
@@ -169,13 +183,14 @@ class MainActivity : Activity() {
         showContent(android.widget.ScrollView(this).apply { addView(root) })
 
         go.setOnClickListener {
-            val a = addr.text.toString().trim().trimEnd('/').let { if (it.startsWith("http")) it else "http://$it" }
+            val a = enteredAddress(addr.text.toString())
             val c = pass.text.toString().trim()
             safeAddress(a)?.let { status.text = it; return@setOnClickListener }
             if (c.length < 32) { status.text = "That pairing code is too short. Copy the whole code."; return@setOnClickListener }
             go.isEnabled = false
             status.setTextColor(Color.DKGRAY); status.text = "Checking…"
-            val serverName = name.text.toString().trim().ifEmpty { existing?.name ?: Uri.parse(a).host ?: "My Bops" }
+            val match = servers.all().find { ServerSafety.normalizeAddress(it.address) == a }
+            val serverName = name.text.toString().trim().ifEmpty { match?.name ?: Uri.parse(a).host ?: "My Bops" }
             thread {
                 val result = check(a, c)
                 runOnUiThread {
@@ -188,6 +203,18 @@ class MainActivity : Activity() {
                     }
                 }
             }
+        }
+    }
+
+    private fun enteredAddress(value: String): String {
+        val raw = value.trim()
+        return ServerSafety.normalizeAddress(if (raw.startsWith("http://", true) || raw.startsWith("https://", true)) raw else "http://$raw")
+    }
+
+    private fun openExternal(uri: Uri) {
+        try { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+        catch (_: ActivityNotFoundException) {
+            android.widget.Toast.makeText(this, "No app can open this link.", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -260,14 +287,14 @@ class MainActivity : Activity() {
                 // Links away from your Bops open in the phone's browser, not inside the app.
                 override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
                     if (sameSite(req.url.toString(), address)) return false
-                    startActivity(Intent(Intent.ACTION_VIEW, req.url))
+                    openExternal(req.url)
                     return true
                 }
                 // A page that ends up somewhere else (a redirect) is left, not shown in the app.
                 override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
                     if (!sameSite(url, address)) {
                         view.stopLoading()
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        openExternal(Uri.parse(url))
                         if (view.canGoBack()) view.goBack() else view.loadUrl("$address/")
                     }
                 }

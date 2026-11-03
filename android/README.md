@@ -23,7 +23,7 @@ Address policy remains HTTPS anywhere or HTTP only within Tailscale `100.64.0.0/
 
 ## Regression checks (disposable emulator only)
 
-These platform-only instrumentation checks add no libraries. **They clear Bops preferences in the test installation.** Start an Android emulator, then from this folder:
+These platform-only instrumentation checks add no libraries. **They erase the app's saved servers and preferences. Never run them on your daily phone; use a disposable emulator only.** Start an Android emulator, then from this folder:
 
 ```powershell
 .\gradlew.bat assembleDebug assembleDebugAndroidTest lintDebug

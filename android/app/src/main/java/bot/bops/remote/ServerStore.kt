@@ -2,6 +2,7 @@ package bot.bops.remote
 
 import android.content.Context
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 import java.util.UUID
 
@@ -27,11 +28,22 @@ class ServerStore(context: Context) {
     }
 
     fun all(): List<Server> = synchronized(lock) {
-        val rows = JSONArray(prefs.getString("servers", "[]"))
-        (0 until rows.length()).map { i ->
-            val row = rows.getJSONObject(i)
-            Server(row.getString("id"), row.getString("name"), row.getString("address"),
-                if (row.isNull("code")) null else row.getString("code"))
+        val stored = prefs.all["servers"]
+        val raw = stored?.toString() ?: "[]"
+        try {
+            if (stored != null && stored !is String) throw JSONException("Server list has the wrong preference type")
+            val rows = JSONArray(raw)
+            (0 until rows.length()).map { i ->
+                val row = rows.getJSONObject(i)
+                Server(row.getString("id"), row.getString("name"), row.getString("address"),
+                    if (row.isNull("code")) null else row.getString("code"))
+            }
+        } catch (_: JSONException) {
+            // Keep the original (including credentials) only in the same private, non-backed-up prefs.
+            // Recover once so the activity, watcher and boot receiver cannot repeatedly crash on it.
+            prefs.edit().putString("servers.corrupt.${UUID.randomUUID()}", raw)
+                .putString("servers", "[]").remove("activeServer").apply()
+            emptyList()
         }
     }
 
@@ -40,10 +52,14 @@ class ServerStore(context: Context) {
 
     fun save(name: String, address: String, code: String): Server = synchronized(lock) {
         val rows = all().toMutableList()
-        val previous = rows.find { it.address == address }
-        val server = Server(previous?.id ?: UUID.randomUUID().toString(), name, address, code)
-        rows.removeAll { it.id == server.id }; rows.add(server)
+        val canonical = ServerSafety.normalizeAddress(address)
+        val matches = rows.filter { ServerSafety.normalizeAddress(it.address) == canonical }
+        val activeId = prefs.getString("activeServer", null)
+        val previous = matches.find { it.id == activeId } ?: matches.firstOrNull()
+        val server = Server(previous?.id ?: UUID.randomUUID().toString(), name, canonical, code)
+        rows.removeAll { it in matches }; rows.add(server)
         val edit = prefs.edit().putString("servers", encode(rows))
+        for (duplicate in matches.filter { it.id != server.id }) edit.remove("seen:${duplicate.id}")
         if (previous?.code != code) edit.remove("seen:${server.id}")
         edit.apply()
         server

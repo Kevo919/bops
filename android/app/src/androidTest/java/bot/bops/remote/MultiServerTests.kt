@@ -42,12 +42,13 @@ class MultiServerTests : Instrumentation() {
             check(ServerSafety.safeAddress("https://bops.example.com") == null)
             check(ServerSafety.safeAddress("http://100.64.0.0:3210") == null)
             check(ServerSafety.safeAddress("http://100.127.255.255") == null)
-            for (address in listOf("http://100.63.255.255", "http://100.128.0.0", "http://192.168.1.1", "http://100.64.999.1", "file:///tmp/a"))
+            for (address in listOf("http://100.63.255.255", "http://100.128.0.0", "http://192.168.1.1", "http://100.64.999.1", "http://0100.64.0.1", "http://100.064.0.1", "http://100.64.00.1", "http://100.64.0.01", "file:///tmp/a"))
                 check(ServerSafety.safeAddress(address) != null) { address }
             check(ServerSafety.sameSite("https://bops.example.com/path", "https://bops.example.com:443"))
             for (other in listOf("http://bops.example.com", "https://bops.example.com:444", "https://bops.example.com.evil.test"))
                 check(!ServerSafety.sameSite(other, "https://bops.example.com"))
             prefs.edit().clear().commit()
+            storageRecoveryChecks()
             pollingChecks()
             uiChecks()
             result.putString("stream", "PASS: migration, idempotence, independent seen keys, add/update/rename/remove/select, stale revocation, isolated revocation, address/origin policy, HTTP polling, UI switcher, QR confirmation, cookie isolation\n")
@@ -57,6 +58,53 @@ class MultiServerTests : Instrumentation() {
             finish(Activity.RESULT_CANCELED, result)
         }
     }
+
+    private fun storageRecoveryChecks() {
+        val prefs = targetContext.getSharedPreferences("bops", 0)
+        prefs.edit().clear().commit()
+        val store = ServerStore(targetContext)
+        check(ServerSafety.normalizeAddress(" HTTPS://BOPS.Example.COM:443/ ") == "https://bops.example.com")
+        check(ServerSafety.normalizeAddress("HTTP://100.64.0.1:80/") == "http://100.64.0.1")
+        check(ServerSafety.normalizeAddress("https://BOPS.Example.COM:8443/base/") == "https://bops.example.com:8443/base")
+        check(ServerSafety.normalizeAddress("https://User:Pa%40ss@BOPS.Example.COM:443/Base%2FPath/?Next=Mixed#Section") ==
+            "https://User:Pa%40ss@bops.example.com/Base%2FPath?Next=Mixed#Section")
+        check(ServerSafety.normalizeAddress("https://trusted.example@OTHER.example:443/") == "https://trusted.example@other.example")
+        check(ServerSafety.normalizeAddress("https://bops%2eexample.com/") == "https://bops%2eexample.com/")
+        check(ServerSafety.normalizeAddress("https://[2001:DB8::1]:443/") == "https://[2001:db8::1]")
+        val first = store.save("Initial", "https://BOPS.Example.COM:443/", "old-code")
+        store.select(first.id)
+        val updated = store.save("Renamed", "https://bops.example.com", "new-code")
+        check(updated.id == first.id && updated.address == "https://bops.example.com" && store.all().size == 1)
+        store.forget(first)
+        check(store.active()?.code == "new-code") // An older rejection cannot erase the replacement.
+        // Existing rows written before normalization must match too, without changing their identity.
+        val legacy = org.json.JSONArray().put(org.json.JSONObject().put("id", "legacy-id").put("name", "Legacy")
+            .put("address", "HTTPS://LEGACY.Example:443/").put("code", "legacy-code"))
+        prefs.edit().putString("servers", legacy.toString()).putString("activeServer", "legacy-id").commit()
+        val migrated = store.save("Legacy updated", "https://legacy.example", "updated-code")
+        check(migrated.id == "legacy-id" && store.all().size == 1 && store.active()?.code == "updated-code")
+        check(store.save("Other path", "https://legacy.example/other", "other-code").id != migrated.id)
+        check(store.save("Other user", "https://user@legacy.example", "user-code").id != migrated.id)
+        val broken = "[{\"id\":\"broken\",\"code\":\"private-test-code\""
+        prefs.edit().putString("servers", broken).putString("activeServer", "legacy-id").commit()
+        check(store.all().isEmpty() && store.active() == null)
+        check(prefs.getString("servers", null) == "[]" && !prefs.contains("activeServer"))
+        val backups = prefs.all.filterKeys { it.startsWith("servers.corrupt.") }
+        check(backups.size == 1 && backups.values.single() == broken)
+        check(ServerStore(targetContext).all().isEmpty())
+        check(prefs.all.filterKeys { it.startsWith("servers.corrupt.") } == backups)
+        // Syntactically valid JSON with an invalid row also recovers, keeping both originals privately.
+        prefs.edit().putString("servers", "[{}]").putString("activeServer", "bad").commit()
+        check(store.all().isEmpty() && store.active() == null)
+        check(prefs.all.filterKeys { it.startsWith("servers.corrupt.") }.values.toSet() == setOf(broken, "[{}]"))
+        prefs.edit().putInt("servers", 42).putString("activeServer", "bad").commit()
+        check(store.all().isEmpty() && store.active() == null)
+        check(prefs.getString("servers", null) == "[]")
+        check(prefs.all.filterKeys { it.startsWith("servers.corrupt.") }.values.toSet() == setOf(broken, "[{}]", "42"))
+        check(store.save("Recovered", "https://recovered.example", "new-code").code == "new-code")
+        prefs.edit().clear().commit()
+    }
+
     private fun pollingChecks() {
         val prefs = targetContext.getSharedPreferences("bops", 0)
         val store = ServerStore(targetContext)
@@ -145,6 +193,15 @@ class MultiServerTests : Instrumentation() {
         click("My PC")
         awaitCookie(a.address, "bops_remote=${a.code}")
         waitForIdleSync()
+        runOnMainSync {
+            val field = MainActivity::class.java.getDeclaredField("web").apply { isAccessible = true }
+            val originalWeb = field.get(activity)
+            check(originalWeb != null)
+            MainActivity::class.java.getDeclaredMethod("onNewIntent", android.content.Intent::class.java)
+                .apply { isAccessible = true }
+                .invoke(activity, android.content.Intent(activity, MainActivity::class.java).putExtra("serverId", a.id))
+            check(field.get(activity) === originalWeb) // Tapping this server's ping must not reload its draft.
+        }
         click("Servers")
         click("Hostinger")
         awaitCookie(b.address, "bops_remote=${b.code}")
@@ -153,7 +210,7 @@ class MultiServerTests : Instrumentation() {
         click("Servers")
         // An external pairing link shows its address but cannot save anything without Connect.
         val qr = android.net.Uri.Builder().scheme("bops").authority("pair")
-            .appendQueryParameter("a", "https://qr.example.invalid")
+            .appendQueryParameter("a", "https://my-pc.ts.net@evil.example.invalid")
             .appendQueryParameter("c", "q".repeat(32)).build()
         targetContext.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, qr, targetContext, MainActivity::class.java)
             .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -161,7 +218,9 @@ class MultiServerTests : Instrumentation() {
         Thread.sleep(500)
         runOnMainSync {
             check(views(activity.window.decorView).filterIsInstance<android.widget.EditText>()
-                .any { it.text.toString() == "https://qr.example.invalid" })
+                .any { it.text.toString() == "https://my-pc.ts.net@evil.example.invalid" })
+            check(views(activity.window.decorView).filterIsInstance<android.widget.TextView>()
+                .any { it.text.toString() == "Target server: evil.example.invalid:443" })
         }
         check(store.all().size == 2)
         click("Saved servers")
