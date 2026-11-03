@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { NextConfig } from "next";
 
 // Bops' modules (config/modules.cjs): config/bops.yaml goes into this server's settings first, so every
-// module (AI models, computers, memory, apps, email, phone…) is switched and swapped there.
+// module (AI models, computers, memory, apps, email, phoneâ€¦) is switched and swapped there.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const applied = (require("./config/modules.cjs") as { apply: (root: string) => string[] }).apply(process.cwd());
 if (applied.length) console.log(`[modules] from config/bops.yaml: ${applied.join(", ")}`);
@@ -22,6 +22,9 @@ const ownAddresses = Object.values(networkInterfaces())
 const nextConfig: NextConfig = {
   env: { BOPS_APP_VERSION: version },
   allowedDevOrigins: ownAddresses,
+  // A second app from this folder at once (the local two-person stack, scripts/dev-two-person.mjs) builds into a
+  // folder of its own, as next dev locks its own. Unset, as everywhere else, it's Next's .next.
+  ...(process.env.BOPS_NEXT_DIST_DIR ? { distDir: process.env.BOPS_NEXT_DIST_DIR } : {}),
   // The desktop app is the product; Next's floating dev badge sat on top of the sidebar footer.
   devIndicators: false,
   // Loaded by Node, not bundled: the AgentMail SDK lazily imports optional payment packages
