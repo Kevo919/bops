@@ -14,7 +14,8 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 // The state in a throwaway file store, as a self-hosted install keeps it (the Mac app keeps it in Bops Cloud, per user: test-profiles.mjs).
 process.env.BOPS_SELF_HOSTED = "1";
 // Orgo is the fake below, on its own origin; the state goes to a throwaway file store, with mail, OpenAI and the tailnet off.
@@ -22,7 +23,8 @@ process.env.BOPS_SELF_HOSTED = "1";
 for (const k of ["ORGO_API_KEY", "BOPS_ORGO_WORKSPACE", "BOPS_ORGO_TEMPLATE", "BOPS_DATABASE_URL", "AGENTMAIL_API_KEY", "BOPS_MAIL_DOMAIN", "OPENAI_API_KEY", "TAILSCALE_AUTH_KEY", "BOPS_WEBRTC"])
   delete process.env[k];
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 // Modules that would start processes when loaded (the Mac check, the relay's agent) or that Node can't load (the
 // desktop look draws the mascot's JSX, mirror.ts has parameter properties) are stand-ins here: each of
 // their exports does nothing. The computer setup tested below only calls them in passing.
@@ -30,7 +32,7 @@ const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 // The server modules import "@/lib/…" and "./store" (no extension), the way Next resolves them.
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -94,14 +96,14 @@ const onPlan = (...plan) => {
   L.forgetPlan();
 };
 
-const P = await import(`${root}/lib/orgo-plans.ts`);
-const T = await import(`${root}/lib/types.ts`);
+const P = await import(`${rootUrl}/lib/orgo-plans.ts`);
+const T = await import(`${rootUrl}/lib/types.ts`);
 const sharesComputerOf = (b) => T.sharesComputer(b);
 const workBotOf = (b) => T.workBot(b, S.getState().bots);
-const L = await import(`${root}/lib/server/plan.ts`);
-const O = await import(`${root}/lib/server/orgo.ts`);
-const S = await import(`${root}/lib/server/store.ts`);
-const B = await import(`${root}/lib/server/bots.ts`);
+const L = await import(`${rootUrl}/lib/server/plan.ts`);
+const O = await import(`${rootUrl}/lib/server/orgo.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const B = await import(`${rootUrl}/lib/server/bots.ts`);
 const plain = (x) => JSON.parse(JSON.stringify(x));
 const noDashes = (text) => assert.ok(!/[—–]/.test(text), `no dashes: ${text}`);
 let n;
@@ -650,7 +652,7 @@ assert.equal(acct.rows.length, 1, "the plan's 1, not 2");
 
 /* ---------------- Setting a computer up ---------------- */
 
-const X = await import(`${root}/lib/server/sessions.ts`);
+const X = await import(`${rootUrl}/lib/server/sessions.ts`);
 /** Orgo for these: Hacker with room; Bops' computers by id, with a status, and screens that come up or don't. */
 const upComputers = new Map();
 let upMade = 0;
@@ -1035,9 +1037,9 @@ swap(unswapped);
 
 /* ---------------- A computer deleted on Orgo's site: the bot moves on, once ---------------- */
 
-const V = await import(`${root}/app/api/vnc/route.ts`);
-const SR = await import(`${root}/app/api/screen/route.ts`);
-const C = await import(`${root}/app/api/computer/route.ts`);
+const V = await import(`${rootUrl}/app/api/vnc/route.ts`);
+const SR = await import(`${rootUrl}/app/api/screen/route.ts`);
+const C = await import(`${rootUrl}/app/api/computer/route.ts`);
 const view = (botId, display = 99) => V.GET(new Request(`http://localhost:3210/api/vnc?bot=${botId}&display=${display}`));
 const shot = (botId, display = 100) => SR.GET(new Request(`http://localhost:3210/api/screen?bot=${botId}&display=${display}`));
 const computerView = (botId) => C.GET(new Request(`http://localhost:3210/api/computer?bot=${botId}`));
@@ -1274,7 +1276,7 @@ S.update((s) => (s.account = undefined));
  * one included; Free and Pro the free one only, and say so in the plan's words. On Max with them all
  * taken, one on the Orgo plan instead (an ordinary create, fresh from the template), when it has room.
  */
-const PI = await import(`${root}/lib/plan-includes.ts`);
+const PI = await import(`${rootUrl}/lib/plan-includes.ts`);
 // The plan Bops Cloud says counts only where the app works through it (cloud.ts cloudOn): the Mac app,
 // not a self-hosted install. So it's the Mac app's here, with the state still in the test's file store.
 delete process.env.BOPS_SELF_HOSTED;
@@ -1453,8 +1455,8 @@ for (const c of PI.PLAN_CARDS) for (const text of [c.computers.title, c.computer
 
 // Emails: each plan's, held by the app (the Mac makes inboxes in its own pod). The plan's main bot's is
 // counted from the start on a paid plan; another bot's comes only when the user asks, on Max, up to 5.
-const M = await import(`${root}/lib/server/mail.ts`);
-const R = await import(`${root}/lib/server/plan-room.ts`);
+const M = await import(`${rootUrl}/lib/server/mail.ts`);
+const R = await import(`${rootUrl}/lib/server/plan-room.ts`);
 for (const [tier, error, upgrade] of [
   ["free_bops", "Free doesn't include an email. Pro includes 1, and Max up to 5.", "plan"],
   ["pro_bops", "Pro includes 1 email. Max includes up to 5.", "max"],
@@ -1512,5 +1514,7 @@ assert.equal(onDisk().owner.about, "saved now", "nothing older lands after it");
 
 console.log(`all plan tests passed (${calls.length} fake Orgo calls, none to the network)`);
 // Gone before the store's next save could make the folder again.
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

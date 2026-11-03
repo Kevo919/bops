@@ -1,3 +1,4 @@
+import { join } from "node:path";
 // Tests for what the account sheet's Your plan shows (components/app/account.tsx PlanAndCredit) for each way of
 // paying for Bops (lib/bops-billing.ts): billed by use (the Orgo balance, Add credit on Orgo, one card, no
 // Bops plan, and the computer's size, Medium or Large, with a switch asked first; Pick your computer too,
@@ -17,9 +18,11 @@ import ts from "typescript";
 process.env.NEXT_PUBLIC_BOPS_BRAINS = "1";
 // A path, not a URL's: a checkout under a folder with a space in its name works too.
 const root = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
+// A file URL for import specifiers, from this OS-path root.
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -81,8 +84,8 @@ globalThis.open = (url) => void opened.push(url);
 
 const { createElement: h, act } = await import("react");
 const { createRoot } = await import("react-dom/client");
-const { PlanAndCredit } = await import(pathToFileURL(`${root}/components/app/account.tsx`).href);
-const { PickComputer } = await import(pathToFileURL(`${root}/components/app/computer-size.tsx`).href);
+const { PlanAndCredit } = await import(fileUrl("components/app/account.tsx"));
+const { PickComputer } = await import(fileUrl("components/app/computer-size.tsx"));
 // Every live view in the window hears when the computer changed size (lib/computer-size.ts).
 let resized = 0;
 globalThis.dispatchEvent = (e) => {

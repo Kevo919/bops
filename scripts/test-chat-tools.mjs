@@ -27,7 +27,8 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 // The user (and this process) is in New York.
@@ -39,12 +40,13 @@ process.env.OPENAI_API_KEY = "sk-test-chat-tools";
 process.env.COMPOSIO_API_KEY = "ck-test";
 process.env.AGENTMAIL_API_KEY = "am-test";
 process.env.BOPS_OWNER_PHONES = "+15551230000";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-chat-tools-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 globalThis.bopsOrgoKey = "sk_orgo_test_chat_tools";
@@ -56,7 +58,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -212,16 +214,16 @@ writeFileSync(
     sessions: [{ id: "ses_was", botId: "boppy", chatId: "chat_elsewhere", sentVia: "routine", routineId: "rtn_was_task", title: "Old task run", goal: "x", host: "orgo", status: "running", steps: [], replies: [], createdAt: 1 }],
   }),
 );
-S = await import(`${root}/lib/server/store.ts`);
-const { botChatId } = await import(`${root}/lib/types.ts`);
-const Style = await import(`${root}/cloud/style.ts`);
-const Chat = await import(`${root}/lib/server/chat.ts`);
-const W = await import(`${root}/lib/server/workspace-skills.ts`);
+S = await import(`${rootUrl}/lib/server/store.ts`);
+const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
+const Style = await import(`${rootUrl}/cloud/style.ts`);
+const Chat = await import(`${rootUrl}/lib/server/chat.ts`);
+const W = await import(`${rootUrl}/lib/server/workspace-skills.ts`);
 /** A skill of the main workspace by name (the procedures seeded below become skills there). */
 const skillNamed = (name) => W.refsOf("ws_main", "skill").find((r) => r.name === name);
 /** Take skills out of the main workspace (by name), as a test leaves things. */
 const dropSkills = (keep) => S.update((st) => { for (const w of st.workspaces ?? []) w.skills = (w.skills ?? []).filter(keep); });
-const Call = await import(`${root}/lib/server/call.ts`);
+const Call = await import(`${rootUrl}/lib/server/call.ts`);
 // The routines timer is left out: the tests run routines themselves.
 clearInterval(globalThis.__bopsRoutines);
 
@@ -265,7 +267,7 @@ async function turnRounds(text, ...rounds) {
 /* ---------------- A restart mid-run ---------------- */
 
 await check("a routine's run going when Bops stopped is left as it was (it may be going on another Mac), and doesn't hold Run now", async () => {
-  const { runningNow } = await import(`${root}/lib/types.ts`);
+  const { runningNow } = await import(`${rootUrl}/lib/types.ts`);
   const was = (id) => S.getState().routines.find((r) => r.id === id);
   assert.deepEqual(was("rtn_was_chat").last, { at: 1, status: "running" });
   assert.deepEqual(was("rtn_was_task").last, { at: 1, status: "running", sessionId: "ses_was" });
@@ -1524,7 +1526,7 @@ await check("run_on_mac: a routine someone else set up stays in the cloud, said 
 });
 
 await check("Run now asked in Slack: the task routine's result comes back there; a run on its time, or one already posted there, doesn't", async () => {
-  const Channels = await import(`${root}/lib/server/channels.ts`);
+  const Channels = await import(`${rootUrl}/lib/server/channels.ts`);
   S.update((st) => {
     st.channels = [{ id: "ch_sl", kind: "slack", botId: "boppy", handle: "Acme", owner: "U1", ownerName: "Alex", pairCode: "1", status: "live", at: 0, slack: { accountId: "ac_1", teamId: "T1", channels: [], dm: "D1" } }];
     st.routines.push(
@@ -1534,7 +1536,7 @@ await check("Run now asked in Slack: the task routine's result comes back there;
       { id: "rtn_other", botId: "boppy", title: "Other ask", goal: "Do the other thing.", schedule: { kind: "weekly", day: 2, time: "09:00" }, enabled: true, run: "task" },
     );
   });
-  const Routines = await import(`${root}/lib/server/routines.ts`);
+  const Routines = await import(`${rootUrl}/lib/server/routines.ts`);
   const k = started.length;
   answers.push(
     async () => {
@@ -1565,7 +1567,7 @@ await check("Run now asked in Slack: the task routine's result comes back there;
 });
 
 await check("a turn by text or in a channel sends back only its own: not a routine's run that landed meanwhile", async () => {
-  const { turnsOwn } = await import(`${root}/lib/types.ts`);
+  const { turnsOwn } = await import(`${rootUrl}/lib/types.ts`);
   assert.equal(turnsOwn({ role: "bot", text: "Hi" }, []), true);
   assert.equal(turnsOwn({ role: "bot", text: "Your inbox summary", routine: { id: "r1" } }, []), false, "a timer's run");
   assert.equal(turnsOwn({ role: "bot", text: "The digest", routine: { id: "r1", manual: true } }, []), true, "one this turn ran now");
@@ -1575,7 +1577,7 @@ await check("a turn by text or in a channel sends back only its own: not a routi
 
 /* ---------------- Replies to send (draft_reply: lib/server/reply-drafts.ts) ---------------- */
 
-const Drafts = await import(`${root}/lib/server/reply-drafts.ts`);
+const Drafts = await import(`${rootUrl}/lib/server/reply-drafts.ts`);
 const KEVIN_THREAD = "18c0a1b2c3d4e5f6";
 const AVA_THREAD = "18c0ffee00000001";
 // Alex's inbox, as Gmail answers: Kevin's email asks (in its words) for a reply to someone else.
@@ -1723,7 +1725,7 @@ await check("draft_reply in Slack and Discord: a channel and thread this turn re
 });
 
 await check("a routine's run offers its drafts, one set up before draft_reply too (its job says so); a quiet one that said NOTHING still posts them, on its message", async () => {
-  const { runRoutine } = await import(`${root}/lib/server/routines.ts`);
+  const { runRoutine } = await import(`${rootUrl}/lib/server/routines.ts`);
   // The Draft replies starter's goal as it was before draft_reply, copied into the routine when it was made.
   const goal = "Check my Gmail for new mail since the last run that needs a reply from me (find_app_actions, then use_app). For each one, give who it's from, the subject, and a short draft reply in my voice. Don't send it or save it in Gmail: I'll send what I like. Writes always ask me first. If nothing new needs a reply, answer NOTHING.";
   S.update((st) => st.routines.push({ id: "rtn_drafts", botId: "boppy", title: "Draft replies as mail comes", goal, schedule: { kind: "every", minutes: 15 }, enabled: false, run: "chat", quiet: true }));
@@ -1813,8 +1815,8 @@ await check("Send: the right action and inputs for each app, from the account it
 });
 
 await check("POST /api/drafts/send: only from the Bops window, never while a shared workspace is open; then the words go as the user left them", async () => {
-  const Route = await import(`${root}/app/api/drafts/send/route.ts`);
-  const { orgoKey } = await import(`${root}/lib/server/orgo-auth.ts`);
+  const Route = await import(`${rootUrl}/app/api/drafts/send/route.ts`);
+  const { orgoKey } = await import(`${rootUrl}/lib/server/orgo-auth.ts`);
   const r = messages().findLast((x) => x.role === "bot" && x.routine?.id === "rtn_drafts");
   const ad = r.drafts[0];
   const req = (body, headers = {}) => new Request("http://127.0.0.1:3210/api/drafts/send", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
@@ -2417,8 +2419,8 @@ await check("a bot that keeps its memory to itself is told so, the main bot is t
 });
 
 await check("PATCH /api/workspaces { id, chain }: kept as cleanChain makes it, only from the Bops window, never while a shared workspace is open", async () => {
-  const Route = await import(`${root}/app/api/workspaces/route.ts`);
-  const { orgoKey } = await import(`${root}/lib/server/orgo-auth.ts`);
+  const Route = await import(`${rootUrl}/app/api/workspaces/route.ts`);
+  const { orgoKey } = await import(`${rootUrl}/lib/server/orgo-auth.ts`);
   const req = (body, headers = {}) => new Request("http://127.0.0.1:3210/api/workspaces", { method: "PATCH", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
   const was = S.getState().workspaces[0].chain;
   try {
@@ -2452,7 +2454,7 @@ await check("PATCH /api/workspaces { id, chain }: kept as cleanChain makes it, o
 });
 
 await check("GET /api/workspaces?olderBops=1: a runner on a Bops from before the chart says so; one new enough, stopped or none doesn't", async () => {
-  const Route = await import(`${root}/app/api/workspaces/route.ts`);
+  const Route = await import(`${rootUrl}/app/api/workspaces/route.ts`);
   const older = async () => (await (await Route.GET(new Request("http://127.0.0.1:3210/api/workspaces?olderBops=1"))).json()).older;
   const runner = (version, status = "running") => ({ status, version, buildId: "b1", by: "dev_1", at: 1 });
   try {
@@ -2467,7 +2469,7 @@ await check("GET /api/workspaces?olderBops=1: a runner on a Bops from before the
 });
 
 await check("a deleted bot's place on the chart: the bots under it answer to its lead, its exceptions go", async () => {
-  const W2 = await import(`${root}/lib/server/workspaces.ts`);
+  const W2 = await import(`${rootUrl}/lib/server/workspaces.ts`);
   const st = structuredClone(S.getState());
   st.workspaces[0].chain = { bots: { nova: { lead: "max" }, pip: { lead: "nova" } }, pairs: { "juno>nova": true, "juno>max": true } };
   W2.forgetBotInChain(st, "nova", "ws_main", "max");
@@ -2499,7 +2501,7 @@ await check("a pasted preview link or localhost address isn't asking to publish;
 /* ---------------- A chat turn on a bot's computer (runner-chat.ts) ---------------- */
 
 await check("a turn a computer's runner answers: the message Bops Cloud wrote is answered without adding another, its rows carry the turn on Bops Cloud's clock, nothing that waits for the Mac is offered, and what can't be done twice is said once", async () => {
-  const { runInTurn } = await import(`${root}/lib/server/turn-context.ts`);
+  const { runInTurn } = await import(`${rootUrl}/lib/server/turn-context.ts`);
   const T = Date.now() + 120_000;
   const ava = { userId: "u_ava", email: "ava@example.com", name: "Ava", ref: "k1" };
   S.update((st) => {
@@ -2554,6 +2556,8 @@ await check("no dashes in anything Bops said or told the model", () => {
 });
 
 server.close();
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`chat tools: ${passed} passed, ${failures} failed${warned.length ? ` (warnings: ${warned.length})` : ""}`);
 process.exit(failures ? 1 : 0);

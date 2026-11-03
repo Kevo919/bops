@@ -1,3 +1,4 @@
+import { join } from "node:path";
 // Tests for a site's Preview password in the window (components/app/preview-password.tsx, and where preview-tab.tsx,
 // app-envs.tsx and hosted-apps.tsx put it): beside its Preview link, "Password" with its value and Copy, read once from
 // the window's route however many places show it, and again only when the apps list says Bops set a newer one; nothing
@@ -18,10 +19,12 @@ import ts from "typescript";
 
 // (As a path, not a URL's: a folder with a space in its name would be %20, then %2520 once made a URL again.)
 const root = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
+// A file URL for import specifiers, from this OS-path root.
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -73,7 +76,7 @@ globalThis.fetch = async (url, init = {}) => {
   return { ok: status < 400, status, json: async () => body };
 };
 
-const P = await import(pathToFileURL(`${root}/components/app/preview-password.tsx`).href);
+const P = await import(fileUrl("components/app/preview-password.tsx"));
 const { createElement: h, act } = await import("react");
 const { createRoot } = await import("react-dom/client");
 
@@ -335,7 +338,7 @@ const placed = (el) => [el, ...el.querySelectorAll("[class]")].filter((x) => cla
 
 await test("on the Preview line in Your Apps: Password, its 7 character value in mono and Copy, one piece where the line says where it is, never cut short; what the line serves a piece of its own after it; nothing placed over anything; while it's read, what's said cut short whole in its tooltip", async () => {
   fresh();
-  const E = await import(pathToFileURL(`${root}/components/app/app-envs.tsx`).href);
+  const E = await import(fileUrl("components/app/app-envs.tsx"));
   const AT = "5e1f0c2".repeat(9).slice(0, 40);
   // (Its Preview as the list says it now: a newer password than the one kept, after fresh(), is read again.)
   const envs = () => {

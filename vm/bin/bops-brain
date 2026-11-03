@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The brains a user brings to a Bops computer (lib/server/brains.ts): Claude Code signed in with their
-# own Claude plan, or on their own API key, and Codex on their own OpenAI key. Claude Code is the
+# own Claude plan, or on their own API key, and Codex on an OpenAI key or ChatGPT plan. Claude Code is the
 # unmodified one Bops installs under /opt/bops/claude. Each brain has a folder of its own here
 # (/root/.bops/brains/<id>: Claude Code's CLAUDE_CONFIG_DIR, Codex's CODEX_HOME), so two brains are two
 # accounts, and nothing here ever reads, copies or prints what's in it.
@@ -101,14 +101,16 @@ bare() {
   export HOME="$RUN_HOME" PATH="$RUNS" LANG=C.UTF-8 TERM=xterm-256color DISABLE_AUTOUPDATER=1
 }
 
-# Bops' settings for Codex in a brain's folder, its CODEX_HOME (never ~/.codex): the user's OpenAI key only,
-# so a ChatGPT sign-in is never used even if one were made here; no update check (Bops pins it); live web
+# Bops' settings for Codex in a brain's folder, its CODEX_HOME (never ~/.codex): the user's OpenAI key,
+# or an explicitly selected ChatGPT plan; never fall back from a key to a plan. No update check; live web
 # search, as Bops agent has; and the commands it runs never get Codex's own key variable. A bot's agent
 # (--bot) has only its run token in OPENAI_API_KEY, which its commands keep (Codex's default would drop every
 # *KEY* and *TOKEN*), so codex, an SDK or curl there work on the bot's account; a run without --bot has no
 # OPENAI_API_KEY at all. Written whole and then moved in, as threads of one brain start side by side.
 codex_config() {
-  local want='forced_login_method = "api"
+  local method="${1:-api}"
+  local want="forced_login_method = \"$method\""'
+cli_auth_credentials_store = "file"
 check_for_update_on_startup = false
 web_search = "live"
 
@@ -180,6 +182,16 @@ w_claude_key() {
     "[ -z \"\${BOPS_MODEL:-}\" ] || export ANTHROPIC_MODEL=\"\$BOPS_MODEL\"" \
     "exec '$CLAUDE' \"\$@\""
 }
+# Plan wrappers remove gate credentials inherited from another agent's thread.
+w_codex_plan() {
+  local selected=""
+  [ -n "${3:-}" ] || selected="unset BOPS_MODEL BOPS_EFFORT; ${2:+export BOPS_MODEL='$2'}"
+  printf '%s\n' "$HEAD" \
+    "unset CODEX_API_KEY OPENAI_API_KEY OPENAI_BASE_URL ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN DEEPINFRA_API_KEY ZAI_API_KEY DEEPSEEK_API_KEY OPENROUTER_API_KEY OPENCODE_CONFIG OPENCODE_CONFIG_CONTENT DSH_HOME CLAUDE_CONFIG_DIR CLAUDE_ENV_FILE BOPS_GATE" \
+    "export CODEX_HOME='$BRAINS/$1'" \
+    ${selected:+"$selected"} \
+    "exec '$CODEX' -c 'forced_login_method=\"chatgpt\"' \${BOPS_MODEL:+-c \"model=\\\"\$BOPS_MODEL\\\"\"} \${BOPS_EFFORT:+-c \"model_reasoning_effort=\\\"\$BOPS_EFFORT\\\"\"} \"\$@\""
+}
 # Codex on a key: its folder, and the run's model, thinking and gate on its own command line (Codex has no model variable).
 w_codex_key() {
   printf '%s\n' "$HEAD" \
@@ -211,10 +223,10 @@ also_wrapper() {
     IFS=: read -r kind pays acct model <<< "$entry"
     [ "$kind" = "$name" ] || continue
     has=1
-    if [ "$kind" = claude ] && [ "$pays" = plan ] && [ -z "$plan" ]; then plan="$acct:$model"; fi
+    if { [ "$kind" = claude ] || [ "$kind" = codex ]; } && [ "$pays" = plan ] && [ -z "$plan" ]; then plan="$acct:$model"; fi
   done
   eval "nm=\$NAMES_$name"
-  if [ -n "$plan" ]; then w_claude_plan "${plan%%:*}" "${plan#*:}"
+  if [ -n "$plan" ]; then w_"$name"_plan "${plan%%:*}" "${plan#*:}"
   elif [ -n "$has" ]; then w_stub "$nm runs on this bot's key only in a thread with $nm. Start one in Bops with New thread." 1
   else w_stub "This bot doesn't run $nm. Add it in its profile in Bops." 127; fi
 }
@@ -235,7 +247,7 @@ wrappers() {
   # before, have no key or token at all. They start from a snapshot of the login shell, where /root/.bashrc may
   # have put the computer's own claude or codex first on the PATH, or made an alias of one: this agent's
   # commands go first again and no alias is left, so each one is the bot's own there too.
-  if [ "$KIND" = claude ] && [ "$PAYS" = plan ]; then drop='unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN CODEX_API_KEY OPENAI_API_KEY'
+  if [ "$PAYS" = plan ]; then drop='unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN CODEX_API_KEY OPENAI_API_KEY'
   else drop='unset CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_AUTH_TOKEN CODEX_API_KEY'; fi
   printf '%s\n' "$drop" 'unalias claude codex opencode agy 2>/dev/null || true' "export PATH='$G/bin':\"\$PATH\"" | put_file "$G/shell-env" 600
 }
@@ -361,23 +373,34 @@ case "$CMD" in
     C="${3:-}"; [[ "$C" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "which computer?" >&2; exit 2; }
     [ -d "$DIR" ] || { echo '{"loggedIn":false}'; exit 0; }
     if [ "$(cat "$DIR/.computer" 2>/dev/null)" != "$C" ]; then rm -rf "$DIR"; echo '{"loggedIn":false}'; exit 0; fi
-    (bare; export PATH="$ACCOUNT_RUNS" CLAUDE_CONFIG_DIR="$DIR"; exec "$CLAUDE" auth status --json) || true
+    if [ "${4:-claude}" = codex ]; then
+      # Match only the CLI's public mode line. Never return API-key hints or auth.json.
+      ANSWER="$(bare; export PATH="$ACCOUNT_RUNS" CODEX_HOME="$DIR"; "$CODEX" -c 'forced_login_method="chatgpt"' login status 2>&1)" || ANSWER=""
+      if [ "$ANSWER" = "Logged in using ChatGPT" ]; then echo '{"loggedIn":true,"authMethod":"chatgpt"}'
+      else echo '{"loggedIn":false}'; fi
+    else
+      (bare; export PATH="$ACCOUNT_RUNS" CLAUDE_CONFIG_DIR="$DIR"; exec "$CLAUDE" auth status --json) || true
+    fi
     ;;
   login)
+    KIND="${5:-claude}"; [[ "$KIND" = claude || "$KIND" = codex ]] || { echo "which agent?" >&2; exit 2; }
     N="${3:-}"; [[ "$N" =~ ^[0-9]+$ ]] || { echo "which display?" >&2; exit 2; }
     C="${4:-}"; [[ "$C" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "which computer?" >&2; exit 2; }
     # A folder from another computer (a copy's) starts over.
     [ -d "$DIR" ] && [ "$(cat "$DIR/.computer" 2>/dev/null)" != "$C" ] && rm -rf "$DIR"
     folder
     printf '%s' "$C" > "$DIR/.computer"
+    printf '%s' "$KIND" > "$DIR/.kind"
+    [ "$KIND" != codex ] || codex_config chatgpt
     mkdir -p "$LOGS"
     # One sign-in per brain: a window still open from the last try goes first, with its Chrome.
     close_signin
     TERMINAL="$(command -v xfce4-terminal || command -v xterm || true)"
     [ -n "$TERMINAL" ] || { echo "no terminal on this computer" >&2; exit 1; }
-    if [ "${TERMINAL##*/}" = xfce4-terminal ]; then ARGS=(--disable-server --title "Sign in to Claude Code" --geometry 96x28+60+40 -x)
-    else ARGS=(-T "Sign in to Claude Code" -geometry 96x28+60+40 -e); fi
-    DISPLAY=":$N" setsid nohup "$TERMINAL" "${ARGS[@]}" "$HERE/bops-brain" sign-in "$ID" "$N" < /dev/null > "$LOGS/brain-$ID.log" 2>&1 &
+    TITLE="Codex"; [ "$KIND" != claude ] || TITLE="Claude Code"
+    if [ "${TERMINAL##*/}" = xfce4-terminal ]; then ARGS=(--disable-server --title "Sign in to $TITLE" --geometry 96x28+60+40 -x)
+    else ARGS=(-T "Sign in to $TITLE" -geometry 96x28+60+40 -e); fi
+    DISPLAY=":$N" setsid nohup "$TERMINAL" "${ARGS[@]}" "$HERE/bops-brain" sign-in "$ID" "$N" "$KIND" < /dev/null > "$LOGS/brain-$ID.log" 2>&1 &
     echo "signing in on :$N"
     ;;
   sign-in)
@@ -388,9 +411,11 @@ case "$CMD" in
     N="${3:?display}"
     mkdir -p "$BRAINS/.open"
     ln -sf "$HERE/bops-brain-browser" "$BRAINS/.open/xdg-open"
-    if (bare; export DISPLAY=":$N" CLAUDE_CONFIG_DIR="$DIR" BROWSER="$HERE/bops-brain-browser" PATH="$BRAINS/.open:$ACCOUNT_RUNS"; exec "$CLAUDE" auth login); then exit 0; fi
+    if [ "${4:-claude}" = codex ]; then
+      if (bare; export DISPLAY=":$N" CODEX_HOME="$DIR" PATH="$ACCOUNT_RUNS"; cd "$DIR"; exec "$CODEX" -c 'forced_login_method="chatgpt"' login --device-auth); then exit 0; fi
+    elif (bare; export DISPLAY=":$N" CLAUDE_CONFIG_DIR="$DIR" BROWSER="$HERE/bops-brain-browser" PATH="$BRAINS/.open:$ACCOUNT_RUNS"; exec "$CLAUDE" auth login); then exit 0; fi
     echo
-    echo "Claude Code didn't finish signing in. Close this window and try again from Bops."
+    echo "The agent didn't finish signing in. Close this window and try again from Bops."
     read -r _ || true
     ;;
   cancel)
@@ -399,7 +424,12 @@ case "$CMD" in
     ;;
   logout|forget)
     close_signin
-    if [ -d "$DIR" ]; then (bare; export PATH="$ACCOUNT_RUNS" CLAUDE_CONFIG_DIR="$DIR"; exec "$CLAUDE" auth logout) > /dev/null 2>&1 || true; fi
+    if [ -d "$DIR" ]; then
+      if [ "${3:-$(cat "$DIR/.kind" 2>/dev/null)}" = codex ]; then
+        (bare; export PATH="$ACCOUNT_RUNS" CODEX_HOME="$DIR"; exec "$CODEX" logout) > /dev/null 2>&1 || true
+        rm -f "$DIR/auth.json"
+      else (bare; export PATH="$ACCOUNT_RUNS" CLAUDE_CONFIG_DIR="$DIR"; exec "$CLAUDE" auth logout) > /dev/null 2>&1 || true; fi
+    fi
     [ "$CMD" = forget ] && rm -rf "$DIR"
     echo "signed out"
     ;;
@@ -461,6 +491,10 @@ case "$CMD" in
     [ -n "$OCC" ] && [ -f "$OCC" ] && OCCONTENT="$(cat "$OCC")"
     DSHCONTENT=""
     [ -n "$DSHP" ] && [ -f "$DSHP" ] && DSHCONTENT="$(cat "$DSHP")"
+    # A missing key must never silently spend a key account's cached ChatGPT login.
+    if [ "$KIND" = codex ] && [ -z "$KEYFILE" ]; then
+      [ "$(cat "$DIR/.kind" 2>/dev/null)" = codex ] && grep -qx 'forced_login_method = "chatgpt"' "$DIR/config.toml" || { echo "Codex runs on your OpenAI key only unless this account signs in with ChatGPT" >&2; exit 2; }
+    fi
     SCREEN="${DISPLAY:-}"
     if [ -z "$BOT" ]; then
       # As before: the brain's own folder, its key (if any) in its CLI's own environment.
@@ -469,19 +503,19 @@ case "$CMD" in
           claude_settings
           bare; export CLAUDE_CONFIG_DIR="$DIR" CLAUDE_ENV_FILE="$DIR/.shell-env"; [ -n "$SCREEN" ] && export DISPLAY="$SCREEN"; [ -n "$KEY" ] && export ANTHROPIC_API_KEY="$KEY"; exec "$CLAUDE" "$@" ;;
         codex)
-          [ -n "$KEY" ] || { echo "Codex runs on your OpenAI key only" >&2; exit 2; }
-          codex_config
-          bare; export CODEX_HOME="$DIR" CODEX_API_KEY="$KEY"; [ -n "$SCREEN" ] && export DISPLAY="$SCREEN"; exec "$CODEX" "$@" ;;
+          METHOD=chatgpt; [ -z "$KEY" ] || METHOD=api
+          codex_config "$METHOD"
+          bare; export CODEX_HOME="$DIR"; [ -z "$KEY" ] || export CODEX_API_KEY="$KEY"; [ -n "$SCREEN" ] && export DISPLAY="$SCREEN"; exec "$CODEX" "$@" ;;
       esac
     fi
     # A bot's agent: an empty environment, the bot's and the agent's own settings, nothing else.
     PAYS=plan
     [ -n "$KEYFILE" ] && PAYS=key
-    [ "$KIND" = claude ] || PAYS=key
+    { [ "$KIND" = claude ] || [ "$KIND" = codex ]; } || PAYS=key
     [ "$PAYS" = key ] && [ -z "$KEY" ] && { echo "$KIND runs on your key here, and none came with this run" >&2; exit 1; }
     if [ "$PAYS" = key ] && [ -z "$ROUTE" ]; then ROUTE=anthropic; [ "$KIND" = codex ] && ROUTE=openai; fi
     [ "$KIND" = claude ] && claude_settings
-    [ "$KIND" = codex ] && codex_config
+    if [ "$KIND" = codex ]; then METHOD=chatgpt; [ "$PAYS" = plan ] || METHOD=api; codex_config "$METHOD"; fi
     bare
     bot_dir
     wrappers
@@ -502,8 +536,13 @@ case "$CMD" in
         CLI=("$CLAUDE" ${MODEL:+--model "$MODEL"} ${EFFORT:+--effort "$EFFORT"})
         ;;
       codex)
-        export CODEX_HOME="$DIR" CODEX_API_KEY="$TOKEN" OPENAI_API_KEY="$TOKEN" OPENAI_BASE_URL="$GURL/openai/v1" BOPS_GATE="$GURL"
-        CX=(-c "openai_base_url=\"$GURL/openai/v1\"" ${MODEL:+-c "model=\"$MODEL\""} ${EFFORT:+-c "model_reasoning_effort=\"$EFFORT\""})
+        export CODEX_HOME="$DIR"
+        CX=()
+        if [ "$PAYS" = key ]; then
+          export CODEX_API_KEY="$TOKEN" OPENAI_API_KEY="$TOKEN" OPENAI_BASE_URL="$GURL/openai/v1" BOPS_GATE="$GURL"
+          CX+=(-c "openai_base_url=\"$GURL/openai/v1\"")
+        else CX+=(-c 'forced_login_method="chatgpt"'); fi
+        CX+=(${MODEL:+-c "model=\"$MODEL\""} ${EFFORT:+-c "model_reasoning_effort=\"$EFFORT\""})
         # Its settings go after its subcommand (exec, exec resume, resume), where Codex reads them.
         PRE=()
         while [ $# -gt 0 ] && { [ "$1" = exec ] || [ "$1" = resume ]; }; do PRE+=("$1"); shift; done

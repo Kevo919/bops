@@ -20,7 +20,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
 const pg = require("pg");
@@ -39,7 +40,7 @@ for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAI
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-delete-cloud-"));
 process.chdir(scratch);
 process.env.HOME = scratch;
-symlinkSync(join(root, "node_modules"), join(scratch, "node_modules"));
+symlinkSync(join(rootPath, "node_modules"), join(scratch, "node_modules"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 mkdirSync(join(scratch, "keychain"));
@@ -66,7 +67,7 @@ if (process.argv[2] === "-i") {
 `,
   { mode: 0o755 },
 );
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 
 const freePort = () =>
   new Promise((resolve) => {
@@ -113,7 +114,7 @@ const cloudPort = await freePort();
 const CLOUD = `http://127.0.0.1:${cloudPort}`;
 process.env.BOPS_CLOUD_URL = CLOUD;
 const cloud = { child: null, log: "" };
-cloud.child = spawn(process.execPath, [join(root, "cloud/server.ts")], {
+cloud.child = spawn(process.execPath, [join(rootPath, "cloud/server.ts")], {
   env: { PATH: process.env.PATH, HOME: scratch, BOPS_DATABASE_URL: DB, BOPS_CLOUD_PORT: String(cloudPort), BOPS_CLOUD_SECRET: randomBytes(32).toString("base64"), BOPS_ORGO_ORIGIN: ORGO },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -140,10 +141,10 @@ const live = async () => (await rowsAfter(0)).rows.map(([id]) => id).sort();
 /* ---------------- The app's modules ---------------- */
 
 const STAND_INS = new Set(["cloud-tunnel", "relay", "sessions", "mac", "desktop", "mirror"]);
-const project = pathToFileURL(root).href + "/";
+const project = pathToFileURL(rootPath).href + "/";
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -177,14 +178,14 @@ console.warn = (...a) => warned.push(a.join(" "));
 const emitWarning = process.emitWarning.bind(process);
 process.emitWarning = (warning, ...rest) => (rest[0]?.code === "MODULE_TYPELESS_PACKAGE_JSON" ? undefined : emitWarning(warning, ...rest));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const L = await import(`${root}/lib/server/orgo-sign-in.ts`);
-const Up = await import(`${root}/lib/server/uploads.ts`);
-const Del = await import(`${root}/lib/server/deleted.ts`);
-await import(`${root}/lib/server/privacy.ts`);
-const PrivacyRoute = await import(`${root}/app/api/privacy/route.ts`);
-const MessagesRoute = await import(`${root}/app/api/chats/[chatId]/messages/route.ts`);
-const { botChatId } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const L = await import(`${rootUrl}/lib/server/orgo-sign-in.ts`);
+const Up = await import(`${rootUrl}/lib/server/uploads.ts`);
+const Del = await import(`${rootUrl}/lib/server/deleted.ts`);
+await import(`${rootUrl}/lib/server/privacy.ts`);
+const PrivacyRoute = await import(`${rootUrl}/app/api/privacy/route.ts`);
+const MessagesRoute = await import(`${rootUrl}/app/api/chats/[chatId]/messages/route.ts`);
+const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
 
 let failures = 0;
 let passed = 0;
@@ -301,6 +302,8 @@ if (stray.length) {
   console.error(`FAIL stray warnings\n  ${stray.join("\n  ")}`);
 }
 quiet.info(`\ndelete messages, Mac and Bops Cloud: ${passed} passed, ${failures} failed`);
-if (!failures) rmSync(scratch, { recursive: true, force: true });
+if (!failures) try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 else quiet.info(`The throwaway folder is kept for a look: ${scratch}`);
 process.exit(failures ? 1 : 0);

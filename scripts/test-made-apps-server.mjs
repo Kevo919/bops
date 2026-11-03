@@ -12,19 +12,20 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.OPENAI_API_KEY = "sk-test-made-apps";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 // Where an app's page finds React and Tailwind (public/made-apps), as in the Mac app.
-process.env.BOPS_SERVER_JS = join(root, "server.js");
+process.env.BOPS_SERVER_JS = join(rootPath, "server.js");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-made-apps-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
@@ -35,7 +36,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -87,13 +88,13 @@ writeFileSync(
   JSON.stringify({ madeApps: [{ id: "app_was", title: "Was building", botId: "boppy", chatId: "chat_boppy", ws: "ws_main", version: 1, versions: [{ n: 1, note: "First", at: 1 }], building: { change: "Add a chart", since: 1, chars: 900 }, createdAt: 1, updatedAt: 1 }] }),
 );
 
-const S = await import(`${root}/lib/server/store.ts`);
-const A = await import(`${root}/lib/server/made-apps.ts`);
-const M = await import(`${root}/lib/server/state-merge.ts`);
-const Bridge = await import(`${root}/app/api/made-apps/[appId]/bridge/route.ts`);
-const AppRoute = await import(`${root}/app/api/made-apps/[appId]/route.ts`);
-const View = await import(`${root}/app/api/made-apps/[appId]/view/route.ts`);
-const { botChatId } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const A = await import(`${rootUrl}/lib/server/made-apps.ts`);
+const M = await import(`${rootUrl}/lib/server/state-merge.ts`);
+const Bridge = await import(`${rootUrl}/app/api/made-apps/[appId]/bridge/route.ts`);
+const AppRoute = await import(`${rootUrl}/app/api/made-apps/[appId]/route.ts`);
+const View = await import(`${rootUrl}/app/api/made-apps/[appId]/view/route.ts`);
+const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
 // Signed in with an @orgo.ai email: apps are open to it (lib/apps-access.ts). A check below signs in as someone else.
 const TEAM = { user: { id: "u_alex", email: "alex@orgo.ai", name: "Alex" }, signedInAt: 1 };
 S.update((s) => {
@@ -241,11 +242,11 @@ await check("delete takes its files and its record", () => {
 });
 
 await check("an app's bot only reads for it: no app action that changes anything, not even with Just do it on", () => {
-  const chat = readFileSync(`${root}/lib/server/chat.ts`, "utf8");
+  const chat = readFileSync(`${rootPath}/lib/server/chat.ts`, "utf8");
   const body = chat.slice(chat.indexOf("export async function answerForApp("), chat.indexOf("/** Thrown when another account's Bops came in"));
   assert.match(body, /runAppAction\(botId, a\.action \?\? "", a\.arguments \?\? \{\}, \{ chatId: app\.chatId \}, a\.account \?\? null, \{ readOnly: true \}\)/);
   assert.match(body, /Here you only read: you can't send, create or change anything/);
-  const composio = readFileSync(`${root}/lib/server/composio.ts`, "utf8");
+  const composio = readFileSync(`${rootPath}/lib/server/composio.ts`, "utf8");
   const run = composio.slice(composio.indexOf("export async function runAppAction("));
   const saved = run.search(/const saved = [^;]*allows\(/);
   assert.ok(saved > 0, "the bot's saved rules are still weighed in runAppAction");
@@ -253,6 +254,8 @@ await check("an app's bot only reads for it: no app action that changes anything
   assert.ok(run.indexOf("if (opts.readOnly) return") < run.indexOf("if (opts.approved) return"), "and before a yes could do it");
 });
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`made apps (server): ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);
