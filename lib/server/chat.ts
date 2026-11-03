@@ -6,6 +6,7 @@ import { trackServerEvent } from "./analytics";
 import { fullAccessOn } from "./full-access";
 import { isSecret, learn, memoryBlock, memoryOn, recall, rememberMessage, saveToMemory, scopeOf, wsOf } from "./memory";
 import { APP_TOOLS, findAppActions, runAppAction } from "./composio";
+import { isZapierTool, runZapierTool, zapierChatTools, zapierForTurn } from "./zapier-chat";
 import { callApi, callApiTool, usableKeys } from "./keys";
 import { askFor, declined, NeedsOk } from "./permission";
 import { appsNote, placesNote } from "./skills";
@@ -1968,6 +1969,9 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
     // member's, the ones this bot has: they reach the owner's keys only through the bots they may tell, and anything
     // but a read asks the owner (keys.ts callApi, for the member).
     const keyed = opts.outside ? [] : await usableKeys(b);
+    // Zapier (zapier-chat.ts): the owner's own turns in the app only, never a member's, a channel's, a text's, an email's or a routine's.
+    const zapierHere = zapierForTurn({ outside: !!opts.outside, member, relayed, background: bg });
+    const zapierTools = zapierHere ? await zapierChatTools() : [];
     // Where its app and key uses are logged as from (access-sync.ts): a routine's run, the user's call, or the chat; and
     // on a member's turn, for whom (their asks are the owner's to answer, named as theirs).
     const used = { chatId, ...(bg ? { via: "routine" as const, viaId: bg.routineId } : opts.call ? { via: "call" as const } : {}), ...(member ? { member: member.name } : {}) };
@@ -2140,6 +2144,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       // The user's apps (every bot has them by default): not on a turn someone else started, like the keys. On a
       // member's, the ones this bot has, and anything that changes something asks the owner (composio.ts runAppAction).
       ...(opts.outside ? [] : APP_TOOLS(b, { forMember: !!member })),
+      ...zapierTools,
       // A reply for the user to send from their account (reply-drafts.ts): a card in Bops' chat, so not by text, in a
       // channel or by email, nor for a member (it's the owner's account it goes from).
       ...(opts.outside || relayed || member ? [] : draftTools(b)),
@@ -2744,6 +2749,21 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
             return fromApp(out);
           })
           .catch(failed);
+      // Zapier: anything but a read asks the owner first (zapier-chat.ts); what it answers is from outside Bops.
+      if (isZapierTool(name) && zapierHere)
+        return runZapierTool(botId, name, a as Record<string, unknown>, { approved })
+          .then((out) => {
+            if (approved) {
+              const ok = !out.startsWith("Failed");
+              addMessage({ chatId, role: "system", text: ok ? `${b.name} did it in Zapier: ${name.slice("zapier_".length)}` : `${b.name} couldn't do it in Zapier: ${out.replace(/^Failed:\s*/, "").slice(0, 160)}`, appResult: { action: name, ok, output: out } });
+            }
+            if (!out.startsWith("Failed")) {
+              readFrom.add("Zapier");
+              bring(out);
+            }
+            return out;
+          })
+          .catch(failed);
       return `${name} isn't a tool you have here.`;
     };
     if (resumed && opts.resume) {
@@ -2770,10 +2790,10 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
     for (let round = 0; round < 6; round++) {
       type Call = { call_id: string; name: string; arguments: string };
       const fcs = response.output.filter((o) => o.type === "function_call") as Call[];
-      const calls = fcs.filter((c) => LOOKUPS.has(c.name));
+      const calls = fcs.filter((c) => LOOKUPS.has(c.name) || isZapierTool(c.name));
       // Set before any runs: a create_skill in the same round as a page or an email read is refused too, and so
       // is a task with an address that isn't written down.
-      if (calls.some((c) => OUTSIDE_READS.has(c.name))) outsideRead = true;
+      if (calls.some((c) => OUTSIDE_READS.has(c.name) || isZapierTool(c.name))) outsideRead = true;
       // Every address the bot wrote in this round's tool inputs, before any of them runs: its own words (madeUp).
       // Not the page web_fetch asks for: one that isn't written down is never fetched, so nothing can say it back.
       for (const c of fcs) if (c.name !== "web_fetch") wroteItself(c.arguments);
@@ -2866,7 +2886,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
     const pictures: { prompt: string; shape: Shape; from?: Message["images"] }[] = [];
     if ([...earlier, ...response.output].some((item) => item.type === "function_call" && !ONLY_READS.has(item.name))) noteActing();
     for (const item of [...earlier, ...response.output]) {
-      if (item.type !== "function_call" || LOOKUPS.has(item.name)) continue;
+      if (item.type !== "function_call" || LOOKUPS.has(item.name) || isZapierTool(item.name)) continue;
       // A tool this turn doesn't have (a routine's run, someone else's turn) does nothing, whatever the model says.
       if (!offered.has(item.name) || (bg && NOT_IN_BACKGROUND.has(item.name))) continue;
       // Work with an address it may not open (workRefused, said in the chat): not started, not passed on.

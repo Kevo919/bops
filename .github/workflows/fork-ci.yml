@@ -58,6 +58,10 @@ jobs:
         run: node scripts/test-windows-fuses.mjs
       - name: Config tests
         run: node scripts/test-config.mjs
+      - name: Connections tests (Zapier MCP, Composio and OpenRouter checks)
+        run: node --conditions=react-server scripts/test-connections.mjs
+      - name: Connections card UI tests
+        run: node scripts/test-connections-ui.mjs
       - name: Chat provider tests
         run: node --conditions=react-server scripts/test-chat-providers.mjs
       - name: Key check tests

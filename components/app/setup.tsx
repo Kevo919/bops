@@ -12,6 +12,7 @@ import { post, teamOf, useSelfHosted } from "./ui";
 import { UpdateSettings } from "./update-notice";
 import type { KeyCheckResult } from "@/lib/server/key-check";
 import { ModelsCard } from "./models-card";
+import { ConnectionsCard } from "./connections-card";
 import { HandyCard } from "./handy-card";
 
 /*
@@ -629,6 +630,7 @@ export function ThisMacSettings({ state }: { state: AppState }) {
         <KeysCard />
       </div>
       <ModelsCard />
+      <ConnectionsCard state={state} />
       <HandyCard />
       <UpdateSettings />
     </div>
