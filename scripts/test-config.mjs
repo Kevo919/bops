@@ -106,6 +106,65 @@ try {
     assert.match(warnings[0], /left out.*unknown/);
   });
 
+  test("Modules: missing, empty and malformed YAML safely read as empty", () => {
+    assert.deepEqual(modules.read(fixture("missing-modules")), {});
+    assert.deepEqual(modules.read(fixture("empty-modules", "bops.yaml", "# empty\n")), {});
+    const source = "ai: [unterminated\n";
+    const root = fixture("bad-modules", "bops.yaml", source);
+    assert.deepEqual(modules.read(root), {});
+    assert.equal(readFileSync(modules.file(root), "utf8"), source);
+    const env = { BOPS_CHAT_MODEL: "untouched" };
+    assert.deepEqual(modules.apply(root, env), []);
+    assert.deepEqual(env, { BOPS_CHAT_MODEL: "untouched" });
+  });
+
+  test("Modules: write retains comments, unrelated keys and sections", () => {
+    const root = fixture("comments", "bops.yaml", "# My modules\nai:\n  # Keep this chat explanation\n  chat: old-model # inline note\n  light: leave-this\n# This section belongs to a plugin\ncustom:\n  untouched: yes\n");
+    modules.write(root, { ai: { chat: "new-model" } });
+    const written = readFileSync(modules.file(root), "utf8");
+    for (const comment of ["# My modules", "# Keep this chat explanation", "# inline note", "# This section belongs to a plugin"])
+      assert.ok(written.includes(comment), `Lost comment: ${comment}`);
+    assert.deepEqual(modules.read(root), { ai: { chat: "new-model", light: "leave-this" }, custom: { untouched: "yes" } });
+    assert.equal(existsSync(`${modules.file(root)}.tmp`), false);
+  });
+
+  test("Modules: clearing a field removes it, while false and zero are preserved", () => {
+    const root = fixture("delete-fields", "bops.yaml", "ai:\n  chat: old\n  tasks: old\n  light: old\n  hardTasks: keep\n");
+    modules.write(root, { ai: { chat: "", tasks: null, light: undefined }, computers: { enabled: false, diskGB: 0 } });
+    assert.deepEqual(modules.read(root), { ai: { hardTasks: "keep" }, computers: { enabled: false, diskGB: 0 } });
+    assert.equal(existsSync(`${modules.file(root)}.tmp`), false);
+  });
+
+  test("Modules: writing a new file creates its config directory and round-trips", () => {
+    const root = join(scratch, "new-module-root");
+    modules.write(root, { ai: { chat: "test-model" }, remote: { requirePairing: true } });
+    assert.deepEqual(modules.read(root), { ai: { chat: "test-model" }, remote: { requirePairing: true } });
+    assert.equal(existsSync(`${modules.file(root)}.tmp`), false);
+  });
+
+  test("Modules: YAML overrides supplied defaults, but explicit outer environment wins", () => {
+    const root = fixture("apply", "bops.yaml", "ai:\n  chat: configured\n  tasks: configured-task\ncomputers:\n  computerTool: false\nthisComputer:\n  chromeWindows: false\nremote:\n  requirePairing: true\nunknown:\n  env: ignored\n");
+    const env = { BOPS_CHAT_MODEL: "default", BOPS_SESSION_MODEL: "outer-task", UNRELATED: "keep" };
+    const outer = { BOPS_SESSION_MODEL: "outer-task" };
+    const changes = modules.apply(root, env, outer);
+    assert.deepEqual(env, { BOPS_CHAT_MODEL: "configured", BOPS_SESSION_MODEL: "outer-task", UNRELATED: "keep", BOPS_COMPUTER_TOOL: "0", BOPS_CHROME_WINDOWS: "", BOPS_REQUIRE_REMOTE: "1" });
+    assert.ok(changes.includes("ai.chat"));
+    assert.ok(!changes.includes("ai.tasks"));
+    assert.deepEqual(outer, { BOPS_SESSION_MODEL: "outer-task" });
+  });
+
+  test("Modules: disabled optional module clears only keys not owned by outer environment", () => {
+    const root = fixture("disabled", "bops.yaml", "computers:\n  enabled: false\nmemory:\n  enabled: false\nai:\n  enabled: false\n");
+    const env = { ORGO_API_KEY: "test-only", HONCHO_API_KEY: "test-outer", UNRELATED: "keep" };
+    modules.apply(root, env, { HONCHO_API_KEY: "test-outer" });
+    assert.deepEqual(env, { HONCHO_API_KEY: "test-outer", UNRELATED: "keep" });
+    const description = modules.describe(root, env);
+    assert.equal(description.find((module) => module.id === "ai").enabled, true);
+    assert.equal(description.find((module) => module.id === "computers").enabled, false);
+    assert.equal(description.find((module) => module.id === "computers").keysSet, false);
+    assert.equal(description.find((module) => module.id === "memory").keysSet, true);
+  });
+
   test("LLMs: run_by keeps an agent that runs the provider and leaves out the rest, with why", () => {
     const problems = [];
     const list = llms.clean({ llms: [
@@ -197,65 +256,6 @@ try {
     const list = llms.clean(require("yaml").parse(on), problems);
     assert.deepEqual(problems, []);
     assert.deepEqual(list.filter((l) => l.provider === "openrouter").map((l) => [l.model, l.runBy ?? "opencode"]), [["deepseek/deepseek-v4-pro", "opencode"], ["qwen/qwen3-coder-next", "dsh"]]);
-  });
-
-  test("Modules: missing, empty and malformed YAML safely read as empty", () => {
-    assert.deepEqual(modules.read(fixture("missing-modules")), {});
-    assert.deepEqual(modules.read(fixture("empty-modules", "bops.yaml", "# empty\n")), {});
-    const source = "ai: [unterminated\n";
-    const root = fixture("bad-modules", "bops.yaml", source);
-    assert.deepEqual(modules.read(root), {});
-    assert.equal(readFileSync(modules.file(root), "utf8"), source);
-    const env = { BOPS_CHAT_MODEL: "untouched" };
-    assert.deepEqual(modules.apply(root, env), []);
-    assert.deepEqual(env, { BOPS_CHAT_MODEL: "untouched" });
-  });
-
-  test("Modules: write retains comments, unrelated keys and sections", () => {
-    const root = fixture("comments", "bops.yaml", "# My modules\nai:\n  # Keep this chat explanation\n  chat: old-model # inline note\n  light: leave-this\n# This section belongs to a plugin\ncustom:\n  untouched: yes\n");
-    modules.write(root, { ai: { chat: "new-model" } });
-    const written = readFileSync(modules.file(root), "utf8");
-    for (const comment of ["# My modules", "# Keep this chat explanation", "# inline note", "# This section belongs to a plugin"])
-      assert.ok(written.includes(comment), `Lost comment: ${comment}`);
-    assert.deepEqual(modules.read(root), { ai: { chat: "new-model", light: "leave-this" }, custom: { untouched: "yes" } });
-    assert.equal(existsSync(`${modules.file(root)}.tmp`), false);
-  });
-
-  test("Modules: clearing a field removes it, while false and zero are preserved", () => {
-    const root = fixture("delete-fields", "bops.yaml", "ai:\n  chat: old\n  tasks: old\n  light: old\n  hardTasks: keep\n");
-    modules.write(root, { ai: { chat: "", tasks: null, light: undefined }, computers: { enabled: false, diskGB: 0 } });
-    assert.deepEqual(modules.read(root), { ai: { hardTasks: "keep" }, computers: { enabled: false, diskGB: 0 } });
-    assert.equal(existsSync(`${modules.file(root)}.tmp`), false);
-  });
-
-  test("Modules: writing a new file creates its config directory and round-trips", () => {
-    const root = join(scratch, "new-module-root");
-    modules.write(root, { ai: { chat: "test-model" }, remote: { requirePairing: true } });
-    assert.deepEqual(modules.read(root), { ai: { chat: "test-model" }, remote: { requirePairing: true } });
-    assert.equal(existsSync(`${modules.file(root)}.tmp`), false);
-  });
-
-  test("Modules: YAML overrides supplied defaults, but explicit outer environment wins", () => {
-    const root = fixture("apply", "bops.yaml", "ai:\n  chat: configured\n  tasks: configured-task\ncomputers:\n  computerTool: false\nthisComputer:\n  chromeWindows: false\nremote:\n  requirePairing: true\nunknown:\n  env: ignored\n");
-    const env = { BOPS_CHAT_MODEL: "default", BOPS_SESSION_MODEL: "outer-task", UNRELATED: "keep" };
-    const outer = { BOPS_SESSION_MODEL: "outer-task" };
-    const changes = modules.apply(root, env, outer);
-    assert.deepEqual(env, { BOPS_CHAT_MODEL: "configured", BOPS_SESSION_MODEL: "outer-task", UNRELATED: "keep", BOPS_COMPUTER_TOOL: "0", BOPS_CHROME_WINDOWS: "", BOPS_REQUIRE_REMOTE: "1" });
-    assert.ok(changes.includes("ai.chat"));
-    assert.ok(!changes.includes("ai.tasks"));
-    assert.deepEqual(outer, { BOPS_SESSION_MODEL: "outer-task" });
-  });
-
-  test("Modules: disabled optional module clears only keys not owned by outer environment", () => {
-    const root = fixture("disabled", "bops.yaml", "computers:\n  enabled: false\nmemory:\n  enabled: false\nai:\n  enabled: false\n");
-    const env = { ORGO_API_KEY: "test-only", HONCHO_API_KEY: "test-outer", UNRELATED: "keep" };
-    modules.apply(root, env, { HONCHO_API_KEY: "test-outer" });
-    assert.deepEqual(env, { HONCHO_API_KEY: "test-outer", UNRELATED: "keep" });
-    const description = modules.describe(root, env);
-    assert.equal(description.find((module) => module.id === "ai").enabled, true);
-    assert.equal(description.find((module) => module.id === "computers").enabled, false);
-    assert.equal(description.find((module) => module.id === "computers").keysSet, false);
-    assert.equal(description.find((module) => module.id === "memory").keysSet, true);
   });
 
   console.log(`PASS: ${passed} config tests (temporary fixtures only)`);

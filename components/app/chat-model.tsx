@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import type { AppState, Chat } from "@/lib/types";
-import { chatDefault, chatKeyName, chatModels, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
+import { chatKeyName, chatModels, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
 import type { AgentRoute } from "@/lib/agents";
 import { post } from "./ui";
+// The chat default (Settings, Models): what a chat with no model picked answers on.
+import { chatDefault } from "@/lib/chat-models";
 
 /**
  * The model a chat's replies run on (Chat.model), picked in its message box: Auto (OpenAI, as before) first, then
