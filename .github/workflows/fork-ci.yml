@@ -42,6 +42,8 @@ jobs:
         run: node scripts/test-bot-ai.mjs
       - name: Subscription UI tests
         run: node scripts/test-subscriptions-ui.mjs
+      - name: Brain accounts and sign-in tests
+        run: node scripts/test-brains.mjs
       - name: CLI agent tests
         run: node --conditions=react-server scripts/test-cli-agents.mjs
       - name: Config tests

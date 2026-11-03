@@ -1235,8 +1235,8 @@ await test("Codex device login is private, plan runs have no key or gate, and lo
   const login = await runHere(c, `bops-brain login ${id} 100 ${PC} codex`);
   assert.equal(login.exit_code, 0);
   assert.match(login.output, /signing in/);
-  // Complete the fake CLI device flow synchronously; no real account or browser is contacted.
-  assert.equal((await runHere(c, `bops-brain sign-in ${id} 100 codex`)).exit_code, 0);
+  // Wait for the one terminal-launched device flow; starting a second login would race status/logout.
+  await until(() => existsSync(join(dir, "auth.json")) && readFileSync(join(dir, "auth.json"), "utf8") === "chatgpt", "the fake Codex device login");
   let status = await runHere(c, `bops-brain status ${id} ${PC} codex`);
   assert.deepEqual(JSON.parse(status.output), { loggedIn: true, authMethod: "chatgpt" });
   const run = await runHere(c, `bops-brain run ${id} codex --bot boppy --agent ag_plan000001 -- --version`);

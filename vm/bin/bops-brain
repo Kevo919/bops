@@ -396,8 +396,9 @@ case "$CMD" in
     close_signin
     TERMINAL="$(command -v xfce4-terminal || command -v xterm || true)"
     [ -n "$TERMINAL" ] || { echo "no terminal on this computer" >&2; exit 1; }
-    if [ "${TERMINAL##*/}" = xfce4-terminal ]; then ARGS=(--disable-server --title "Sign in to $KIND" --geometry 96x28+60+40 -x)
-    else ARGS=(-T "Sign in to $KIND" -geometry 96x28+60+40 -e); fi
+    TITLE="Codex"; [ "$KIND" != claude ] || TITLE="Claude Code"
+    if [ "${TERMINAL##*/}" = xfce4-terminal ]; then ARGS=(--disable-server --title "Sign in to $TITLE" --geometry 96x28+60+40 -x)
+    else ARGS=(-T "Sign in to $TITLE" -geometry 96x28+60+40 -e); fi
     DISPLAY=":$N" setsid nohup "$TERMINAL" "${ARGS[@]}" "$HERE/bops-brain" sign-in "$ID" "$N" "$KIND" < /dev/null > "$LOGS/brain-$ID.log" 2>&1 &
     echo "signing in on :$N"
     ;;
@@ -535,11 +536,12 @@ case "$CMD" in
         ;;
       codex)
         export CODEX_HOME="$DIR"
-        CX=(${MODEL:+-c "model=\"$MODEL\""} ${EFFORT:+-c "model_reasoning_effort=\"$EFFORT\""})
+        CX=()
         if [ "$PAYS" = key ]; then
           export CODEX_API_KEY="$TOKEN" OPENAI_API_KEY="$TOKEN" OPENAI_BASE_URL="$GURL/openai/v1" BOPS_GATE="$GURL"
           CX+=(-c "openai_base_url=\"$GURL/openai/v1\"")
         else CX+=(-c 'forced_login_method="chatgpt"'); fi
+        CX+=(${MODEL:+-c "model=\"$MODEL\""} ${EFFORT:+-c "model_reasoning_effort=\"$EFFORT\""})
         # Its settings go after its subcommand (exec, exec resume, resume), where Codex reads them.
         PRE=()
         while [ $# -gt 0 ] && { [ "$1" = exec ] || [ "$1" = resume ]; }; do PRE+=("$1"); shift; done
