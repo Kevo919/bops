@@ -15,7 +15,8 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 Object.assign(process.env, {
@@ -30,11 +31,12 @@ Object.assign(process.env, {
   BOPS_UI_TOKEN: "window-token-test",
 });
 const LINE = "+14155550199";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -144,13 +146,13 @@ globalThis.fetch = async (input, init) => {
   return realFetch(input, init);
 };
 
-const PV = await import(`${root}/lib/phone-voices.ts`);
-const W = await import(`${root}/lib/bot-settings.ts`);
-const SQ = await import(`${root}/lib/sequences.ts`);
-const S = await import(`${root}/lib/server/store.ts`);
-const M = await import(`${root}/lib/server/mail.ts`);
-const P = await import(`${root}/lib/server/phone.ts`);
-const route = await import(`${root}/app/api/bots/route.ts`);
+const PV = await import(`${rootUrl}/lib/phone-voices.ts`);
+const W = await import(`${rootUrl}/lib/bot-settings.ts`);
+const SQ = await import(`${rootUrl}/lib/sequences.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const M = await import(`${rootUrl}/lib/server/mail.ts`);
+const P = await import(`${rootUrl}/lib/server/phone.ts`);
+const route = await import(`${rootUrl}/app/api/bots/route.ts`);
 
 S.update((s) => {
   s.owner = { name: "Ava", about: "" };
@@ -470,6 +472,8 @@ await test("Everyone else shows the chain in its steps, for each Replies to othe
 });
 
 fake.close();
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`voice and mail: ${passed} passed`);
 process.exit(0);

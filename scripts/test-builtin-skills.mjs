@@ -13,13 +13,15 @@
 // Usage: node --conditions=react-server scripts/test-builtin-skills.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -33,9 +35,9 @@ registerHooks({
   },
 });
 
-const { BUILTIN_LABELS, BUILTIN_SKILLS } = await import(`${root}/lib/builtin-skills.ts`);
-const { APPS_LABEL, SKILL_LABEL_MAX, cleanLabel, isUnsorted } = await import(`${root}/lib/skill-labels.ts`);
-const { BUNDLE_LIMITS, SLUG_RE, checkFolder, isScript, renderSkillMd } = await import(`${root}/lib/server/skill-bundle.ts`);
+const { BUILTIN_LABELS, BUILTIN_SKILLS } = await import(`${rootUrl}/lib/builtin-skills.ts`);
+const { APPS_LABEL, SKILL_LABEL_MAX, cleanLabel, isUnsorted } = await import(`${rootUrl}/lib/skill-labels.ts`);
+const { BUNDLE_LIMITS, SLUG_RE, checkFolder, isScript, renderSkillMd } = await import(`${rootUrl}/lib/server/skill-bundle.ts`);
 
 let failures = 0;
 let passed = 0;

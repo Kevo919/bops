@@ -13,7 +13,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 // A file store, loaded at once and always ready (lib/server/persist.ts); the Mac app's ways (state in Bops Cloud)
 // once it's loaded, below.
@@ -34,18 +34,19 @@ process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 // The Mac app's server listens on this Mac only (desktop/main.cjs): bot computers can't reach it.
 process.env.HOSTNAME = "127.0.0.1";
 process.env.BOPS_TELEMETRY = "0";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-members-"));
 // A `security` that has nothing, first on the PATH: nothing here reads this Mac's Keychain.
 mkdirSync(join(scratch, "bin"));
 writeFileSync(join(scratch, "bin", "security"), "#!/bin/sh\nexit 44\n");
 chmodSync(join(scratch, "bin", "security"), 0o755);
-process.env.PATH = `${join(scratch, "bin")}:${process.env.PATH}`;
+process.env.PATH = `${join(scratch, "bin")}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 // Modules that would start processes when loaded are stand-ins whose exports do nothing (as in test-plan.mjs).
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -88,14 +89,14 @@ const offline = () => {
   throw new TypeError("fetch failed");
 };
 
-const R = await import(`${root}/app/api/members/route.ts`);
-const M = await import(`${root}/lib/members.ts`);
-const P = await import(`${root}/lib/plan-includes.ts`);
-const A = await import(`${root}/cloud/analytics-rules.ts`);
-const T = await import(`${root}/cloud/protocol.ts`);
+const R = await import(`${rootUrl}/app/api/members/route.ts`);
+const M = await import(`${rootUrl}/lib/members.ts`);
+const P = await import(`${rootUrl}/lib/plan-includes.ts`);
+const A = await import(`${rootUrl}/cloud/analytics-rules.ts`);
+const T = await import(`${rootUrl}/cloud/protocol.ts`);
 // Loaded: now it's the Mac app, whose state lives in Bops Cloud. Its Bops Cloud gives people their role (cloud-caps.ts).
 delete process.env.BOPS_SELF_HOSTED;
-const Caps = await import(`${root}/lib/server/cloud-caps.ts`);
+const Caps = await import(`${rootUrl}/lib/server/cloud-caps.ts`);
 const withRoles = async () => ({ ok: true, macs: 0, caps: ["roles"] });
 Caps.resetCloudCaps({ health: withRoles });
 
@@ -487,8 +488,8 @@ assert.equal(r.status, 200);
 assert.deepEqual(calls.filter((c) => c.method === "POST").at(-1).body, { email: "new@example.com", permission: "admin" }, "Orgo's invite words: admin");
 // Making someone an Admin: their Member entry stays as it was (a bridge would outlast a demotion on orgo.ai).
 {
-  const Sm = await import(`${root}/lib/server/store.ts`);
-  const Ws = await import(`${root}/lib/server/workspaces.ts`);
+  const Sm = await import(`${rootUrl}/lib/server/store.ts`);
+  const Ws = await import(`${rootUrl}/lib/server/workspaces.ts`);
   const wsOf = () => Sm.getState().workspaces?.find((w) => w.orgoProjectId === WS)?.id ?? "ws_main";
   const entry = () => Sm.getState().workspaces?.find((w) => w.id === wsOf())?.memberAccess?.["jamie@example.com"];
   const mapBefore = Sm.getState().workspaces?.find((w) => w.id === wsOf())?.memberAccess;
@@ -576,7 +577,7 @@ assert.deepEqual(M.ROLE_NAMES, { viewer: "Member", admin: "Admin" }, "the roles,
 // Your Apps for an Admin with no entry: the owner's Mac reads the apps for members once orgo-web's list says anyone is
 // in (an Admin: their Preview passwords too), whatever the entries say.
 {
-  const Af = await import(`${root}/lib/server/apps-for-members.ts`);
+  const Af = await import(`${rootUrl}/lib/server/apps-for-members.ts`);
   Af.notePeopleIn("ws_people", { any: false, admin: false });
   assert.deepEqual([Af.anyoneSeesApps("ws_people"), Af.anyoneSeesApps("ws_people", "write")], [false, false], "nobody in");
   Af.notePeopleIn("ws_people", { any: true, admin: false });
@@ -713,8 +714,8 @@ console.log("ok - a kept workspace id that's gone is looked up again");
 
 // Kept on the Bops workspace whose sheet it is (the one findBopsWorkspace is asked for: here the default), by email or
 // a guest's "user:<id>", once Orgo has the invite or the change; never a key the window sent; gone with the person.
-const S = await import(`${root}/lib/server/store.ts`);
-const W = await import(`${root}/lib/server/workspaces.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const W = await import(`${rootUrl}/lib/server/workspaces.ts`);
 const sheetWs = () => S.getState().workspace ?? "ws_main";
 /** Each entry's levels (when it was set, MemberAccess.at and invite, is checked on its own below). */
 const levels = (map) => map && Object.fromEntries(Object.entries(map).map(([k, a]) => [k, { others: a.others, bots: a.bots }]));
@@ -883,7 +884,7 @@ console.log("ok - Use its computer: the copy kept when not sent, off kept as off
 
 /* ---------------- 10e. Use its computer for a member: orgo-web first, kept only once it took it ---------------- */
 {
-  const O = await import(`${root}/lib/server/orgo.ts`);
+  const O = await import(`${rootUrl}/lib/server/orgo.ts`);
   const raw = (k) => rawKept()[k];
   const MEMBERS_PATH = `/api/workspaces/${WS}/members`;
   const PATCH_MEMBERS = `PATCH ${MEMBERS_PATH}`;
@@ -1084,7 +1085,7 @@ console.log("ok - Use its computer for a member: orgo-web first, kept once it to
   const tied = S.getState().workspaces.find((w) => w.id === sheetWs()).orgoProjectId;
   S.update((st) => void (st.workspaces.find((w) => w.id === sheetWs()).orgoProjectId = WS));
   list = says({ "u-jamie": true });
-  const Ms = await import(`${root}/lib/server/members.ts`);
+  const Ms = await import(`${rootUrl}/lib/server/members.ts`);
   await Ms.forgetGoneMembers(KEY);
   assert.equal(raw("jamie@example.com").computer, "use");
   S.update((st) => {
@@ -1273,9 +1274,9 @@ assert.deepEqual([r.status, r.body.code], [400, "BAD_ACCESS"]);
 assert.deepEqual(on("ws_main")["jamie@example.com"], { others: "read", bots: {} }, "unchanged");
 
 // A bot deleted goes from everyone's access: one made later with its name gets its id, and starts hidden.
-const Bt = await import(`${root}/lib/server/bots.ts`);
-const Rm = await import(`${root}/lib/server/remove.ts`);
-const Ac = await import(`${root}/lib/member-access.ts`);
+const Bt = await import(`${rootUrl}/lib/server/bots.ts`);
+const Rm = await import(`${rootUrl}/lib/server/remove.ts`);
+const Ac = await import(`${rootUrl}/lib/member-access.ts`);
 assert.equal((await Bt.createBot("Otto", "Ops", "ws_main")).botId, "otto");
 W.setMemberAccess("ws_main", "jamie@example.com", { others: "none", bots: { boppy: "read", otto: "read" } });
 W.setMemberAccess("ws_main", "user:u-guest", { others: "none", bots: { otto: "write" } });
@@ -1301,7 +1302,7 @@ console.log("ok - bot access: a deleted bot's goes with it");
 // A bot deleted from a group that stays: its lines there stay its own. One made later with its name gets another id,
 // so what the old one said, which someone it was hidden from never saw, never shows to them as the new one's.
 {
-  const { botsOf, handedByOthers, sharedMessages, sharedSlice } = await import(`${root}/cloud/ws-slice.ts`);
+  const { botsOf, handedByOthers, sharedMessages, sharedSlice } = await import(`${rootUrl}/cloud/ws-slice.ts`);
   const sam = await Bt.createBot("Sam", "Ops", "ws_main");
   const vera = await Bt.createBot("Vera", "Money", "ws_main");
   S.update((st) => {
@@ -1336,8 +1337,8 @@ console.log("ok - a deleted bot's lines in a group that stays never read as a ne
 // News held for later (attention.ts): the main bot's "While you were busy" says whose watch each line came from, so a
 // member given Boppy alone reads its own line and nothing of what another bot's watch found (cloud/ws-slice.ts).
 {
-  const At = await import(`${root}/lib/server/attention.ts`);
-  const { botsOf, handedByOthers, sharedMessages, sharedSlice } = await import(`${root}/cloud/ws-slice.ts`);
+  const At = await import(`${rootUrl}/lib/server/attention.ts`);
+  const { botsOf, handedByOthers, sharedMessages, sharedSlice } = await import(`${rootUrl}/cloud/ws-slice.ts`);
   const vera = await Bt.createBot("Vera", "Money", "ws_main");
   At.holdForLater({ botId: vera.botId, text: "Bank: “Withdrawal of $4,800, balance $212”" });
   At.holdForLater({ botId: "boppy", text: "Inbox: “Dana wrote back”" });
@@ -1365,9 +1366,9 @@ console.log("ok - the digest of news held for later shows a member only the line
 // nothing, and one answered already nothing; and they never reply: their own Bops has none of the owner's requests to
 // answer (replyToAsk says so, the approvals route 409), and the window shows the card inert (chat-view.tsx).
 {
-  const { sharedSlice } = await import(`${root}/cloud/ws-slice.ts`);
-  const P = await import(`${root}/lib/server/permission.ts`);
-  const Ap = await import(`${root}/app/api/apps/approvals/route.ts`);
+  const { sharedSlice } = await import(`${rootUrl}/cloud/ws-slice.ts`);
+  const P = await import(`${rootUrl}/lib/server/permission.ts`);
+  const Ap = await import(`${rootUrl}/app/api/apps/approvals/route.ts`);
   const vera = await Bt.createBot("Vera", "Money", "ws_main");
   const resume = { engine: "responses", responseId: "resp_books", callId: "call_books", call: { name: "use_app", arguments: "{}" } };
   const ask = (id, botId, reply) => ({ id, botId, chatId: `bot:${botId}`, threadId: "ses_books", askedBy: "dev_runner_c1", action: "Send an email", resources: ["books@acme.example"], preview: "to: books@acme.example", at: 5, resume, ...(reply ? { reply } : {}) });
@@ -1405,7 +1406,7 @@ console.log("ok - a message kept between us deleted: the answers to it stay kept
 // A bot from before whose id is "owner" writes into memory as itself (bops-owner), never as the owner, whose
 // words go in as the bank's own peer (memory.ts OWNER_WHO).
 {
-  const Mem = await import(`${root}/lib/server/memory.ts`);
+  const Mem = await import(`${rootUrl}/lib/server/memory.ts`);
   assert.equal(Mem.memoryPeerOf("ws_main", "owner"), "bops-owner");
   assert.notEqual(Mem.memoryPeerOf("ws_main", Mem.OWNER_WHO), "bops-owner");
   assert.ok(!/^bops-/.test(Mem.memoryPeerOf("ws_main", Mem.OWNER_WHO)), "the owner's is the bank's own peer");
@@ -1415,8 +1416,8 @@ console.log("ok - a message kept between us deleted: the answers to it stay kept
 // sentVia is the word that names the owner there, so the thread says it's a bot's (Session.sentViaBot), and what
 // carries it on to the Mac says so too. The owner's own task and a routine's run, as always.
 {
-  const X = await import(`${root}/lib/server/sessions.ts`);
-  const T = await import(`${root}/lib/types.ts`);
+  const X = await import(`${rootUrl}/lib/server/sessions.ts`);
+  const T = await import(`${rootUrl}/lib/types.ts`);
   const threadNow = (id) => S.getState().sessions.find((x) => x.id === id);
   // (It leads Kid on the team chart, lib/chain.ts: work goes only down a line.)
   S.update((st) => {
@@ -1446,7 +1447,7 @@ console.log("ok - a message kept between us deleted: the answers to it stay kept
   assert.notEqual(moved.id, handed.id);
   assert.deepEqual([moved.sentVia, moved.sentViaBot], ["you", true]);
   // Bops Cloud shows a member the bot that handed it on, as it does for any bot's (cloud/ws-slice.ts).
-  const { sliceOf } = await import(`${root}/cloud/ws-slice.ts`);
+  const { sliceOf } = await import(`${rootUrl}/cloud/ws-slice.ts`);
   assert.equal(sliceOf(S.getState(), "ws_main").sessions.find((x) => x.id === handed.id)?.sentViaBot, true);
   // A routine's run that a computer's runner began, paused there for the user's OK, moved to the Mac by the user: the
   // run is the Mac's now, so its end there is that run's end (that time of the routine done, never due again for the
@@ -1476,8 +1477,8 @@ console.log("ok - a message kept between us deleted: the answers to it stay kept
 // next message included. That keeps them out of the shared memory and a procedure's draft only: Bops Cloud
 // shows all of it to someone the owner gave the bot (cloud/ws-slice.ts), and nothing of it to anyone else.
 {
-  const Mem = await import(`${root}/lib/server/memory.ts`);
-  const { botsOf, handedByOthers, sharedMessages, sharedSlice } = await import(`${root}/cloud/ws-slice.ts`);
+  const Mem = await import(`${rootUrl}/lib/server/memory.ts`);
+  const { botsOf, handedByOthers, sharedMessages, sharedSlice } = await import(`${rootUrl}/cloud/ws-slice.ts`);
   const ask = "Between us, find what senior engineers earn in Austin";
   S.update((st) => {
     st.sessions.push({ id: "s_pay", botId: "boppy", chatId: "bot:boppy", sentVia: "you", title: "Austin pay", goal: ask, host: "orgo", status: "running", steps: [], replies: [], createdAt: 1 });
@@ -1508,7 +1509,7 @@ console.log("ok - a thread started for a message kept between us is kept between
 
 // Two Macs: one takes the last person away while the other adds someone. The map stays (empty), so the two go
 // together entry by entry, whichever merges last.
-const G = await import(`${root}/lib/server/state-merge.ts`);
+const G = await import(`${rootUrl}/lib/server/state-merge.ts`);
 S.update((st) => void st.workspaces.push({ id: "ws_merge", name: "Merge", createdAt: 1 }));
 const mergeWs = (blob) => blob.workspaces.find((w) => w.id === "ws_merge").memberAccess;
 W.setMemberAccess("ws_merge", "kim@example.com", { others: "read", bots: {} });
@@ -1600,7 +1601,7 @@ for (const card of P.PLAN_CARDS) for (const line of card.lines) noDashes(line.te
 for (const e of said) noDashes(e);
 assert.ok(said.size >= 15, `the route's words were all checked (${said.size})`);
 // The sheet's own words.
-const sheet = readFileSync(join(root, "components/app/members.tsx"), "utf8");
+const sheet = readFileSync(join(rootPath, "components/app/members.tsx"), "utf8");
 for (const m of sheet.matchAll(/"([^"\n]{12,})"|`([^`\n]{12,})`|>([^<>{}\n]{12,})</g)) noDashes(m[1] ?? m[2] ?? m[3]);
 console.log("ok - the words");
 
@@ -1617,7 +1618,7 @@ for (const [event, props] of [
 }
 assert.deepEqual(A.cleanProperties("bops_members_opened", { people: 3, email: "alex@example.com" }, "app"), { people: 3 });
 assert.deepEqual(A.cleanProperties("bops_upgrade_clicked", { surface: "members" }, "app"), { surface: "members" });
-const server = readFileSync(join(root, "lib/server/members.ts"), "utf8");
+const server = readFileSync(join(rootPath, "lib/server/members.ts"), "utf8");
 const tracked = [...server.matchAll(/trackServerEvent\(([^;]*)\);/g)].map((m) => m[1]);
 assert.deepEqual(
   [...new Set(tracked.map((t) => /^"(\w+)"/.exec(t)?.[1]))].sort(),
@@ -1631,7 +1632,7 @@ console.log("ok - no emails in usage events");
 /* ---------------- Someone else can use the workspace (no Bops runner there: runner-install.ts) ---------------- */
 
 {
-  const S = await import(`${root}/lib/server/members.ts`);
+  const S = await import(`${rootUrl}/lib/server/members.ts`);
   replies = usual();
   const others = (members, invites = []) => {
     list = { members, invites, seats: seatsOf() };
@@ -1654,8 +1655,8 @@ console.log("ok - someone else can use the workspace: any other member, or an in
 /* ---------------- Bot access forgotten without the sheet (runner-install.ts's look) ---------------- */
 
 {
-  const S = await import(`${root}/lib/server/members.ts`);
-  const St = await import(`${root}/lib/server/store.ts`);
+  const S = await import(`${rootUrl}/lib/server/members.ts`);
+  const St = await import(`${rootUrl}/lib/server/store.ts`);
   replies = usual();
   list = { members: MEMBERS, invites: INVITES, seats: seatsOf() };
   const had = St.getState().workspaces.find((w) => w.id === "ws_main").orgoProjectId;
@@ -1691,7 +1692,7 @@ console.log("ok - bot access: forgotten at the Mac's look too, whether or not th
 /* ---------------- Bot access is for the membership it was set in ---------------- */
 
 {
-  const St = await import(`${root}/lib/server/store.ts`);
+  const St = await import(`${rootUrl}/lib/server/store.ts`);
   replies = usual();
   const raw = () => St.getState().workspaces.find((w) => w.id === sheetWs()).memberAccess ?? {};
   const read = { others: "read", bots: {} };
@@ -1722,7 +1723,7 @@ console.log("ok - bot access: forgotten at the Mac's look too, whether or not th
   r = await get();
   assert.equal(raw()["dana@example.com"], undefined, "coming back never brings her old bots");
   assert.deepEqual(accessOf(r.body)["u-dana"], NONE);
-  const Sv = await import(`${root}/lib/server/members.ts`);
+  const Sv = await import(`${rootUrl}/lib/server/members.ts`);
   const had = St.getState().workspaces.find((w) => w.id === sheetWs()).orgoProjectId;
   St.update((st) => void (st.workspaces.find((w) => w.id === sheetWs()).orgoProjectId = WS));
   W.setMemberAccess(sheetWs(), "dana@example.com", read, { at: joined });
@@ -1751,6 +1752,8 @@ console.log("ok - bot access: forgotten at the Mac's look too, whether or not th
 console.log("ok - bot access: only for the membership it was set in, so someone removed and back never finds their old bots");
 
 process.chdir(tmpdir());
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log("all passed");
 process.exit(0);

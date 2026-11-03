@@ -22,14 +22,16 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 import { WebSocketServer } from "ws";
 import { endGroup, killGroup, removeTemp } from "./fixtures/cleanup.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -42,8 +44,8 @@ registerHooks({
     }
   },
 });
-const { cleanInput, startRelay, LINGER_MS, POINTER_BINDING, pointerOf } = await import(`${root}/lib/browser-relay.ts`);
-const { BROWSER_METHODS } = await import(`${root}/cloud/protocol.ts`);
+const { cleanInput, startRelay, LINGER_MS, POINTER_BINDING, pointerOf } = await import(`${rootUrl}/lib/browser-relay.ts`);
+const { BROWSER_METHODS } = await import(`${rootUrl}/cloud/protocol.ts`);
 
 let passed = 0;
 const test = async (name, f) => {

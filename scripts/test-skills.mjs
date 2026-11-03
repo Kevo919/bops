@@ -23,18 +23,20 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
 const UI = "ui-token-test-skills";
 process.env.BOPS_UI_TOKEN = UI;
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-skills-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const ORGO_KEY = "sk_orgo_test_skills";
@@ -46,7 +48,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -204,10 +206,10 @@ async function check(name, fn) {
 const said = [];
 const hear = (...xs) => (said.push(...xs.map((x) => (typeof x === "string" ? x : JSON.stringify(x)))), xs[0]);
 
-const S = await import(`${root}/lib/server/store.ts`);
-const W = await import(`${root}/lib/server/workspace-skills.ts`);
-const B = await import(`${root}/lib/server/skill-bundle.ts`);
-const Route = await import(`${root}/app/api/skills/route.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const W = await import(`${rootUrl}/lib/server/workspace-skills.ts`);
+const B = await import(`${rootUrl}/lib/server/skill-bundle.ts`);
+const Route = await import(`${rootUrl}/app/api/skills/route.ts`);
 const route = async (body, method = "POST") => {
   const res = await Route[method](new Request(`http://localhost:3210/api/skills${method === "GET" ? body ?? "" : ""}`, { method, headers: { "content-type": "application/json", "x-bops-window": UI }, ...(method === "GET" ? {} : { body: JSON.stringify(body) }) }));
   return { status: res.status, body: hear(await res.json()) };
@@ -496,7 +498,7 @@ await check("A workspace bound to its Orgo project: its folder moves to the proj
   writeFileSync(join(dataDir(), "p_two", "skills", "from-there", "SKILL.md"), "---\nname: from-there\ndescription: x\n---\n");
   mkdirSync(join(dataDir(), "p_two", "skills", "weekly-report"), { recursive: true });
   writeFileSync(join(dataDir(), "p_two", "skills", "weekly-report", "SKILL.md"), "theirs");
-  const O = await import(`${root}/lib/server/orgo.ts`);
+  const O = await import(`${rootUrl}/lib/server/orgo.ts`);
   O.bindProject("ws_two", "p_two");
   assert.equal(S.getState().workspaces.find((w) => w.id === "ws_two").orgoProjectId, "p_two");
   assert.ok(!existsSync(join(dataDir(), "ws_two")), "the old folder is gone");
@@ -585,7 +587,7 @@ await check("Syncs at once (the publish's timer, the window, the sign-in move) a
 });
 
 await check("Drafts and deletes reach Orgo: a draft goes by itself; a delete Orgo doesn't take waits on disk, is never pulled back, and goes later or after a restart", async () => {
-  const O = await import(`${root}/lib/server/sync-outbox.ts`);
+  const O = await import(`${rootUrl}/lib/server/sync-outbox.ts`);
   const clearTimers = () => {
     for (const t of globalThis.bopsSkillsSync?.values() ?? []) clearTimeout(t);
     globalThis.bopsSkillsSync?.clear();
@@ -660,7 +662,7 @@ await check("Drafts and deletes reach Orgo: a draft goes by itself; a delete Org
 });
 
 await check("A create or an edit Orgo hadn't taken when Bops quit goes at the next start (workspaces.ts startProjectBinding)", async () => {
-  const Wk = await import(`${root}/lib/server/workspaces.ts`);
+  const Wk = await import(`${rootUrl}/lib/server/workspaces.ts`);
   const clearTimers = () => {
     for (const t of globalThis.bopsSkillsSync?.values() ?? []) clearTimeout(t);
     globalThis.bopsSkillsSync?.clear();
@@ -785,7 +787,7 @@ await check("Several Macs agree: a sync reads only what changed since the last (
 });
 
 await check("Script approvals reach Orgo with the Bops sign-in key: approved and revoked through an outbox kept on disk, one whose skill isn't on Orgo yet sent after its sync, orgo.ai's taken here, its revokes too", async () => {
-  const O = await import(`${root}/lib/server/sync-outbox.ts`);
+  const O = await import(`${rootUrl}/lib/server/sync-outbox.ts`);
   const clearTimers = () => {
     for (const t of globalThis.bopsSkillsSync?.values() ?? []) clearTimeout(t);
     globalThis.bopsSkillsSync?.clear();
@@ -888,7 +890,7 @@ await check("Script approvals reach Orgo with the Bops sign-in key: approved and
 });
 
 await check("An approval Orgo can't place (a script edited after its skill was published) isn't asked again on a timer and holds no sync back; it goes with the version that holds it; one whose script changed again leaves the outbox", async () => {
-  const O = await import(`${root}/lib/server/sync-outbox.ts`);
+  const O = await import(`${rootUrl}/lib/server/sync-outbox.ts`);
   const clearTimers = () => {
     for (const t of globalThis.bopsSkillsSync?.values() ?? []) clearTimeout(t);
     globalThis.bopsSkillsSync?.clear();
@@ -1114,6 +1116,8 @@ await check("Plain words: nothing a person or a bot reads has a dash, or a secre
 
 server.close();
 console.log(`\nskills: ${passed} passed, ${failed} failed`);
-if (!failed) rmSync(scratch, { recursive: true, force: true });
+if (!failed) try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 else console.log(`The throwaway folder is kept for a look: ${scratch}`);
 process.exit(failed ? 1 : 0);

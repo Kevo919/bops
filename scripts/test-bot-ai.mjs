@@ -73,7 +73,7 @@ writeFileSync(
 
 /* ---------------- Loading the app's modules ---------------- */
 
-const fileUrl = (p) => pathToFileURL(`${root}/${p}`).href;
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 // sessions.ts is a stand in: what setBotAi asks of it is recorded.
 const SESSIONS_OWN = `
 const calls = (globalThis.__sessionCalls ??= []);
@@ -86,7 +86,7 @@ const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
