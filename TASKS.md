@@ -51,7 +51,23 @@ Owned by the lead. Statuses: TODO, DOING, REVIEW (PR open), DONE, BLOCKED.
 | 32 | Podcast (OpenAI TTS) and video generation behind a module flag | next free | TODO | | M, low priority |
 | 33 | ACP server: `bops acp` stdio maps ACP sessions to chat turns and asks to permission.ts | next free | TODO | | L, low priority |
 
-| 34 | More starter repos for the Repos section, pending a license and safety check each (codex: verify the canonical repo, license, run steps, keys, and whether it fits a bot's Linux computer; drop any that don't fit): n8n-io/n8n (Kevin already uses n8n), paperless-ngx/paperless-ngx (documents and leases for the rentals), actualbudget/actual (budgets), twentyhq/twenty (CRM), Stirling-Tools/Stirling-PDF (PDF tools), unclecode/crawl4ai (web to data), browser-use/browser-use (browser agent), Aider-AI/aider (coding agent), open-webui/open-webui (local chat UI), NousResearch/hermes-agent (agent), excalidraw/excalidraw (diagrams) | codex | TODO | | After 20. Post the checked list on the board; the lead approves the final set |
+| 34 | (superseded by 35–38) More starter repos for the Repos section, pending a license and safety check each (codex: verify the canonical repo, license, run steps, keys, and whether it fits a bot's Linux computer; drop any that don't fit): n8n-io/n8n (Kevin already uses n8n), paperless-ngx/paperless-ngx (documents and leases for the rentals), actualbudget/actual (budgets), twentyhq/twenty (CRM), Stirling-Tools/Stirling-PDF (PDF tools), unclecode/crawl4ai (web to data), browser-use/browser-use (browser agent), Aider-AI/aider (coding agent), open-webui/open-webui (local chat UI), NousResearch/hermes-agent (agent), excalidraw/excalidraw (diagrams) | codex | TODO | | After 20. Post the checked list on the board; the lead approves the final set |
+
+### Repos program (Kevin, 2026-11-03): every repo installed, runnable and usable by every bot and the whole app
+
+Shared rules for 35–38:
+- **Recipe format first (codex, as part of 19's design note):** one file per repo, config/repos/<id>.yaml, with repo, license, what it's for, stack, install, run, port or CLI entry, health check (an http URL that must return 200, or a command that must exit 0, e.g. `--help`), optional keys (names only), and a "fits a bot's Linux computer" flag. The Repos section and the bots' tools read these files.
+- **Clone by default. Fork into Kevo919 only with the lead's OK** (when we must change the code). Never push anything to a third-party repo.
+- **Every recipe sets its own goals and proves them:** (1) clone ok, (2) install exit 0, (3) run starts, (4) health check passes, (5) a bot can list, open and run it through the tools. Post the real output for each step in the PR's Verified section. Run on a disposable Linux box (Docker on Kevin's PC, ONLY after his OK and with RAM ≥ 3 GB free), never on Kevin's real data. Stop each container when you're done.
+- **License check:** note the license. AGPL/SSPL/"fair-code" (n8n, twenty?) are fine to run privately, but flag them. Anything with no license gets dropped.
+- **No secrets in recipes.** Keys are named, then stored in Keys/.env.local by Kevin.
+
+| # | Task | Who | Status | Branch / PR | Notes |
+|---|---|---|---|---|---|
+| 35 | Recipes + verification: paperclipai/paperclip, Kevo919/paperclip (private, via GITHUB_TOKEN), HKUDS/CLI-Anything, morluto/rea (JS/web modes), bilawalsidhu/gods-eye-view | codex | TODO | | After 19's design note is approved |
+| 36 | Recipes + verification: n8n-io/n8n, paperless-ngx/paperless-ngx, actualbudget/actual, twentyhq/twenty, Stirling-Tools/Stirling-PDF, excalidraw/excalidraw | zai | TODO | | After 19's recipe format is posted. Prefer each project's official Docker image where it has one |
+| 37 | Recipes + verification: unclecode/crawl4ai, browser-use/browser-use, Aider-AI/aider, open-webui/open-webui, NousResearch/hermes-agent | codex | TODO | | After 35 |
+| 38 | Every bot knows the repos: the repo tools are in every bot's chat and task tools; a line in the bots' briefing lists what's installed; the Repos section shows status (installed / running / failed + last health check). Test with 2 bots | codex | TODO | | After 19 |
 
 ## Merged 2026-11-03 (lead, with Kevin's OK)
 #3, #1, #2, #10, #14, #13, #9, #6, #4, #12, #16. windows-port = 7c52c29. Post-merge checks: tsc 0; bot-ai 25, cli-agents 40, chat-providers 18, chat-tools 84, look 20, config 15, key-check 8, llms 11.
