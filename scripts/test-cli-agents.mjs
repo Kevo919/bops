@@ -26,16 +26,28 @@
 // with Anthropic and OpenAI keys and tokens planted in it. Bops Cloud (OpenAI behind it) is a fake too. Nothing reaches a real service. The window's cards for
 // these threads are rendered to HTML by a child of the test (--render: the window's code isn't react-server).
 //
+// On Windows, Docker runs only the fake Linux computers (node:24-bookworm, no network).
+// App modules, assertions and UI rendering run in native Windows Node. Python 3
+// must be available as python. The PATH assertion checks the remote Node folder.
 // Usage: node --conditions=react-server scripts/test-cli-agents.mjs
 //        REAL_CLAUDE=1 node --conditions=react-server scripts/test-cli-agents.mjs
 //          also runs this Mac's own Claude Code (signed in as it is here, with no Anthropic key or token in its
 //          environment) through the same fake computer, on "Reply with the word ok.", and prints the events it saw.
 import assert from "node:assert/strict";
-import { execFile, execFileSync } from "node:child_process";
-import { accessSync, constants, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { execFile as nativeExecFile, execFileSync as nativeExecFileSync, spawn } from "node:child_process";
+import { createServer, request as httpRequest } from "node:http";
+import { linuxComputerFixture } from "./cli-computer-fixture.mjs";
+import * as fs from "node:fs";
+const { constants, mkdtempSync } = fs;
+let fixture;
+const mappedFs = (name) => (...args) => (fixture?.fs[name] ?? fs[name])(...args);
+const [accessSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmdirSync, rmSync, writeFileSync] = ["accessSync", "existsSync", "mkdirSync", "readdirSync", "readFileSync", "realpathSync", "rmdirSync", "rmSync", "writeFileSync"].map(mappedFs);
+const execFile = (...args) => (fixture?.execFile ?? nativeExecFile)(...args);
+const execFileSync = (...args) => (fixture?.execFileSync ?? nativeExecFileSync)(...args);
 import { registerHooks } from "node:module";
 import { homedir, tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, join as nativeJoin } from "node:path";
+const join = (...parts) => (fixture?.join ?? nativeJoin)(...parts);
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
@@ -51,12 +63,13 @@ process.env.BOPS_RESPONSES_WS = "0";
 // Bops listens on this Mac only, as the Mac app does by default: computers get no address for it, and
 // nothing asks this Mac's Tailscale (composio.ts bopsAddress).
 process.env.HOSTNAME = "127.0.0.1";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 // Modules that would start processes when loaded are stand-ins: each export does nothing.
 const STAND_INS = new Set(["relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -93,7 +106,7 @@ if (process.argv[2] === "--render") {
   globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
   globalThis.matchMedia = () => ({ matches: false });
   globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
-  const { ThreadSheet, ChatView } = await import(pathToFileURL(`${root}/components/app/chat-view.tsx`).href);
+  const { ThreadSheet, ChatView } = await import(`${rootUrl}/components/app/chat-view.tsx`);
   const { renderToStaticMarkup } = await import("react-dom/server");
   const { createElement: h } = await import("react");
   const v = JSON.parse(readFileSync(process.argv[3], "utf8"));
@@ -127,22 +140,31 @@ if (process.argv[2] === "--render") {
   process.exit(0);
 }
 
-const scratch = mkdtempSync(join(tmpdir(), "bops-test-cli-agents-"));
+const nativeScratch = mkdtempSync(join(tmpdir(), "bops-test-cli-agents-"));
+if (process.platform === "win32") {
+  assert.ok(!REAL_CLAUDE, "REAL_CLAUDE is not supported by the isolated Windows fake computers");
+  fixture = linuxComputerFixture(nativeScratch);
+}
+const scratch = fixture?.scratch ?? nativeScratch;
+const computerNode = fixture?.node ?? process.execPath;
 // Whatever the test started from its folder goes with it, also when an assertion fails or it's stopped
 // (Ctrl-C, kill): a stand-in left running would run on forever.
 const sweep = () => {
+  if (fixture) return fixture.stop();
   try {
     execFileSync("pkill", ["-f", "--", scratch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")]);
   } catch {}
 };
 process.on("exit", sweep);
 for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]]) process.on(signal, () => process.exit(code));
-process.chdir(scratch);
-process.env.HOME = join(scratch, "home");
+process.chdir(nativeScratch);
+process.env.HOME = nativeJoin(nativeScratch, "home");
 mkdirSync(process.env.HOME);
 // The app's files (vm/, the browser tools' version) are read from where it runs.
-symlinkSync(join(root, "node_modules"), join(scratch, "node_modules"));
-symlinkSync(join(root, "vm"), join(scratch, "vm"));
+fs.symlinkSync(join(rootPath, "node_modules"), nativeJoin(nativeScratch, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+if (fixture) fs.cpSync(join(rootPath, "vm"), nativeJoin(nativeScratch, "vm"), { recursive: true });
+else fs.symlinkSync(join(rootPath, "vm"), join(scratch, "vm"));
+fixture?.start();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(check, what, ms = 20_000) {
   for (const end = Date.now() + ms; Date.now() < end; await sleep(20)) {
@@ -181,7 +203,7 @@ const args = process.argv.slice(2);
 const pid = process.pid;
 appendFileSync(RUNS, JSON.stringify({ pid, at: Date.now(), args, env: process.env, cwd: process.cwd() }) + "\\n");
 // Gone with the test, however it ended (a stand-in left hanging would run on forever).
-const TEST = ${process.pid};
+const TEST = ${fixture?.parentPid ?? process.pid};
 setInterval(() => { try { process.kill(TEST, 0); } catch (e) { if (e.code === "ESRCH") process.exit(0); } }, 1000).unref();
 const heard = (x) => appendFileSync(HEARD, JSON.stringify({ pid, at: Date.now(), ...x }) + "\\n");
 const D = process.env.CLAUDE_CONFIG_DIR ?? join(process.env.HOME ?? "/", ".claude");
@@ -268,7 +290,7 @@ const TERMINAL = join(LOG, "terminal.log");
 const fakeCodex = join(scratch, "fake-codex.mjs");
 writeFileSync(
   fakeCodex,
-  `import { appendFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+  `import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 const RUNS = ${JSON.stringify(CODEX_RUNS)}, HEARD = ${JSON.stringify(HEARD)}, FLAGS = ${JSON.stringify(FLAGS)}, PICTURE = ${JSON.stringify(PICTURE)};
@@ -276,10 +298,21 @@ const args = process.argv.slice(2);
 const pid = process.pid;
 appendFileSync(RUNS, JSON.stringify({ pid, ppid: process.ppid, at: Date.now(), args, env: process.env, cwd: process.cwd() }) + "\\n");
 // Gone with the test, however it ended (a stand-in left hanging would run on forever).
-const TEST = ${process.pid};
+const TEST = ${fixture?.parentPid ?? process.pid};
 setInterval(() => { try { process.kill(TEST, 0); } catch (e) { if (e.code === "ESRCH") process.exit(0); } }, 1000).unref();
 const heard = (x) => appendFileSync(HEARD, JSON.stringify({ pid, at: Date.now(), ...x }) + "\\n");
-if (args[0] === "--version") { console.log("codex-cli 0.160.0"); process.exit(0); }
+if (args.includes("--version")) { console.log("codex-cli 0.160.0"); process.exit(0); }
+const authFile = join(process.env.CODEX_HOME, "auth.json");
+if (args.includes("login")) {
+  if (args.includes("status")) {
+    const mode = existsSync(authFile) ? readFileSync(authFile, "utf8") : "none";
+    console.error(mode === "chatgpt" ? "Logged in using ChatGPT" : mode === "api" ? "Logged in using an API key - synthetic-private-hint" : "Not logged in");
+    process.exit(mode === "none" ? 1 : 0);
+  }
+  if (!args.includes("--device-auth")) process.exit(2);
+  writeFileSync(authFile, "chatgpt"); process.exit(0);
+}
+if (args.includes("logout")) { rmSync(authFile, { force: true }); process.exit(0); }
 const resume = args[1] === "resume";
 const pos = [];
 for (let i = resume ? 2 : 1; i < args.length; i++) { if (args[i] === "-c") { i++; continue; } if (!args[i].startsWith("--")) pos.push(args[i]); }
@@ -329,12 +362,14 @@ async function go() {
 `,
 );
 const fake = (name, body) => writeFileSync(join(fakebin, name), `#!/bin/bash\n${body}\n`, { mode: 0o755 });
-fake("claude", `exec ${JSON.stringify(process.execPath)} ${JSON.stringify(fakeClaude)} "$@"`);
-fake("codex", `exec ${JSON.stringify(process.execPath)} ${JSON.stringify(fakeCodex)} "$@"`);
+fake("claude", `exec ${JSON.stringify(computerNode)} ${JSON.stringify(fakeClaude)} "$@"`);
+fake("codex", `exec ${JSON.stringify(computerNode)} ${JSON.stringify(fakeCodex)} "$@"`);
 // xfce4-terminal: what it was asked (and on which screen), then the command after -x, in its place.
 fake("xfce4-terminal", `echo "$DISPLAY $*" >> ${JSON.stringify(TERMINAL)}\nwhile [ $# -gt 0 ] && [ "$1" != -x ]; do shift; done\nshift\nexec "$@"`);
 fake("setsid", `exec "$@"`);
-const lines = (f) => (existsSync(f) ? readFileSync(f, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
+// Each record is one append ending in "\n". A fake may still be writing the last one while a test polls (a run's
+// record has its whole environment), so a last piece with no "\n" yet is left for the next read, not parsed.
+const lines = (f) => (existsSync(f) ? readFileSync(f, "utf8").split("\n").slice(0, -1).filter(Boolean).map((l) => JSON.parse(l)) : []);
 /** Every Claude Code process the fake computers ran for a thread (not its status checks), oldest first. */
 const runs = () => lines(RUNS).filter((r) => r.args.includes("-p"));
 /** Every Claude Code opened in a terminal, oldest first. */
@@ -364,7 +399,7 @@ const pid = process.pid;
 const flag = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
 const patch = flag("--patch") && existsSync(flag("--patch")) ? JSON.parse(readFileSync(flag("--patch"), "utf8")) : null;
 appendFileSync(RUNS, JSON.stringify({ pid, ppid: process.ppid, at: Date.now(), args, env: process.env, cwd: process.cwd(), patch }) + "\\n");
-const TEST = ${process.pid};
+const TEST = ${fixture?.parentPid ?? process.pid};
 setInterval(() => { try { process.kill(TEST, 0); } catch (e) { if (e.code === "ESRCH") process.exit(0); } }, 1000).unref();
 const heard = (x) => appendFileSync(HEARD, JSON.stringify({ pid, at: Date.now(), ...x }) + "\\n");
 if (args[0] === "--version") { console.log("0.2.2-alpha.2"); process.exit(0); }
@@ -433,6 +468,7 @@ const response = (id, output) => ({ id, object: "response", model: "gpt-6.1-sol"
 const KEY = "sk-ant-api03-VAULT-KEY-7Qx9";
 const OPENAI_KEY = "sk-proj-VAULT-OPENAI-4Kd2";
 const DEEPSEEK_KEY = "sk-VAULT-DEEPSEEK-9Zp1";
+const ZAI_CN_KEY = "zaicn-VAULT-GLM-3Hq8";
 /** What the computer's environment has besides Bops' own: keys and tokens Claude Code or Codex would use first, and Codex's own folder. */
 const PLANTED = {
   ANTHROPIC_API_KEY: "sk-ant-api03-PLANTED",
@@ -475,7 +511,7 @@ const runHere = (c, command) =>
           BOPS_CODEX: join(fakebin, "codex"),
           // DeepSeek Harness by its Node's path (bops-brain runs it so): this Node, and the fake.
           BOPS_DSH: fakeDsh,
-          BOPS_DSH_NODE: process.execPath,
+          BOPS_DSH_NODE: computerNode,
           BOPS_LOGS: join(c.dir, "logs"),
           BOPS_HOME: c.home,
           ...PLANTED,
@@ -522,6 +558,7 @@ const vault = new Map([
   ["ANTHROPIC_API_KEY", KEY],
   ["OPENAI_API_KEY", OPENAI_KEY],
   ["DEEPSEEK_API_KEY", DEEPSEEK_KEY],
+  ["ZAI_CODING_CN_API_KEY", ZAI_CN_KEY],
 ]);
 let reveals = 0;
 /** The Vault has given all the keys it allows this hour. */
@@ -576,12 +613,12 @@ globalThis.fetch = async (input, init) => {
 const warned = [];
 console.warn = (...a) => warned.push(a.join(" "));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const X = await import(`${root}/lib/server/sessions.ts`);
-const C = await import(`${root}/lib/server/cli-agents.ts`);
-const A = await import(`${root}/lib/asks.ts`);
-const Cx = await import(`${root}/lib/server/composio.ts`);
-const P = await import(`${root}/lib/server/permission.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const X = await import(`${rootUrl}/lib/server/sessions.ts`);
+const C = await import(`${rootUrl}/lib/server/cli-agents.ts`);
+const A = await import(`${rootUrl}/lib/asks.ts`);
+const Cx = await import(`${rootUrl}/lib/server/composio.ts`);
+const P = await import(`${rootUrl}/lib/server/permission.ts`);
 P.askTimingHeld.pollMs = 20;
 C.cliTiming.pollMs = 25;
 
@@ -609,6 +646,7 @@ const signIn = (computerId = PC, brainId = PLAN.id) => {
 };
 const agentDir = (sid, computerId = PC) => join(pc(computerId).agents, sid);
 const alive = (pid) => {
+  if (fixture) return fixture.alive(pid);
   try {
     process.kill(pid, 0);
     return true;
@@ -619,8 +657,8 @@ const alive = (pid) => {
 const details = (id) => thread(id).steps.map((x) => x.detail);
 /** Threads as the server left them, for the --render pass. */
 const views = {};
-const { screenMap } = await import(`${root}/lib/screens.ts`);
-const T = await import(`${root}/lib/types.ts`);
+const { screenMap } = await import(`${rootUrl}/lib/screens.ts`);
+const T = await import(`${rootUrl}/lib/types.ts`);
 const { DISPLAYS } = T;
 const screenMapOf = () => screenMap(S.getState(), main.id);
 
@@ -907,7 +945,7 @@ await test("the screen MCP's approve tool hands Claude Code allow with its input
     [
       "import json, sys, importlib.util",
       `sys.argv = ["screen_mcp.py", "stdio", "--session", "ses_1", "--bot", "boppy", "--approve"]`,
-      `spec = importlib.util.spec_from_file_location("screen_mcp", ${JSON.stringify(join(root, "vm/screen_mcp.py"))})`,
+      `spec = importlib.util.spec_from_file_location("screen_mcp", ${JSON.stringify(join(rootPath, "vm/screen_mcp.py"))})`,
       "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)",
       "assert 'approve' in m.server.tools",
       "m.os.path.exists = lambda p: True",
@@ -923,7 +961,7 @@ await test("the screen MCP's approve tool hands Claude Code allow with its input
   assert.deepEqual(out[1], { behavior: "deny", message: "Maya said no." });
   assert.deepEqual(out[2], { behavior: "deny", message: "Bops refused: not allowed" });
   // Without --approve, a Bops agent thread's screen MCP has no such tool.
-  const plain = execFileSync("python3", ["-c", `import sys, importlib.util; sys.argv=["s","stdio","--session","x"]; spec=importlib.util.spec_from_file_location("s", ${JSON.stringify(join(root, "vm/screen_mcp.py"))}); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m); print("approve" in m.server.tools)`], { env: { PATH: REAL_PATH, PYTHONPATH: join(scratch, "py"), PYTHONDONTWRITEBYTECODE: "1" } }).toString().trim();
+  const plain = execFileSync("python3", ["-c", `import sys, importlib.util; sys.argv=["s","stdio","--session","x"]; spec=importlib.util.spec_from_file_location("s", ${JSON.stringify(join(rootPath, "vm/screen_mcp.py"))}); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m); print("approve" in m.server.tools)`], { env: { PATH: REAL_PATH, PYTHONPATH: join(scratch, "py"), PYTHONDONTWRITEBYTECODE: "1" } }).toString().trim();
   assert.equal(plain, "False");
 });
 
@@ -1217,6 +1255,46 @@ await test("Codex never runs without its key: no ChatGPT sign-in, no key from an
   });
 });
 
+await test("Codex device login is private, plan runs have no key or gate, and logout revokes its status", async () => {
+  const c = pc(PC);
+  const id = "brain_chatgpt_test";
+  const dir = join(c.brains, id);
+  const login = await runHere(c, `bops-brain login ${id} 100 ${PC} codex`);
+  assert.equal(login.exit_code, 0);
+  assert.match(login.output, /signing in/);
+  // Wait for the one terminal-launched device flow; starting a second login would race status/logout.
+  await until(() => existsSync(join(dir, "auth.json")) && readFileSync(join(dir, "auth.json"), "utf8") === "chatgpt", "the fake Codex device login");
+  let status = await runHere(c, `bops-brain status ${id} ${PC} codex`);
+  assert.deepEqual(JSON.parse(status.output), { loggedIn: true, authMethod: "chatgpt" });
+  const run = await runHere(c, `bops-brain run ${id} codex --bot boppy --agent ag_plan000001 -- --version`);
+  assert.equal(run.exit_code, 0, run.output);
+  const last = JSON.parse(readFileSync(CODEX_RUNS, "utf8").trim().split("\n").at(-1));
+  assert.equal(last.env.CODEX_HOME, dir);
+  for (const name of ["OPENAI_API_KEY", "CODEX_API_KEY", "OPENAI_BASE_URL", "BOPS_GATE"]) assert.equal(last.env[name], undefined, name);
+  assert.ok(last.args.includes('forced_login_method="chatgpt"'));
+  // Invoke the generated plan wrapper from a different agent's environment: all six providers are poisoned.
+  const nestedKeys = ["OPENAI_API_KEY", "CODEX_API_KEY", "ANTHROPIC_API_KEY", "DEEPINFRA_API_KEY", "ZAI_API_KEY", "DEEPSEEK_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_BASE_URL", "OPENAI_BASE_URL", "BOPS_GATE", "OPENCODE_CONFIG_CONTENT", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "OPENCODE_CONFIG", "DSH_HOME", "CLAUDE_CONFIG_DIR", "CLAUDE_ENV_FILE"];
+  const bin = await runHere(c, `bops-brain bin nested_bot --also codex:plan:${id}:gpt-6.1-sol`);
+  assert.equal(bin.exit_code, 0);
+  const wrapper = join(bin.output.trim(), "codex");
+  const nested = await runHere(c, `${nestedKeys.map((k) => `${k}=fixture-sentinel`).join(" ")} BOPS_MODEL=wrong-parent-model '${wrapper}' --version`);
+  assert.equal(nested.exit_code, 0, nested.output);
+  const nestedRun = JSON.parse(readFileSync(CODEX_RUNS, "utf8").trim().split("\n").at(-1));
+  for (const key of nestedKeys) assert.equal(nestedRun.env[key], undefined, key);
+  assert.equal(nestedRun.env.CODEX_HOME, dir);
+  assert.ok(nestedRun.args.includes('model="gpt-6.1-sol"'));
+  assert.ok(!nestedRun.args.join(" ").includes("wrong-parent-model"));
+  writeFileSync(join(dir, "auth.json"), "api");
+  status = await runHere(c, `bops-brain status ${id} ${PC} codex`);
+  assert.deepEqual(JSON.parse(status.output), { loggedIn: false });
+  assert.ok(!status.output.includes("synthetic-private-hint"));
+  writeFileSync(join(dir, "auth.json"), "chatgpt");
+  assert.equal((await runHere(c, `bops-brain logout ${id} codex`)).exit_code, 0);
+  assert.equal(existsSync(join(dir, "auth.json")), false);
+  status = await runHere(c, `bops-brain status ${id} ${PC} codex`);
+  assert.deepEqual(JSON.parse(status.output), { loggedIn: false });
+});
+
 /* ---------------- Open in terminal ---------------- */
 
 const termRuns = () => terms().map((r) => ({ ...r, heard: heardBy(r.pid) }));
@@ -1398,7 +1476,7 @@ await test("a thread Bops agent took over stays on Bops agent when its bot goes 
 });
 
 await test("taking an agent off the bot, or removing its account, stops what it runs now, saying why", async () => {
-  const B = await import(`${root}/lib/server/brains.ts`);
+  const B = await import(`${rootUrl}/lib/server/brains.ts`);
   const s = X.startSession({ botId: main.id, goal: "SLOW: migrate the database", title: "Migrate", where: "cloud", fresh: true });
   await until(() => runs().some((r) => heardBy(r.pid).some((h) => h.got?.startsWith("SLOW: migrate"))), "it to start");
   const r = runs().at(-1);
@@ -1537,7 +1615,7 @@ await test("a bot's DeepSeek Harness agent runs its thread: dsh --profile headle
   assert.equal(r.env.DSH_TELEMETRY_DISABLED, "1");
   assert.ok(!Object.values(r.env).includes(DEEPSEEK_KEY), "the key is nowhere in its environment");
   for (const k of Object.keys(PLANTED)) assert.equal(r.env[k], undefined, `no ${k}`);
-  assert.ok(r.env.PATH.split(":").at(-1) === join(process.execPath, ".."), "its Node's folder last on PATH: what it runs finds the computer's own first");
+  assert.ok(r.env.PATH.split(fixture ? ":" : delimiter).at(-1) === (fixture ? "/usr/local/bin" : join(computerNode, "..")), "its Node's folder last on PATH: what it runs finds the computer's own first");
   assert.equal(r.env.DISPLAY, `:${t.lastDisplay}`);
   assert.equal(realpathSync(r.cwd), realpathSync(join(pc(PC).dir, "workspace")));
   // The run's patch: Bops' MCP servers and briefing (the thread's), then its provider at the gate (the variable named,
@@ -1617,6 +1695,108 @@ await test("its DeepSeek key turned down: the thread waits on the user with Fini
   });
 });
 
+await test("a DeepSeek Harness agent on the China Coding Plan (zai-coding-cn/glm-5.3): its own key's run token, the gate's zai-coding-cn route, never Z.ai's key variable", async () => {
+  const before = structuredClone(S.bot(main.id).ai);
+  const CN = { id: "ag_dshzaicn01", kind: "dsh", pays: "key", model: "zai-coding-cn/glm-5.3" };
+  S.update(() => void (S.bot(main.id).ai = { agents: [{ id: "bops", kind: "bops", pays: "credit" }, CN], default: CN.id }));
+  try {
+    const s = X.startSession({ botId: main.id, goal: "Fix the totals", title: "Totals", where: "cloud", fresh: true });
+    assert.deepEqual(thread(s.id).agent, { id: CN.id, kind: "dsh", model: "zai-coding-cn/glm-5.3" });
+    const t = await ended(s.id);
+    assert.equal(t.status, "done", `it finished (${t.error ?? ""}; ${warned.join(" | ")})`);
+    const r = dshRuns().at(-1);
+    assert.match(r.env.ZAI_CODING_CN_API_KEY, /^bopsrun_[0-9a-f]{64}$/, "the run token in the China plan's own key variable");
+    assert.equal(r.env.ZAI_API_KEY, undefined, "not in Z.ai's");
+    assert.ok(!Object.values(r.env).includes(ZAI_CN_KEY), "the key is nowhere in its environment");
+    const provider = r.patch.find((x) => x.id === "llm-pi-ai").config.providers;
+    assert.deepEqual(Object.keys(provider), ["zai-coding-cn"]);
+    assert.equal(provider["zai-coding-cn"].apiKeyEnv, "ZAI_CODING_CN_API_KEY");
+    assert.equal(provider["zai-coding-cn"].api, "openai-completions");
+    assert.equal(provider["zai-coding-cn"].baseURL, `${r.env.BOPS_GATE}/zai-coding-cn/v1`);
+    assert.deepEqual(provider["zai-coding-cn"].models, [{ id: "glm-5.3", name: "glm-5.3" }]);
+    assert.deepEqual(r.patch.find((x) => x.id === "agent-default-model").config, { provider: "zai-coding-cn", model: "glm-5.3" });
+    assert.ok(!JSON.stringify(r.patch).includes(ZAI_CN_KEY), "nothing secret in it");
+    assert.ok(!pc(PC).commands.some((x) => x.includes(ZAI_CN_KEY)), "no command Bops ran had the key in it");
+  } finally {
+    S.update(() => {
+      if (before === undefined) delete S.bot(main.id).ai;
+      else S.bot(main.id).ai = before;
+    });
+  }
+});
+
+/** One request through a gate on this Mac (node:http: this test's fetch is the fake Orgo's). */
+const viaGate = (port, path, headers, body) =>
+  new Promise((resolve, reject) => {
+    const req = httpRequest({ host: "127.0.0.1", port, path, method: "POST", headers: { "content-type": "application/json", ...headers } }, (res) => {
+      let text = "";
+      res.on("data", (c) => (text += c));
+      res.on("end", () => resolve({ status: res.statusCode, text }));
+    });
+    req.on("error", reject);
+    req.end(body);
+  });
+
+await test("gate routing: zai-coding-cn goes to open.bigmodel.cn's coding API (no /v1), on its key as a Bearer; zai-coding still goes to api.z.ai", async () => {
+  // The real table: each route's fixed upstream and which ones drop the run's /v1 (read from the file, not run).
+  const table = JSON.parse(
+    execFileSync("python3", ["-I", "-c", "import ast, json, sys\nt = ast.parse(open(sys.argv[1]).read())\nout = {}\nfor n in t.body:\n    if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name) and n.targets[0].id in ('UPSTREAMS', 'NO_V1'):\n        v = ast.literal_eval(n.value)\n        out[n.targets[0].id] = sorted(v) if isinstance(v, set) else v\nprint(json.dumps(out))", join(rootPath, "vm/bin/bops-ai-gate")], { env: { PATH: REAL_PATH } }).toString(),
+  );
+  assert.equal(table.UPSTREAMS["zai-coding-cn"], "https://open.bigmodel.cn/api/coding/paas/v4");
+  assert.equal(table.UPSTREAMS["zai-coding"], "https://api.z.ai/api/coding/paas/v4");
+  assert.deepEqual(table.NO_V1, ["zai", "zai-coding", "zai-coding-cn"]);
+  // Every route bops-brain's --route takes is one the gate knows, and the other way round.
+  const brain = readFileSync(join(rootPath, "vm/bin/bops-brain"), "utf8");
+  const routes = brain.match(/\[\[ "\$ROUTE" =~ \^\(([a-z|-]+)\)\$ \]\]/)[1].split("|");
+  assert.deepEqual([...routes].sort(), Object.keys(table.UPSTREAMS).sort());
+  assert.match(brain, /"zai-coding-cn": \{ "npm": "@ai-sdk\/openai-compatible", "name": "Z\.ai Coding Plan \(China\)", "options": \{ "baseURL": "\{env:BOPS_GATE\}\/zai-coding-cn\/v1", "apiKey": "\{env:ZAI_CODING_CN_API_KEY\}" \} \}/, "OpenCode's provider at the gate");
+  assert.equal(brain.match(/zai-coding-cn\) export ZAI_CODING_CN_API_KEY="\$TOKEN" ;;/g)?.length, 2, "OpenCode's and DeepSeek Harness's key variable");
+  // A real gate on this Mac, in front of a fake provider: what reaches it, for each Z.ai coding route.
+  const got = [];
+  const upstream = createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      got.push({ path: req.url, auth: req.headers.authorization, apiKey: req.headers["x-api-key"], body });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ choices: [{ message: { role: "assistant", content: "ok" } }] }));
+    });
+  });
+  await new Promise((r) => upstream.listen(0, "127.0.0.1", r));
+  const up = `http://127.0.0.1:${upstream.address().port}`;
+  const gates = [];
+  try {
+    for (const [route, key] of [["zai-coding-cn", ZAI_CN_KEY], ["zai-coding", "zai-VAULT-GLOBAL-1"]]) {
+      // The gate runs here on the host (not on a fake computer), so its port file is a host path.
+      const pf = nativeJoin(nativeScratch, `gate-${route}.port`);
+      const token = `bopsrun_${"ab".repeat(32)}`;
+      const g = spawn(process.platform === "win32" ? "python" : "python3", ["-I", join(rootPath, "vm/bin/bops-ai-gate"), "--route", route, "--port-file", pf], { env: { PATH: REAL_PATH, BOPS_GATE_TEST: "1", BOPS_GATE_UPSTREAM: up }, stdio: ["pipe", "ignore", "ignore"] });
+      gates.push(g);
+      g.stdin.end(`${token}\n${key}\n`);
+      await until(() => fs.existsSync(pf), `${route}'s gate to listen`);
+      const port = Number(fs.readFileSync(pf, "utf8"));
+      got.length = 0;
+      const ok = await viaGate(port, `/${route}/v1/chat/completions`, { authorization: `Bearer ${token}` }, JSON.stringify({ model: "glm-5.3", messages: [] }));
+      assert.equal(ok.status, 200, `${route}: ${ok.text}`);
+      assert.deepEqual(got.map((x) => x.path), ["/chat/completions"], `${route}: the run's /v1 dropped, as the coding API has none`);
+      assert.equal(got[0].auth, `Bearer ${key}`, `${route}: the key, as a Bearer`);
+      assert.equal(got[0].apiKey, undefined);
+      assert.equal(JSON.parse(got[0].body).model, "glm-5.3");
+      got.length = 0;
+      const wrong = await viaGate(port, `/${route}/v1/chat/completions`, { authorization: "Bearer bopsrun_wrong" }, "{}"); // gitleaks:allow (fake token)
+      assert.equal(wrong.status, 401);
+      const other = await viaGate(port, `/${route === "zai-coding-cn" ? "zai-coding" : "zai-coding-cn"}/v1/chat/completions`, { authorization: `Bearer ${token}` }, "{}");
+      assert.equal(other.status, 404, `${route}'s gate takes only its own route`);
+      const offV1 = await viaGate(port, `/${route}/chat/completions`, { authorization: `Bearer ${token}` }, "{}");
+      assert.equal(offV1.status, 404);
+      assert.equal(got.length, 0, "a wrong token, another route or a path off /v1 never reaches the provider");
+    }
+  } finally {
+    for (const g of gates) g.kill("SIGTERM");
+    await new Promise((r) => upstream.close(r));
+  }
+});
+
 await test("the thread's words have no long dashes", () => {
   for (const id of [t1]) for (const x of [thread(id).answer, ...thread(id).steps.map((y) => y.detail)]) assert.ok(!/[–—]/.test(x), x);
   const plan = { kind: "claude", model: "claude-opus-5-5", agent: { id: "ag_planplan01", kind: "claude", pays: "plan" } };
@@ -1642,7 +1822,7 @@ await test("the window's cards for them read right (the --render pass)", async (
   const st = S.getState();
   writeFileSync(file, JSON.stringify({ ...views, screenNo: DISPLAYS.indexOf(views.takeover.display) + 1, bots: st.bots, brains: st.brains, chat: st.chats.find((c) => c.id === views.signIn.chatId) }));
   const out = await new Promise((resolve, reject) =>
-    execFile(process.execPath, [...process.execArgv.filter((a) => a.startsWith("--preserve-symlinks")), fileURLToPath(import.meta.url), "--render", file], { cwd: root, env: { PATH: REAL_PATH, HOME: process.env.HOME } }, (err, stdout, stderr) => (err ? reject(new Error(`${stdout}${stderr}`)) : resolve(stdout))),
+    execFile(process.execPath, [...process.execArgv.filter((a) => a.startsWith("--preserve-symlinks")), fileURLToPath(import.meta.url), "--render", file], { cwd: rootPath, env: { PATH: REAL_PATH, HOME: process.env.HOME } }, (err, stdout, stderr) => (err ? reject(new Error(`${stdout}${stderr}`)) : resolve(stdout))),
   );
   assert.equal(out.match(/^ok render:/gm)?.length, 5, out);
   process.stdout.write(out.replace(/^/gm, "  "));
@@ -1724,8 +1904,13 @@ if (REAL_CLAUDE) {
   });
 }
 
-console.log(`\n${passed} passed`);
 for (const c of pcs.values())
   for (const d of existsSync(c.agents) ? readdirSync(c.agents) : []) await new Promise((r) => execFile("/bin/bash", ["-c", `BOPS_AGENTS=${c.agents} ${join(c.bin, "bops-agent")} stop ${d}`], () => r()));
-rmSync(scratch, { recursive: true, force: true });
+fixture?.stop();
+// Remove the test junction itself before removing the scratch tree.
+if (fixture) fs.rmdirSync(nativeJoin(nativeScratch, "node_modules"));
+try {
+  fs.rmSync(nativeScratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
+console.log(`\n${passed} passed`);
 process.exit(0);

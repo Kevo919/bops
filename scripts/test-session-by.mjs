@@ -17,10 +17,12 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-session-by-"));
 process.chdir(scratch);
 process.env.HOME = scratch;
@@ -28,7 +30,7 @@ process.env.BOPS_DEVICE_SEED = "mac-a";
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -85,8 +87,8 @@ const quiet = { info: console.info, warn: console.warn };
 console.info = () => {};
 console.warn = () => {};
 
-const S = await import(`${root}/lib/server/store.ts`);
-const P = await import(`${root}/lib/server/persist-cloud.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const P = await import(`${rootUrl}/lib/server/persist-cloud.ts`);
 const USER = "u_session_by";
 const ME = P.deviceIdFor(USER);
 const RUNNER = P.deviceIdFor(USER, "c1c1c1c1-0000-4000-8000-000000000001");
@@ -231,7 +233,9 @@ try {
   console.warn = quiet.warn;
   server.close();
   process.chdir(tmpdir());
-  rmSync(scratch, { recursive: true, force: true });
+  try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 }
 
 console.log(`session by: ${passed} passed, ${failures} failed`);

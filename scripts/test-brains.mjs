@@ -37,24 +37,24 @@ process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 process.env.BOPS_APP_VERSION = "9.9.9";
 const UI = "ui-token-test-brains";
 process.env.BOPS_UI_TOKEN = UI;
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-brains-"));
 const fakebin = join(scratch, "fakebin");
 mkdirSync(fakebin);
 writeFileSync(join(fakebin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${fakebin}:${process.env.PATH}`;
+process.env.PATH = `${fakebin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 globalThis.bopsOrgoKey = "sk_orgo_test_brains";
 // The app's own files (vm/bin) are read from where it runs: here, a throwaway folder with them in it.
 const work = join(scratch, "work");
 mkdirSync(work);
-symlinkSync(join(root, "vm"), join(work, "vm"));
+symlinkSync(join(rootPath, "vm"), join(work, "vm"));
 process.chdir(work);
 
 /* ---------------- Loading the app's modules ---------------- */
 
-const fileUrl = (p) => pathToFileURL(`${root}/${p}`).href;
+const fileUrl = (p) => pathToFileURL(join(rootPath, p)).href;
 // sessions.ts is the app's task runner: here, the takeover and the computer's setup, as calls written down.
 const SESSIONS_OWN = `
 import { update } from ${JSON.stringify(fileUrl("lib/server/store.ts"))};
@@ -81,7 +81,7 @@ registerHooks({
   resolve(specifier, context, next) {
     // Only the server may import these; here everything is the server, and the window's code too.
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -341,6 +341,7 @@ await test("a saved state's brains come back in shape: real bots only, Codex on 
         { id: "brain_bad", kind: "gemini", name: "?", auth: "plan", bots: [], createdAt: 3 },
         { id: "brain_away", kind: "claude", name: "Claude Code", auth: "plan", bots: [], workspaceId: "ws_deleted", createdAt: 4 },
         { id: "brain_old", kind: "claude", name: "Claude Code 2", auth: "plan", bots: ["boppy"], createdAt: 5, signIns: [{ computerId: "pc-replaced", at: 1, account: { plan: "pro" } }, { computerId: "pc-now", at: 2, account: { plan: "max" } }] },
+        { id: "brain_invalid_auth", kind: "codex", name: "Invalid auth", auth: "invalid", bots: [], workspaceId: "ws_main", createdAt: 6 },
         null,
       ],
       workspaces: [{ id: "ws_main", name: "Main", createdAt: 1 }],
@@ -349,13 +350,14 @@ await test("a saved state's brains come back in shape: real bots only, Codex on 
   const before = structuredClone(S.getState());
   await S.bindSignIn("u-norm");
   const st = S.getState();
-  assert.deepEqual(st.brains.map((x) => x.id), ["brain_ok", "brain_cx", "brain_old"], "a deleted workspace's brain goes with it");
+  assert.deepEqual(st.brains.map((x) => x.id), ["brain_ok", "brain_cx", "brain_old", "brain_invalid_auth"], "a deleted workspace's brain goes with it");
   assert.deepEqual(st.brains[2].signIns.map((x) => x.computerId), ["pc-now"], "signed in only on a computer a bot has");
   const [ok, cx] = st.brains;
   assert.deepEqual(ok.bots, ["boppy"], "a bot that isn't here is dropped");
   assert.equal(ok.workspaceId, "ws_main");
   assert.equal(ok.signingIn, undefined, "a sign-in that was going can't be watched now");
-  assert.equal(cx.auth, "key", "Codex signs in with a key only");
+  assert.equal(cx.auth, "plan", "a persisted Codex ChatGPT plan survives the real state-load normalizer");
+  assert.equal(st.brains.find((x) => x.id === "brain_invalid_auth").auth, "key", "invalid auth still defaults to key");
   assert.deepEqual(cx.bots, []);
   assert.equal(cx.signingIn.failed, "it took too long.", "a failed one stays, saying why");
   assert.equal(st.bots.find((b) => b.id === "boppy").brain, "brain_ok");
@@ -369,7 +371,10 @@ await test("a saved state's brains come back in shape: real bots only, Codex on 
 
 let planId;
 await test("brains are added to the workspace with the bots picked, named after what they are", () => {
-  assert.throws(() => B.addBrain({ kind: "codex", auth: "plan" }), /OpenAI API key only/);
+  const codexPlan = B.addBrain({ kind: "codex", auth: "plan" });
+  assert.equal(codexPlan.auth, "plan");
+  assert.equal(codexPlan.keyName, undefined);
+  B.removeBrain(codexPlan.id);
   assert.throws(() => B.addBrain({ kind: "gemini", auth: "key" }), /Claude Code or Codex/);
   const x = B.addBrain({ kind: "claude", auth: "plan", bots: ["otto", "rook", "kai", "otto", "nobody"], use: true });
   planId = x.id;
@@ -425,7 +430,7 @@ await test("Claude Code is npm's own package at the pinned version, into Bops' f
   assert.match(cmd, /npm install -g --prefix \/opt\/bops\/claude --no-audit --no-fund --loglevel=error @anthropic-ai\/claude-code@2\.1\.292 /);
   assert.doesNotMatch(cmd, /ignore-scripts|--force|patch|sed /, "installed as it comes");
   assert.match(cmd, /DISABLE_AUTOUPDATER=1 \/opt\/bops\/claude\/bin\/claude --version/);
-  assert.match(readFileSync(join(root, "orgo/bops-base.mjs"), "utf8"), /const CLAUDE_CODE_VERSION = "2\.1\.292";/, "the next image has the same one");
+  assert.match(readFileSync(join(rootPath, "orgo/bops-base.mjs"), "utf8"), /const CLAUDE_CODE_VERSION = "2\.1\.292";/, "the next image has the same one");
   await B.ensureClaudeCode("pc-x");
   await B.ensureClaudeCode("pc-x");
   assert.equal(pc("pc-x").installs, 1, "asked once per computer");
@@ -436,12 +441,43 @@ await test("Claude Code is npm's own package at the pinned version, into Bops' f
   assert.equal(pc("pc-y").installs, 2, "one that failed is tried again");
 });
 
-await test("the brain scripts go on a computer as they are in vm/bin, and only when they changed", async () => {
+await test("the brain scripts go on a computer with Linux line endings, and only when they changed", async () => {
   await B.ensureBrainTools("pc-main");
-  for (const f of ["bops-brain", "bops-brain-browser"]) assert.equal(readFileSync(join(pc("pc-main").bin, f), "utf8"), readFileSync(join(root, "vm/bin", f), "utf8"));
+  for (const f of ["bops-brain", "bops-brain-browser"]) assert.equal(readFileSync(join(pc("pc-main").bin, f), "utf8"), readFileSync(join(rootPath, "vm/bin", f), "utf8").replace(/\r\n/g, "\n"));
   const n = pc("pc-main").commands.length;
   await B.ensureBrainTools("pc-main");
   assert.equal(pc("pc-main").commands.length, n, "checked once per run of Bops");
+});
+
+await test("CRLF brain scripts replace stale remote hashes with executable LF uploads", async () => {
+  const fixture = join(scratch, "crlf-source");
+  mkdirSync(join(fixture, "vm/bin"), { recursive: true });
+  const names = ["bops-brain", "bops-brain-browser", "bops-agent", "bops-ai-gate", "bops-exec"];
+  const c = pc("pc-crlf");
+  for (const name of names) {
+    const lf = readFileSync(join(rootPath, "vm/bin", name), "utf8").replace(/\r\n/g, "\n");
+    assert.match(lf, /^#!\/usr\/bin\/env (bash|python3)\n/);
+    const crlf = lf.replace(/\n/g, "\r\n");
+    writeFileSync(join(fixture, "vm/bin", name), crlf);
+    writeFileSync(join(c.bin, name), crlf);
+  }
+  const before = process.cwd();
+  try {
+    process.chdir(fixture);
+    await B.ensureBrainTools("pc-crlf");
+    for (const name of names) {
+      const uploaded = readFileSync(join(c.bin, name));
+      const source = readFileSync(join(fixture, "vm/bin", name));
+      assert.equal(uploaded.toString(), source.toString().replace(/\r\n/g, "\n"));
+      assert.notEqual(createHash("md5").update(uploaded).digest("hex"), createHash("md5").update(source).digest("hex"));
+      assert.ok(c.commands.some((command) => command.endsWith(`> /usr/local/bin/${name} && chmod 0755 /usr/local/bin/${name} && echo ok`)));
+    }
+    const count = c.commands.length;
+    await B.ensureBrainTools("pc-crlf");
+    assert.equal(c.commands.length, count, "normalized content uses the existing cache");
+  } finally {
+    process.chdir(before);
+  }
 });
 
 await test("Claude Code's status is kept to whether it's signed in, how, and whose account", () => {
@@ -467,7 +503,7 @@ await test("a sign-in opens Claude Code's own on a free screen of the bot's comp
   assert.equal(brain(planId).signingIn.computerId, "pc-main");
   await until("the sign-in to finish", () => brain(planId).signIns?.length);
   const c = pc("pc-main");
-  assert.ok(c.commands.some((x) => x === `bops-brain login ${planId} 101 pc-main`), "Claude Code's sign-in, on that screen");
+  assert.ok(c.commands.some((x) => x === `bops-brain login ${planId} 101 pc-main claude`), "Claude Code's sign-in, on that screen");
   assert.ok(sessionCalls.some((x) => x[0] === "ensureScreens" && x[1] === "pc-main"));
   // The terminal on screen 101, running Claude Code's own login.
   assert.match(lines("terminal.log"), new RegExp(`--disable-server --title Sign in to Claude Code .* -x .*bops-brain sign-in ${planId} 101`));
@@ -511,7 +547,11 @@ await test("nothing of the login, and nothing planted, is in the state, a log or
 
 await test("every Claude Code run here starts with no Anthropic key or token from its environment", () => {
   const runs = claudeRuns();
-  assert.ok(runs.length >= 3);
+  // So the checks below aren't vacuous: the sign-in above ran Claude Code's login and at least one status (the
+  // one that saw it signed in). How many statuses ran first depends on how soon the fake login finished
+  // against the 20ms poll, so the count itself is not something to assert.
+  assert.ok(runs.some((r) => r.args === "auth login"), "its login ran");
+  assert.ok(runs.some((r) => r.args === "auth status --json"), "its status ran");
   for (const r of runs) {
     for (const k of Object.keys(r.env)) assert.ok(!/^ANTHROPIC_|^CLAUDE_CODE_OAUTH|^CLAUDECODE$|^BOPS_/.test(k), `${r.args}: ${k} reached Claude Code`);
     assert.ok(!Object.values(r.env).some((v) => /PLANTED|planted/.test(v)), `${r.args}: something planted reached it`);
@@ -649,7 +689,7 @@ await test("a key brain's key comes from the Vault for its run only, and isn't k
 await test("a sign-in asked for on another computer closes the one going first: its terminal and page, and its screen back", async () => {
   writeFileSync(SLOW, "");
   const first = await B.startSignIn(planId, "otto");
-  await until("the first sign-in to open", () => pc("pc-main").commands.includes(`bops-brain login ${planId} ${first.display} pc-main`));
+  await until("the first sign-in to open", () => pc("pc-main").commands.includes(`bops-brain login ${planId} ${first.display} pc-main claude`));
   assert.equal(S.getState().takeover?.display, first.display);
   const n = pc("pc-main").commands.length;
   const handed = sessionCalls.filter((c) => c[0] === "returnControl").length;
@@ -673,7 +713,11 @@ await test("the routes are the Bops window's only, and add, change, sign in and 
   const { brain: cx } = await add.json();
   assert.equal(cx.name, "Codex");
   assert.equal(bot("boppy").brain, cx.id);
-  assert.equal((await R.POST(fromWindow("/api/brains", { kind: "codex", auth: "plan" }))).status, 400);
+  const planResponse = await R.POST(fromWindow("/api/brains", { kind: "codex", auth: "plan" }));
+  assert.equal(planResponse.status, 200);
+  const { brain: codexPlan } = await planResponse.json();
+  assert.equal(codexPlan.auth, "plan");
+  await R.DELETE(fromWindow("/api/brains", { id: codexPlan.id }, "DELETE"));
   assert.deepEqual((await (await R.GET(fromWindow("/api/brains", undefined, "GET"))).json()).brains.map((x) => x.id), [planId, cx.id]);
   assert.equal((await (await R.PATCH(fromWindow("/api/brains", { id: cx.id, name: "Codex (work)" }, "PATCH"))).json()).brain.name, "Codex (work)");
   assert.equal((await R.PATCH(fromWindow("/api/brains", { id: cx.id, botId: "otto", level: "sure" }, "PATCH"))).status, 400);
@@ -721,7 +765,7 @@ if (REAL_CLAUDE)
     mkdirSync(join(brains, "brain_real"), { recursive: true });
     writeFileSync(join(brains, "brain_real", ".computer"), "this-mac");
     const out = await new Promise((resolve) =>
-      execFile(join(root, "vm/bin/bops-brain"), ["status", "brain_real", "this-mac"], { env: { PATH: process.env.PATH, BOPS_BRAINS: brains, BOPS_CLAUDE: real, BOPS_HOME: process.env.HOME, ...PLANTED } }, (_e, so, se) => resolve(`${so}${se}`)),
+      execFile(join(rootPath, "vm/bin/bops-brain"), ["status", "brain_real", "this-mac"], { env: { PATH: process.env.PATH, BOPS_BRAINS: brains, BOPS_CLAUDE: real, BOPS_HOME: process.env.HOME, ...PLANTED } }, (_e, so, se) => resolve(`${so}${se}`)),
     );
     assert.deepEqual(B.parseStatus(out), { loggedIn: false });
   });
@@ -913,12 +957,14 @@ await test("a bot's profile says which brain its tasks run on, by its role", asy
 
 await test("the brain files have no long dashes in what they say", () => {
   for (const f of ["components/app/brains.tsx", "lib/server/brains.ts", "lib/server/cli-agents.ts", "vm/bin/bops-brain", "vm/bin/bops-brain-browser", "vm/bin/bops-agent", "app/api/brains/route.ts", "app/api/brains/bot/route.ts", "app/api/brains/sign-in/route.ts", "app/api/brains/sign-out/route.ts", "app/api/sessions/[sessionId]/terminal/route.ts"])
-    noDashes(readFileSync(join(root, f), "utf8"), f);
+    noDashes(readFileSync(join(rootPath, f), "utf8"), f);
 });
 
 // Fake sign-ins still waiting stop before their folder goes.
 writeFileSync(STOP, "");
 await new Promise((r) => setTimeout(r, 300));
 console.log(`\n${passed} passed`);
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

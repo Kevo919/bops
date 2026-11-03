@@ -29,8 +29,9 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 import ts from "typescript";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.TZ = "America/New_York";
@@ -38,12 +39,13 @@ process.env.BOPS_SELF_HOSTED = "1";
 const UI = "window-token-your-data";
 process.env.BOPS_UI_TOKEN = UI;
 globalThis.bopsOrgoKey = "sk_orgo_test_your_data";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-your-data-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
@@ -54,7 +56,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -85,21 +87,21 @@ process.emitWarning = (warning, ...rest) => (rest[0]?.code === "MODULE_TYPELESS_
 const rejections = [];
 process.on("unhandledRejection", (e) => rejections.push(String(e?.stack ?? e)));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const P = await import(`${root}/lib/privacy.ts`);
-const Priv = await import(`${root}/lib/server/privacy.ts`);
-const Del = await import(`${root}/lib/server/deleted.ts`);
-const Rm = await import(`${root}/lib/server/remove.ts`);
-const Up = await import(`${root}/lib/server/uploads.ts`);
-const Fr = await import(`${root}/lib/server/frames.ts`);
-const Pages = await import(`${root}/lib/server/pages.ts`);
-const M = await import(`${root}/lib/server/state-merge.ts`);
-const Route = await import(`${root}/app/api/privacy/route.ts`);
-const ChatsRoute = await import(`${root}/app/api/chats/route.ts`);
-const MessagesRoute = await import(`${root}/app/api/chats/[chatId]/messages/route.ts`);
-const { callAllowed } = await import(`${root}/components/app/view-only.ts`);
-const { orgoKey } = await import(`${root}/lib/server/orgo-auth.ts`);
-const { botChatId } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const P = await import(`${rootUrl}/lib/privacy.ts`);
+const Priv = await import(`${rootUrl}/lib/server/privacy.ts`);
+const Del = await import(`${rootUrl}/lib/server/deleted.ts`);
+const Rm = await import(`${rootUrl}/lib/server/remove.ts`);
+const Up = await import(`${rootUrl}/lib/server/uploads.ts`);
+const Fr = await import(`${rootUrl}/lib/server/frames.ts`);
+const Pages = await import(`${rootUrl}/lib/server/pages.ts`);
+const M = await import(`${rootUrl}/lib/server/state-merge.ts`);
+const Route = await import(`${rootUrl}/app/api/privacy/route.ts`);
+const ChatsRoute = await import(`${rootUrl}/app/api/chats/route.ts`);
+const MessagesRoute = await import(`${rootUrl}/app/api/chats/[chatId]/messages/route.ts`);
+const { callAllowed } = await import(`${rootUrl}/components/app/view-only.ts`);
+const { orgoKey } = await import(`${rootUrl}/lib/server/orgo-auth.ts`);
+const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
 clearInterval(globalThis.__bopsRoutines);
 Priv.privacyTiming.pauseMs = 0;
 Priv.privacyTiming.flushMs = 5_000;
@@ -559,7 +561,7 @@ await check("Restore puts it back in its chat, in time order, under its id, with
   assert.equal(existsSync(join(deletedDir(), item.id)), false);
   assert.equal((await call("POST", { restore: item.id })).status, 404);
   // Bops Cloud takes a row it holds as removed (json NULL) written again as new: its upsert updates where json IS DISTINCT.
-  assert.match(readFileSync(`${root}/cloud/state.ts`, "utf8"), /ON CONFLICT \(user_id, id\) DO UPDATE\s+SET chat_id = EXCLUDED\.chat_id, at = EXCLUDED\.at, json = EXCLUDED\.json, seq = EXCLUDED\.seq[^\n]*\n\s+WHERE bops\.chat_messages\.json IS DISTINCT FROM EXCLUDED\.json/);
+  assert.match(readFileSync(`${rootPath}/cloud/state.ts`, "utf8"), /ON CONFLICT \(user_id, id\) DO UPDATE\s+SET chat_id = EXCLUDED\.chat_id, at = EXCLUDED\.at, json = EXCLUDED\.json, seq = EXCLUDED\.seq[^\n]*\n\s+WHERE bops\.chat_messages\.json IS DISTINCT FROM EXCLUDED\.json/);
 });
 
 await check("a group chat deleted goes whole into Recently deleted; a message whose chat is gone can't go back until the chat does", async () => {
@@ -692,7 +694,7 @@ await check("what the user kept between us is never copied into Recently deleted
 });
 
 await check("a bot id a copy in Recently deleted names isn't given to a new bot, and Restore refuses a chat or bot made again since under its id", async () => {
-  const Bots = await import(`${root}/lib/server/bots.ts`);
+  const Bots = await import(`${rootUrl}/lib/server/bots.ts`);
   const MAX = botChatId("max");
   setPrivacy({ deletedDays: 30 });
   S.update((s) => {
@@ -829,7 +831,7 @@ await check("fewer days for what's deleted say first how many copies go here, an
   assert.equal(P.deletedGoesLine(0, { deletedDays: 0, copies: 0 }), "Nothing in Recently deleted on this Mac goes now. Copies on your other Macs go at their next check. It can't be undone.");
   assert.equal(P.deletedGoesLine(7, null), "This deletes the copies older than 7 days in Recently deleted on this Mac now. Copies older than 7 days on your other Macs go at their next check. It can't be undone.");
   // The window: fewer days always ask (nothing here to delete too, or Bops couldn't say); a failed read never skips the keep's question.
-  const src = readFileSync(`${root}/components/app/your-data.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/your-data.tsx`, "utf8");
   assert.match(src, /if \(d < info\.deletedDays\) \{[\s\S]*?return setAskingDeleted\(/);
   assert.match(src, /if \(!goes \|\| keepGoesAny\(goes\)\) return setAsking\(/);
   assert.match(src, /onClick=\{\(\) => void pickDeleted\(d\)\}/);
@@ -949,9 +951,9 @@ await check("the sweep runs only on a signed in Mac: never on a computer's runne
   assert.deepEqual(ids(), ["msg_old"]);
   assert.equal((await Priv.sweepKept(NOW)).messages, 1);
   setPrivacy({});
-  const src = readFileSync(`${root}/lib/server/privacy.ts`, "utf8");
+  const src = readFileSync(`${rootPath}/lib/server/privacy.ts`, "utf8");
   assert.ok(src.includes('loopHere("privacy")'));
-  const { MAC_LOOPS, RUNNER_LOOPS } = await import(`${root}/lib/server/persist.ts`);
+  const { MAC_LOOPS, RUNNER_LOOPS } = await import(`${rootUrl}/lib/server/persist.ts`);
   assert.ok(MAC_LOOPS.includes("privacy") && !RUNNER_LOOPS.includes("privacy"));
 });
 
@@ -985,7 +987,7 @@ await check("a reset keeps the user's Your data choices", async () => {
 await check("nothing the window says about your data has a dash or says Orbit", () => {
   const words = [];
   for (const f of ["components/app/your-data.tsx", "lib/privacy.ts", "app/api/privacy/route.ts", "lib/server/deleted.ts"]) {
-    const src = ts.createSourceFile(f, readFileSync(`${root}/${f}`, "utf8"), ts.ScriptTarget.Latest, true, f.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const src = ts.createSourceFile(f, readFileSync(`${rootPath}/${f}`, "utf8"), ts.ScriptTarget.Latest, true, f.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
     const walk = (n) => {
       if (ts.isJsxAttribute(n) && n.name.getText() === "className") return;
       if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n) || ts.isTemplateHead(n) || ts.isTemplateMiddle(n) || ts.isTemplateTail(n) || ts.isJsxText(n)) words.push([f, n.text]);
@@ -1006,7 +1008,7 @@ await check("nothing the window says about your data has a dash or says Orbit", 
   for (const [d, g] of [[0, null], [7, { deletedDays: 7, copies: 2 }], [0, { deletedDays: 0, copies: 0 }]]) assert.ok(!DASHES.test(P.deletedGoesLine(d, g)));
   assert.equal(P.goesLine(90, { ...none, keepDays: 90, messages: 1240 }), "This deletes 1,240 messages older than 90 days from Bops Cloud and all your Macs. It can't be undone.");
   // Where things are kept, as they are: the memory service by name, what OpenAI keeps, where logins go, and what Start over keeps.
-  const src = readFileSync(`${root}/components/app/your-data.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/your-data.tsx`, "utf8");
   for (const said of ["Honcho, the memory service Orgo uses", "Answers to chats and tasks", "A bot signing in fills them into that site's page, never into a chat or a model.", "Start over keeps a copy of your chats in Bops Cloud."])
     assert.ok(src.includes(said), said);
   assert.ok(!src.includes("Never sent anywhere"));
@@ -1019,6 +1021,8 @@ await check("nothing unexpected: no rejections, no stray warnings", async () => 
 });
 
 console.log(`\nyour data: ${passed} passed, ${failures} failed`);
-if (!failures) rmSync(scratch, { recursive: true, force: true });
+if (!failures) try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 else console.log(`The throwaway folder is kept for a look: ${scratch}`);
 process.exit(failures ? 1 : 0);

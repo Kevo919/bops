@@ -11,19 +11,21 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 
 // A file store, loaded at once and always ready (lib/server/persist.ts); the Mac app's ways (Bops Cloud's AI
 // credit, cloud.ts cloudOn) once it's loaded, below.
 process.env.BOPS_SELF_HOSTED = "1";
 for (const k of ["ORGO_API_KEY", "BOPS_ORGO_WORKSPACE", "BOPS_ORGO_TEMPLATE", "BOPS_DATABASE_URL", "AGENTMAIL_API_KEY", "BOPS_MAIL_DOMAIN", "OPENAI_API_KEY", "TAILSCALE_AUTH_KEY"]) delete process.env[k];
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 // Modules that would start processes when loaded are stand-ins whose exports do nothing (as in test-plan.mjs).
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -76,9 +78,9 @@ for (const level of ["log", "info", "warn", "error"]) {
   };
 }
 
-const C = await import(`${root}/lib/credit-topup.ts`);
-const R = await import(`${root}/app/api/account/credit/route.ts`);
-const L = await import(`${root}/lib/server/plan.ts`);
+const C = await import(`${rootUrl}/lib/credit-topup.ts`);
+const R = await import(`${rootUrl}/app/api/account/credit/route.ts`);
+const L = await import(`${rootUrl}/lib/server/plan.ts`);
 // Loaded: now it's the Mac app, whose AI credit is Bops Cloud's.
 delete process.env.BOPS_SELF_HOSTED;
 
@@ -353,7 +355,7 @@ for (const t of [null, undefined, { used_seconds: 1 }, { used_seconds: 1, limit_
 }
 // The account sheet's words for it: 10 hours a month, used of them, and the day they start over as Orgo names it
 // (the UTC day, Nov 1, in any time zone: west of UTC the hours are back the evening before).
-const PI = await import(`${root}/lib/plan-includes.ts`);
+const PI = await import(`${rootUrl}/lib/plan-includes.ts`);
 assert.deepEqual(PI.freeHoursWords(time), {
   note: "Free includes 10 hours a month on your Bops computer. It sleeps when nothing's using it, so only the time it works counts. Your hours start over Nov 1.",
   amount: "2 of 10 hours used",
@@ -399,9 +401,9 @@ for (const w of [PI.freeHoursWords(weekly), PI.freeHoursWords(weeklyUsed)]) for 
 for (const w of [PI.freeHoursWords(time), PI.freeHoursWords(allUsed), PI.freeHoursWords(weekly), PI.freeHoursWords(weeklyUsed)]) for (const text of Object.values(w)) noDashes(text);
 // Orgo's "10 hours used" is told apart from any other refusal, in Orgo's own words (orgo-web lib/bops-free-hours.ts
 // freeHoursMessage): this month's, or this week's from an Orgo that still counts by the week.
-const FH = await import(`${root}/lib/server/free-hours.ts`);
-const O = await import(`${root}/lib/server/orgo.ts`);
-const S = await import(`${root}/lib/server/store.ts`);
+const FH = await import(`${rootUrl}/lib/server/free-hours.ts`);
+const O = await import(`${rootUrl}/lib/server/orgo.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
 const usedUp = "Your free Bops computer has used its 10 hours this month. It's back on November 1, or upgrade to Pro to keep it on.";
 const usedUpWeek = "Your free Bops computer has used its 10 hours this week. It's back Monday, Oct 12, or upgrade to Pro to keep it on.";
 assert.equal(FH.freeHoursUsed(new O.OrgoError("x", 402, "bops_free_hours", usedUp)), usedUp);
@@ -453,5 +455,7 @@ for (const line of logged) for (const secret of [KEY, IDEM, HANDLE, HANDLE2]) as
 assert.ok(logged.some((l) => l.includes("[credit]")), "Orgo's failures are logged, by status and code");
 
 console.log(`all credit top-up tests passed (${calls.length} fake Orgo calls, none to the network)`);
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

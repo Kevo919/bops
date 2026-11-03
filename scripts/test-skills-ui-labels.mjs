@@ -16,11 +16,12 @@ import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -70,9 +71,9 @@ globalThis.fetch = async (url, init) => {
   return { ok: true, status: 200, json: async () => ({}) };
 };
 
-const Sk = await import(pathToFileURL(`${root}/components/app/skills.tsx`).href);
-const L = await import(pathToFileURL(`${root}/lib/skill-labels.ts`).href);
-const B = await import(pathToFileURL(`${root}/lib/builtin-skills.ts`).href);
+const Sk = await import(`${rootUrl}/components/app/skills.tsx`);
+const L = await import(`${rootUrl}/lib/skill-labels.ts`);
+const B = await import(`${rootUrl}/lib/builtin-skills.ts`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 

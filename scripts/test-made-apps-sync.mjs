@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
@@ -26,13 +26,14 @@ process.env.OPENAI_API_KEY = "sk-test-made-apps-sync";
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 const ORGO_KEY = "sk_orgo_test_made_apps_sync";
 globalThis.bopsOrgoKey = ORGO_KEY;
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
-process.env.BOPS_SERVER_JS = join(root, "server.js");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
+process.env.BOPS_SERVER_JS = join(rootPath, "server.js");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-made-apps-sync-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
@@ -42,7 +43,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -260,12 +261,12 @@ globalThis.fetch = async (input, init) => {
 
 /* ---------------- Bops ---------------- */
 
-const S = await import(`${root}/lib/server/store.ts`);
-const A = await import(`${root}/lib/server/made-apps.ts`);
-const F = await import(`${root}/lib/server/made-apps-sync.ts`);
-const O = await import(`${root}/lib/server/sync-outbox.ts`);
-const R = await import(`${root}/lib/server/remove.ts`);
-const { appsStayLine, botChatId } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const A = await import(`${rootUrl}/lib/server/made-apps.ts`);
+const F = await import(`${rootUrl}/lib/server/made-apps-sync.ts`);
+const O = await import(`${rootUrl}/lib/server/sync-outbox.ts`);
+const R = await import(`${rootUrl}/lib/server/remove.ts`);
+const { appsStayLine, botChatId } = await import(`${rootUrl}/lib/types.ts`);
 const T = F.madeAppsSyncForTests;
 // Signed in with an @orgo.ai email: apps are open to it (lib/apps-access.ts). A check below signs in as someone else.
 const TEAM = { user: { id: "u_alex", email: "alex@orgo.ai", name: "Alex" }, signedInAt: 1 };
@@ -524,7 +525,7 @@ await check("A bot deleted: the apps it made stay, under the workspace's main bo
   assert.equal(appsStayLine(st, st.bots.find((b) => b.id === "max")), "The app it made stays, under Boppy.");
   assert.equal(appsStayLine({ bots: st.bots, madeApps: [...st.madeApps, { ...st.madeApps[0], id: "app_x", botId: "max" }] }, st.bots.find((b) => b.id === "max")), "The 2 apps it made stay, under Boppy.");
   assert.equal(appsStayLine(st, st.bots.find((b) => b.id === "boppy")), null, "none made: nothing said");
-  for (const f of ["components/app/bot-menu.tsx", "components/app/bot-panel.tsx"]) assert.match(readFileSync(join(root, f), "utf8"), /appsStayLine\(state, b\)/, `${f} says it`);
+  for (const f of ["components/app/bot-menu.tsx", "components/app/bot-panel.tsx"]) assert.match(readFileSync(join(rootPath, f), "utf8"), /appsStayLine\(state, b\)/, `${f} says it`);
   await R.deleteBot("max");
   await settle();
   const a = app("app_fromb4");
@@ -641,13 +642,15 @@ await check("An account apps aren't open to, signed in where the list on this Ma
 await check("Plain words: nothing said has a long dash", () => {
   const words = [...S.getState().messages.map((m) => m.text), ...(S.getState().madeApps ?? []).map((a) => a.error ?? ""), ...logged];
   for (const w of words) assert.ok(!/[–—]/.test(w), w);
-  for (const f of ["lib/server/made-apps-sync.ts"]) assert.ok(!/[–—]/.test(readFileSync(join(root, f), "utf8")), f);
+  for (const f of ["lib/server/made-apps-sync.ts"]) assert.ok(!/[–—]/.test(readFileSync(join(rootPath, f), "utf8")), f);
   assert.deepEqual(logged.filter((l) => /^\[made-apps\]/.test(l)), [], "no stray warnings");
   assert.deepEqual(rejections, []);
 });
 
 T.reset();
 console.log(`\nmade apps in Orgo: ${passed} passed, ${failed} failed`);
-if (!failed) rmSync(scratch, { recursive: true, force: true });
+if (!failed) try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 else console.log(`The throwaway folder is kept for a look: ${scratch}`);
 process.exit(failed ? 1 : 0);

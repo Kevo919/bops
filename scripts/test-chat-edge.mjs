@@ -12,7 +12,8 @@ import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   load(url, context, next) {
@@ -30,7 +31,7 @@ globalThis.innerWidth = 1440;
 const stored = new Map();
 globalThis.localStorage = { getItem: (k) => stored.get(k) ?? null, setItem: (k, v) => stored.set(k, String(v)), removeItem: (k) => stored.delete(k) };
 
-const E = await import(pathToFileURL(`${root}/components/app/chat-edge.tsx`).href);
+const E = await import(`${rootUrl}/components/app/chat-edge.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -78,7 +79,7 @@ await test("the edge: a focusable separator over the panel's left edge, a resize
   assert.match(html, /title="Drag to resize"/);
   assert.match(html, /class="group absolute inset-y-0 -left-1 z-40 flex w-2 cursor-col-resize justify-center outline-none"/);
   assert.doesNotMatch(html, /fixed inset-0/, "the cover is only there while it's dragged");
-  const src = readFileSync(`${root}/components/app/chat-edge.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/chat-edge.tsx`, "utf8");
   assert.match(src, /setPointerCapture\(e\.pointerId\)/);
   assert.match(src, /\{dragging && <div aria-hidden className="fixed inset-0 z-\[100\] cursor-col-resize" \/>\}/, "the panel's frames can't take the pointer mid drag");
   assert.match(src, /onDoubleClick=\{\(\) => keep\(CHAT_WIDTH\)\}/);
@@ -87,7 +88,7 @@ await test("the edge: a focusable separator over the panel's left edge, a resize
 });
 
 await test("the app: the edge on the side panel, the title bar's columns the grid's, no slide while it's dragged", () => {
-  const app = readFileSync(`${root}/components/app/bops-app.tsx`, "utf8");
+  const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
   assert.match(app, /const \[chatWidth, setChatWidth\] = useState\(storedChatWidth\);/);
   assert.match(app, /<section ref=\{panelRef\} className="relative flex min-h-0 min-w-0 flex-col bg-white">\n\s+<ChatEdge from=\{sidebarWidth\} width=\{chatWidth\} onWidth=\{setChatWidth\} onDragging=\{setEdgeDragged\} \/>/);
   assert.match(app, /className=\{`grid h-11 shrink-0 border-b border-\[#ECECEA\] bg-\[#F7F7F6\] \[-webkit-app-region:drag\] \$\{slide\}`\} style=\{columns\}/);

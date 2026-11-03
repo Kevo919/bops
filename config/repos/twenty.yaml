@@ -1,0 +1,49 @@
+id: twenty
+name: Twenty
+repo: twentyhq/twenty
+url: https://github.com/twentyhq/twenty
+license: "custom: AGPL-3.0 with an added permission, plus a commercial license for files marked @license Enterprise"
+license_note: >-
+  AGPL-3.0 for most of the project: anyone you serve it to over a network must be able to get the source
+  of your modified version. Files marked "/* @license Enterprise */" are under a commercial license; some
+  packages (CLI, SDKs, twenty-ui, twenty-apps) are MIT.
+what: An open-source CRM with customizable objects, views and workflows.
+good_for: self-hosted CRM
+stack: [node, typescript, postgres, redis, docker]
+requirements:
+  docker: true
+  other:
+    - docker compose
+    - openssl (to generate APP_SECRET)
+keys_optional:
+  - name: AUTH_GOOGLE_CLIENT_SECRET
+    for: Google sign-in and Gmail/Calendar sync
+  - name: AUTH_MICROSOFT_CLIENT_SECRET
+    for: Microsoft sign-in and Outlook sync
+  - name: EMAIL_SMTP_PASSWORD
+    for: Sending email through SMTP
+keys_required:
+  - name: APP_SECRET
+    for: Signs sessions and tokens; generate once with openssl rand -base64 32 into packages/twenty-docker/.env
+  - name: PG_DATABASE_PASSWORD
+    for: Password for the bundled Postgres container, set in packages/twenty-docker/.env
+clone: git clone --depth 1 https://github.com/twentyhq/twenty.git twenty
+install:
+  - cd packages/twenty-docker && cp .env.example .env
+  - cd packages/twenty-docker && echo "APP_SECRET=$(openssl rand -base64 32)" >> .env
+  - cd packages/twenty-docker && echo "PG_DATABASE_PASSWORD=$(openssl rand -hex 16)" >> .env
+run: cd packages/twenty-docker && docker compose up -d
+background: false
+kind: web
+port: 3000
+health:
+  http: http://127.0.0.1:3000/healthz
+  expect: 200
+fits_bot_computer: false
+fits_reason: Needs a Docker daemon plus Postgres, Redis, server and worker containers; heavy for a bot computer.
+verified: false
+verified_reason: >-
+  Needs Docker here: the sandbox has the Docker CLI but no running daemon. Clone (140dae38) and LICENSE were
+  read. Steps follow the README's Docker Compose self-host link and packages/twenty-docker
+  (docker-compose.yml publishes 3000:3000 and health-checks /healthz; .env.example sets TAG, SERVER_URL,
+  STORAGE_TYPE). The install lines generate secrets on the machine; none are stored here.

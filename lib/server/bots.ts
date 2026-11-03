@@ -6,6 +6,7 @@ import { botIdsWaiting } from "./memory-deletes";
 import { ensureInbox } from "./mail";
 import { noMainComputer, noOwnComputer } from "./plan";
 import { trackServerEvent } from "./analytics";
+import { newChatModel } from "./chat-default";
 
 /**
  * Where people can reach this bot, for its own prompts (chat and calls), so "what's your email?" or
@@ -124,7 +125,9 @@ export async function createBot(name: string, role?: string, workspaceId?: strin
       workspaceId: ws,
     };
     s.bots.push(b);
-    s.chats.push({ id: botChatId(botId), kind: "bot", botIds: [botId], createdAt: Date.now(), typing: [], workspaceId: ws });
+    // A new chat starts on the chat default (Settings, Models), when its key is set; else Auto.
+    const model = newChatModel();
+    s.chats.push({ id: botChatId(botId), kind: "bot", botIds: [botId], createdAt: Date.now(), typing: [], workspaceId: ws, ...(model ? { model } : {}) });
   });
   trackServerEvent("bops_bot_created", { own_computer: ownComputer && !noRoom, workspace_bots: getState().bots.filter((x) => workspaceOf(x) === team).length });
   // Its own email address, made in the background (mail.ts; nothing happens when mail is off).
