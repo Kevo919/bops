@@ -1,13 +1,14 @@
-// Fake providers only. No .env files, real credentials, filesystem writes or external requests.
+// Fake providers only (and a fake Ollama on 127.0.0.1). No .env files, real credentials, filesystem writes or external requests.
 // Run: node --conditions=react-server scripts/test-key-check.mjs (Node 24).
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { join } from "node:path";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const originals = { ...process.env };
 const originalFetch = globalThis.fetch;
-for (const key of Object.keys(process.env)) if (/^(BOPS_|OPENAI_|ANTHROPIC_|ZAI_|DEEPSEEK_|OPENROUTER_|DEEPINFRA_|ORGO_)/.test(key)) delete process.env[key];
+for (const key of Object.keys(process.env)) if (/^(BOPS_|OPENAI_|ANTHROPIC_|ZAI_|DEEPSEEK_|OPENROUTER_|DEEPINFRA_|ORGO_|OLLAMA_)/.test(key)) delete process.env[key];
 
 registerHooks({
   resolve(specifier, context, next) {
@@ -47,8 +48,10 @@ const resultOf = async (key, status, data) => {
 };
 
 try {
-  await test("GET exposes exactly seven metadata rows and makes no provider calls", async () => {
-    const expected = [ROUTE_KEYS.openai, "OPENAI_EXECUTOR_API_KEY", ROUTE_KEYS.anthropic, ROUTE_KEYS.zai, ROUTE_KEYS.deepseek, ROUTE_KEYS.openrouter, "ORGO_API_KEY"];
+  await test("GET exposes exactly eight metadata rows and makes no provider calls", async () => {
+    const expected = [ROUTE_KEYS.openai, "OPENAI_EXECUTOR_API_KEY", ROUTE_KEYS.anthropic, ROUTE_KEYS.zai, ROUTE_KEYS.deepseek, ROUTE_KEYS.openrouter, "ORGO_API_KEY", ROUTE_KEYS.ollama];
+    assert.equal(ROUTE_KEYS.ollama, "OLLAMA_BASE_URL", "Ollama's row is its address: it has no key");
+    assert.equal(keyCheckList().find(x => x.key === "OLLAMA_BASE_URL").label, "Ollama (free, local)");
     assert.deepEqual(keyCheckList().map(x => x.key), expected);
     assert.ok(keyCheckList().every(x => x.status === "not set"));
     for (const key of expected) process.env[key] = `SYNTHETIC_SECRET_${key}`;
@@ -169,6 +172,43 @@ try {
     assert.equal(result.result.status, "works");
     assert.ok(!JSON.stringify(result).includes("SYNTHETIC_SECRET"));
     assert.equal(calls.length, 1);
+  });
+  await test("Ollama: GET {OLLAMA_BASE_URL}/models on a fake local server, Bearer only with OLLAMA_API_KEY", async () => {
+    const got = [];
+    let answer = (res) => { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ object: "list", data: [{ id: "qwen2.5:3b" }] })); };
+    const server = createServer((req, res) => { got.push({ method: req.method, url: req.url, auth: req.headers.authorization }); answer(res); });
+    await new Promise(r => server.listen(0, "127.0.0.1", r));
+    const base = `http://127.0.0.1:${server.address().port}/v1`;
+    globalThis.fetch = originalFetch;
+    try {
+      delete process.env.OLLAMA_BASE_URL;
+      assert.equal((await checkKey("OLLAMA_BASE_URL")).status, "not set");
+      assert.equal(got.length, 0);
+      process.env.OLLAMA_BASE_URL = `${base}/`;
+      delete process.env.OLLAMA_API_KEY;
+      let r = await checkKey("OLLAMA_BASE_URL");
+      assert.equal(r.status, "works");
+      assert.equal(r.message, "Ollama answered with 1 model. It's free: no key or credit needed.");
+      assert.deepEqual(got[0], { method: "GET", url: "/v1/models", auth: undefined });
+      process.env.OLLAMA_API_KEY = "SYNTHETIC_SECRET_OLLAMA";
+      r = await checkKey("OLLAMA_BASE_URL");
+      assert.equal(got[1].auth, "Bearer SYNTHETIC_SECRET_OLLAMA");
+      assert.ok(!JSON.stringify(r).includes("SYNTHETIC_SECRET"));
+      answer = (res) => { res.writeHead(401); res.end("{}"); };
+      assert.equal((await checkKey("OLLAMA_BASE_URL")).status, "invalid");
+      answer = (res) => { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ object: "list", data: [] })); };
+      assert.match((await checkKey("OLLAMA_BASE_URL")).message, /no models yet: pull one/);
+      answer = (res) => { res.writeHead(200, { "content-type": "text/html" }); res.end("<html>not ollama</html>"); };
+      assert.equal((await checkKey("OLLAMA_BASE_URL")).status, "unavailable");
+      await new Promise(r => server.close(r));
+      const off = await checkKey("OLLAMA_BASE_URL");
+      assert.equal(off.status, "unavailable");
+      assert.match(off.message, /Nothing answered at OLLAMA_BASE_URL/);
+    } finally {
+      server.close();
+      globalThis.fetch = async (url, options) => { calls.push({ url, options }); return reply(url, options); };
+      delete process.env.OLLAMA_BASE_URL; delete process.env.OLLAMA_API_KEY;
+    }
   });
   console.log(`PASS: ${passed} key-check tests; synthetic credentials and fake fetch only.`);
 } finally {

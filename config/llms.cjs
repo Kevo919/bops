@@ -6,7 +6,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const PROVIDERS = ["anthropic", "openai", "deepinfra", "zai", "zai-coding", "deepseek", "openrouter"];
+const PROVIDERS = ["anthropic", "openai", "deepinfra", "zai", "zai-coding", "deepseek", "openrouter", "ollama"];
 const JOBS = ["coding", "planning", "thinking", "research", "writing", "browsing"];
 const MODEL = /^[A-Za-z0-9._:/-]{1,120}$/;
 
