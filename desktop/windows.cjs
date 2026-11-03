@@ -36,9 +36,11 @@ const hidden = (opts) => (isWindows ? { ...opts, windowsHide: true } : opts);
  * runs as cmd → npx → cmd → node, a chain whose middle outlives its top, so stopping the top left
  * the server running. One node at the top is one tree to stop. (On the Mac: npx, as before.)
  */
-const devServer = (repo, port) =>
+const devServer = (repo, port, built = false) =>
   isWindows
-    ? { command: "node", args: [path.join(repo, "node_modules", "next", "dist", "bin", "next"), "dev", "--port", String(port)] }
+    ? // `built`: the app was built with `npm run app:build:win`, which compiles the server first, so it
+      // runs it as built (next start: faster, nothing recompiled as you use it) rather than in development.
+      { command: "node", args: [path.join(repo, "node_modules", "next", "dist", "bin", "next"), built ? "start" : "dev", "--port", String(port)] }
     : { command: "npx", args: ["next", "dev", "--port", String(port)] };
 
 /** Stop a process and everything it started, at once (the Windows equal of SIGKILL to a process group). */

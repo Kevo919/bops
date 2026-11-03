@@ -16,7 +16,8 @@
     "fast": "next build && next start --port 3210",
     "app:release": "scripts/release.sh",
     "setup:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-windows.ps1",
-    "app:build:win": "node -e \"require('fs').writeFileSync('desktop/repo.json', JSON.stringify({ path: process.cwd() }))\" && electron-builder --win --dir"
+    "app:build:win": "next build && node -e \"require('fs').writeFileSync('desktop/repo.json', JSON.stringify({ path: process.cwd(), built: true }))\" && electron-builder --win --dir",
+    "app:dev:win": "node -e \"require('fs').writeFileSync('desktop/repo.json', JSON.stringify({ path: process.cwd() }))\" && electron-builder --win --dir"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

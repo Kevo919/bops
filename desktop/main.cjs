@@ -3,9 +3,10 @@
  * isn't already running, opens the window with the Mac title bar from the design, and on quit
  * stops what it started, including the bots' background browsers.
  */
-const { app, autoUpdater, BrowserWindow, clipboard, desktopCapturer, dialog, ipcMain, nativeImage, Notification, powerMonitor, screen, session, shell, systemPreferences } = require("electron");
+const { app, autoUpdater, BrowserWindow, clipboard, desktopCapturer, dialog, ipcMain, Menu, nativeImage, Notification, powerMonitor, screen, session, shell, systemPreferences, Tray } = require("electron");
 const { execFile, execFileSync, spawn } = require("node:child_process");
-const win = require("./windows.cjs");
+const winHost = require("./windows.cjs");
+const { installBackground } = require("./background.cjs");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const net = require("node:net");
@@ -56,7 +57,7 @@ function windowToken() {
  * from an earlier start reaches it too). A path too long for a socket goes in this user's own temp folder.
  */
 function renderSocket() {
-  if (win.isWindows) return win.renderPipe();
+  if (winHost.isWindows) return winHost.renderPipe();
   const file = path.join(app.getPath("userData"), "render.sock");
   return Buffer.byteLength(file) < 100 ? file : path.join(os.tmpdir(), "bops-render.sock");
 }
@@ -64,6 +65,14 @@ let renderService;
 
 /** The window's session carries it to the server on every request, as a cookie no page script can read. */
 const giveWindowToken = () => session.defaultSession.cookies.set({ url: URL, name: "bops_window", value: windowToken(), httpOnly: true, sameSite: "strict" });
+/** Windows' `npm run app:build:win` compiles the server first and says so here: Bops.exe runs it as built. */
+const BUILT = (() => {
+  try {
+    return !!require("./repo.json").built && fs.existsSync(path.join(require("./repo.json").path, ".next", "BUILD_ID"));
+  } catch {
+    return false;
+  }
+})();
 const REPO = (() => {
   try {
     return require("./repo.json").path;
@@ -111,7 +120,7 @@ let shellPath;
 /** The login shell still being asked, so quitting can stop it. */
 let pathProbe;
 function loginPath() {
-  if (win.isWindows) return (shellPath ??= Promise.resolve(win.windowsPath()));
+  if (winHost.isWindows) return (shellPath ??= Promise.resolve(winHost.windowsPath()));
   shellPath ??= new Promise((resolve) => {
     const fallback = [...new Set([...(process.env.PATH ?? "").split(":").filter(Boolean), ...FALLBACK_PATH])].join(":");
     let out = "";
@@ -228,8 +237,8 @@ async function whoAnswers() {
  * its id, name, user, parent and folder. Null when there's none, or it can't be seen (another user's).
  */
 async function listener() {
-  if (win.isWindows) {
-    const l = await win.listener(PORT, [serverHome(), REPO]);
+  if (winHost.isWindows) {
+    const l = await winHost.listener(PORT, [serverHome(), REPO]);
     if (!l) return null;
     // Windows has no process names Next can set and no user ids per process: a Bops server is a node
     // running Next from this app's folder (or its source, in development), and only this user's
@@ -262,8 +271,8 @@ const looksLikeBops = (l) => !!l && (l.comm.startsWith("next-server") || l.comm.
  * copy from opening, but an old copy from before it can still be open).
  */
 const stoppable = (l) =>
-  win.isWindows
-    ? looksLikeBops(l) && (l.ppid === process.pid || !win.alive(l.ppid))
+  winHost.isWindows
+    ? looksLikeBops(l) && (l.ppid === process.pid || !winHost.alive(l.ppid))
     : looksLikeBops(l) && l.uid === process.getuid() && !!l.home && realpath(l.home) === realpath(serverHome()) && (l.ppid === 1 || l.ppid === process.pid);
 
 /**
@@ -354,10 +363,10 @@ function nodeBinary() {
  * gentler asks the server to save first, then stops the tree (desktop/windows.cjs). False when it's gone.
  */
 function signalTree(pid, sig) {
-  if (win.isWindows) {
-    if (!win.alive(pid)) return false;
-    if (sig === "SIGKILL") win.killTree(pid);
-    else win.stopServerTree(pid, PORT, windowToken());
+  if (winHost.isWindows) {
+    if (!winHost.alive(pid)) return false;
+    if (sig === "SIGKILL") winHost.killTree(pid);
+    else winHost.stopServerTree(pid, PORT, windowToken());
     return true;
   }
   try {
@@ -373,7 +382,7 @@ function signalTree(pid, sig) {
 }
 /** Bots' Chrome on this computer, closed with the server. */
 function stopBotChrome() {
-  if (win.isWindows) return win.killBotChrome();
+  if (winHost.isWindows) return winHost.killBotChrome();
   try {
     execFileSync("pkill", ["-f", ".bops/chrome/"]);
   } catch {}
@@ -424,12 +433,12 @@ async function spawnServer() {
         detached: true,
         windowsHide: true,
       })
-    : spawn(win.devServer(REPO, PORT).command, win.devServer(REPO, PORT).args, win.hidden({
+    : spawn(winHost.devServer(REPO, PORT, BUILT).command, winHost.devServer(REPO, PORT, BUILT).args, winHost.hidden({
         cwd: REPO,
         env: { ...process.env, PATH, BOPS_UI_TOKEN: windowToken(), BOPS_RENDER_SOCKET: renderSocket() },
         stdio: "ignore",
         // On Windows a detached child gets a console window of its own; the app's own windows are enough.
-        detached: !win.isWindows,
+        detached: !winHost.isWindows,
       }));
   if (packaged) fs.closeSync(packaged.log);
   server = child;
@@ -723,6 +732,8 @@ function showMain() {
 
 async function createWindow() {
   const win = new BrowserWindow({
+    // Started by Windows at sign-in (desktop/background.cjs): hidden until opened from the tray.
+    show: !background.startHidden() || mainWin !== undefined,
     width: 1360,
     height: 860,
     minWidth: 1180,
@@ -737,6 +748,7 @@ async function createWindow() {
     webPreferences: { webviewTag: true, preload: path.join(__dirname, "preload.cjs") },
   });
   mainWin = win;
+  background.attach(win);
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: "deny" };
@@ -1376,6 +1388,8 @@ if (!first) {
   app.quit();
 }
 app.on("second-instance", () => app.isReady() && showMain());
+// Windows: Bops in the tray, kept running when its window closes, optionally started with Windows.
+const background = installBackground({ app, Tray, Menu, Notification, nativeImage, icon: ICON, showMain: () => showMain(), log: (t) => mainLog(t) });
 app.whenReady().then(() => {
   if (!first) return;
   mainLog(`Bops ${app.getVersion()} opening (pid ${process.pid})`);
@@ -1440,7 +1454,7 @@ app.on("will-quit", () => {
   const pid = server?.pid ?? adopted;
   // A server too stuck to act on SIGTERM would outlive Bops: stopped hard once its exit work's 8s are up.
   // (On Windows the stop already ends with the tree stopped hard: desktop/windows.cjs stopServerTree.)
-  if (stopServer() && pid && !win.isWindows)
+  if (stopServer() && pid && !winHost.isWindows)
     try {
       spawn("/bin/sh", ["-c", `sleep 10; kill -KILL -${pid} 2>/dev/null || kill -KILL ${pid} 2>/dev/null`], { detached: true, stdio: "ignore" }).unref();
     } catch {}
