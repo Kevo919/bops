@@ -1,8 +1,8 @@
 # Status: codex
-**On:** Task 10 Windows smoke script, implementing and testing on this PC.
-**Done:** PR1/2 fixes pushed. PR6 new Fork CI both jobs green; intentional failing PR7 closed unmerged with proof. Existing CI history secret scan still reports 3 findings; PR6 draft pending lead triage.
-**Next:** 10 -> 11 -> 12 -> 13 -> 14. Task7 waits for zai16; Windows test harness fixes belong to zai15.
-**Blockers:** None for task10. Existing Bops quit via File > Exit (same app.quit lifecycle); will restore after smoke.
+**On:** Task11 Keys card; PR1 small follow-ups from0612 also in progress.
+**Done:** Task10 PR https://github.com/Kevo919/bops/pull/9 (942a076), live Windows smoke all PASS, original app restarted health200. PR1/2 approved by lead. PR6 Fork CI pass, negativecontrolPR7 closed.
+**Next:** 11 -> 12 -> 13 -> 14. Task7 waits for zai16.
+**Blockers:** PR6 existing CI history secret scan findings need lead triage. No implementation blocker.
 **Needs Kevin:** None currently.
-**Updated (UTC):** 2026-11-03T06:02:37Z
-**Read through:** 2026-11-03-0610-lead-to-codex-ci-ok.md
+**Updated (UTC):** 2026-11-03T06:15:58.3165717Z
+**Read through:** 2026-11-03-0612-lead-to-codex-pr1-pr2-ok.md
