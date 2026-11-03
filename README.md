@@ -177,7 +177,7 @@ The app itself is Electron and Next.js.
 What this fork adds to Bops:
 
 - **Windows.** Bops runs on a Windows PC: `npm run setup:win`, then `npm run app` (or `npm run app:build:win` for `dist-desktop\win-unpacked\Bops.exe`). Saved logins and tokens are encrypted, with the key in Windows Credential Manager. Bots can work on the PC too: by default only in a Chrome of their own (Codex's Windows sandbox runs their commands as a separate, restricted Windows user); with **Settings → Full access** on, as you, with a shell and your files.
-- **Your phone.** The Android app in [`android/`](android/README.md) is Bops on your phone. Pair it in **Settings → Your phone**; away from home it reaches your PC over Tailscale.
+- **Your phone.** The Android app in [`android/`](android/README.md) is Bops on your phone. Pair it in **Settings → Your phone**; away from home it reaches your PC over Tailscale. To install it, open the download link on your phone: [docs/android-install.md](docs/android-install.md) walks you through it.
 - **A server.** Bops on a Hostinger VPS, always on: see [docs/hostinger.md](docs/hostinger.md), or run `scripts/vps-setup.sh` there.
 - **Modules.** Every part is swappable or can be switched off, like DeepSeek Harness's plugins: the AI provider and each model, computers, memory, apps, email, phone and more. Change them in **Settings → Modules** or in `config/bops.yaml` (see `config/bops.example.yaml`); add your own in `config/modules.d/`.
 - **Your LLMs, in one file.** [`config/llms.yaml`](config/llms.yaml) lists every model your bots can use: Claude to start with (new bots start on it), and room for Z.ai, DeepSeek, OpenRouter, OpenAI and more. Copy a block, change three lines, restart.
