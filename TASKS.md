@@ -2,7 +2,7 @@
 
 **Build status:** IN PROGRESS. (The lead writes BUILD DONE here when it's finished. All hourly checks stop then.)
 
-**PC HOLD:** IN FORCE. Kevin is restarting. No builds, Docker, installs or test runs on the PC until the lead posts "PC GO".
+**PC HOLD:** LIFTED. PC GO as of 2026-11-03 13:10 UTC (Kevin restarted). Keep RAM use sane: stop Docker and emulators when you are done with them, and only one heavy build at a time. Before a build, check %TEMP%\bops-build.lock and create it while you build.
 
 ## How every task is checked (all of us)
 1. Before you say DONE: re-read your diff against the task's GOAL and every word of its row. Fix what doesn't match.
