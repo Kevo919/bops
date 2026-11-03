@@ -1,4 +1,5 @@
 import "server-only";
+import { agentApiPath } from "./agent-api-path";
 import { execFile, execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -223,9 +224,9 @@ export const browserMcp = (port: number, dir: string) => {
   // Windows has no /usr/bin/env to set them with: the blocked origins go as Playwright's own flag, and
   // its sockets are named pipes there, which have no path-length limit to work around.
   if (onWindows)
-    return { type: "stdio", command: process.execPath, args: [...args, "--blocked-origins", blocked.slice(blocked.indexOf("=") + 1)], cwd: join(dir, "workspace") };
+    return { type: "stdio", command: process.execPath, args: [...args, "--blocked-origins", blocked.slice(blocked.indexOf("=") + 1)], cwd: agentApiPath(join(dir, "workspace")) };
   const env = [`PWTEST_SOCKETS_DIR=${taskSockets(dir)}`, blocked, ...(asNode ? ["ELECTRON_RUN_AS_NODE=1"] : [])];
-  return { type: "stdio", command: "/usr/bin/env", args: [...env, process.execPath, ...args], cwd: join(dir, "workspace") };
+  return { type: "stdio", command: "/usr/bin/env", args: [...env, process.execPath, ...args], cwd: agentApiPath(join(dir, "workspace")) };
 };
 
 /**
@@ -279,7 +280,7 @@ export const macUiMcp = (dir: string) => ({
   type: "stdio",
   command: "/usr/bin/env",
   args: [...(asNode ? ["ELECTRON_RUN_AS_NODE=1"] : []), process.execPath, macUiScript(), "--cua", CUA_DRIVER],
-  cwd: join(dir, "workspace"),
+  cwd: agentApiPath(join(dir, "workspace")),
 });
 
 /** What the executor's environment keeps of the server's: nothing secret, nothing that only makes the server run. */

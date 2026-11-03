@@ -7,6 +7,7 @@ import { olderBopsOnAccount } from "@/lib/server/chart";
 import { GroupError, setComputerName } from "@/lib/server/bot-groups";
 import { setChatRouting } from "@/lib/server/cloud-chat";
 import { runnersSoon } from "@/lib/server/runner-install";
+import { update } from "@/lib/server/store";
 
 /**
  * `?preview=<id>`: what deleting that workspace takes with it, for the confirm (its computers, keys, skills
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const unready = notReady();
   if (unready) return unready;
-  const { id, name, current, noticeSeen, revertOrgoMove, syncNames, favorites, chain, computerName, chat } = (await request.json().catch(() => ({}))) as {
+  const { id, name, current, noticeSeen, revertOrgoMove, syncNames, favorites, chain, computerName, chat, routineAwayDays } = (await request.json().catch(() => ({}))) as {
     id?: string;
     name?: string;
     current?: string;
@@ -72,8 +73,17 @@ export async function PATCH(request: Request) {
     chain?: unknown;
     computerName?: { computer?: unknown; name?: unknown };
     chat?: unknown;
+    routineAwayDays?: number;
   };
   ensureMain();
+  // The routines' inactivity brake's days (Settings → Workspace → General): the owner's to say, from their own window, with their own workspace open.
+  if (routineAwayDays !== undefined) {
+    if (!fromBopsWindow(request) || sharedOpen()) return Response.json({ error: "Only the owner can change this." }, { status: 403 });
+    if (typeof routineAwayDays !== "number" || !Number.isInteger(routineAwayDays) || routineAwayDays < 0 || routineAwayDays > 365) return Response.json({ error: "Say whole days, 0 to 365 (0 is never skip)." }, { status: 400 });
+    // 0 is "never skip" and stays 0: `|| undefined` would turn it back into the default 7.
+    update((s) => (s.routineAwayDays = routineAwayDays));
+    return Response.json({ ok: true });
+  }
   // Where its chat is answered is the owner's to say: from their own window, with their own workspace open.
   if (chat !== undefined) {
     if (!id || (chat !== "mac" && chat !== "auto")) return Response.json({ error: 'Say which workspace, and "mac" or "auto".' }, { status: 400 });

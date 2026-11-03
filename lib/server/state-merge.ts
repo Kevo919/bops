@@ -400,7 +400,7 @@ export function mergeApproval(base: Blob, mine: Blob, theirs: Blob): Blob {
  * the thread that took its place, and what waits on the user and the offer it clears) and a dismiss
  * (dismissWaiting: the mark, and what waits on the user and the replies it offered, cleared).
  */
-const ASKED_ELSEWHERE = ["stopAsked", "replacedBy", "dismissed", "blocker", "waitingOnYou", "options", "offerMac"] as const;
+const ASKED_ELSEWHERE = ["stopAsked", "replacedBy", "dismissed", "blocker", "waitingOnYou", "options", "offerMac", "allowedAsks"] as const;
 
 /**
  * A thread changed on both sides (the user replied on the Mac while a computer's runner worked on it, or

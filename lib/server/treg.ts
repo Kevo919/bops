@@ -4,7 +4,7 @@ import { USAGE_BOT_HEADER } from "@/cloud/protocol";
 import type { Bot } from "@/lib/types";
 import { appHeaders } from "./app-version";
 import { cloudOn, cloudProxy, cloudSessionNow } from "./cloud";
-import { allows, NeedsOk, type AskSpec } from "./permission";
+import { allows, NeedsOk, threadAllows, type AskSpec } from "./permission";
 import { bot, installId, ownerName } from "./store";
 
 /**
@@ -438,7 +438,7 @@ export async function findData(botId: string, query: string): Promise<string> {
  * get_data: one endpoint by id. Up to CAP runs at once; a dearer one asks the user (NeedsOk: the run pauses for
  * their reply, lib/server/permission.ts), unless the bot's rules allow it, and runs on their yes (`approved`).
  */
-export async function getData(botId: string, endpointId: string, input: unknown, opts: { approved?: boolean } = {}): Promise<string> {
+export async function getData(botId: string, endpointId: string, input: unknown, opts: { approved?: boolean; where?: { sessionId?: string } } = {}): Promise<string> {
   const b = bot(botId);
   if (!b || !dataOn(b)) return "You don't have business data.";
   const e = await endpointOf(endpointId.trim());
@@ -460,16 +460,17 @@ export async function getData(botId: string, endpointId: string, input: unknown,
     preview: `${what ? `${what}\n` : ""}${e.id} on treg, about ${price(e)} from your credit.\n\n${clip(JSON.stringify(input ?? {}, null, 1), 1200)}`,
     kind: "data",
   };
-  // Money from the user's AI credit: Just do it doesn't cover it, an Always allow they saved for this lookup does.
-  if (allows(b, ask, { justDoIt: false })) return dear();
+  // Money from the user's AI credit: Just do it doesn't cover it, an Always allow they saved for this lookup
+  // does, and so does an Allow for this thread (permission.ts): the run doesn't pause for the same one again.
+  if (allows(b, ask, { justDoIt: false }) || threadAllows(botId, opts.where?.sessionId, ask.action)) return dear();
   throw new NeedsOk(ask);
 }
 
 /** A data tool call by name, for the places that pass tool calls on. `approved`: the user said yes to this very call. */
-export function runDataTool(botId: string, name: string, args: Record<string, unknown>, _where: { chatId?: string; sessionId?: string }, opts: { approved?: boolean } = {}): Promise<string> {
+export function runDataTool(botId: string, name: string, args: Record<string, unknown>, where: { chatId?: string; sessionId?: string }, opts: { approved?: boolean } = {}): Promise<string> {
   if (name === "business_search") return businessSearch(botId, String(args.job ?? ""), args as Input);
   if (name === "find_data") return findData(botId, String(args.query ?? ""));
-  return getData(botId, String(args.endpoint_id ?? ""), args.input, opts);
+  return getData(botId, String(args.endpoint_id ?? ""), args.input, { ...opts, where });
 }
 
 /** What a bot is told about its business data, for its chat, tasks and calls (skills.ts style). */

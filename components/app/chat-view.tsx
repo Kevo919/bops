@@ -1010,28 +1010,32 @@ export function ChatView({
               }}
             />
             )}
-            {solo && !state.shared && (
-              <AgentChipPick
-                state={state}
-                bot={solo}
-                keys={boxKeys}
-                value={picked?.id ?? null}
-                onPick={(id) =>
-                  setAgentPicks((p) => {
-                    const next = { ...p };
-                    if (id) next[c.id] = id;
-                    else delete next[c.id];
-                    return next;
-                  })
-                }
-              />
-            )}
-            {/* The model this chat's replies run on (Chat.model): Auto is OpenAI, as before. */}
-            {!state.shared && <ChatModelPick state={state} chat={c} onError={setModelError} />}
             <button type="submit" aria-label="Send" disabled={!draft.trim() && !attaching.length} className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-ink disabled:opacity-30">
               <SendIcon />
             </button>
             </div>
+            {!state.shared && (
+            <div data-composer-chips className="flex min-w-0 flex-wrap items-center gap-1.5 pt-1 [&>*]:min-w-0 [&>*]:max-w-full">
+              {solo && !state.shared && (
+                <AgentChipPick
+                  state={state}
+                  bot={solo}
+                  keys={boxKeys}
+                  value={picked?.id ?? null}
+                  onPick={(id) =>
+                    setAgentPicks((p) => {
+                      const next = { ...p };
+                      if (id) next[c.id] = id;
+                      else delete next[c.id];
+                      return next;
+                    })
+                  }
+                />
+              )}
+              {/* The model this chat's replies run on (Chat.model): Auto is OpenAI, as before. */}
+              {!state.shared && <ChatModelPick state={state} chat={c} onError={setModelError} />}
+            </div>
+            )}
           </form>
           )}
           {micError && <div className="px-3 pt-1.5 text-[12px] leading-4 text-[#B42318]">{micError}</div>}
@@ -3284,12 +3288,13 @@ function AppApprovalCard({ state, approval: a, className = "" }: { state: AppSta
   const api = apiAskOf(a);
   // What went wrong answering it from a shared workspace (it shows again, with why).
   const [error, setError] = useState<string | null>(null);
-  const decide = async (reply: "once" | "always" | "reject", message?: string) => {
+  const decide = async (reply: "once" | "session" | "always" | "reject", message?: string) => {
     setBusy(true);
     const note = message?.trim() ? { message: message.trim() } : {};
     // In a shared workspace, a viewer with Write on its bot answers through the owner's Bops (shared-act.ts): named as theirs there.
     if (state.shared) {
-      const r = await memberAct({ act: "answer", askId: a.id, reply, ...note });
+      // Members' answers can't scope to a thread (the button is hidden in a shared workspace; a stray call lands as once).
+      const r = await memberAct({ act: "answer", askId: a.id, reply: reply === "session" ? "once" : reply, ...note });
       setError(r.ok ? null : (r.error ?? null));
       setBusy(false);
       return;
@@ -3354,6 +3359,13 @@ function AppApprovalCard({ state, approval: a, className = "" }: { state: AppSta
             <button disabled={busy} onClick={() => void decide("always")} title={alwaysScope(name, a)} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
               Always allow
             </button>
+            {/* A thread's own app or data asks (the kinds that honour it, permission.ts Session.allowedAsks):
+                the same thing runs on without asking again, this thread alone. Never in a shared workspace. */}
+            {!!a.threadId && !state.shared && (a.kind === "app" || a.kind === "data") && (
+              <button disabled={busy} onClick={() => void decide("session")} title="This thread runs the same thing on without asking again; a new thread asks as new" className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
+                Allow for this thread
+              </button>
+            )}
             <button disabled={busy} onClick={() => void decide("once")} className={`${btn} bg-ink text-white`}>
               Allow once
             </button>
