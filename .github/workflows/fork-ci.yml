@@ -50,6 +50,8 @@ jobs:
         run: node --conditions=react-server scripts/test-key-check.mjs
       - name: LLM catalog tests
         run: node --conditions=react-server scripts/test-llms.mjs
+      - name: Look permission and sanitizer tests
+        run: node --conditions=react-server scripts/test-look.mjs
 
   android:
     if: github.repository != 'OrgoAI/bops'
