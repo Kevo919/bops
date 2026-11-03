@@ -1,5 +1,9 @@
 # Tasks
 
+**Build status:** IN PROGRESS. (The lead writes BUILD DONE here when it's finished. All hourly checks stop then.)
+
+**PC HOLD:** IN FORCE. Kevin is restarting. No builds, Docker, installs or test runs on the PC until the lead posts "PC GO".
+
 ## How every task is checked (all of us)
 1. Before you say DONE: re-read your diff against the task's GOAL and every word of its row. Fix what doesn't match.
 2. Run every check the task names, plus npx tsc --noEmit -p . and npm run lint for web changes, or gradlew assembleDebug lintDebug for Android. Paste the real output in the PR under "Verified".

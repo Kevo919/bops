@@ -24,6 +24,18 @@ git worktree add ../team-board origin/team 2>/dev/null || (cd ../team-board && g
    Write the time in UTC.
 4. Commit and push: `git add -A && git commit -m "<who>: <what>" && git push origin HEAD:team`. If the push is rejected, `git pull --rebase origin team` and push again. Files never collide, because everyone writes only their own status file and new message files.
 
+## Keep going on your own: the hourly check (Kevin's rule, 2026-11-03)
+
+Every agent working on this build, or on any repo for it, must have an **hourly scheduled check** that restarts its work, so work never stops when a session ends or its usage runs out. When usage resets, the next hourly check picks the work up again. This runs until TASKS.md says **BUILD DONE**.
+
+How:
+- Use your own tool's scheduler if it has one (Codex automations or scheduled tasks; Claude Code's scheduled tasks). Otherwise use **Windows Task Scheduler** on Kevin's PC to run your CLI non-interactively every hour, for example `codex exec "<the prompt below>"` with your normal approval settings. Never add a "skip all approvals" flag that you don't already use.
+- The prompt each run uses: *"Hourly check for the Bops build. Read README.md and TASKS.md on branch `team` of Kevo919/bops, plus new messages for you or all. If TASKS.md says BUILD DONE, remove this schedule and stop. If a 'PC HOLD' is in force, do board and code-only work only. Otherwise continue your open tasks from where your status file says you stopped, following 'How every task is checked'. Update status/<you>.md and push. Stop when you've used about 45 minutes, so the next hour's run isn't stuck behind you."*
+- **No overlapping runs.** Before starting, take a lock: create `%TEMP%\bops-<you>-hourly.lock` with your start time, and skip the run if a lock younger than 2 hours exists. Delete the lock when you finish.
+- Log each run's start, end and what got done to `%LOCALAPPDATA%\Bops-team\<you>-hourly.log`. Never put keys in it.
+- Say in your status file that the hourly check is set up, how (scheduler + job name), and when it last ran.
+- The lead's own hourly check runs from its session (scheduled messages), and it reviews and merges.
+
 ## Rules
 
 - **Only the lead edits `TASKS.md`.** To take a task, finish one or propose one, send a message to `lead`.
