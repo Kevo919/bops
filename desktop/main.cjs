@@ -424,13 +424,12 @@ async function spawnServer() {
         detached: true,
         windowsHide: true,
       })
-    : spawn(win.npx().command, ["next", "dev", "--port", String(PORT)], win.hidden({
+    : spawn(win.devServer(REPO, PORT).command, win.devServer(REPO, PORT).args, win.hidden({
         cwd: REPO,
         env: { ...process.env, PATH, BOPS_UI_TOKEN: windowToken(), BOPS_RENDER_SOCKET: renderSocket() },
         stdio: "ignore",
         // On Windows a detached child gets a console window of its own; the app's own windows are enough.
         detached: !win.isWindows,
-        shell: win.npx().shell,
       }));
   if (packaged) fs.closeSync(packaged.log);
   server = child;

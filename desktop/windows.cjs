@@ -5,7 +5,8 @@
  * Windows equal here, and main.cjs calls these only when process.platform is "win32", so the Mac app
  * runs exactly as before.
  */
-const { execFile, spawn } = require("node:child_process");
+const { execFile, execFileSync, spawn } = require("node:child_process");
+const path = require("node:path");
 const crypto = require("node:crypto");
 const os = require("node:os");
 
@@ -31,16 +32,20 @@ function renderPipe() {
 const hidden = (opts) => (isWindows ? { ...opts, windowsHide: true } : opts);
 
 /**
- * `npx` is npx.cmd on Windows, and Node only runs a .cmd through a shell (since its 2024 security fix
- * it refuses to spawn one directly). The arguments here are the app's own, never the user's.
+ * The development server, started straight with node and Next's own bin: on Windows `npx next dev`
+ * runs as cmd → npx → cmd → node, a chain whose middle outlives its top, so stopping the top left
+ * the server running. One node at the top is one tree to stop. (On the Mac: npx, as before.)
  */
-const npx = () => (isWindows ? { command: "npx.cmd", shell: true } : { command: "npx", shell: false });
+const devServer = (repo, port) =>
+  isWindows
+    ? { command: "node", args: [path.join(repo, "node_modules", "next", "dist", "bin", "next"), "dev", "--port", String(port)] }
+    : { command: "npx", args: ["next", "dev", "--port", String(port)] };
 
 /** Stop a process and everything it started, at once (the Windows equal of SIGKILL to a process group). */
 function killTree(pid) {
   if (!pid) return;
   try {
-    execFile("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true }, () => {});
+    execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore", timeout: 10000 });
   } catch {}
 }
 
@@ -52,22 +57,23 @@ function killTree(pid) {
  */
 function stopServerTree(pid, port, token) {
   if (!pid) return;
+  // Done before it returns: a helper left running in the background is stopped with the app when it
+  // quits (Electron's processes share a job on Windows), and the server would outlive it. The save
+  // takes well under a second; it gives up after 8.
   const script = `
 try { Invoke-WebRequest -UseBasicParsing -Method POST -TimeoutSec 8 -Headers @{ "x-bops-window" = $env:BOPS_STOP_TOKEN; "origin" = "http://127.0.0.1:$env:BOPS_STOP_PORT" } "http://127.0.0.1:$env:BOPS_STOP_PORT/api/restart" | Out-Null } catch {}
-Start-Sleep -Milliseconds 500
 taskkill /PID $env:BOPS_STOP_PID /T /F | Out-Null
 `;
   try {
-    spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script], {
-      detached: true,
+    execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
       stdio: "ignore",
       windowsHide: true,
+      timeout: 15000,
       // The token goes in the environment, never on the command line, where other programs can read it.
       env: { ...process.env, BOPS_STOP_PID: String(pid), BOPS_STOP_PORT: String(port), BOPS_STOP_TOKEN: token ?? "" },
-    }).unref();
-  } catch {
-    killTree(pid);
-  }
+    });
+  } catch {}
+  killTree(pid);
 }
 
 /** Bots' own Chrome (its profile is under ~/.bops/chrome/): the Windows equal of `pkill -f .bops/chrome/`. */
@@ -115,4 +121,4 @@ function alive(pid) {
   }
 }
 
-module.exports = { listener, alive, isWindows, windowsPath, renderPipe, hidden, npx, killTree, stopServerTree, killBotChrome };
+module.exports = { listener, alive, isWindows, windowsPath, renderPipe, hidden, devServer, killTree, stopServerTree, killBotChrome };
