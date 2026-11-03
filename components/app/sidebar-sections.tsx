@@ -248,8 +248,8 @@ function AskCard({ ask: a, botName, where, shared, onOpen }: { ask: AppApproval;
         <button disabled={busy} onClick={() => void decide("always")} title={scope} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
           Always allow
         </button>
-        {/* A thread's own ask, answered from the owner's own Bops (members' answers can't scope to a thread). */}
-        {!!a.threadId && !shared && (
+        {/* A thread's own app or data ask (the kinds that honour it), from the owner's own Bops (members' answers can't scope to a thread). */}
+        {!!a.threadId && !shared && (a.kind === "app" || a.kind === "data") && (
           <button disabled={busy} onClick={() => void decide("session")} title="This thread runs the same thing on without asking again" className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
             For this thread
           </button>

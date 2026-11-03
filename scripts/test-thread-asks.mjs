@@ -129,6 +129,38 @@ check("Deny still works, and grants don't leak into it", () => {
   assert.deepEqual(allowed("ses_d"), [], "nothing granted on a no");
 });
 
+check("Allow for this thread answers the same action's other waiting asks with it", () => {
+  thread("ses_e");
+  const one = ask("Create a row in Airtable", "ses_e");
+  const two = ask("Create a row in Airtable", "ses_e");
+  const other = ask("Delete a row in Airtable", "ses_e");
+  assert.equal(P.replyToAsk(one.id, "session"), undefined);
+  assert.equal(one.reply.reply, "session");
+  assert.equal(two.reply.reply, "session", "its twin answered with it: it would run unasked anyway");
+  assert.equal(other.reply, undefined, "a different action still waits");
+  assert.deepEqual(allowed("ses_e"), ["Create a row in Airtable"]);
+});
+
+check("a runner's copy of a thread never rewrites its grants (cloud/computer-scope)", async () => {
+  const Scope = await import(at("cloud/computer-scope.ts"));
+  thread("ses_f");
+  const one = ask("Create a row in Airtable", "ses_f");
+  P.replyToAsk(one.id, "session");
+  const stored = S.getState();
+  // The runner sends the same thread back with the grant stripped, and with one of its own added.
+  const mine = JSON.parse(JSON.stringify(stored));
+  const t = mine.sessions.find((x) => x.id === "ses_f");
+  delete t.allowedAsks;
+  const kept = Scope.keepAllowed(JSON.parse(JSON.stringify(stored)), mine, { device: stored.sessions.find((x) => x.id === "ses_f")?.by ?? "other", user: "u", bots: [stored.bots[0].id] });
+  const keptT = kept.blob.sessions.find((x) => x.id === "ses_f");
+  assert.deepEqual(keptT.allowedAsks, ["Create a row in Airtable"], "the owner's word survives the runner's copy");
+  // And one the runner tries to add isn't taken either.
+  const mine2 = JSON.parse(JSON.stringify(stored));
+  mine2.sessions.find((x) => x.id === "ses_f").allowedAsks = ["Pay everything"];
+  const kept2 = Scope.keepAllowed(JSON.parse(JSON.stringify(stored)), mine2, { device: stored.sessions.find((x) => x.id === "ses_f")?.by ?? "other", user: "u", bots: [stored.bots[0].id] });
+  assert.deepEqual(kept2.blob.sessions.find((x) => x.id === "ses_f").allowedAsks, ["Create a row in Airtable"], "a computer never says yes to itself");
+});
+
 process.chdir(tmpdir());
 try {
   rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });

@@ -3355,8 +3355,9 @@ function AppApprovalCard({ state, approval: a, className = "" }: { state: AppSta
             <button disabled={busy} onClick={() => void decide("always")} title={alwaysScope(name, a)} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
               Always allow
             </button>
-            {/* A thread's own asks only (permission.ts Session.allowedAsks): the same thing runs on without asking again, this thread alone. */}
-            {!!a.threadId && (
+            {/* A thread's own app or data asks (the kinds that honour it, permission.ts Session.allowedAsks):
+                the same thing runs on without asking again, this thread alone. Never in a shared workspace. */}
+            {!!a.threadId && !state.shared && (a.kind === "app" || a.kind === "data") && (
               <button disabled={busy} onClick={() => void decide("session")} title="This thread runs the same thing on without asking again; a new thread asks as new" className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
                 Allow for this thread
               </button>

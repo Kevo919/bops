@@ -163,11 +163,17 @@ export function replyToAsk(askId: string, reply: AskReply, message?: string, mem
     x.reply = answer;
     answered.push(x);
     // Allow for this thread: the action goes on the thread's own list (Session.allowedAsks), so its run
-    // doesn't pause for the same thing again. Only a thread's request has a thread to be allowed for.
+    // doesn't pause for the same thing again. Only a thread's request has a thread to be allowed for,
+    // and its other unanswered asks for the same action are answered with it (they'd run unasked anyway).
     if (reply === "session") {
       if (!x.threadId) return void (x.reply = { ...answer, reply: "once" });
       const t = s.sessions.find((y) => y.id === x.threadId);
       if (t) t.allowedAsks = [...new Set([...(t.allowedAsks ?? []), x.action])].slice(-50);
+      for (const y of s.appApprovals ?? [])
+        if (!y.reply && y.id !== x.id && y.threadId === x.threadId && y.botId === x.botId && y.action === x.action) {
+          y.reply = answer;
+          answered.push(y);
+        }
       return;
     }
     if (reply !== "always") return;
