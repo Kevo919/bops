@@ -516,7 +516,11 @@ await test("nothing of the login, and nothing planted, is in the state, a log or
 
 await test("every Claude Code run here starts with no Anthropic key or token from its environment", () => {
   const runs = claudeRuns();
-  assert.ok(runs.length >= 3);
+  // So the checks below aren't vacuous: the sign-in above ran Claude Code's login and at least one status (the
+  // one that saw it signed in). How many statuses ran first depends on how soon the fake login finished
+  // against the 20ms poll, so the count itself is not something to assert.
+  assert.ok(runs.some((r) => r.args === "auth login"), "its login ran");
+  assert.ok(runs.some((r) => r.args === "auth status --json"), "its status ran");
   for (const r of runs) {
     for (const k of Object.keys(r.env)) assert.ok(!/^ANTHROPIC_|^CLAUDE_CODE_OAUTH|^CLAUDECODE$|^BOPS_/.test(k), `${r.args}: ${k} reached Claude Code`);
     assert.ok(!Object.values(r.env).some((v) => /PLANTED|planted/.test(v)), `${r.args}: something planted reached it`);
