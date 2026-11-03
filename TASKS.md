@@ -31,6 +31,8 @@ Owned by the lead. Statuses: TODO, DOING, REVIEW (PR open), DONE, BLOCKED.
 | 15 | Make every scripts/test-*.mjs run on Windows too: fix new URL("..", import.meta.url).pathname (/C:/... paths), mixed join/URL imports, and EPERM temp cleanup (retry rm with maxRetries, or ignore EPERM on cleanup only). No assertion changes. | zai | REVIEW | PR #11 | GOAL: node scripts/test-bot-ai.mjs and node --conditions=react-server scripts/test-cli-agents.mjs pass on Kevin's PC AND still pass on Linux CI. Paste both outputs |
 | 16 | Tailscale-only server mode in scripts/vps-setup.sh: BOPS_TAILSCALE=1 installs Tailscale (official apt repo), skips Caddy and public ports entirely, binds Bops to 127.0.0.1 and exposes it with `tailscale serve` (https on the tailnet) — so it can share a VPS that already runs n8n/Traefik on 80/443 without touching them. Must detect and refuse to touch anything already on 80/443 when not in this mode. Update docs/hostinger.md | zai | REVIEW | PR #12 | GOAL: Kevin's VPS already runs n8n; nothing about n8n may change. codex's task 7 dry run tests this mode after it lands |
 
+| 17 | Release builds turn off Electron's EnableNodeCliInspectArguments fuse (@electron/fuses at build), and smoke-windows.ps1 no longer needs --inspect | codex | TODO | | Low priority, after 14 and 7 |
+
 ## Done
 
 - Windows port, phone pairing, Android app v1, tray, notifications, QR pairing, modules, job routing + Z.ai, sync docs, LLMs file (lead), on windows-port at 7568894.
