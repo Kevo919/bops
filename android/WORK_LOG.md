@@ -44,3 +44,12 @@
 - Limits: Catalog HTTP responses are injected fixtures, not a live Bops/config reload integration test. Same-WebView identity verified; actual unsent drafts and live calls not exercised.
 - Remaining work: Lead reviews task 4 PR, after task 1 PR #1. Branch feature/android-llms is stacked on feature/android-multi until #1 merges; PR targets windows-port as requested.
 - Next recommended action: Review the task 4-only delta against feature/android-multi, merge #1 first, then validate the native model list against a live server.
+
+### 2026-11-03T00:47:20-06:00 | Codex Sub-Agent: Android | Feature | Review Needed
+- Summary: Android Settings loads GET /api/llms (root llms array), with a single compatibility GET /api/state (state.llms) only when the new endpoint returns 404.
+- Files touched: android/app/src/main/java/bot/bops/remote/LlmCatalog.kt; android/app/src/androidTest/java/bot/bops/remote/LlmCatalogChecks.kt; android/README.md; android/WORK_LOG.md.
+- Details: Both requests retain per-server pairing cookies, redirect refusal, timeouts, 401/403 unpair behavior, bounded actual-byte reads and connection cleanup. Authentication errors, redirects, other HTTP failures, malformed successful responses and connection errors never trigger fallback. Updated UI fixtures use the new response shape.
+- Verification: With JAVA_HOME=C:/Program Files/Android/Android Studio/jbr and ANDROID_HOME=C:/Users/MBV3n/AppData/Local/Android/Sdk, ./android/gradlew.bat -p android assembleDebug assembleDebugAndroidTest lintDebug passed: BUILD SUCCESSFUL in 50s, 69 actionable tasks executed. Installed debug and test APKs on emulator-5554 only; adb -s emulator-5554 shell am instrument -w bot.bops.remote.test/bot.bops.remote.MultiServerTests printed full PASS including LLM settings/client. Tests cover endpoint order, authenticated fallback, fallback-only-on-404, legacy auth/error handling and legacy response byte limit. git diff --check passed.
+- Risks/blockers: HTTP fixtures are injected; no live endpoint integration or physical-device test. Existing deprecation warnings remain.
+- Remaining work: Parent completes and validates web endpoint, reviews combined change, and handles commit/push/PR.
+- Next recommended action: Review Android client and endpoint together before publishing.

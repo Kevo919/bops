@@ -12,7 +12,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 internal object LlmCatalogChecks {
-    private const val body = """{"state":{"llms":[{"name":"Planner","provider":"openai","model":"example-model","starter":true,"useFor":["planning","thinking"]},{"name":"Writer","provider":"anthropic","model":"other-model"}]}}"""
+    private const val body = """{"llms":[{"name":"Planner","provider":"openai","model":"example-model","starter":true,"useFor":["planning","thinking"]},{"name":"Writer","provider":"anthropic","model":"other-model"}]}"""
     private class Response(url: URL, private val status: Int, private val body: String,
                            private val gate: CountDownLatch? = null,
                            private val declaredLength: Int = -1) : HttpURLConnection(url) {
@@ -51,25 +51,63 @@ internal object LlmCatalogChecks {
         val result = catalog.load(server) as CatalogResult.Loaded
         check(result.models.size == 2 && result.models[0].starter && result.models[0].jobs == listOf("planning", "thinking"))
         check(result.models[1].jobs.isEmpty() && !result.models[1].starter)
-        check(last!!.url.toString() == "${server.address}/api/state")
+        check(last!!.url.toString() == "${server.address}/api/llms")
         check(last!!.getRequestProperty("Cookie") == "bops_remote=${server.code}")
         check(last!!.requestMethod == "GET" && !last!!.instanceFollowRedirects && last!!.closed && last!!.streamClosed)
         check(last!!.connectTimeout == 8000 && last!!.readTimeout == 15000)
-        check((catalog.parse("""{"state":{"llms":[]}}""") as CatalogResult.Loaded).models.isEmpty())
-        for (invalid in listOf("not JSON", "{}", """{"state":{}}""", """{"state":{"llms":[{}]}}"""))
+        check((catalog.parse("""{"llms":[]}""") as CatalogResult.Loaded).models.isEmpty())
+        for (invalid in listOf("not JSON", "{}", """{"state":{}}""", """{"llms":[{}]}"""))
             check(catalog.parse(invalid) is CatalogResult.Error)
         for (status in listOf(401, 403)) check(LlmCatalog { Response(it, status, "") }.load(server) === CatalogResult.Unpaired)
         for (status in listOf(302, 500)) check(LlmCatalog { Response(it, status, "") }.load(server) is CatalogResult.Error)
         check(LlmCatalog { throw java.io.IOException("fixture") }.load(server) is CatalogResult.Error)
         check(LlmCatalog { error("must not connect") }.load(server.copy(code = null)) === CatalogResult.Unpaired)
         check(LlmCatalog { error("must not connect") }.load(server.copy(address = "http://192.168.1.1")) is CatalogResult.Error)
+        fallbackChecks(server)
         responseLimitChecks(server)
+    }
+
+    private fun fallbackChecks(server: Server) {
+        val calls = mutableListOf<Response>()
+        val legacyBody = "{\"state\":$body}"
+        val result = LlmCatalog { url ->
+            Response(url, if (calls.isEmpty()) 404 else 200, legacyBody).also { calls.add(it) }
+        }.load(server)
+        check(result is CatalogResult.Loaded && result.models.size == 2)
+        check(calls.map { it.url.path } == listOf("/api/llms", "/api/state"))
+        check(calls.all { it.closed && !it.instanceFollowRedirects && it.requestMethod == "GET" &&
+            it.getRequestProperty("Cookie") == "bops_remote=${server.code}" })
+        // Auth failures, redirects, server errors, malformed 200 and connection errors never fall back.
+        for (status in listOf(200, 301, 302, 401, 403, 429, 500)) {
+            var count = 0
+            val rejected = LlmCatalog { url -> count++; Response(url, status, "not JSON") }.load(server)
+            check(count == 1)
+            check(if (status == 401 || status == 403) rejected === CatalogResult.Unpaired else rejected is CatalogResult.Error)
+        }
+        for (status in listOf(401, 403, 404, 500)) {
+            var count = 0
+            val rejected = LlmCatalog { url -> Response(url, if (count++ == 0) 404 else status, "") }.load(server)
+            check(count == 2)
+            check(if (status == 401 || status == 403) rejected === CatalogResult.Unpaired else rejected is CatalogResult.Error)
+        }
+        var count = 0
+        check(LlmCatalog { count++; throw java.io.IOException("fixture") }.load(server) is CatalogResult.Error)
+        check(count == 1)
+        // Legacy responses retain the same actual-byte limit, even without Content-Length.
+        calls.clear()
+        val oversized = LlmCatalog { url ->
+            Response(url, if (calls.isEmpty()) 404 else 200, " ".repeat(5 * 1024 * 1024 + 1))
+                .also { calls.add(it) }
+        }.load(server)
+        check(oversized is CatalogResult.Error && oversized.message.contains("5 MiB"))
+        check(calls.size == 2 && calls.last().bytesRead == 5 * 1024 * 1024 + 1 && calls.all { it.closed })
+        check(calls.last().streamClosed)
     }
 
     private fun responseLimitChecks(server: Server) {
         val limit = 5 * 1024 * 1024
         // A multibyte value ensures the boundary measures UTF-8 bytes, not String length.
-        val json = """{"state":{"llms":[]},"note":"é"}"""
+        val json = """{"llms":[],"note":"é"}"""
         val exact = json + " ".repeat(limit - json.toByteArray(Charsets.UTF_8).size)
         var reply: Response? = null
         val exactResult = LlmCatalog { Response(it, 200, exact).also { response -> reply = response } }.load(server)
@@ -87,7 +125,7 @@ internal object LlmCatalogChecks {
             check(reply!!.largestRead <= 8192 && reply!!.closed && reply!!.streamClosed)
         }
         // Under the character limit but over the byte limit must also fail.
-        val multibyte = """{"state":{"llms":[]},"note":"""" + "é".repeat(limit / 2) + "\"}"
+        val multibyte = """{"llms":[],"note":"""" + "é".repeat(limit / 2) + "\"}"
         check(multibyte.length < limit && multibyte.toByteArray(Charsets.UTF_8).size > limit)
         val result = LlmCatalog { Response(it, 200, multibyte).also { response -> reply = response } }.load(server)
         check(result is CatalogResult.Error && result.message.contains("exceeds the 5 MiB limit"))
@@ -154,7 +192,7 @@ internal object LlmCatalogChecks {
         click("Back to Bops")
         test.runOnMainSync { check(webField.get(activity) === originalWeb) }
         click("Settings"); awaitText("Planner")
-        inject(200, """{"state":{"llms":[]}}""")
+        inject(200, """{"llms":[]}""")
         click("Refresh"); awaitText("No models configured")
         inject(500, "")
         click("Refresh"); awaitText("answered 500")
