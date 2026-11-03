@@ -11,6 +11,7 @@
 // Usage: node --conditions=react-server scripts/test-chat-providers.mjs
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createServer } from "node:http";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
@@ -20,7 +21,7 @@ import ts from "typescript";
 
 const UI = process.argv.includes("--ui");
 
-for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|ANTHROPIC|ZAI|DEEPSEEK|OPENROUTER|DEEPINFRA|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
+for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|ANTHROPIC|ZAI|DEEPSEEK|OPENROUTER|DEEPINFRA|OLLAMA|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.OPENAI_API_KEY = "sk-test-openai";
 const KEYS = { ANTHROPIC_API_KEY: "sk-ant-test-SECRET123", ZAI_API_KEY: "zai-test-SECRET456", DEEPSEEK_API_KEY: "ds-test-SECRET789", OPENROUTER_API_KEY: "or-test-SECRET000" };
@@ -110,6 +111,19 @@ await check("the window's picker: Auto first, the models by provider, (no key) w
   assert.equal(renderToStaticMarkup(h(ChatModelPick, { state: { ...state, shared: { id: "x" } }, chat: { id: chatId } })), "", "not in a shared workspace");
 });
 
+await check("the window's picker: Ollama only where it's set up (OLLAMA_BASE_URL), and its hint names that, not a key", async () => {
+  const { ChatModelPick, chatModelHint } = await import(`${rootUrl}/components/app/chat-model.tsx`);
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { createElement: h } = await import("react");
+  const off = { chatKeys: { anthropic: true, openai: true, ollama: false } };
+  const on = { chatKeys: { ...off.chatKeys, ollama: true } };
+  assert.ok(!/ollama/i.test(renderToStaticMarkup(h(ChatModelPick, { state: off, chat: { id: chatId } }))), "not offered without Ollama");
+  assert.match(renderToStaticMarkup(h(ChatModelPick, { state: on, chat: { id: chatId } })), /<optgroup label="Ollama \(free, local\)"><option value="ollama\/qwen2\.5:3b">Qwen 2\.5 3B<\/option><\/optgroup>/);
+  assert.match(renderToStaticMarkup(h(ChatModelPick, { state: off, chat: { id: chatId, model: "ollama/qwen2.5:3b" } })), /value="ollama\/qwen2\.5:3b" selected="">Qwen 2\.5 3B \(no key\)/, "a chat already on it still shows it");
+  assert.equal(chatModelHint(off, { model: "ollama/qwen2.5:3b" }), "Ollama isn't set up on this server: add OLLAMA_BASE_URL (its address, like http://127.0.0.1:11434/v1) to .env.local, then restart Bops.");
+  assert.equal(chatModelHint(on, { model: "ollama/qwen2.5:3b" }), null);
+});
+
   process.exit(failures ? 1 : 0);
 }
 
@@ -120,9 +134,12 @@ const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, 
 const sent = [];
 const next = [];
 const openaiAsked = [];
+const realFetch = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
   const req = new Request(input, init);
   const url = new URL(req.url);
+  // The fake Ollama: a real HTTP server on this machine (below).
+  if (url.hostname === "127.0.0.1") return realFetch(input, init);
   if (url.origin === "https://api.openai.com") {
     const b = JSON.parse(await req.text());
     openaiAsked.push(b);
@@ -275,6 +292,117 @@ const fails = async (params, answer) => {
   assert.fail("it should have failed");
 };
 
+/* ---------------- Ollama (a fake local HTTP server) ---------------- */
+
+/** Every request the fake Ollama got. It speaks OpenAI's Chat Completions at /v1, as Ollama does. */
+const ollamaGot = [];
+const ollamaNext = [];
+const ollama = createServer((req, res) => {
+  let raw = "";
+  req.on("data", (c) => (raw += c));
+  req.on("end", () => {
+    const body = raw ? JSON.parse(raw) : null;
+    ollamaGot.push({ method: req.method, path: req.url, headers: req.headers, body });
+    const say = (obj, status = 200) => {
+      res.writeHead(status, { "content-type": "application/json" });
+      res.end(JSON.stringify(obj));
+    };
+    if (req.method === "GET" && req.url === "/v1/models") return say({ object: "list", data: [{ id: "qwen2.5:3b", object: "model", owned_by: "library" }] });
+    if (req.method !== "POST" || req.url !== "/v1/chat/completions") return say({ error: "404 page not found" }, 404);
+    // As Ollama answers: a model it hasn't pulled, and a small one that can't take tools.
+    if (body.model === "missing:7b") return say({ error: { message: `model "missing:7b" not found, try pulling it first`, type: "api_error", param: null, code: null } }, 404);
+    if (body.model === "tiny:1b" && body.tools) return say({ error: { message: "registry.ollama.ai/library/tiny:1b does not support tools", type: "api_error", param: null, code: null } }, 400);
+    const answer = ollamaNext.shift();
+    if (answer) return say(...answer(body));
+    say(chatSays(`Local ${body.model}.`));
+  });
+});
+await new Promise((r) => ollama.listen(0, "127.0.0.1", r));
+const ollamaUrl = `http://127.0.0.1:${ollama.address().port}/v1`;
+process.env.OLLAMA_BASE_URL = `${ollamaUrl}/`;
+
+await check("Ollama: OLLAMA_BASE_URL's Chat Completions, no key, the model's colon kept, a tool call carried on, no images", async () => {
+  ollamaGot.length = 0;
+  sent.length = 0;
+  ollamaNext.push(() => [chatSays(null, [{ id: "call_ol", type: "function", function: { name: "recall", arguments: '{"question":"dog"}' } }])], () => [chatSays("It's Rex, locally.")]);
+  const pic = [{ role: "user", content: [{ type: "input_text", text: "My dog?" }, { type: "input_image", image_url: "data:image/png;base64,CCCC", detail: "auto" }] }];
+  const r1 = await P.createOnProvider({ ...base, model: "ollama/qwen2.5:3b", input: pic });
+  const q1 = ollamaGot[0];
+  assert.equal(q1.method, "POST");
+  assert.equal(q1.path, "/v1/chat/completions", "the address's trailing slash is dropped");
+  assert.equal(q1.body.model, "qwen2.5:3b", "the colon survives");
+  assert.equal(q1.headers.authorization, undefined, "no key: no Authorization at all");
+  assert.deepEqual(q1.body.tools.map((t) => t.function.name), ["recall"], "tools sent, web_search left out");
+  assert.ok(q1.body.messages[0].content.includes(P.NO_WEB_SEARCH));
+  assert.match(q1.body.messages[1].content, /can't see images/, "an image is a note");
+  assert.equal(r1.model, "ollama/qwen2.5:3b");
+  assert.equal(r1.output.find((o) => o.type === "function_call").call_id, "call_ol");
+  const r2 = await P.createOnProvider({ ...base, model: "ollama/qwen2.5:3b", previous_response_id: r1.id, input: [{ type: "function_call_output", call_id: "call_ol", output: "Rex" }] });
+  assert.deepEqual(ollamaGot[1].body.messages.at(-1), { role: "tool", tool_call_id: "call_ol", content: "Rex" });
+  assert.equal(r2.output_text, "It's Rex, locally.");
+  assert.equal(sent.length, 0, "nothing went to a cloud provider");
+});
+
+await check("Ollama: OLLAMA_API_KEY, when set, goes as Bearer and never into the words", async () => {
+  ollamaGot.length = 0;
+  process.env.OLLAMA_API_KEY = "ol-test-SECRET555";
+  try {
+    await P.createOnProvider({ model: "ollama/qwen2.5:3b", input: "hi" });
+    assert.equal(ollamaGot[0].headers.authorization, "Bearer ol-test-SECRET555");
+    ollamaNext.push(() => [{ error: { message: "unauthorized ol-test-SECRET555" } }, 401]);
+    const no = await fails({ model: "ollama/qwen2.5:3b", input: "hi" });
+    assert.equal(no.message, "Ollama turned this down: it wants a key. Set OLLAMA_API_KEY in .env.local to the one its proxy expects, then restart Bops.");
+    assert.equal(no.status, 401);
+    assert.ok(!no.message.includes("SECRET555") && !no.said.includes("SECRET555"));
+  } finally {
+    delete process.env.OLLAMA_API_KEY;
+  }
+});
+
+await check("Ollama: a model that can't take tools is asked once more without them, and sent none from then on", async () => {
+  ollamaGot.length = 0;
+  const r = await P.createOnProvider({ ...base, model: "ollama/tiny:1b", input: "hi" });
+  assert.equal(ollamaGot.length, 2, "one refusal, one retry");
+  assert.ok(ollamaGot[0].body.tools);
+  assert.ok(!("tools" in ollamaGot[1].body), "the retry has no tools");
+  assert.deepEqual(ollamaGot[1].body.messages, ollamaGot[0].body.messages, "the same conversation");
+  assert.equal(r.output_text, "Local tiny:1b.");
+  await P.createOnProvider({ ...base, model: "ollama/tiny:1b", previous_response_id: r.id, input: "again" });
+  assert.equal(ollamaGot.length, 3, "remembered: straight in without tools");
+  assert.ok(!("tools" in ollamaGot[2].body));
+  // Another 400 isn't about tools: no retry, plain words.
+  ollamaGot.length = 0;
+  ollamaNext.push(() => [{ error: { message: "invalid JSON in messages" } }, 400]);
+  const bad = await fails({ ...base, model: "ollama/qwen2.5:3b", input: "hi" });
+  assert.equal(ollamaGot.length, 1);
+  assert.equal(bad.message, "Ollama turned this down (HTTP 400): invalid JSON in messages.");
+  // Other providers are never retried without tools.
+  sent.length = 0;
+  const zai = await fails({ ...base, model: "zai/glm-5.2", input: "hi" }, () => json({ error: { message: "tools not supported" } }, 400));
+  assert.equal(sent.length, 1);
+  assert.equal(zai.status, 400);
+});
+
+await check("Ollama: a model it hasn't pulled, and an address with nothing there, said plainly", async () => {
+  const missing = await fails({ model: "ollama/missing:7b", input: "hi" });
+  assert.equal(missing.message, 'Ollama doesn\'t have the model "missing:7b". Pull it on the server (ollama pull missing:7b), or pick another model.');
+  assert.equal(missing.status, 404);
+  const closed = createServer();
+  await new Promise((r) => closed.listen(0, "127.0.0.1", r));
+  const port = closed.address().port;
+  await new Promise((r) => closed.close(r));
+  process.env.OLLAMA_BASE_URL = `http://127.0.0.1:${port}/v1`;
+  try {
+    const off = await fails({ model: "ollama/qwen2.5:3b", input: "hi" });
+    assert.equal(off.message, `Couldn't reach Ollama at http://127.0.0.1:${port}/v1: check that Ollama is running there, and OLLAMA_BASE_URL in .env.local, then try again.`);
+    assert.equal(off.status, undefined);
+    delete process.env.OLLAMA_BASE_URL;
+    assert.equal(P.ollamaBase(), "http://127.0.0.1:11434/v1", "the default address");
+  } finally {
+    process.env.OLLAMA_BASE_URL = ollamaUrl;
+  }
+});
+
 await check("a provider's no is plain words naming the provider and the fix, with its HTTP status, and never the key", async () => {
   const e401 = await fails({ model: "anthropic/claude-opus-5-5", input: "hi" }, () => json({ type: "error", error: { type: "authentication_error", message: `invalid x-api-key ${KEYS.ANTHROPIC_API_KEY}` } }, 401));
   assert.equal(e401.message, "Claude turned this down: your Anthropic key isn't valid. Check ANTHROPIC_API_KEY in .env.local, then restart Bops.");
@@ -385,6 +513,23 @@ await check("the models offered: Your LLMs first, then the built in ones they do
   assert.equal(M.providerOf("openrouter/moonshotai/kimi-k3"), "openrouter");
   assert.equal(M.providerOf("gpt-6.1-sol"), undefined);
   assert.equal(M.providerOf("madeup/x"), undefined);
+  assert.ok(ids.includes("ollama/qwen2.5:3b"), "Ollama's built in one");
+  assert.equal(M.providerOf("ollama/qwen2.5:3b"), "ollama");
+  assert.equal(M.chatModelShown({ provider: "ollama" }, {}), false);
+  assert.equal(M.chatModelShown({ provider: "ollama" }, { ollama: true }), true);
+  assert.equal(M.chatModelShown({ provider: "deepseek" }, {}), true, "the others show, with (no key)");
+});
+
+await check("Ollama in Your LLMs is for chats only: not offered to a bot's agents, not a starter", async () => {
+  A.setLlms([{ name: "Llama local", provider: "ollama", model: "llama3.2:1b", starter: true, useFor: ["writing"] }]);
+  try {
+    assert.ok(M.chatModels().some((m) => m.id === "ollama/llama3.2:1b"), "a chat can pick it");
+    for (const kind of ["opencode", "dsh", "claude"]) assert.ok(!A.modelsFor(kind).some((m) => m.id.startsWith("ollama/")), kind);
+    assert.equal(A.modelOk("opencode", "ollama/llama3.2:1b"), false);
+    assert.equal(A.starterAi(), undefined, "a bot doesn't start on it");
+  } finally {
+    A.setLlms([{ name: "Claude Sonnet 5.5", provider: "anthropic", model: "claude-sonnet-5-5", starter: true }, { name: "Kimi on OpenRouter", provider: "openrouter", model: "moonshotai/kimi-k3" }]);
+  }
 });
 
 await check("POST /api/chats/model: only the Bops window, only a model from the list, and Auto clears it", async () => {
@@ -403,6 +548,8 @@ await check("POST /api/chats/model: only the Bops window, only a model from the 
   assert.equal(S.chat(chatId).model, "openrouter/moonshotai/kimi-k3");
   assert.equal((await post({ chatId, model: "zai-coding/glm-5.3" }, win)).status, 200, "a built in one");
   assert.equal(S.chat(chatId).model, "zai-coding/glm-5.3");
+  assert.equal((await post({ chatId, model: "ollama/qwen2.5:3b" }, win)).status, 200, "Ollama's, colon and all");
+  assert.equal(S.chat(chatId).model, "ollama/qwen2.5:3b");
   assert.equal((await post({ chatId, model: null }, win)).status, 200);
   assert.ok(!("model" in S.chat(chatId)), "Auto: unset, as before");
   // A server with no window that only lets in the paired phone (BOPS_REQUIRE_REMOTE=1): that phone.
@@ -437,8 +584,16 @@ await check("/api/state says which providers have a key, as true or false only",
   assert.equal(state.chatKeys.anthropic, true);
   assert.equal(state.chatKeys.deepinfra, false);
   assert.equal(state.chatKeys.openai, true);
+  assert.equal(state.chatKeys.ollama, true, "OLLAMA_BASE_URL is set");
   for (const v of Object.values(state.chatKeys)) assert.equal(typeof v, "boolean");
   const text = JSON.stringify(state);
+  assert.ok(!text.includes(ollamaUrl), "not even Ollama's address");
+  delete process.env.OLLAMA_BASE_URL;
+  try {
+    assert.equal((await (await State.GET(new Request("http://localhost/api/state"))).json()).state.chatKeys.ollama, false, "no Ollama: false");
+  } finally {
+    process.env.OLLAMA_BASE_URL = ollamaUrl;
+  }
   for (const k of Object.values(KEYS)) assert.ok(!text.includes(k), "no key in the state");
 });
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { AppState, Chat } from "@/lib/types";
-import { chatKeyName, chatModels, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
+import { chatKeyName, chatModels, chatModelShown, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
 import type { AgentRoute } from "@/lib/agents";
 import { post } from "./ui";
 
@@ -14,9 +14,10 @@ import { post } from "./ui";
 export function ChatModelPick({ state, chat: c, onError }: { state: AppState; chat: Chat; onError?: (line: string | null) => void }) {
   const [saving, setSaving] = useState(false);
   if (state.shared) return null;
-  const models = chatModels();
   const keys = state.chatKeys ?? {};
   const value = c.model ?? "";
+  // Ollama's models only where it's set up; the chat's own pick stays shown either way.
+  const models = chatModels().filter((m) => m.id === value || chatModelShown(m, keys));
   const groups = new Map<AgentRoute, ChatModel[]>();
   for (const m of models) groups.set(m.provider, [...(groups.get(m.provider) ?? []), m]);
   // One no longer in the list (taken out of config/llms.yaml): still shown, so the box says what the chat is on.
@@ -63,5 +64,6 @@ export function ChatModelPick({ state, chat: c, onError }: { state: AppState; ch
 export function chatModelHint(state: Pick<AppState, "chatKeys" | "shared">, c: Pick<Chat, "model">): string | null {
   const p = providerOf(c.model);
   if (!p || state.shared || state.chatKeys?.[p]) return null;
+  if (p === "ollama") return `Ollama isn't set up on this server: add OLLAMA_BASE_URL (its address, like http://127.0.0.1:11434/v1) to .env.local, then restart Bops.`;
   return `${providerName(p)} has no key on this server yet: add ${chatKeyName(p)} to .env.local, then restart Bops.`;
 }
