@@ -193,10 +193,16 @@ class MainActivity : Activity() {
         }
         setContentView(web)
         web.loadUrl("$address/")
+        // Notifications while the app is closed: Android 13+ asks first; the service starts either way
+        // (without the OK it shows nothing, and the app's notification settings can allow it later).
+        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFY)
+        PingService.startIfWanted(this)
     }
 
     private fun forget(why: String) {
-        prefs.edit().remove("code").apply()
+        prefs.edit().remove("code").remove("seen").apply()
+        stopService(Intent(this, PingService::class.java))
         CookieManager.getInstance().removeAllCookies(null)
         runOnUiThread { showSetup(why) }
     }
@@ -225,5 +231,6 @@ class MainActivity : Activity() {
     companion object {
         private const val FILES = 1
         private const val MIC = 2
+        private const val NOTIFY = 3
     }
 }
