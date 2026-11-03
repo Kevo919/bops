@@ -81,11 +81,13 @@ const INGOT = "http://ingot.test";
 process.env.BOPS_INGOT_URL = `${INGOT}/`;
 // (As a path, not a URL's: a folder with a space in its name would be %20, then %2520 once made a URL again.)
 const root = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
+// A file URL for import specifiers, from this OS-path root.
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-hosted-apps-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const ORGO_KEY = "sk_orgo_test_hosted_apps";
@@ -172,7 +174,7 @@ writeFileSync(join(vendor, "ingot-linux-amd64"), BINARY);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -1288,24 +1290,24 @@ async function check(name, fn) {
 const heard = [];
 const hear = (x) => (heard.push(typeof x === "string" ? x : JSON.stringify(x)), x);
 
-S = await import(`${root}/lib/server/store.ts`);
-const { botChatId, DISPLAYS } = await import(`${root}/lib/types.ts`);
-const I = await import(`${root}/lib/server/ingot.ts`);
-const O = await import(`${root}/lib/server/orgo.ts`);
-const H = await import(`${root}/lib/server/hosted-apps.ts`);
-const L = await import(`${root}/lib/server/app-labels.ts`);
+S = await import(fileUrl("lib/server/store.ts"));
+const { botChatId, DISPLAYS } = await import(fileUrl("lib/types.ts"));
+const I = await import(fileUrl("lib/server/ingot.ts"));
+const O = await import(fileUrl("lib/server/orgo.ts"));
+const H = await import(fileUrl("lib/server/hosted-apps.ts"));
+const L = await import(fileUrl("lib/server/app-labels.ts"));
 /** The site's Published project (named with a Published label sealed for it) and Preview project (a Preview label), as the fake has them. */
 const prodProject = (app, site = app, c = "c_boppy") => web.projects.find((p) => p.computerId === c && L.isLabelOf("prod", p.name, `${PROJECT}/${app}`, site));
 const previewProject = (app, site = app, c = "c_boppy") => web.projects.find((p) => p.computerId === c && L.isLabelOf("preview", p.name, `${PROJECT}/${app}`, site));
 const previewUrl = (app, site = app, c = "c_boppy") => web.urls.find((u) => u.computerId === c && L.isLabelOf("preview", u.label, `${PROJECT}/${app}`, site));
-const Chat = await import(`${root}/lib/server/chat.ts`);
-const AppsRoute = await import(`${root}/app/api/hosted-apps/route.ts`);
-const AppRoute = await import(`${root}/app/api/hosted-apps/[name]/route.ts`);
-const CommitsRoute = await import(`${root}/app/api/hosted-apps/[name]/commits/route.ts`);
-const LogsRoute = await import(`${root}/app/api/hosted-apps/[name]/logs/route.ts`);
-const DnsRoute = await import(`${root}/app/api/hosted-apps/[name]/dns/route.ts`);
-const RecordsRoute = await import(`${root}/app/api/hosted-apps/[name]/dns/records/route.ts`);
-const RecordRoute = await import(`${root}/app/api/hosted-apps/[name]/dns/records/[recordId]/route.ts`);
+const Chat = await import(fileUrl("lib/server/chat.ts"));
+const AppsRoute = await import(fileUrl("app/api/hosted-apps/route.ts"));
+const AppRoute = await import(fileUrl("app/api/hosted-apps/[name]/route.ts"));
+const CommitsRoute = await import(fileUrl("app/api/hosted-apps/[name]/commits/route.ts"));
+const LogsRoute = await import(fileUrl("app/api/hosted-apps/[name]/logs/route.ts"));
+const DnsRoute = await import(fileUrl("app/api/hosted-apps/[name]/dns/route.ts"));
+const RecordsRoute = await import(fileUrl("app/api/hosted-apps/[name]/dns/records/route.ts"));
+const RecordRoute = await import(fileUrl("app/api/hosted-apps/[name]/dns/records/[recordId]/route.ts"));
 clearInterval(globalThis.__bopsRoutines);
 
 const WS = "ws_main";
@@ -2728,12 +2730,12 @@ await check("Apps on the web are only for an @orgo.ai account for now: anyone el
   const was = S.getState().account;
   S.update((s) => (s.account = { user: { id: "u_x", email: "someone@example.com", name: "Someone" }, signedInAt: 1 }));
   try {
-    const A = await import(pathToFileURL(`${root}/lib/apps-access.ts`).href);
+    const A = await import(fileUrl("lib/apps-access.ts"));
     assert.equal(A.appsOpen(S.getState()), false);
     assert.equal(A.appsOpenTo("Ava@Orgo.AI "), true, "case and spaces aside");
     assert.equal(A.appsOpenTo("x@orgo.ai.evil.com"), false);
     assert.equal(A.appsOpenTo(null), false);
-    const R = await import(pathToFileURL(`${root}/app/api/hosted-apps/route.ts`).href);
+    const R = await import(fileUrl("app/api/hosted-apps/route.ts"));
     assert.equal((await R.GET(new Request("http://127.0.0.1:3210/api/hosted-apps?ws=" + WS))).status, 404);
     assert.equal((await get(CommitsRoute, `/api/hosted-apps/recipe-box/commits?ws=${WS}`, { name: "recipe-box" })).status, 404);
     assert.equal((await get(LogsRoute, `/api/hosted-apps/recipe-box/logs?ws=${WS}`, { name: "recipe-box" })).status, 404);
@@ -2774,12 +2776,12 @@ await check("Hosting not open to the account: enabled false with a plain why, th
 
 /* ---------------- Add app, its settings, variables and deploys, and adding a domain ---------------- */
 
-const SettingsRoute = await import(`${root}/app/api/hosted-apps/[name]/settings/route.ts`);
-const EnvRoute = await import(`${root}/app/api/hosted-apps/[name]/env/route.ts`);
-const LocalRoute = await import(`${root}/app/api/hosted-apps/[name]/local/route.ts`);
-const DomainsRoute = await import(`${root}/app/api/hosted-apps/[name]/domains/route.ts`);
-const SearchRoute = await import(`${root}/app/api/hosted-apps/[name]/domains/search/route.ts`);
-const DomainRoute = await import(`${root}/app/api/hosted-apps/[name]/domains/[domainId]/route.ts`);
+const SettingsRoute = await import(fileUrl("app/api/hosted-apps/[name]/settings/route.ts"));
+const EnvRoute = await import(fileUrl("app/api/hosted-apps/[name]/env/route.ts"));
+const LocalRoute = await import(fileUrl("app/api/hosted-apps/[name]/local/route.ts"));
+const DomainsRoute = await import(fileUrl("app/api/hosted-apps/[name]/domains/route.ts"));
+const SearchRoute = await import(fileUrl("app/api/hosted-apps/[name]/domains/search/route.ts"));
+const DomainRoute = await import(fileUrl("app/api/hosted-apps/[name]/domains/[domainId]/route.ts"));
 /** One of the app's routes called as the window would (or, `window` false, as a page a bot's browser reached), its answer heard. */
 const ask = async (Route, method, path, params, body, { window = true } = {}) => {
   const req = new Request(`http://localhost:3210${path}`, { method, headers: { "content-type": "application/json", ...(window ? { "x-bops-window": UI } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -3378,8 +3380,8 @@ await check("A double tap on Buy from the app's tab buys once: the second, while
 
 /* ---------------- Add a domain from the user's Cloudflare, through Orgo's broker ---------------- */
 
-const CF = await import(`${root}/lib/server/cloudflare.ts`);
-const CfRoute = await import(`${root}/app/api/hosted-apps/[name]/domains/[domainId]/cloudflare/route.ts`);
+const CF = await import(fileUrl("lib/server/cloudflare.ts"));
+const CfRoute = await import(fileUrl("app/api/hosted-apps/[name]/domains/[domainId]/cloudflare/route.ts"));
 /** The user's Cloudflare zones: two in their own account, one the workspace bought through Orgo, one not active yet. */
 const Z_TEST = "7e".repeat(16);
 const Z_COM = "c0".repeat(16);
@@ -3902,11 +3904,11 @@ cloudflareDone();
 
 /* ---------------- Settings, Domains: the workspace's domains, searched for and bought without an app ---------------- */
 
-const WsDomainsRoute = await import(`${root}/app/api/domains/route.ts`);
-const WsSearchRoute = await import(`${root}/app/api/domains/search/route.ts`);
-const WsZoneRoute = await import(`${root}/app/api/domains/[zone]/route.ts`);
-const WsRecordsRoute = await import(`${root}/app/api/domains/[zone]/records/route.ts`);
-const WsRecordRoute = await import(`${root}/app/api/domains/[zone]/records/[recordId]/route.ts`);
+const WsDomainsRoute = await import(fileUrl("app/api/domains/route.ts"));
+const WsSearchRoute = await import(fileUrl("app/api/domains/search/route.ts"));
+const WsZoneRoute = await import(fileUrl("app/api/domains/[zone]/route.ts"));
+const WsRecordsRoute = await import(fileUrl("app/api/domains/[zone]/records/route.ts"));
+const WsRecordRoute = await import(fileUrl("app/api/domains/[zone]/records/[recordId]/route.ts"));
 const SPARE = "6a6a6a6a-1111-4222-8333-444455556666";
 const BAKES = "7d7d7d7d-1111-4222-8333-444455556666";
 const BLOG_SITE = "p_recipe_blog";
@@ -5470,7 +5472,7 @@ await check("Local after a task: the site it worked on (Session.app.site) starte
   const f = await localAsk({ action: "fix", site: "notes-admin" });
   assert.deepEqual([f.status, f.body.sites["notes-admin"].fixes], [200, 1]);
   assert.deepEqual(boppy.localAsked.at(-2), ["mark", "field-notes", "notes-admin", "fix"]);
-  const { orgoKey } = await import(`${root}/lib/server/orgo-auth.ts`);
+  const { orgoKey } = await import(fileUrl("lib/server/orgo-auth.ts"));
   globalThis.bopsShared = { user: S.stateUser(), key: orgoKey(), copy: { openNow: () => ({ id: "shared_p" }), data: () => ({}), close() {} }, subscriber: { stop() {} } };
   try {
     const no = await localAsk({ action: "fix", site: "notes-admin" });
@@ -5609,7 +5611,7 @@ await check("Local after a task: where to watch it is said first, then it's chec
 });
 
 await check("A preview open on this Mac follows its Local's port to the same port here: a Local an older bops-local started on another port, started again on its own, moves the forward too; stopped, it closes", async () => {
-  const P = await import(`${root}/lib/server/local-preview.ts`);
+  const P = await import(fileUrl("lib/server/local-preview.ts"));
   const net = await import("node:net");
   const free = () => new Promise((done) => {
     const sv = net.createServer().listen(0, "127.0.0.1", () => {
@@ -5634,7 +5636,7 @@ await check("A preview open on this Mac follows its Local's port to the same por
 });
 
 await check("Preview on this Mac without the tailnet goes through its computer's SSH: Bops' own key made once (0600, never sent) and reused; Orgo asked to turn SSH on only while it's off, so keys the user set there stay; the key added to its authorized_keys once, every other line kept; its host key pinned in Bops' own known_hosts; ssh with that one forward and nothing else; a page through it; the same tunnel for a preview open; the tailnet first when it's up", async () => {
-  const P = await import(`${root}/lib/server/local-preview.ts`);
+  const P = await import(fileUrl("lib/server/local-preview.ts"));
   const http = await import("node:http");
   const net = await import("node:net");
   const free = () => new Promise((done) => {
@@ -5764,7 +5766,7 @@ await check("Preview on this Mac without the tailnet goes through its computer's
 });
 
 await check("A preview through SSH follows its Local to a new port (a tunnel to it, the old one stopped), comes back when ssh drops, and closes on Stop; when SSH can't be had (no address yet, sshd not answering, that port of this Mac in use), its screen instead, said, with nothing left open", async () => {
-  const P = await import(`${root}/lib/server/local-preview.ts`);
+  const P = await import(fileUrl("lib/server/local-preview.ts"));
   const http = await import("node:http");
   const net = await import("node:net");
   const free = () => new Promise((done) => {
@@ -5849,7 +5851,7 @@ await check("A preview through SSH follows its Local to a new port (a tunnel to 
 });
 
 await check("Removing an app forgets its Locals on its computer (bops-local forget: each one stopped, its files gone, so its port is free for the next app), closes its previews on this Mac (their ssh too), and removes its working folder there only with its repo, and only its own workspace's; never wakes a computer asleep for it", async () => {
-  const P = await import(`${root}/lib/server/local-preview.ts`);
+  const P = await import(fileUrl("lib/server/local-preview.ts"));
   const http = await import("node:http");
   const dev = http.createServer((req, res) => res.end("field notes"));
   await new Promise((r) => dev.listen(0, "127.0.0.1", r));
@@ -6091,7 +6093,7 @@ await check("Plain words: nothing a person or a bot reads has a dash", async () 
 /* ---------------- What members with Your Apps see (lib/server/apps-for-members.ts) ---------------- */
 
 await check("what members see: kept only while someone has Your Apps at Read, written when it changed, never a variable, token or error", async () => {
-  const F = await import(`${root}/lib/server/apps-for-members.ts`);
+  const F = await import(fileUrl("lib/server/apps-for-members.ts"));
   const app = (o = {}) => ({
     name: "seen",
     head: "cs-2",
@@ -6178,7 +6180,7 @@ await check("what members see: kept only while someone has Your Apps at Read, wr
 });
 
 await check("what members see of a site's Preview: its link, its state and whether it asks for a password; its password only while someone has Your Apps at Write, read from Orgo again only once Bops set another, never in what bots read", async () => {
-  const F = await import(`${root}/lib/server/apps-for-members.ts`);
+  const F = await import(fileUrl("lib/server/apps-for-members.ts"));
   const LINK = "https://m3q8zt5kw2pd.orgo.dev";
   const server = { on: true, password: "Mx4tR8q", at: 100 };
   const app = (o = {}) => ({
@@ -6345,7 +6347,7 @@ await check("A copy's task brief: its own folder and Local, the pull and commit 
 });
 
 await check("Local acts pick the bot's copy: stop, Fix it and open on its own task's screen name it; local_app and a task's end use the bot's own; a bot that doesn't work on it acts on the app's own folder's; a bot not of the workspace is refused; its preview here on its own port and key", async () => {
-  const P = await import(`${root}/lib/server/local-preview.ts`);
+  const P = await import(fileUrl("lib/server/local-preview.ts"));
   const http = await import("node:http");
   const dev = http.createServer((req, res) => res.end("team notes"));
   await new Promise((r) => dev.listen(0, "127.0.0.1", r));
@@ -6422,7 +6424,7 @@ await check("Google sign in, once an address, for a copy's Local too: told in th
 });
 
 await check("Cleanups: a bot whose Works on moves off the app has its copy's Local stopped and forgotten (its folder kept); a bot deleted has its Locals forgotten (its folder kept, the app left with the others; the app's own bot's folder's alone); Remove app forgets every copy's and, with its repo, removes every copy of its repo's", async () => {
-  const G = await import(`${root}/lib/server/bot-groups.ts`);
+  const G = await import(fileUrl("lib/server/bot-groups.ts"));
   const lastForget = () => boppy.localAsked.findLast((x) => x[0] === "forget").filter((x) => x !== undefined);
   // Works on: Sam on the app, then on none.
   G.setBotSite("sam", { app: "team-notes", site: "team-notes" });
@@ -6472,5 +6474,7 @@ await check("Cleanups: a bot whose Works on moves off the app has its copy's Loc
 console.log(`\nhosted apps: ${passed} passed, ${failed} failed`);
 // The throwaway folder this run made (its state, the made-up binaries, the shell checks), gone with it.
 process.chdir(tmpdir());
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(failed ? 1 : 0);

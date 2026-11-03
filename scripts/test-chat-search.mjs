@@ -10,20 +10,22 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 // A self-hosted install with nobody signed in: the state is a file in the working folder.
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 process.env.OPENAI_API_KEY = "sk-test-search";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-search-"));
 // The Keychain is never read: `security` is a stand-in that has nothing, the Orgo key is set here, and HOME is empty.
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 globalThis.bopsOrgoKey = "sk_orgo_test_search";
@@ -35,7 +37,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -80,10 +82,10 @@ globalThis.fetch = async (input, init) => {
 const warned = [];
 console.warn = (...a) => warned.push(a.join(" "));
 
-const { botChatId } = await import(`${root}/lib/types.ts`);
-const S = await import(`${root}/lib/server/store.ts`);
-const Style = await import(`${root}/cloud/style.ts`);
-const Chat = await import(`${root}/lib/server/chat.ts`);
+const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const Style = await import(`${rootUrl}/cloud/style.ts`);
+const Chat = await import(`${rootUrl}/lib/server/chat.ts`);
 
 const noDashes = (text) => assert.ok(!/[–—]/.test(String(text)), `no dashes: ${text}`);
 
@@ -179,6 +181,8 @@ assert.ok(!outside.tools.some((t) => t.type === "web_search"), "no web search on
 assert.ok(!outside.instructions.includes("web_search"), "and no word of it");
 assert.match(outside.instructions, /Start a task \(start_task\) for work on a website/);
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log("Chat search: all tests passed");
 process.exit(0);

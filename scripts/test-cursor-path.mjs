@@ -8,9 +8,11 @@
 // - A press hurries (180 ms), a move close behind the last follows, reduced motion jumps.
 // Usage: node scripts/test-cursor-path.mjs
 import assert from "node:assert/strict";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
-const { at, travel, retarget, travelMs, HURRY_MS, STREAM_MS } = await import(`${root}/lib/cursor-path.ts`);
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
+const { at, travel, retarget, travelMs, HURRY_MS, STREAM_MS } = await import(`${rootUrl}/lib/cursor-path.ts`);
 
 let passed = 0;
 const test = (name, f) => {

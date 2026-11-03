@@ -14,18 +14,20 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.OPENAI_API_KEY = "sk-test-memory-own";
 process.env.HONCHO_API_KEY = "hc-test-memory-own";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-memory-own-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
@@ -36,7 +38,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -145,10 +147,10 @@ globalThis.fetch = async (input, init) => {
   throw new TypeError(`fetch failed (the test is offline: ${url.host})`);
 };
 
-const S = await import(`${root}/lib/server/store.ts`);
-const Mem = await import(`${root}/lib/server/memory.ts`);
-const MD = await import(`${root}/lib/server/memory-deletes.ts`);
-const { botChatId } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const Mem = await import(`${rootUrl}/lib/server/memory.ts`);
+const MD = await import(`${rootUrl}/lib/server/memory-deletes.ts`);
+const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
 
 // The main workspace: Boppy runs it (bank "bops"). Juno keeps its memory to itself and still reads the team's; Rex keeps
 // its own and reads only its own; Max uses the team's.
@@ -274,7 +276,7 @@ await check("Keep it apart leaves both banks; Bring it in copies its facts into 
 });
 
 await check("deleting a bot deletes its own bank", async () => {
-  const { deleteBot } = await import(`${root}/lib/server/remove.ts`);
+  const { deleteBot } = await import(`${rootUrl}/lib/server/remove.ts`);
   assert.ok(honcho.banks.has("bops-bot-rex"));
   await deleteBot("rex");
   assert.equal(S.getState().bots.some((b) => b.id === "rex"), false);
@@ -288,8 +290,8 @@ await check("deleting a bot deletes its own bank", async () => {
 });
 
 await check("a bot deleted while memory is off: its bank waits in the outbox, a new bot never gets its id meanwhile, and it goes once memory is back; in another workspace, that workspace's bank", async () => {
-  const { deleteBot } = await import(`${root}/lib/server/remove.ts`);
-  const { freeBotId } = await import(`${root}/lib/server/bots.ts`);
+  const { deleteBot } = await import(`${rootUrl}/lib/server/remove.ts`);
+  const { freeBotId } = await import(`${rootUrl}/lib/server/bots.ts`);
   // Pip, in Acme's workspace, keeps its memory to itself: its bank is Acme's, "bops-ws_acme-bot-pip".
   S.update((s) => {
     s.workspaces.push({ id: "ws_acme", name: "Acme", createdAt: 1, chain: { bots: { pip: { memory: "own" } } } });
@@ -315,6 +317,8 @@ await check("a bot deleted while memory is off: its bank waits in the outbox, a 
   assert.ok(!honcho.banks.has("bops-bot-pip"), "never the main workspace's");
 });
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`\nmemory own: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

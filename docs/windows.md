@@ -21,12 +21,12 @@ This installer puts the Bops desktop app in your Windows user account and adds a
 ## Install and open
 
 1. In File Explorer, open the checkout's `dist-desktop` folder and double-click **Bops-Setup.exe**.
-2. Installation is per-user, normally under `%LOCALAPPDATA%\Programs\bops`. It adds **Bops** to your Start menu. A previous installation can determine the actual installation directory.
+2. Installation is per-user, normally under `%LOCALAPPDATA%\Programs\bops`. It adds **Bops** to your Start menu and desktop. A previous installation can determine the actual installation directory.
 3. Press the Windows key, type **Bops**, and select the installed app. Keep the original checkout available whenever you use it.
 
 This local build is unsigned. Windows may show an unknown-publisher or reputation warning, and managed PCs may block installation. Verify where the installer came from; if policy blocks it, ask your administrator or use an approved signed build. Do not disable Windows protections to install it.
 
-If you previously created a Start menu shortcut for the unpacked app, the installer may replace that shortcut. After installation, check **Bops → Open file location → Properties** to confirm its target is the installed executable.
+The installer refreshes the existing **Bops.lnk** in your Start menu and desktop, including a temporary shortcut to `dist-desktop\win-unpacked\Bops.exe`. It uses the same name rather than adding a second shortcut. After installation, check **Bops → Open file location → Properties** to confirm its target is the installed executable. An explicit `--no-desktop-shortcut` installer option is respected.
 
 ## Uninstall and reinstall
 

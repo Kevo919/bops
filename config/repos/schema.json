@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Kevo919/bops/config/repos/schema.json",
+  "title": "Bops repo recipe",
+  "description": "One starter GitHub repo that the owner and bots can Open/Run on a bot's Linux cloud computer. See config/repos/README.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id", "name", "repo", "url", "license", "license_note", "what", "good_for",
+    "stack", "requirements", "keys_optional", "keys_required",
+    "clone", "install", "run", "kind", "health",
+    "fits_bot_computer", "fits_reason", "verified"
+  ],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$", "description": "Matches the file name: config/repos/<id>.yaml." },
+    "name": { "type": "string", "minLength": 1 },
+    "repo": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", "description": "GitHub owner/name." },
+    "url": { "type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+    "private": { "type": "boolean", "description": "True when the repo can't be cloned without a token." },
+    "needs_token": { "$ref": "#/$defs/envName", "description": "Env var NAME holding a token that can clone a private repo (never the value)." },
+    "license": { "type": "string", "pattern": "^([A-Za-z0-9.+-]+|custom: .+)$", "description": "SPDX id, or \"custom: ...\"." },
+    "license_note": { "type": "string", "description": "Flags AGPL/SSPL/fair-code/non-commercial code or data; empty string when there is nothing to flag." },
+    "what": { "type": "string", "minLength": 1, "description": "One plain sentence." },
+    "good_for": { "type": "string", "minLength": 1, "description": "A few words." },
+    "stack": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "node": { "type": "string", "pattern": "^>=\\d+(\\.\\d+){0,2}$" },
+        "python": { "type": "string", "pattern": "^>=\\d+(\\.\\d+){0,2}(,<\\d+(\\.\\d+){0,2})?$" },
+        "docker": { "type": "boolean" },
+        "other": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "keys_optional": { "$ref": "#/$defs/keyList" },
+    "keys_required": { "$ref": "#/$defs/keyList" },
+    "env": {
+      "type": "object",
+      "description": "Non-secret environment variables set for install, run and health.",
+      "additionalProperties": { "type": "string" }
+    },
+    "clone": { "type": "string", "pattern": "^(git (-c (?!credential)[^ ]+ )?clone |broker-tarball: )", "description": "Run in the parent folder; the clone lands in a folder named <id>. Private repos use broker-tarball: Bops' server fetches a pinned tarball through its key broker, so no token ever reaches the bot's computer (no credential helpers)." },
+    "install": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Shell commands, run in order inside the clone." },
+    "run": {
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+      ]
+    },
+    "background": { "type": "boolean", "description": "True when the last run command is long-running: the runner starts it detached, then runs the health check." },
+    "kind": { "enum": ["web", "cli", "mcp", "library"] },
+    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "health": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["http", "expect"],
+          "properties": {
+            "http": { "type": "string", "pattern": "^http://(127\\.0\\.0\\.1|localhost):\\d+(/.*)?$" },
+            "expect": { "type": "integer", "minimum": 100, "maximum": 599 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cmd", "expect_exit"],
+          "properties": {
+            "cmd": { "type": "string", "minLength": 1 },
+            "expect_exit": { "type": "integer", "minimum": 0, "maximum": 255 }
+          }
+        }
+      ]
+    },
+    "fits_bot_computer": { "type": "boolean" },
+    "fits_reason": { "type": "string", "minLength": 1 },
+    "verified": {
+      "oneOf": [
+        { "const": false },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["date", "by", "steps", "notes"],
+          "properties": {
+            "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+            "by": { "type": "string", "minLength": 1 },
+            "commit": { "type": "string", "pattern": "^[0-9a-f]{7,40}$" },
+            "steps": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["clone", "install", "run", "health"],
+              "properties": {
+                "clone": { "$ref": "#/$defs/stepResult" },
+                "install": { "$ref": "#/$defs/stepResult" },
+                "run": { "$ref": "#/$defs/stepResult" },
+                "health": { "$ref": "#/$defs/stepResult" }
+              }
+            },
+            "notes": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "verified_reason": { "type": "string", "minLength": 1, "description": "Required when verified is false." }
+  },
+  "$defs": {
+    "envName": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+    "keyList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "for"],
+        "properties": {
+          "name": { "$ref": "#/$defs/envName" },
+          "for": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "stepResult": {
+      "type": "string",
+      "pattern": "^(pass|pass: .+|fail: .+|skipped: .+)$",
+      "description": "pass, pass: <detail>, fail: <first error line>, or skipped: <why>."
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import { join } from "node:path";
 // Tests for the card of what a task changed in an app on the web, in the chat (components/app/app-change.tsx, where
 // chat-view.tsx shows it, and View changes opening the app's tab at its History: app-envs.tsx openAtHistory,
 // hosted-apps.tsx): the app, the first line of the bot's newest changeset and its short id, how many changesets and
@@ -15,9 +16,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const root = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
+// A file URL for import specifiers, from this OS-path root.
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -60,10 +63,10 @@ globalThis.fetch = async (url, init = {}) => {
   return { ok: status < 400, status, json: async () => body };
 };
 
-const { AppChangeCard } = await import(pathToFileURL(`${root}/components/app/app-change.tsx`).href);
-const { OpenHostedApp } = await import(pathToFileURL(`${root}/components/app/hosted-apps.tsx`).href);
-const { openIntent } = await import(pathToFileURL(`${root}/components/app/app-envs.tsx`).href);
-const { ChatView } = await import(pathToFileURL(`${root}/components/app/chat-view.tsx`).href);
+const { AppChangeCard } = await import(fileUrl("components/app/app-change.tsx"));
+const { OpenHostedApp } = await import(fileUrl("components/app/hosted-apps.tsx"));
+const { openIntent } = await import(fileUrl("components/app/app-envs.tsx"));
+const { ChatView } = await import(fileUrl("components/app/chat-view.tsx"));
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 

@@ -28,16 +28,18 @@ import { createServer } from "node:http";
 import { createRequire, registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { endGroup, groupAlive, removeTemp } from "./fixtures/cleanup.mjs";
 import { ACCOUNT, BOT, COMPUTER, SAM, SAM_ROLE, OWNER, PROJECT, ownerState, profileFor, roleFor, workspacesFor } from "./fixtures/two-person.mjs";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 const require = createRequire(import.meta.url);
 // The relay is the app's TypeScript (lib/browser-relay.ts), loaded as the tests load it: "@/" is this folder.
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -50,7 +52,7 @@ registerHooks({
     }
   },
 });
-const HERE = join(root, ".scratch", "two-person");
+const HERE = join(rootPath, ".scratch", "two-person");
 const STATE = join(HERE, "stack.json");
 const LOG = join(HERE, "stack.log");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -123,7 +125,7 @@ async function start() {
   mkdirSync(HERE, { recursive: true });
   rmSync(STATE, { force: true });
   const log = openSync(LOG, "w");
-  const child = spawn(process.execPath, [new URL(import.meta.url).pathname, "serve"], { detached: true, stdio: ["ignore", log, log], cwd: root });
+  const child = spawn(process.execPath, [fileURLToPath(import.meta.url), "serve"], { detached: true, stdio: ["ignore", log, log], cwd: rootPath });
   child.unref();
   const end = Date.now() + 8 * 60_000;
   for (;;) {
@@ -345,7 +347,7 @@ async function serve() {
     psql("postgres", ["-c", "CREATE ROLE bops_app LOGIN PASSWORD 'bops-local'"]);
     for (const db of ["orgo_stack", "orgo_core", "orgo_edge"]) {
       psql("postgres", ["-c", `CREATE DATABASE ${db} OWNER bops_app`]);
-      psql(db, ["-v", "bops_app_password=bops-local", "-f", join(root, "db", "provision.sql")]);
+      psql(db, ["-v", "bops_app_password=bops-local", "-f", join(rootPath, "db", "provision.sql")]);
     }
     const DB = `postgres://bops_app:bops-local@127.0.0.1:${ports.pg}/orgo_stack`;
 
@@ -423,8 +425,8 @@ async function serve() {
 
     /* Bops Cloud. */
     say(`Bops Cloud on ${ports.cloud}`);
-    const cloud = run("cloud", process.execPath, [join(root, "cloud", "server.ts")], {
-      cwd: root,
+    const cloud = run("cloud", process.execPath, [join(rootPath, "cloud", "server.ts")], {
+      cwd: rootPath,
       env: { ...cleanEnv(), BOPS_DATABASE_URL: DB, BOPS_CLOUD_PORT: String(ports.cloud), BOPS_CLOUD_SECRET: randomBytes(32).toString("base64"), BOPS_ORGO_ORIGIN: ORGO, BOPS_CLOUD_PUBLIC_URL: urls.cloud },
     });
     await waitFor("Bops Cloud", () => cloud.output().includes(`listening on 127.0.0.1:${ports.cloud}`), 60_000);
@@ -465,9 +467,9 @@ async function serve() {
     );
     await waitFor("Chrome's DevTools", () => fetch(`http://127.0.0.1:${ports.chrome}/json/version`).then((r) => r.ok, () => false), 30_000);
     // As a computer's runner starts it (lib/server/browser-runner.ts), with the stand-in's screen and its own made-up key.
-    const { startRelay, handedBack } = await import(pathToFileURL(join(root, "lib", "browser-relay.ts")).href);
-    const { travelMs } = await import(pathToFileURL(join(root, "lib", "cursor-path.ts")).href);
-    const { BOPS_STATE_LEVEL_HEADER, BOPS_USER_HEADER, STATE_LEVEL } = await import(pathToFileURL(join(root, "cloud", "protocol.ts")).href);
+    const { startRelay, handedBack } = await import(pathToFileURL(join(rootPath, "lib", "browser-relay.ts")).href);
+    const { travelMs } = await import(pathToFileURL(join(rootPath, "lib", "cursor-path.ts")).href);
+    const { BOPS_STATE_LEVEL_HEADER, BOPS_USER_HEADER, STATE_LEVEL } = await import(pathToFileURL(join(rootPath, "cloud", "protocol.ts")).href);
     const relayOptions = {
       url: () => urls.cloud,
       headers: () => ({ Authorization: `Bearer ${COMPUTER.key}` }),
@@ -505,8 +507,8 @@ async function serve() {
       mkdirSync(home);
       mkdirSync(keychain);
       writeFileSync(join(keychain, encodeURIComponent("orgo-api-key")), person.key);
-      return run(who, process.execPath, [join(root, "node_modules", "next", "dist", "bin", "next"), "dev", "-p", String(port), "-H", "127.0.0.1"], {
-        cwd: root,
+      return run(who, process.execPath, [join(rootPath, "node_modules", "next", "dist", "bin", "next"), "dev", "-p", String(port), "-H", "127.0.0.1"], {
+        cwd: rootPath,
         env: {
           ...cleanEnv(),
           HOME: home,
