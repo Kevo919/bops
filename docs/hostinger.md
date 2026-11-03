@@ -1,0 +1,86 @@
+# Running Bops on a Hostinger VPS
+
+Bops can run on a Linux server (a Hostinger **VPS**, KVM plan), always on, so your phone reaches it from anywhere without your PC being awake. Hostinger's **shared** or **web hosting** plans can't run it: Bops is a server that keeps running, and those plans only serve web pages.
+
+What you get on a server: chat, your bots and their cloud computers (Orgo), routines, Slack/Telegram/Discord, email and phone. What you don't: bots working on your own PC (there is no PC there). The desktop app on your PC and the server are separate Bops; pick one as the one your phone uses.
+
+## 1. The server
+
+Ubuntu 24.04 on the VPS, then as root:
+
+```bash
+apt update && apt install -y git curl caddy
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt install -y nodejs
+useradd -m -s /bin/bash bops
+```
+
+## 2. Bops
+
+```bash
+sudo -iu bops
+git clone https://github.com/<you>/bops.git && cd bops
+git checkout windows-port
+npm install --include=dev
+cp .env.example .env.local
+```
+
+In `.env.local` set at least:
+
+```bash
+BOPS_SELF_HOSTED=1
+OPENAI_API_KEY=...
+OPENAI_EXECUTOR_API_KEY=...
+ORGO_API_KEY=...
+# Lets nothing in but your paired phone (and the webhooks that prove themselves):
+BOPS_REQUIRE_REMOTE=1
+# The key for saved logins and tokens (openssl rand -hex 32). Keep a copy somewhere safe.
+BOPS_SECRET_KEY=...
+BOPS_PUBLIC_URL=https://bops.example.com
+```
+
+Build it: `npx next build`.
+
+## 3. Keep it running (systemd)
+
+`/etc/systemd/system/bops.service`:
+
+```ini
+[Unit]
+Description=Bops
+After=network-online.target
+
+[Service]
+User=bops
+WorkingDirectory=/home/bops/bops
+ExecStart=/usr/bin/npx next start --port 3210 -H 127.0.0.1
+Restart=always
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`systemctl enable --now bops`. It listens on 127.0.0.1 only: the internet reaches it through Caddy below, never directly.
+
+## 4. HTTPS (Caddy)
+
+Point a domain (or a subdomain) at the VPS's IP in your DNS, then `/etc/caddy/Caddyfile`:
+
+```
+bops.example.com {
+    reverse_proxy 127.0.0.1:3210
+}
+```
+
+`systemctl reload caddy`. Caddy gets the certificate by itself.
+
+## 5. Pair your phone
+
+On the server: `cd ~/bops && node scripts/pair-phone.mjs`. It prints a pairing code once. In the Bops app on your phone, enter `https://bops.example.com` and that code. Run it again to pair a new phone (the old code stops working), or with `--off` to unpair.
+
+## Updating
+
+```bash
+sudo -iu bops && cd bops && git pull && npm install --include=dev && npx next build && exit
+systemctl restart bops
+```

@@ -172,6 +172,14 @@ The app itself is Electron and Next.js.
 - **Signed in with Orgo**, the app works through Bops Cloud (`cloud/`), the server Orgo runs for hosted Bops. Orgo's provider keys stay there, and your Mac gets only narrow ones: a key for your own mailboxes and a spend-capped key for tasks. Bops Cloud also takes the webhooks for texts, calls and Slack, and keeps your chats in your account.
 - **Self-hosted** (`BOPS_SELF_HOSTED=1`), the app calls each provider directly with the keys in `.env.local` and keeps its state in `.data/` on your Mac. A small relay (`edge/`) can give the webhooks a public HTTPS address.
 
+## This fork: Windows, your phone, a server
+
+This fork adds three things to Bops:
+
+- **Windows.** Bops runs on a Windows PC: `npm run setup:win`, then `npm run app` (or `npm run app:build:win` for `dist-desktop\win-unpacked\Bops.exe`). Saved logins and tokens are encrypted, with the key in Windows Credential Manager. Bots can work on the PC too: by default only in a Chrome of their own (Codex's Windows sandbox runs their commands as a separate, restricted Windows user); with **Settings → Full access** on, as you, with a shell and your files.
+- **Your phone.** The Android app in [`android/`](android/README.md) is Bops on your phone. Pair it in **Settings → Your phone**; away from home it reaches your PC over Tailscale.
+- **A server.** Bops on a Hostinger VPS, always on: see [docs/hostinger.md](docs/hostinger.md).
+
 ## Run it yourself
 
 ### Requirements
