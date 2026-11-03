@@ -16,12 +16,12 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 import { fill } from "./fake-exports.mjs";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|COMPOSIO|ORGO)_/.test(k)) delete process.env[k];
 process.env.COMPOSIO_API_KEY = "test-composio";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-access-"));
 
 const forward = (mod, names) => names.map((n) => `export const ${n} = (...a) => globalThis.__fake[${JSON.stringify(mod)}].${n}(...a);`).join("\n");
@@ -40,7 +40,7 @@ const COMPOSIO = `export class Composio { constructor(o) { globalThis.__fake.com
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "@composio/core") return { url: "fake:composio", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -755,6 +755,8 @@ await check("POST /api/apps takes How often from the Bops window only, as a sche
   }
 });
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`access: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

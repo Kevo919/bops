@@ -16,17 +16,17 @@ import { createServer } from "node:http";
 import { createRequire, registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.BOPS_UI_TOKEN = "ui-token-test-skill-labels";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-skill-labels-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const ORGO_KEY = "sk_orgo_test_skill_labels";
@@ -36,7 +36,7 @@ mkdirSync(work);
 process.chdir(work);
 
 /** Bops' own skills as lib/builtin-skills.ts shapes them: one label with two skills (one with a file), and a label with none yet. */
-const BUILTINS = `import { APPS_LABEL, sameLabel } from ${JSON.stringify(pathToFileURL(`${root}/lib/skill-labels.ts`).href)};
+const BUILTINS = `import { APPS_LABEL, sameLabel } from ${JSON.stringify(`${root}/lib/skill-labels.ts`)};
 export const BUILTIN_LABELS = [
   { label: APPS_LABEL, about: "Building, versioning and deploying apps with Ingot: read one before you change an app." },
   { label: "Bops basics", about: "Nothing in it yet." },
@@ -48,12 +48,12 @@ export const BUILTIN_SKILLS = [
 export const builtinSkills = (apps) => (apps ? BUILTIN_SKILLS : BUILTIN_SKILLS.filter((s) => !sameLabel(s.label, APPS_LABEL)));
 export const builtinLabels = (apps) => (apps ? BUILTIN_LABELS : BUILTIN_LABELS.filter((l) => !sameLabel(l.label, APPS_LABEL)));
 `;
-const BUILTINS_URL = pathToFileURL(`${root}/lib/builtin-skills.ts`).href;
+const BUILTINS_URL = `${root}/lib/builtin-skills.ts`;
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "@/lib/builtin-skills") return { url: BUILTINS_URL, shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -681,6 +681,8 @@ await check("Plain words: nothing a bot reads has a dash; no stray warnings", as
 
 server.close();
 console.log(`\nskill labels: ${passed} passed, ${failed} failed`);
-if (!failed) rmSync(scratch, { recursive: true, force: true });
+if (!failed) try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 else console.log(`The throwaway folder is kept for a look: ${scratch}`);
 process.exit(failed ? 1 : 0);

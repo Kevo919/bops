@@ -14,7 +14,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 // The state in a throwaway file store, as a self-hosted install keeps it (the Mac app keeps it in Bops Cloud, per user: test-profiles.mjs).
 process.env.BOPS_SELF_HOSTED = "1";
 // Orgo is the fake below, on its own origin; the state goes to a throwaway file store, with mail, OpenAI and the tailnet off.
@@ -22,7 +22,7 @@ process.env.BOPS_SELF_HOSTED = "1";
 for (const k of ["ORGO_API_KEY", "BOPS_ORGO_WORKSPACE", "BOPS_ORGO_TEMPLATE", "BOPS_DATABASE_URL", "AGENTMAIL_API_KEY", "BOPS_MAIL_DOMAIN", "OPENAI_API_KEY", "TAILSCALE_AUTH_KEY", "BOPS_WEBRTC"])
   delete process.env[k];
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 // Modules that would start processes when loaded (the Mac check, the relay's agent) or that Node can't load (the
 // desktop look draws the mascot's JSX, mirror.ts has parameter properties) are stand-ins here: each of
 // their exports does nothing. The computer setup tested below only calls them in passing.
@@ -30,7 +30,7 @@ const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 // The server modules import "@/lib/…" and "./store" (no extension), the way Next resolves them.
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -1512,5 +1512,7 @@ assert.equal(onDisk().owner.about, "saved now", "nothing older lands after it");
 
 console.log(`all plan tests passed (${calls.length} fake Orgo calls, none to the network)`);
 // Gone before the store's next save could make the folder again.
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

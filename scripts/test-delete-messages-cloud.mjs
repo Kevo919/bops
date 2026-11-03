@@ -20,7 +20,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
 const pg = require("pg");
@@ -39,7 +41,7 @@ for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAI
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-delete-cloud-"));
 process.chdir(scratch);
 process.env.HOME = scratch;
-symlinkSync(join(root, "node_modules"), join(scratch, "node_modules"));
+symlinkSync(join(rootPath, "node_modules"), join(scratch, "node_modules"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 mkdirSync(join(scratch, "keychain"));
@@ -66,7 +68,7 @@ if (process.argv[2] === "-i") {
 `,
   { mode: 0o755 },
 );
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 
 const freePort = () =>
   new Promise((resolve) => {
@@ -113,7 +115,7 @@ const cloudPort = await freePort();
 const CLOUD = `http://127.0.0.1:${cloudPort}`;
 process.env.BOPS_CLOUD_URL = CLOUD;
 const cloud = { child: null, log: "" };
-cloud.child = spawn(process.execPath, [join(root, "cloud/server.ts")], {
+cloud.child = spawn(process.execPath, [join(rootPath, "cloud/server.ts")], {
   env: { PATH: process.env.PATH, HOME: scratch, BOPS_DATABASE_URL: DB, BOPS_CLOUD_PORT: String(cloudPort), BOPS_CLOUD_SECRET: randomBytes(32).toString("base64"), BOPS_ORGO_ORIGIN: ORGO },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -143,7 +145,7 @@ const STAND_INS = new Set(["cloud-tunnel", "relay", "sessions", "mac", "desktop"
 const project = pathToFileURL(root).href + "/";
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -301,6 +303,8 @@ if (stray.length) {
   console.error(`FAIL stray warnings\n  ${stray.join("\n  ")}`);
 }
 quiet.info(`\ndelete messages, Mac and Bops Cloud: ${passed} passed, ${failures} failed`);
-if (!failures) rmSync(scratch, { recursive: true, force: true });
+if (!failures) try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 else quiet.info(`The throwaway folder is kept for a look: ${scratch}`);
 process.exit(failures ? 1 : 0);

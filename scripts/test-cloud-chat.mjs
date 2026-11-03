@@ -8,17 +8,17 @@
 // Usage: node --conditions=react-server scripts/test-cloud-chat.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
-import { pathToFileURL } from "node:url";
+
 import { unfaked } from "./fake-exports.mjs";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 const FAKES = { store: ["chat", "getState", "pullState", "stateDevice", "stateUser"], cloud: ["cloudOn", "cloudUrl"], "orgo-auth": ["cloudKey"], persist: ["onRunner"] };
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {

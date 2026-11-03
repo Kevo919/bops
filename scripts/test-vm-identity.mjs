@@ -21,12 +21,12 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 import { unfaked } from "./fake-exports.mjs";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.example";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const START = process.argv.includes("--start");
 
 const FAKES = {
@@ -40,7 +40,7 @@ const VALUES = { runner: { IDENTITY_EVERY_MS: 300000, WHO_AM_I_EVERY_MS: 60000 }
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -708,7 +708,7 @@ await check("its VMM asked every minute: another computer is a copy (it leaves),
 });
 
 await check("started on its own, a runner with no credential waits and starts on a key; a refused one stops", () => {
-  const run = spawnSync(process.execPath, ["--conditions=react-server", new URL(import.meta.url).pathname, "--start"], { encoding: "utf8" });
+  const run = spawnSync(process.execPath, ["--conditions=react-server", import.meta.url, "--start"], { encoding: "utf8" });
   assert.equal(run.status, 0, `${run.stdout}${run.stderr}`.split("\n").filter((l) => /FAIL|passed|^\s{2}/.test(l)).join("\n"));
 });
 

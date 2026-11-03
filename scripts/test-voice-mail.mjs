@@ -15,7 +15,7 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 Object.assign(process.env, {
@@ -30,11 +30,11 @@ Object.assign(process.env, {
   BOPS_UI_TOKEN: "window-token-test",
 });
 const LINE = "+14155550199";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -470,6 +470,8 @@ await test("Everyone else shows the chain in its steps, for each Replies to othe
 });
 
 fake.close();
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`voice and mail: ${passed} passed`);
 process.exit(0);

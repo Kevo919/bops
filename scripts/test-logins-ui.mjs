@@ -16,14 +16,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 process.env.NEXT_PUBLIC_BOPS_BRAINS = "1";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -97,8 +97,8 @@ globalThis.fetch = async (url, init = {}) => {
 
 const { createElement: h, act } = await import("react");
 const { createRoot } = await import("react-dom/client");
-const App = await import(pathToFileURL(`${root}/components/app/bops-app.tsx`).href);
-const Logins = await import(pathToFileURL(`${root}/components/app/logins.tsx`).href);
+const App = await import(`${root}/components/app/bops-app.tsx`);
+const Logins = await import(`${root}/components/app/logins.tsx`);
 
 let passed = 0;
 const test = async (name, f) => {

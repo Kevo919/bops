@@ -9,10 +9,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 registerHooks({
   load(url, context, next) {
@@ -30,7 +30,7 @@ globalThis.innerWidth = 1440;
 const stored = new Map();
 globalThis.localStorage = { getItem: (k) => stored.get(k) ?? null, setItem: (k, v) => stored.set(k, String(v)), removeItem: (k) => stored.delete(k) };
 
-const E = await import(pathToFileURL(`${root}/components/app/chat-edge.tsx`).href);
+const E = await import(`${root}/components/app/chat-edge.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 

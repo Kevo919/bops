@@ -16,7 +16,7 @@
 // Usage: node scripts/test-state-merge.mjs
 import assert from "node:assert/strict";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const M = await import(`${root}/lib/server/state-merge.ts`);
 
 let failures = 0;

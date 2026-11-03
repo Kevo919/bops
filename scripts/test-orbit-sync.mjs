@@ -22,7 +22,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.TZ = "America/New_York";
@@ -32,12 +32,12 @@ process.env.ORGO_API_KEY = "sk_test_orbit";
 process.env.OPENAI_API_KEY = "sk-test-orbit";
 process.env.HONCHO_API_KEY = "hc-test-orbit";
 process.env.BOPS_MEMORY_MODEL = "gpt-test-memory";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-orbit-sync-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
@@ -51,7 +51,7 @@ Date.now = () => realNow() + skew;
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -1254,5 +1254,7 @@ await check("nothing unexpected: no rejections, no dashes in what's said, no unk
 T.reset();
 console.log(`\norbit sync: ${passed} passed, ${failures} failed`);
 if (failures) console.log(`The throwaway folder is kept for a look: ${scratch}`);
-else rmSync(scratch, { recursive: true, force: true });
+else try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(failures ? 1 : 0);

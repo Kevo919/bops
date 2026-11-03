@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseHTML } from "linkedom";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const { compile } = await import("@tailwindcss/node");
 
 let passed = 0;

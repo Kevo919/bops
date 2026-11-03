@@ -30,7 +30,7 @@ import { createHash, createHmac } from "node:crypto";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 // A self-hosted install: the state is a file in the working folder, memory is Honcho on its own key
@@ -41,13 +41,15 @@ process.env.OPENAI_API_KEY = "sk-test-categories";
 process.env.HONCHO_API_KEY = "hc-test-categories";
 process.env.BOPS_MEMORY_MODEL = "gpt-test-memory";
 const HONCHO_KEY = process.env.HONCHO_API_KEY;
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-categories-"));
 // The Keychain is never read: `security` is a stand-in that has nothing, and HOME is empty.
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
@@ -64,7 +66,7 @@ Date.now = () => realNow() + skew;
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -2818,7 +2820,7 @@ await section("Plain words: no dashes in anything the user reads", async () => {
   // Every line the engine and the route can show, the ones no test reaches too (out of AI credit is the cloud's
   // alone): nothing in their source has a dash, but clip()'s pattern that takes dashes out.
   for (const file of ["lib/server/memory-categories.ts", "app/api/memory/categories/route.ts", "lib/memory-categories.ts"])
-    readFileSync(join(root, file), "utf8")
+    readFileSync(join(rootPath, file), "utf8")
       .split("\n")
       .forEach((line, n) => {
         if (/[\u2013\u2014]/.test(line) && !/\.replace\(\/[^/]*[\u2013\u2014][^/]*\/[gimsuy]*,/.test(line)) assert.fail(`${file}:${n + 1} has a dash: ${line.trim()}`);
@@ -2846,5 +2848,7 @@ console.log(`\nMemory categories: ${results.length - failed.length} of ${results
 const failing = failed.flatMap((r) => r.checks);
 if (failing.length) console.log(`Checks that fail:\n${failing.map((c) => `  * ${c}`).join("\n")}`);
 if (failed.length) console.log(`The throwaway folder is kept for a look: ${scratch}`);
-else rmSync(scratch, { recursive: true, force: true });
+else try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(failed.length ? 1 : 0);

@@ -20,7 +20,9 @@ import { gunzipSync } from "node:zlib";
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO)_/.test(k)) delete process.env[k];
 delete process.env.DO_NOT_TRACK;
 delete process.env.NODE_ENV;
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 const ts = createRequire(import.meta.url)("typescript");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(check, what, ms = 4000) {
@@ -36,7 +38,7 @@ const STAND_INS = new Set(["keychain", "cloud-tunnel", "relay", "mac", "desktop"
 const project = pathToFileURL(root).href + "/";
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -118,7 +120,7 @@ for (const [event, spec] of Object.entries(R.EVENTS)) {
 assert.ok(R.POSTHOG_PROJECT.startsWith("phc_") && R.POSTHOG_PROJECT.length > 20, "the project key is a PostHog project key");
 assert.equal(R.POSTHOG_HOST, "https://us.i.posthog.com");
 // The same project as bops.bot (and so orgo-web's): compared, never printed.
-assert.ok(readFileSync(join(root, "site/index.html"), "utf8").includes(`posthog.init('${R.POSTHOG_PROJECT}'`), "the site uses the same project");
+assert.ok(readFileSync(join(rootPath, "site/index.html"), "utf8").includes(`posthog.init('${R.POSTHOG_PROJECT}'`), "the site uses the same project");
 
 const clean = R.cleanProperties;
 assert.equal(clean("bops_nope", {}, "mac_server"), null, "an unknown event");
@@ -554,7 +556,7 @@ const [setup] = await until(() => ofEvent("bops_setup_finished", mark).length &&
 assert.deepEqual(setup.properties.skipped, ["relay"]);
 
 // Starting over keeps the switch.
-assert.match(readFileSync(join(root, "lib/server/store.ts"), "utf8"), /const \{ host, account, usage, relay, macs, analyticsOff(?:, \w+)* \} = box\.state;[\s\S]{0,200}migrate\(\{ host, account, usage, relay, macs, analyticsOff,/);
+assert.match(readFileSync(join(rootPath, "lib/server/store.ts"), "utf8"), /const \{ host, account, usage, relay, macs, analyticsOff(?:, \w+)* \} = box\.state;[\s\S]{0,200}migrate\(\{ host, account, usage, relay, macs, analyticsOff,/);
 
 // Signed out: the switch can't be set.
 S.update((s) => (s.account = undefined));
@@ -662,8 +664,8 @@ const walk = (dir) => {
     else if (/\.(ts|tsx)$/.test(f)) files.push(p);
   }
 };
-for (const d of ["app", "components", "lib", "cloud"]) walk(join(root, d));
-files.push(join(root, "instrumentation.ts"));
+for (const d of ["app", "components", "lib", "cloud"]) walk(join(rootPath, d));
+files.push(join(rootPath, "instrumentation.ts"));
 const used = new Map();
 const SENDERS = { trackEvent: "app", trackServerEvent: "mac_server", trackCloudEvent: "cloud" };
 for (const f of files) {
@@ -682,6 +684,8 @@ console.log("ok - the catalog matches the code");
 
 for (const u of strays) assert.ok(!u.includes("posthog"), `nothing else of PostHog's was called: ${u}`);
 process.chdir(tmpdir());
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log("all passed");
 process.exit(0);

@@ -14,14 +14,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -76,8 +76,8 @@ const item = (id, category, title, extra = {}) => ({ id, category, key: title.to
 let items = [item("aaaaaaaaaa", "people", "Priya Shah"), item("bbbbbbbbbb", "people", "Dana Lee"), item("cccccccccc", "todos", "Send receipts")];
 const snap = () => ({ on: true, ws: "w1", rev: Math.random(), items: items.map((i) => ({ ...i })), syncing: false, syncedAt: Date.now() });
 
-const { orbitStore, MemoryPage, groupsOf } = await import(pathToFileURL(`${root}/components/app/memory-categories.tsx`).href);
-const { issueStore, issueOrder, isOpen } = await import(pathToFileURL(`${root}/components/app/orbit-issues.tsx`).href);
+const { orbitStore, MemoryPage, groupsOf } = await import(`${root}/components/app/memory-categories.tsx`);
+const { issueStore, issueOrder, isOpen } = await import(`${root}/components/app/orbit-issues.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -313,7 +313,7 @@ await test("All: every kind on one page, Issues still a chip", async () => {
 });
 
 await test("Skills and Apps, kinds in Knowledge: Skills chip after Issues with its count (Apps chip hidden for now), each its own page in the tab, and not in All", async () => {
-  const { MemoryView } = await import(pathToFileURL(`${root}/components/app/memory-categories.tsx`).href);
+  const { MemoryView } = await import(`${root}/components/app/memory-categories.tsx`);
   const s = { on: true, ws: "w1", items: [item("aaaaaaaaaa", "people", "Priya Shah")], syncing: false };
   let t = text(renderToStaticMarkup(h(MemoryPage, { snap: s, act: async () => null, forgetting, issues: 3, skills: 2, apps: 1, category: "all", onCategory: noop, onClose: noop })));
   assert.match(t, /All 1 Issues 3 Skills 2 People 1/);
@@ -376,7 +376,7 @@ await test("a read that fails says why with Try again, never an endless spinner;
 });
 
 await test("in a workspace shared with the user, Knowledge says it's kept on the owner's Bops: no spinner, no kinds to pick", async () => {
-  const { MemoryView } = await import(pathToFileURL(`${root}/components/app/memory-categories.tsx`).href);
+  const { MemoryView } = await import(`${root}/components/app/memory-categories.tsx`);
   const state = {
     account: { user: { id: "u1" } },
     workspace: "shared_p1",
@@ -394,7 +394,7 @@ await test("in a workspace shared with the user, Knowledge says it's kept on the
 });
 
 await test("Routines in the footer: a round button, with how many monitors have news", async () => {
-  const { AutopilotButton } = await import(pathToFileURL(`${root}/components/app/autopilot.tsx`).href);
+  const { AutopilotButton } = await import(`${root}/components/app/autopilot.tsx`);
   const base = { bots: [{ id: "boppy", name: "Boppy", isMain: true }], routines: [], watches: [], sessions: [], messages: [] };
   let html = renderToStaticMarkup(h(AutopilotButton, { state: base, onOpen: noop }));
   assert.match(html, /aria-label="Routines"/);
@@ -407,7 +407,7 @@ await test("Routines in the footer: a round button, with how many monitors have 
 });
 
 await test("Routines in the footer opens at the monitor with news", async () => {
-  const { AutopilotButton } = await import(pathToFileURL(`${root}/components/app/autopilot.tsx`).href);
+  const { AutopilotButton } = await import(`${root}/components/app/autopilot.tsx`);
   const watch = (id, alert, since) => ({ id, botId: "boppy", site: "acme.example", lookFor: "a price drop", alert, since, page: { url: "https://acme.example" } });
   const state = { bots: [{ id: "boppy", name: "Boppy", isMain: true }], routines: [], sessions: [], messages: [], watches: [watch("w1", undefined, 3), watch("w2", { at: 1, text: "Down 10%" }, 1)] };
   const opened = [];
@@ -419,14 +419,14 @@ await test("Routines in the footer opens at the monitor with news", async () => 
 });
 
 await test("a new Needs you leaves Routines, Skills and the other pages you're reading", async () => {
-  const { isReading } = await import(pathToFileURL(`${root}/components/app/panel-tabs.tsx`).href);
+  const { isReading } = await import(`${root}/components/app/panel-tabs.tsx`);
   for (const kind of ["web", "vault", "crm", "memory", "bot", "autopilot"]) assert.equal(isReading({ id: "t", kind }), true, kind);
   for (const kind of ["computer", "new", "mac"]) assert.equal(isReading({ id: "t", kind }), false, kind);
   assert.equal(isReading(undefined), false);
 });
 
 await test("Knowledge opened again: a search on Issues goes to All", async () => {
-  const { memoryAgain } = await import(pathToFileURL(`${root}/components/app/panel-tabs.tsx`).href);
+  const { memoryAgain } = await import(`${root}/components/app/panel-tabs.tsx`);
   const tab = (category) => ({ id: "t", kind: "memory", ws: "w1", category });
   assert.equal(memoryAgain(tab("issues"), { query: "Priya" }, 1).category, "all", "Issues doesn't search");
   assert.equal(memoryAgain(tab("issues"), { query: "Priya" }, 1).query, "Priya");
@@ -472,7 +472,7 @@ Object.defineProperty(win.HTMLInputElement.prototype, "type", {
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { createRoot } = await import("react-dom/client");
 const { act } = await import("react");
-const { IssuesPage } = await import(pathToFileURL(`${root}/components/app/orbit-issues.tsx`).href);
+const { IssuesPage } = await import(`${root}/components/app/orbit-issues.tsx`);
 
 async function mount(el) {
   const box = doc.createElement("div");
@@ -562,8 +562,8 @@ const opened = (id, user = "u9") => h(IssuesPage, { user, ws: "w9", focus: id, t
 const patches = () => calls.filter((c) => c.method === "PATCH").map((c) => c.body);
 
 await test("in a workspace shared with the user, Knowledge and the footer's Knowledge button read nothing, mounted", async () => {
-  const { MemoryView } = await import(pathToFileURL(`${root}/components/app/memory-categories.tsx`).href);
-  const { KnowledgeButton } = await import(pathToFileURL(`${root}/components/app/sidebar.tsx`).href);
+  const { MemoryView } = await import(`${root}/components/app/memory-categories.tsx`);
+  const { KnowledgeButton } = await import(`${root}/components/app/sidebar.tsx`);
   const state = {
     account: { user: { id: "u7" } },
     workspace: "shared_p7",

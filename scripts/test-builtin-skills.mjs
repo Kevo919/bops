@@ -13,13 +13,13 @@
 // Usage: node --conditions=react-server scripts/test-builtin-skills.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
-import { pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {

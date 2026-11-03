@@ -17,9 +17,9 @@ import { createRequire, registerHooks } from "node:module";
 import { createServer as createTcp } from "node:net";
 import { networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const require = createRequire(import.meta.url);
 const F = require(`${root}/desktop/app-frames.cjs`);
 let passed = 0;
@@ -145,7 +145,7 @@ if (process.env.SKIP_ELECTRON) {
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -250,7 +250,9 @@ try {
   });
   seen = JSON.parse(readFileSync(results, "utf8"));
 } finally {
-  rmSync(scratch, { recursive: true, force: true });
+  try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
   evil.close();
   bops.close();
   rtc?.close();

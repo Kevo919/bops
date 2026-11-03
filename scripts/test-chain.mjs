@@ -10,7 +10,7 @@
 // Usage: node scripts/test-chain.mjs
 import assert from "node:assert/strict";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const C = await import(`${root}/cloud/chain.ts`);
 
 let passed = 0;

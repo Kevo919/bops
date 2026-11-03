@@ -11,19 +11,19 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 
 // A file store, loaded at once and always ready (lib/server/persist.ts); the Mac app's ways (Bops Cloud's AI
 // credit, cloud.ts cloudOn) once it's loaded, below.
 process.env.BOPS_SELF_HOSTED = "1";
 for (const k of ["ORGO_API_KEY", "BOPS_ORGO_WORKSPACE", "BOPS_ORGO_TEMPLATE", "BOPS_DATABASE_URL", "AGENTMAIL_API_KEY", "BOPS_MAIL_DOMAIN", "OPENAI_API_KEY", "TAILSCALE_AUTH_KEY"]) delete process.env[k];
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 // Modules that would start processes when loaded are stand-ins whose exports do nothing (as in test-plan.mjs).
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -453,5 +453,7 @@ for (const line of logged) for (const secret of [KEY, IDEM, HANDLE, HANDLE2]) as
 assert.ok(logged.some((l) => l.includes("[credit]")), "Orgo's failures are logged, by status and code");
 
 console.log(`all credit top-up tests passed (${calls.length} fake Orgo calls, none to the network)`);
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

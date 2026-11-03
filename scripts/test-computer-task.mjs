@@ -30,7 +30,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFil
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE)_/.test(k)) delete process.env[k];
@@ -39,12 +39,14 @@ process.env.BOPS_DEVICE_SEED = "test-computer-task";
 process.env.BOPS_RESPONSES_WS = "0";
 // The CRM's tools are off for bots now (lib/server/crm.ts crmForBots); this test still checks them.
 process.env.BOPS_CRM_TOOLS = "1";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 // Modules that would start processes when loaded, or that Node can't load, are stand-ins: each export does nothing.
 const STAND_INS = new Set(["relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -68,8 +70,8 @@ process.chdir(scratch);
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 // The screen tools Bops puts on a computer are read from the working folder (sessions.ts ensureScreenTools).
-symlinkSync(join(root, "node_modules"), join(scratch, "node_modules"));
-symlinkSync(join(root, "vm"), join(scratch, "vm"));
+symlinkSync(join(rootPath, "node_modules"), join(scratch, "node_modules"));
+symlinkSync(join(rootPath, "vm"), join(scratch, "vm"));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(check, what, ms = 15_000) {
   for (const end = Date.now() + ms; Date.now() < end; await sleep(25)) {

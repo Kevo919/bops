@@ -47,7 +47,7 @@ import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { fill } from "./fake-exports.mjs";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const TAG = "v0.0.32";
 const old = (path) => {
   try {
@@ -166,7 +166,7 @@ registerHooks({
     if (inTree(parent)) {
       if (specifier === "@composio/core") return { url: "fake32:composio", shortCircuit: true };
       const rel = specifier.startsWith("@/") ? specifier.slice(2) : /^\.{1,2}\//.test(specifier) ? new URL(specifier, `file:///${relIn(parent)}`).pathname.slice(1) : null;
-      if (rel === null) return next(specifier, { ...context, parentURL: pathToFileURL(`${root}/package.json`).href });
+      if (rel === null) return next(specifier, { ...context, parentURL: `${root}/package.json` });
       const url = fromTag(rel);
       if (!url) throw new Error(`${TAG} has no ${rel}`);
       const name = /^lib\/server\/([a-z-]+)\.ts$/.exec(relIn(url))?.[1];
@@ -175,7 +175,7 @@ registerHooks({
     }
     if (/\/lib\/server\/(logins|keys|hosted-apps)\.ts$/.test(parent) && NOW_FAKED.test(specifier)) return { url: `fakenow:${specifier.slice(2)}?${new URL(`${specifier}.ts`, parent).href}`, shortCircuit: true };
     // This build's own files: "@/" is the repo, and an import without its extension is its .ts or .tsx.
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {

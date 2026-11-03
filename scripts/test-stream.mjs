@@ -17,17 +17,17 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 
 for (const k of ["ORGO_API_KEY", "BOPS_ORGO_WORKSPACE", "BOPS_ORGO_TEMPLATE", "BOPS_DATABASE_URL", "AGENTMAIL_API_KEY", "OPENAI_API_KEY", "TAILSCALE_AUTH_KEY", "BOPS_WEBRTC", "BOPS_SCREEN_STREAM"]) delete process.env[k];
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 // Modules that would start processes when loaded (the Mac check, the relay's agent) or that Node can't load are
 // stand-ins: each of their exports does nothing.
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -339,5 +339,7 @@ assert.equal(R.wheelClicks(0, 5000, 0).clicks, 10, "at most 10 clicks an event")
 console.log("client: retry waits, a stream smaller than the screen, what a VNC stream does by its close code, Orgo's frames, clicks onto the picture, buttons and the wheel");
 
 console.log(`all stream tests passed (${calls.length} fake Orgo calls, none to the network)`);
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

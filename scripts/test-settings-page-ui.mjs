@@ -14,14 +14,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 process.env.NEXT_PUBLIC_BOPS_BRAINS = "1";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -95,10 +95,10 @@ globalThis.fetch = async (url, init = {}) => {
 
 const { createElement: h, act } = await import("react");
 const { createRoot } = await import("react-dom/client");
-const App = await import(pathToFileURL(`${root}/components/app/bops-app.tsx`).href);
-const { YouMenu } = await import(pathToFileURL(`${root}/components/app/sidebar.tsx`).href);
-const { BotMenu } = await import(pathToFileURL(`${root}/components/app/bot-menu.tsx`).href);
-const { Members } = await import(pathToFileURL(`${root}/components/app/members.tsx`).href);
+const App = await import(`${root}/components/app/bops-app.tsx`);
+const { YouMenu } = await import(`${root}/components/app/sidebar.tsx`);
+const { BotMenu } = await import(`${root}/components/app/bot-menu.tsx`);
+const { Members } = await import(`${root}/components/app/members.tsx`);
 
 let passed = 0;
 const test = async (name, f) => {

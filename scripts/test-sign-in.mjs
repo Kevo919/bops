@@ -13,7 +13,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 // Orgo is the fake below, on its own origin; the state goes to a throwaway file store.
 for (const k of ["ORGO_API_KEY", "BOPS_DATABASE_URL", "BOPS_SELF_HOSTED"]) delete process.env[k];
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const ts = createRequire(import.meta.url)("typescript");
 // Modules that would start something when called or loaded (the Keychain, Bops Cloud, the relay, the
 // bots' sessions and what they load) are stand-ins: each of their exports does nothing.
@@ -24,7 +24,7 @@ const STAND_INS = new Set(["keychain", "cloud-tunnel", "relay", "sessions", "mac
 const project = pathToFileURL(root).href + "/";
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -168,5 +168,7 @@ const del = await route.DELETE();
 assert.deepEqual(await del.json(), { ok: true });
 
 process.chdir(tmpdir());
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log("sign-in tests passed");

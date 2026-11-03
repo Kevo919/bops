@@ -14,14 +14,14 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -51,13 +51,13 @@ globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} }
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
 
-const { CODER_MIN_SIZE, mascotMarkup, mascotSvg, MOVING_MOODS } = await import(pathToFileURL(`${root}/lib/mascot.ts`).href);
-const { codersOf, codingThread, isPraise, moodOf, moodSignals, NO_SIGNALS, SHY_MS } = await import(pathToFileURL(`${root}/lib/bot-mood.ts`).href);
-const { BotMoods, BotMoodsFrom, CallTalking, Mascot, talkingStore } = await import(pathToFileURL(`${root}/components/app/mascot.tsx`).href);
-const { stateArrived } = await import(pathToFileURL(`${root}/components/app/state-arrival.ts`).href);
-const { ChatAvatar } = await import(pathToFileURL(`${root}/components/app/ui.tsx`).href);
-const { ChatView } = await import(pathToFileURL(`${root}/components/app/chat-view.tsx`).href);
-const { botTalking, BOT_TALKING } = await import(pathToFileURL(`${root}/components/app/call-bar.tsx`).href);
+const { CODER_MIN_SIZE, mascotMarkup, mascotSvg, MOVING_MOODS } = await import(`${root}/lib/mascot.ts`);
+const { codersOf, codingThread, isPraise, moodOf, moodSignals, NO_SIGNALS, SHY_MS } = await import(`${root}/lib/bot-mood.ts`);
+const { BotMoods, BotMoodsFrom, CallTalking, Mascot, talkingStore } = await import(`${root}/components/app/mascot.tsx`);
+const { stateArrived } = await import(`${root}/components/app/state-arrival.ts`);
+const { ChatAvatar } = await import(`${root}/components/app/ui.tsx`);
+const { ChatView } = await import(`${root}/components/app/chat-view.tsx`);
+const { botTalking, BOT_TALKING } = await import(`${root}/components/app/call-bar.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 

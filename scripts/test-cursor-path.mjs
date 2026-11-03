@@ -9,7 +9,7 @@
 // Usage: node scripts/test-cursor-path.mjs
 import assert from "node:assert/strict";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const { at, travel, retarget, travelMs, HURRY_MS, STREAM_MS } = await import(`${root}/lib/cursor-path.ts`);
 
 let passed = 0;

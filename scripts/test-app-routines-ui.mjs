@@ -23,14 +23,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -60,9 +60,9 @@ globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} }
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
 
-const { AppRoutines, BotRoutines, routinesOfApp, routineCount } = await import(pathToFileURL(`${root}/components/app/routines.tsx`).href);
-const { AutopilotPage, checkedOf, RoutineList, RoutinesEmpty } = await import(pathToFileURL(`${root}/components/app/autopilot.tsx`).href);
-const { ConnectStep, checkLine, grantOf, HOW_OFTEN } = await import(pathToFileURL(`${root}/components/app/apps.tsx`).href);
+const { AppRoutines, BotRoutines, routinesOfApp, routineCount } = await import(`${root}/components/app/routines.tsx`);
+const { AutopilotPage, checkedOf, RoutineList, RoutinesEmpty } = await import(`${root}/components/app/autopilot.tsx`);
+const { ConnectStep, checkLine, grantOf, HOW_OFTEN } = await import(`${root}/components/app/apps.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -746,7 +746,7 @@ await test("an app's routines: one question across its bots' lists; a check name
 
 /* ---------------- A routine's reports ---------------- */
 
-const { routineReports, PAIR_GRACE_MS, tookWords } = await import(pathToFileURL(`${root}/lib/routine-reports.ts`).href);
+const { routineReports, PAIR_GRACE_MS, tookWords } = await import(`${root}/lib/routine-reports.ts`);
 const M = 60_000;
 const D = 86_400_000;
 const said = (id, at, text, extra = {}) => ({ id, chatId: "bot:bot_main", role: "bot", botId: "bot_main", text, at, ...extra });
@@ -802,7 +802,7 @@ await test("reports: Orgo's runs and the last run, newest first; quiet from its 
 });
 
 await test("when a run began, in the owner's zone: today, yesterday, this past week by its day, then its date", async () => {
-  const { ranWhen } = await import(pathToFileURL(`${root}/components/app/routine-reports.tsx`).href);
+  const { ranWhen } = await import(`${root}/components/app/routine-reports.tsx`);
   const LA = "America/Los_Angeles";
   const at = Date.parse("2026-10-26T19:00:00Z"); // Monday, noon in Los Angeles
   assert.equal(ranWhen(Date.parse("2026-10-26T15:00:00Z"), at, LA), "Today 8 AM");
@@ -1389,7 +1389,7 @@ await test("in a workspace shared with the user, a run's replies are shown and c
 });
 
 await test("lib/reply-drafts.ts: where a draft stands, and drafts as words where their cards can't go", async () => {
-  const { draftStatus, draftsText, draftWhere, SEND_STALE_MS } = await import(pathToFileURL(`${root}/lib/reply-drafts.ts`).href);
+  const { draftStatus, draftsText, draftWhere, SEND_STALE_MS } = await import(`${root}/lib/reply-drafts.ts`);
   const t = 1_000_000;
   assert.equal(draftStatus({}, t), "draft");
   assert.equal(draftStatus({ sending: t - 1000 }, t), "sending");

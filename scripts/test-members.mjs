@@ -13,7 +13,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 // A file store, loaded at once and always ready (lib/server/persist.ts); the Mac app's ways (state in Bops Cloud)
 // once it's loaded, below.
@@ -34,18 +34,20 @@ process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 // The Mac app's server listens on this Mac only (desktop/main.cjs): bot computers can't reach it.
 process.env.HOSTNAME = "127.0.0.1";
 process.env.BOPS_TELEMETRY = "0";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-members-"));
 // A `security` that has nothing, first on the PATH: nothing here reads this Mac's Keychain.
 mkdirSync(join(scratch, "bin"));
 writeFileSync(join(scratch, "bin", "security"), "#!/bin/sh\nexit 44\n");
 chmodSync(join(scratch, "bin", "security"), 0o755);
-process.env.PATH = `${join(scratch, "bin")}:${process.env.PATH}`;
+process.env.PATH = `${join(scratch, "bin")}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 // Modules that would start processes when loaded are stand-ins whose exports do nothing (as in test-plan.mjs).
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -1600,7 +1602,7 @@ for (const card of P.PLAN_CARDS) for (const line of card.lines) noDashes(line.te
 for (const e of said) noDashes(e);
 assert.ok(said.size >= 15, `the route's words were all checked (${said.size})`);
 // The sheet's own words.
-const sheet = readFileSync(join(root, "components/app/members.tsx"), "utf8");
+const sheet = readFileSync(join(rootPath, "components/app/members.tsx"), "utf8");
 for (const m of sheet.matchAll(/"([^"\n]{12,})"|`([^`\n]{12,})`|>([^<>{}\n]{12,})</g)) noDashes(m[1] ?? m[2] ?? m[3]);
 console.log("ok - the words");
 
@@ -1617,7 +1619,7 @@ for (const [event, props] of [
 }
 assert.deepEqual(A.cleanProperties("bops_members_opened", { people: 3, email: "alex@example.com" }, "app"), { people: 3 });
 assert.deepEqual(A.cleanProperties("bops_upgrade_clicked", { surface: "members" }, "app"), { surface: "members" });
-const server = readFileSync(join(root, "lib/server/members.ts"), "utf8");
+const server = readFileSync(join(rootPath, "lib/server/members.ts"), "utf8");
 const tracked = [...server.matchAll(/trackServerEvent\(([^;]*)\);/g)].map((m) => m[1]);
 assert.deepEqual(
   [...new Set(tracked.map((t) => /^"(\w+)"/.exec(t)?.[1]))].sort(),
@@ -1751,6 +1753,8 @@ console.log("ok - bot access: forgotten at the Mac's look too, whether or not th
 console.log("ok - bot access: only for the membership it was set in, so someone removed and back never finds their old bots");
 
 process.chdir(tmpdir());
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log("all passed");
 process.exit(0);

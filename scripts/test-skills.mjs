@@ -23,18 +23,18 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
 const UI = "ui-token-test-skills";
 process.env.BOPS_UI_TOKEN = UI;
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-skills-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const ORGO_KEY = "sk_orgo_test_skills";
@@ -46,7 +46,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -1114,6 +1114,8 @@ await check("Plain words: nothing a person or a bot reads has a dash, or a secre
 
 server.close();
 console.log(`\nskills: ${passed} passed, ${failed} failed`);
-if (!failed) rmSync(scratch, { recursive: true, force: true });
+if (!failed) try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 else console.log(`The throwaway folder is kept for a look: ${scratch}`);
 process.exit(failed ? 1 : 0);

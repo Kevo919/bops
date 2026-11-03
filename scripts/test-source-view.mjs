@@ -16,14 +16,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -90,9 +90,9 @@ const { createRoot } = await import("react-dom/client");
 const { act, createElement: h } = await import("react");
 const P = await import(`${root}/lib/source-parse.ts`);
 const V = await import(`${root}/lib/source-view.ts`);
-const { IssueSource, SourceThread } = await import(pathToFileURL(`${root}/components/app/source-view.tsx`).href);
-const { ReplyDrafts } = await import(pathToFileURL(`${root}/components/app/reply-drafts.tsx`).href);
-const { viewOnly } = await import(pathToFileURL(`${root}/components/app/view-only.ts`).href);
+const { IssueSource, SourceThread } = await import(`${root}/components/app/source-view.tsx`);
+const { ReplyDrafts } = await import(`${root}/components/app/reply-drafts.tsx`);
+const { viewOnly } = await import(`${root}/components/app/view-only.ts`);
 
 async function mount(el) {
   const box = doc.createElement("div");

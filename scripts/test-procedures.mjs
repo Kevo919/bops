@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 // A self-hosted install: the state is a file in the working folder, the model is OpenAI on its own key.
@@ -25,12 +25,14 @@ process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 process.env.OPENAI_API_KEY = "sk-test-procedures";
 process.env.HONCHO_API_KEY = "hc-test-procedures";
 process.env.BOPS_CHAT_MODEL = "gpt-test-chat";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-procedures-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
@@ -41,7 +43,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -794,7 +796,7 @@ await part("Plain words: no dashes in anything the user or a bot reads", async (
   for (const line of spoken) noDashes(line);
   // Nothing in the sources has a dash, but the patterns that take dashes out.
   for (const file of ["lib/server/procedures.ts", "lib/server/workspace-skills.ts", "lib/server/skill-bundle.ts", "app/api/skills/route.ts", "components/app/skill-dialog.tsx", "components/app/skills.tsx"])
-    readFileSync(join(root, file), "utf8")
+    readFileSync(join(rootPath, file), "utf8")
       .split("\n")
       .forEach((line, n) => {
         if (/[–—]/.test(line) && !/\.replace\(\/[^/]*[–—][^/]*\/[gimsuy]*,/.test(line)) assert.fail(`${file}:${n + 1} has a dash: ${line.trim()}`);
@@ -818,5 +820,7 @@ await part("Nothing unexpected: no stray warnings, network calls, other model ca
 const failed = results.filter((r) => !r.ok);
 console.log(`\nSave as skill: ${results.length - failed.length} of ${results.length} parts passed.`);
 if (failed.length) console.log(`The throwaway folder is kept for a look: ${scratch}`);
-else rmSync(scratch, { recursive: true, force: true });
+else try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(failed.length ? 1 : 0);

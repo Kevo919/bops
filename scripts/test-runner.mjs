@@ -27,13 +27,13 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 import { unfaked } from "./fake-exports.mjs";
 const { deviceIdOf } = await import(new URL("../cloud/device.ts", import.meta.url).href);
 
 process.env.TZ = "America/New_York";
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 const FAKES = {
   store: ["addMessage", "bot", "flushState", "getState", "id", "ownerName", "ownSession", "patchSession", "pullState", "session", "startLanded", "stateDevice", "stateEpoch", "stateInCloud", "statePulledAt", "stateReady", "stateTooNew", "update"],
@@ -63,7 +63,7 @@ const FAKES = {
 };
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {

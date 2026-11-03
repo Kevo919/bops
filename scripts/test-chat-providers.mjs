@@ -15,7 +15,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 const UI = process.argv.includes("--ui");
@@ -25,12 +25,14 @@ process.env.BOPS_SELF_HOSTED = "1";
 process.env.OPENAI_API_KEY = "sk-test-openai";
 const KEYS = { ANTHROPIC_API_KEY: "sk-ant-test-SECRET123", ZAI_API_KEY: "zai-test-SECRET456", DEEPSEEK_API_KEY: "ds-test-SECRET789", OPENROUTER_API_KEY: "or-test-SECRET000" };
 Object.assign(process.env, KEYS);
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-chat-providers-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 globalThis.bopsOrgoKey = "sk_orgo_test_chat_providers";
@@ -44,7 +46,7 @@ const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
     if (UI && specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -92,7 +94,7 @@ if (UI) {
   globalThis.matchMedia = () => ({ matches: false });
   const chatId = "bot:boppy";
 await check("the window's picker: Auto first, the models by provider, (no key) where the server has none, and the hint", async () => {
-  const { ChatModelPick, chatModelHint } = await import(pathToFileURL(`${root}/components/app/chat-model.tsx`).href);
+  const { ChatModelPick, chatModelHint } = await import(`${root}/components/app/chat-model.tsx`);
   const { renderToStaticMarkup } = await import("react-dom/server");
   const { createElement: h } = await import("react");
   const state = { chatKeys: { anthropic: true, openai: true, zai: false, "zai-coding": false, deepseek: false, openrouter: true } };
@@ -490,7 +492,7 @@ await check("Auto (no model): the turn goes to OpenAI as before, with web_search
 });
 
 await check("the window's picker renders right (the --ui pass)", async () => {
-  const out = await new Promise((resolve) => execFile(process.execPath, [fileURLToPath(import.meta.url), "--ui"], { cwd: root, env: process.env }, (error, stdout, stderr) => resolve({ error, text: `${stdout}${stderr}` })));
+  const out = await new Promise((resolve) => execFile(process.execPath, [fileURLToPath(import.meta.url), "--ui"], { cwd: rootPath, env: process.env }, (error, stdout, stderr) => resolve({ error, text: `${stdout}${stderr}` })));
   if (out.error) assert.fail(out.text);
   assert.match(out.text, /ok {3}the window's picker/);
 });

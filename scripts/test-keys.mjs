@@ -19,19 +19,21 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.OPENAI_API_KEY = "sk-test-keys";
 const UI = "ui-token-test-keys";
 process.env.BOPS_UI_TOKEN = UI;
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-keys-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const ORGO_KEY = "sk_orgo_test_keys";
@@ -44,7 +46,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -197,7 +199,7 @@ async function until(check, what, ms = 5000) {
   assert.fail(`timed out waiting for ${what}`);
 }
 const KeysRoute = await import(`${root}/app/api/keys/route.ts`);
-const KeyRoute = await import(pathToFileURL(`${root}/app/api/keys/[name]/route.ts`).href);
+const KeyRoute = await import(`${root}/app/api/keys/[name]/route.ts`);
 const RevealRoute = await import(`${root}/app/api/keys/reveal/route.ts`);
 clearInterval(globalThis.__bopsRoutines);
 
@@ -424,7 +426,7 @@ await check("reveal says plainly why not: a name Bops can't call, a key not set,
 });
 
 await check("no bot or model can reach reveal: only its route calls it, and no tool is named for it", () => {
-  for (const f of ["lib/server/chat.ts", "lib/server/computer-task.ts", "lib/server/composio.ts"]) assert.ok(!readFileSync(join(root, f), "utf8").includes("revealKey"), `${f} doesn't call revealKey`);
+  for (const f of ["lib/server/chat.ts", "lib/server/computer-task.ts", "lib/server/composio.ts"]) assert.ok(!readFileSync(join(rootPath, f), "utf8").includes("revealKey"), `${f} doesn't call revealKey`);
   const users = [];
   const walk = (d) => {
     for (const f of readdirSync(d)) {
@@ -434,7 +436,7 @@ await check("no bot or model can reach reveal: only its route calls it, and no t
       else if (/\.(ts|tsx)$/.test(f) && readFileSync(p, "utf8").includes("revealKey")) users.push(p.slice(root.length + 1));
     }
   };
-  for (const d of ["app", "lib", "components"]) walk(join(root, d));
+  for (const d of ["app", "lib", "components"]) walk(join(rootPath, d));
   // Besides the Vault's own: a key brain's run (lib/server/brains.ts revealBrainKey), whose key goes to its
   // computer as a file the run reads and deletes, never to a bot's tools or a model.
   assert.deepEqual(users.sort(), ["app/api/keys/reveal/route.ts", "lib/server/brains.ts", "lib/server/keys.ts"]);
@@ -800,6 +802,8 @@ await check("no key value in any log, or anything the model was sent", () => {
 });
 
 server.close();
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`keys: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

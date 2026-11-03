@@ -8,10 +8,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 registerHooks({
   load(url, context, next) {
@@ -23,7 +23,7 @@ registerHooks({
 });
 globalThis.window = globalThis;
 
-const { UpdateCard, UpdateNotice, UpdateSettings } = await import(pathToFileURL(`${root}/components/app/update-notice.tsx`).href);
+const { UpdateCard, UpdateNotice, UpdateSettings } = await import(`${root}/components/app/update-notice.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 

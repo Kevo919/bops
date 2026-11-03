@@ -14,14 +14,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -54,9 +54,9 @@ globalThis.localStorage = { getItem: (k) => stored.get(k) ?? null, setItem: (k, 
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
 
-const { SidebarRail } = await import(pathToFileURL(`${root}/components/app/sidebar-rail.tsx`).href);
-const { railMark, attentionOf, needsByBot } = await import(pathToFileURL(`${root}/components/app/sidebar-sections.tsx`).href);
-const { openFooterPage, footerPageOf } = await import(pathToFileURL(`${root}/components/app/sidebar-footer.tsx`).href);
+const { SidebarRail } = await import(`${root}/components/app/sidebar-rail.tsx`);
+const { railMark, attentionOf, needsByBot } = await import(`${root}/components/app/sidebar-sections.tsx`);
+const { openFooterPage, footerPageOf } = await import(`${root}/components/app/sidebar-footer.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 

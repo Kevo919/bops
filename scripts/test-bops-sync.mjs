@@ -15,14 +15,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { unfaked } from "./fake-exports.mjs";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO|NEXT_PUBLIC_BOPS)_/.test(k)) delete process.env[k];
 // A build with brains (lib/types.ts BRAINS_ON, read as it loads): this file runs itself once more as one, for the brains' checks.
 const BRAINS_BUILD = process.argv.includes("--brains-build");
 if (BRAINS_BUILD) process.env.NEXT_PUBLIC_BOPS_BRAINS = "1";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-map-"));
 
 const FAKES = {
@@ -32,7 +32,7 @@ const FAKES = {
 };
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -257,7 +257,9 @@ if (BRAINS_BUILD) {
     assert.equal(puts().length, 2);
     assert.ok(puts().every((c) => brainsIn(c.body).length));
   });
-  rmSync(scratch, { recursive: true, force: true });
+  try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
   console.log(`bops sync (brains): ${passed} passed, ${failures} failed`);
   process.exit(failures ? 1 : 0);
 }
@@ -497,6 +499,8 @@ await check("a computer's runner never sends the map, nor the access set", async
   }
 }
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`bops sync: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

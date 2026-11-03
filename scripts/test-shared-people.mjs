@@ -11,19 +11,19 @@ import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 
 process.env.BOPS_SELF_HOSTED = "1";
 for (const k of ["ORGO_API_KEY", "BOPS_ORGO_WORKSPACE", "BOPS_DATABASE_URL", "TAILSCALE_AUTH_KEY", "BOPS_COMPUTER_TOOL", "BOPS_UI_TOKEN", "AGENTMAIL_API_KEY", "OPENAI_API_KEY"]) delete process.env[k];
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 process.env.HOSTNAME = "127.0.0.1";
 process.env.BOPS_TELEMETRY = "0";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-shared-people-"));
 mkdirSync(join(scratch, "bin"));
 writeFileSync(join(scratch, "bin", "security"), "#!/bin/sh\nexit 44\n");
 chmodSync(join(scratch, "bin", "security"), 0o755);
-process.env.PATH = `${join(scratch, "bin")}:${process.env.PATH}`;
+process.env.PATH = `${join(scratch, "bin")}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 
 const PROJECT = "7c7c7c7c-1111-4000-8000-000000000001";
 const ADMIN_KEY = "sk_test_admin_viewer_key_000000";
@@ -39,7 +39,7 @@ export const sharedOpen = () => !!globalThis.__shared.open;
 `;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {

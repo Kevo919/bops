@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 // Tests for the git hook scripts/setup.sh installs (pre-push, "bops-public-history-guard", a copy of
 // scripts/push-guard.sh): with bops-secrets' private patterns at hand, a push to the public repo is refused when
 // anything a new commit carries matches one, wherever in the commit it is: its message or another header (a
@@ -22,7 +23,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { crc32, deflateRawSync, gzipSync } from "node:zlib";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-push-guard-"));
 const clone = join(scratch, "clone");
 const secrets = join(scratch, "secrets");
@@ -54,10 +57,10 @@ async function check(name, fn) {
 
 try {
   execFileSync("git", ["clone", "-q", "--shared", "--no-checkout", root, clone], { env, stdio: "pipe" });
-  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: rootPath, encoding: "utf8" }).trim();
   // The remote has this repo's HEAD (as a clone of the public repo would have its main).
   git(["update-ref", "refs/remotes/origin/base", head]);
-  execFileSync("bash", [join(root, "scripts/setup.sh"), "--hook"], { cwd: clone, env, stdio: "pipe" });
+  execFileSync("bash", [join(rootPath, "scripts/setup.sh"), "--hook"], { cwd: clone, env, stdio: "pipe" });
   const hook = join(git(["rev-parse", "--path-format=absolute", "--git-common-dir"]), "hooks/pre-push");
 
   /** A commit on `parent`: `files` sets each path's bytes (null takes it out); `who` writes and commits it. */
@@ -313,7 +316,7 @@ try {
     sh(["update-ref", "refs/remotes/origin/base", head]);
     writeFileSync(join(sh(["rev-parse", "--path-format=absolute", "--git-dir"]), "shallow"), `${head}\n`);
     assert.equal(sh(["rev-parse", "--is-shallow-repository"]), "true");
-    execFileSync("bash", [join(root, "scripts/setup.sh"), "--hook"], { cwd: shallow, env, stdio: "pipe" });
+    execFileSync("bash", [join(rootPath, "scripts/setup.sh"), "--hook"], { cwd: shallow, env, stdio: "pipe" });
     const shallowHook = join(sh(["rev-parse", "--path-format=absolute", "--git-common-dir"]), "hooks/pre-push");
     const sha = sh(["commit-tree", sh(["rev-parse", `${head}^{tree}`]), "-p", head, "-m", `Ask ${PATTERN} about it`]);
     const r = push(sha, { cwd: shallow, run: shallowHook });
@@ -324,7 +327,7 @@ try {
   });
 
   await check("an older hook gives way to the newer one in the checkout that pushes, and setup leaves a newer one installed as it is", () => {
-    const real = readFileSync(join(root, "scripts/push-guard.sh"), "utf8");
+    const real = readFileSync(join(rootPath, "scripts/push-guard.sh"), "utf8");
     const version = Number(/^guard_version=(\d+)$/m.exec(real)[1]);
     // Installed long ago: it lets everything through.
     const old = real.replace(/^guard_version=\d+$/m, "guard_version=1").replace(/^lower\(\) \{/m, "exit 0\nlower() {");
@@ -340,10 +343,10 @@ try {
     // Setup never puts an older one over a newer one.
     const newer = real.replace(/^guard_version=\d+$/m, `guard_version=${version + 1}`);
     writeFileSync(hook, newer);
-    execFileSync("bash", [join(root, "scripts/setup.sh"), "--hook"], { cwd: clone, env, stdio: "pipe" });
+    execFileSync("bash", [join(rootPath, "scripts/setup.sh"), "--hook"], { cwd: clone, env, stdio: "pipe" });
     assert.equal(readFileSync(hook, "utf8"), newer);
     writeFileSync(hook, old);
-    execFileSync("bash", [join(root, "scripts/setup.sh"), "--hook"], { cwd: clone, env, stdio: "pipe" });
+    execFileSync("bash", [join(rootPath, "scripts/setup.sh"), "--hook"], { cwd: clone, env, stdio: "pipe" });
     assert.equal(readFileSync(hook, "utf8"), real);
   });
 
@@ -357,7 +360,9 @@ try {
     assert.equal(ok.status, 0, `${ok.stdout}${ok.stderr}`);
   });
 } finally {
-  rmSync(scratch, { recursive: true, force: true });
+  try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 }
 
 console.log(`${passed} passed, ${failures} failed`);

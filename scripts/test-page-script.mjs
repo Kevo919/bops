@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 // Tests for the page-script runner (vm/page-script.cjs), which runs a cloud task's page_script on the
 // Chrome of its screen (lib/server/computer-task.ts): here, on a headless Chrome of its own with a
 // throwaway profile on a spare port. A script fills and submits a form by its label and button, reads a
@@ -11,7 +12,9 @@ import { copyFileSync, existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 const chrome = [process.env.CHROME_PATH, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"].find((p) => p && existsSync(p));
 if (!chrome) {
   console.log("page script: skipped (no Chrome here; set CHROME_PATH)");
@@ -20,8 +23,8 @@ if (!chrome) {
 
 // The runner as it sits on a bot's computer: next to the node_modules that hold playwright-core.
 const dir = mkdtempSync(join(tmpdir(), "bops-test-page-"));
-copyFileSync(join(root, "vm/page-script.cjs"), join(dir, "page-script.cjs"));
-symlinkSync(join(root, "node_modules"), join(dir, "node_modules"));
+copyFileSync(join(rootPath, "vm/page-script.cjs"), join(dir, "page-script.cjs"));
+symlinkSync(join(rootPath, "node_modules"), join(dir, "node_modules"));
 const port = 9300 + Math.floor(Math.random() * 600);
 const browser = spawn(chrome, ["--headless=new", `--remote-debugging-port=${port}`, `--user-data-dir=${join(dir, "profile")}`, "--no-first-run", "--no-default-browser-check", "data:text/html,<title>First</title>one"], { stdio: "ignore" });
 const cleanup = () => {

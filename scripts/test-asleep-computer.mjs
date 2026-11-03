@@ -18,7 +18,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 
 // A file store, loaded at once and always ready (lib/server/persist.ts); the Mac app's ways (cloud.ts cloudOn,
 // so Bops says when its computer is in use) once it's loaded, below.
@@ -28,12 +28,12 @@ for (const k of ["ORGO_API_KEY", "BOPS_ORGO_WORKSPACE", "BOPS_ORGO_TEMPLATE", "B
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 // The app's version, which every call to Orgo says (lib/server/app-version.ts orgoHeaders).
 process.env.BOPS_APP_VERSION = "9.9.9";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 // Modules that would start processes when loaded, or that Node can't load, are stand-ins whose exports do nothing (as in test-plan.mjs).
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -429,5 +429,7 @@ console.log("asleep in storage: an action waits for the wake (computer_waking, w
 assert.ok(calls.every((c) => c.auth === "Bearer sk_test_asleep"), "Orgo asked with the user's own key");
 assert.ok(calls.every((c) => c.version === "9.9.9"), "every call says the app's version");
 console.log(`all asleep-computer tests passed (${calls.length} fake Orgo calls, none to the network)`);
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

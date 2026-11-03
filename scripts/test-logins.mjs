@@ -12,13 +12,13 @@
 // Usage: node --conditions=react-server scripts/test-logins.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
-import { pathToFileURL } from "node:url";
+
 import { fill } from "./fake-exports.mjs";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|COMPOSIO|ORGO)_/.test(k)) delete process.env[k];
 const UI = "ui-token-test-logins";
 process.env.BOPS_UI_TOKEN = UI;
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 const forward = (mod, names) => names.map((n) => `export const ${n} = (...a) => globalThis.__fake[${JSON.stringify(mod)}].${n}(...a);`).join("\n");
 const FAKES = {
@@ -43,7 +43,7 @@ export class KeysError extends Error {}`,
 };
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {

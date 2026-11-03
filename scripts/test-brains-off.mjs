@@ -16,7 +16,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 for (const k of Object.keys(process.env))
@@ -26,14 +26,16 @@ delete process.env.NEXT_PUBLIC_BOPS_BRAINS;
 process.env.BOPS_DEVICE_SEED = "test-brains-off";
 process.env.BOPS_RESPONSES_WS = "0";
 process.env.HOSTNAME = "127.0.0.1";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 // Modules that would start processes when loaded are stand-ins: each export does nothing.
 const STAND_INS = new Set(["relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
     // Only the server may import these; here everything is the server, and the window's code too.
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -63,8 +65,8 @@ process.chdir(scratch);
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 // The app's files (vm/, the browser tools' version) are read from where it runs.
-symlinkSync(join(root, "node_modules"), join(scratch, "node_modules"));
-symlinkSync(join(root, "vm"), join(scratch, "vm"));
+symlinkSync(join(rootPath, "node_modules"), join(scratch, "node_modules"));
+symlinkSync(join(rootPath, "vm"), join(scratch, "vm"));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(check, what, ms = 20_000) {
   for (const end = Date.now() + ms; Date.now() < end; await sleep(20)) {
@@ -329,7 +331,7 @@ await check("every brain route, and a thread's terminal, answers 404", async () 
     bot: await import(`${root}/app/api/brains/bot/route.ts`),
     signIn: await import(`${root}/app/api/brains/sign-in/route.ts`),
     signOut: await import(`${root}/app/api/brains/sign-out/route.ts`),
-    terminal: await import(pathToFileURL(`${root}/app/api/sessions/[sessionId]/terminal/route.ts`).href),
+    terminal: await import(`${root}/app/api/sessions/[sessionId]/terminal/route.ts`),
   };
   S.update((s) => s.sessions.push(brainThread("ses_term")));
   const calls = [
@@ -359,8 +361,8 @@ await check("every brain route, and a thread's terminal, answers 404", async () 
 
 await check("a release builds without brains, whatever a .env file says", () => {
   // The server (and the bundle for the bots' computers' runners) is built by scripts/server-bundle.sh, which the release runs.
-  assert.match(readFileSync(join(root, "scripts/release.sh"), "utf8"), /^scripts\/server-bundle\.sh$/m);
-  assert.match(readFileSync(join(root, "scripts/server-bundle.sh"), "utf8"), /^\s*NEXT_PUBLIC_BOPS_BRAINS=0 npx next build$/m);
+  assert.match(readFileSync(join(rootPath, "scripts/release.sh"), "utf8"), /^scripts\/server-bundle\.sh$/m);
+  assert.match(readFileSync(join(rootPath, "scripts/server-bundle.sh"), "utf8"), /^\s*NEXT_PUBLIC_BOPS_BRAINS=0 npx next build$/m);
 });
 
 /* ---------------- A copy of the main computer ---------------- */
@@ -404,7 +406,7 @@ const view = (sessions = [], more = {}) => ({ ...structuredClone(S.getState()), 
 const BRAINY = /\bBrain\b|their brain|Claude Code|Bops agent|Codex|Open in terminal|Sign in with your Claude plan/;
 
 await check("Settings has no AI plans place, and This Mac no Brain section", async () => {
-  const { Settings } = await import(pathToFileURL(`${root}/components/app/bops-app.tsx`).href);
+  const { Settings } = await import(`${root}/components/app/bops-app.tsx`);
   const html = renderToStaticMarkup(h(Settings, { state: view(), at: "mac", onClose: noop, onShowScreen: noop, onOpenVault: noop }));
   const t = text(html);
   const nav = [...html.matchAll(/data-settings-nav="([a-z]+)"/g)].map((m) => m[1]);
@@ -415,7 +417,7 @@ await check("Settings has no AI plans place, and This Mac no Brain section", asy
 });
 
 await check("a bot's profile has no Brain and no badge for the brain it was set to: its AI is Bops agent alone", async () => {
-  const { BotPanel } = await import(pathToFileURL(`${root}/components/app/bot-panel.tsx`).href);
+  const { BotPanel } = await import(`${root}/components/app/bot-panel.tsx`);
   const st = view();
   const b = st.bots.find((x) => x.id === main.id);
   for (const section of ["details", "skills"]) {
@@ -432,7 +434,7 @@ await check("a bot's profile has no Brain and no badge for the brain it was set 
 });
 
 await check("a thread Claude Code ran has no badge and no Open in terminal, one waiting on its brain no Sign in, and a Codex thread's reply box reads as Bops agent's", async () => {
-  const { ThreadSheet, ChatView } = await import(pathToFileURL(`${root}/components/app/chat-view.tsx`).href);
+  const { ThreadSheet, ChatView } = await import(`${root}/components/app/chat-view.tsx`);
   const sheetHtml = (s, more) => renderToStaticMarkup(h(ThreadSheet, { state: view([s], more), session: s, onClose: noop, onShowComputer: noop, onShowScreen: noop }));
   const done = text(sheetHtml(brainThread("ses_a")));
   assert.match(done, new RegExp(`^Cart total ${main.name} · finished · 2 steps · left off on screen \\d `), done);
@@ -461,6 +463,8 @@ await check("a thread Claude Code ran has no badge and no Open in terminal, one 
 });
 
 console.log(`\nbrains off: ${passed} passed, ${failed} failed`);
-if (!failed) rmSync(scratch, { recursive: true, force: true });
+if (!failed) try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 else console.log(`The throwaway folder is kept for a look: ${scratch}`);
 process.exit(failed ? 1 : 0);

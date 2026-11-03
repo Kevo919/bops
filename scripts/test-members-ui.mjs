@@ -15,14 +15,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -52,9 +52,9 @@ globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} }
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
 
-const S = await import(pathToFileURL(`${root}/components/app/members.tsx`).href);
-const M = await import(pathToFileURL(`${root}/lib/members.ts`).href);
-const A = await import(pathToFileURL(`${root}/lib/member-access.ts`).href);
+const S = await import(`${root}/components/app/members.tsx`);
+const M = await import(`${root}/lib/members.ts`);
+const A = await import(`${root}/lib/member-access.ts`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -537,7 +537,7 @@ await test("Member and None say what people get, and keys on the computers are s
 
 /* ---------------- The team chart (team-chart.tsx) ---------------- */
 
-const Chart = await import(pathToFileURL(`${root}/components/app/team-chart.tsx`).href);
+const Chart = await import(`${root}/components/app/team-chart.tsx`);
 
 await test("the sheet links to the team chart, never with a shared workspace open", async () => {
   bops();

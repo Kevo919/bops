@@ -36,7 +36,7 @@ import { accessSync, constants, existsSync, mkdirSync, mkdtempSync, readdirSync,
 import { registerHooks } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 const REAL_CLAUDE = process.env.REAL_CLAUDE === "1";
@@ -51,12 +51,14 @@ process.env.BOPS_RESPONSES_WS = "0";
 // Bops listens on this Mac only, as the Mac app does by default: computers get no address for it, and
 // nothing asks this Mac's Tailscale (composio.ts bopsAddress).
 process.env.HOSTNAME = "127.0.0.1";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 // Modules that would start processes when loaded are stand-ins: each export does nothing.
 const STAND_INS = new Set(["relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -93,7 +95,7 @@ if (process.argv[2] === "--render") {
   globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
   globalThis.matchMedia = () => ({ matches: false });
   globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
-  const { ThreadSheet, ChatView } = await import(pathToFileURL(`${root}/components/app/chat-view.tsx`).href);
+  const { ThreadSheet, ChatView } = await import(`${root}/components/app/chat-view.tsx`);
   const { renderToStaticMarkup } = await import("react-dom/server");
   const { createElement: h } = await import("react");
   const v = JSON.parse(readFileSync(process.argv[3], "utf8"));
@@ -141,8 +143,8 @@ process.chdir(scratch);
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 // The app's files (vm/, the browser tools' version) are read from where it runs.
-symlinkSync(join(root, "node_modules"), join(scratch, "node_modules"));
-symlinkSync(join(root, "vm"), join(scratch, "vm"));
+symlinkSync(join(rootPath, "node_modules"), join(scratch, "node_modules"));
+symlinkSync(join(rootPath, "vm"), join(scratch, "vm"));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(check, what, ms = 20_000) {
   for (const end = Date.now() + ms; Date.now() < end; await sleep(20)) {
@@ -460,7 +462,7 @@ const onPc = (c, path) => (path.startsWith("/usr/local/bin/") ? join(c.bin, path
 const runHere = (c, command) =>
   new Promise((resolve) =>
     execFile(
-      "/bin/bash",
+      process.platform === "win32" ? "bash" : "/bin/bash",
       ["-c", command],
       {
         env: {
@@ -907,7 +909,7 @@ await test("the screen MCP's approve tool hands Claude Code allow with its input
     [
       "import json, sys, importlib.util",
       `sys.argv = ["screen_mcp.py", "stdio", "--session", "ses_1", "--bot", "boppy", "--approve"]`,
-      `spec = importlib.util.spec_from_file_location("screen_mcp", ${JSON.stringify(join(root, "vm/screen_mcp.py"))})`,
+      `spec = importlib.util.spec_from_file_location("screen_mcp", ${JSON.stringify(join(rootPath, "vm/screen_mcp.py"))})`,
       "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)",
       "assert 'approve' in m.server.tools",
       "m.os.path.exists = lambda p: True",
@@ -923,7 +925,7 @@ await test("the screen MCP's approve tool hands Claude Code allow with its input
   assert.deepEqual(out[1], { behavior: "deny", message: "Maya said no." });
   assert.deepEqual(out[2], { behavior: "deny", message: "Bops refused: not allowed" });
   // Without --approve, a Bops agent thread's screen MCP has no such tool.
-  const plain = execFileSync("python3", ["-c", `import sys, importlib.util; sys.argv=["s","stdio","--session","x"]; spec=importlib.util.spec_from_file_location("s", ${JSON.stringify(join(root, "vm/screen_mcp.py"))}); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m); print("approve" in m.server.tools)`], { env: { PATH: REAL_PATH, PYTHONPATH: join(scratch, "py"), PYTHONDONTWRITEBYTECODE: "1" } }).toString().trim();
+  const plain = execFileSync("python3", ["-c", `import sys, importlib.util; sys.argv=["s","stdio","--session","x"]; spec=importlib.util.spec_from_file_location("s", ${JSON.stringify(join(rootPath, "vm/screen_mcp.py"))}); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m); print("approve" in m.server.tools)`], { env: { PATH: REAL_PATH, PYTHONPATH: join(scratch, "py"), PYTHONDONTWRITEBYTECODE: "1" } }).toString().trim();
   assert.equal(plain, "False");
 });
 
@@ -1642,7 +1644,7 @@ await test("the window's cards for them read right (the --render pass)", async (
   const st = S.getState();
   writeFileSync(file, JSON.stringify({ ...views, screenNo: DISPLAYS.indexOf(views.takeover.display) + 1, bots: st.bots, brains: st.brains, chat: st.chats.find((c) => c.id === views.signIn.chatId) }));
   const out = await new Promise((resolve, reject) =>
-    execFile(process.execPath, [...process.execArgv.filter((a) => a.startsWith("--preserve-symlinks")), fileURLToPath(import.meta.url), "--render", file], { cwd: root, env: { PATH: REAL_PATH, HOME: process.env.HOME } }, (err, stdout, stderr) => (err ? reject(new Error(`${stdout}${stderr}`)) : resolve(stdout))),
+    execFile(process.execPath, [...process.execArgv.filter((a) => a.startsWith("--preserve-symlinks")), fileURLToPath(import.meta.url), "--render", file], { cwd: rootPath, env: { PATH: REAL_PATH, HOME: process.env.HOME } }, (err, stdout, stderr) => (err ? reject(new Error(`${stdout}${stderr}`)) : resolve(stdout))),
   );
   assert.equal(out.match(/^ok render:/gm)?.length, 5, out);
   process.stdout.write(out.replace(/^/gm, "  "));
@@ -1727,5 +1729,7 @@ if (REAL_CLAUDE) {
 console.log(`\n${passed} passed`);
 for (const c of pcs.values())
   for (const d of existsSync(c.agents) ? readdirSync(c.agents) : []) await new Promise((r) => execFile("/bin/bash", ["-c", `BOPS_AGENTS=${c.agents} ${join(c.bin, "bops-agent")} stop ${d}`], () => r()));
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

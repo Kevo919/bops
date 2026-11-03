@@ -17,10 +17,12 @@ import { registerHooks } from "node:module";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^BOPS_/.test(k)) delete process.env[k];
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 // The sites remembered as needing the browser go in .data/ under the working folder: a throwaway one.
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-render-"));
 process.chdir(scratch);
@@ -42,7 +44,7 @@ registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "node:dns/promises" && context.parentURL?.endsWith("/lib/server/safe-fetch.ts")) return { url: FAKE_DNS, format: "module", shortCircuit: true };
     if (specifier === "node:os" && context.parentURL?.endsWith("/lib/server/safe-fetch.ts")) return { url: FAKE_OS, format: "module", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -56,10 +58,10 @@ registerHooks({
   },
 });
 
-const { FetchRefused } = await import(pathToFileURL(`${root}/lib/server/safe-fetch.ts`).href);
-const render = await import(pathToFileURL(`${root}/lib/server/web-render.ts`).href);
-const { openGuard } = await import(pathToFileURL(`${root}/lib/server/render-guard.ts`).href);
-const { pageLines, readPage } = await import(pathToFileURL(`${root}/lib/server/web-page.ts`).href);
+const { FetchRefused } = await import(`${root}/lib/server/safe-fetch.ts`);
+const render = await import(`${root}/lib/server/web-render.ts`);
+const { openGuard } = await import(`${root}/lib/server/render-guard.ts`);
+const { pageLines, readPage } = await import(`${root}/lib/server/web-page.ts`);
 const { CHALLENGE, RENDER_LIMIT_MS, browserStatus, forgetSites, lastGuardRefusals, needsBrowser, rememberSite, renderPage, siteNeedsBrowser } = render;
 
 /* ---------------- The fixture pages ---------------- */
@@ -235,7 +237,7 @@ await part("When a page needs the browser", async () => {
     for (const t of ["Prices loaded by JavaScript", "Welcome past the wall", "Just a moment ago", "Checking your order status", "One more step to finish your account"]) assert.doesNotMatch(t, CHALLENGE, t);
   });
   await check("the hidden window waits on the same words, its own copy (no pattern comes from a request)", () => {
-    const own = /const WALL_WORDS =\s*(\/.*\/)([a-z]*);/.exec(readFileSync(join(root, "desktop/render.cjs"), "utf8"));
+    const own = /const WALL_WORDS =\s*(\/.*\/)([a-z]*);/.exec(readFileSync(join(rootPath, "desktop/render.cjs"), "utf8"));
     assert.ok(own, "WALL_WORDS in desktop/render.cjs");
     assert.equal(own[1], `/${CHALLENGE.source}/`);
     assert.equal(own[2], CHALLENGE.flags);
@@ -406,7 +408,7 @@ await part("No browser: pages read as they always did", async () => {
 
 /* ---------------- The real browser (Electron, as the Mac app runs it) ---------------- */
 
-const ELECTRON = join(root, "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron");
+const ELECTRON = join(rootPath, "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron");
 if (process.platform !== "darwin" || !existsSync(ELECTRON)) {
   console.log(`skip The real browser: no Electron app at ${ELECTRON}`);
 } else {
@@ -415,7 +417,7 @@ if (process.platform !== "darwin" || !existsSync(ELECTRON)) {
   process.env.BOPS_UI_TOKEN = "0123456789abcdef".repeat(4); // gitleaks:allow (a made-up token for this test)
   const harnessEnv = { ...process.env };
   delete harnessEnv.BOPS_FETCH_ALLOW;
-  const electron = spawn(ELECTRON, [join(root, "scripts/render-harness.cjs")], { env: harnessEnv, stdio: ["pipe", "pipe", "pipe"] });
+  const electron = spawn(ELECTRON, [join(rootPath, "scripts/render-harness.cjs")], { env: harnessEnv, stdio: ["pipe", "pipe", "pipe"] });
   let harnessLog = "";
   electron.stderr.on("data", (d) => (harnessLog += d));
   const started = await new Promise((resolve) => {
@@ -656,7 +658,9 @@ server.close();
 canary.close();
 for (const res of held) res.destroy();
 server.closeAllConnections?.();
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} parts passed`);
 process.exit(failed.length ? 1 : 0);

@@ -25,13 +25,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 import { unfaked } from "./fake-exports.mjs";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.example";
 process.env.BOPS_CLOUD_URL = "https://bops.example/api";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 const FAKES = {
   store: ["flushState", "getState", "stateDevice", "stateInCloud", "stateReady", "stateTooNew", "update"],
@@ -47,7 +47,7 @@ const FAKES = {
 const VALUES = { runner: { RUNNER_CONF: "/etc/supervisor/conf.d/bops-runner.conf", RUNNER_WRAPPER: "/opt/bops/runner/run.sh" } };
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -1510,6 +1510,8 @@ await check("the probe says key=yes only for a line that sets a non-empty ORGO_A
   rmSync(dir, { recursive: true, force: true });
 });
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`runner install: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

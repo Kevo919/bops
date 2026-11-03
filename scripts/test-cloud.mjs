@@ -18,7 +18,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { gunzipSync } from "node:zlib";
 import { WebSocketServer } from "ws";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 const ts = createRequire(import.meta.url)("typescript");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Wait for `check` to give something truthy (and return it). */
@@ -39,7 +41,7 @@ const scratch = mkdtempSync(join(tmpdir(), "bops-test-cloud-"));
 process.chdir(scratch);
 process.env.HOME = scratch;
 // Some modules read files through the working folder (the page recorder they inject).
-symlinkSync(join(root, "node_modules"), join(scratch, "node_modules"));
+symlinkSync(join(rootPath, "node_modules"), join(scratch, "node_modules"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 mkdirSync(join(scratch, "keychain"));
@@ -79,7 +81,7 @@ require("http").createServer((_, res) => res.end('{"connected":true}')).listen(N
 `,
   { mode: 0o755 },
 );
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.BOPS_RELAY_BIN = join(bin, "orgo-relay");
 const freePort = () =>
   new Promise((resolve) => {
@@ -150,7 +152,7 @@ web.answer = providers;
 const project = pathToFileURL(root).href + "/";
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -1937,7 +1939,7 @@ console.log("routing: on by default where Orgo offers it, off when the user says
 orgo.offered = true;
 // The script Bops sends to the computer is read from vm/bin under the working folder (the scratch one here).
 mkdirSync(join(scratch, "vm/bin"), { recursive: true });
-symlinkSync(join(root, "vm/bin/bops-keep-screens"), join(scratch, "vm/bin/bops-keep-screens"));
+symlinkSync(join(rootPath, "vm/bin/bops-keep-screens"), join(scratch, "vm/bin/bops-keep-screens"));
 orgo.computer = { id: "c_route", mode: "residential", deviceId: null, proxyOn: true, ran: [] };
 S.update((s) => Object.assign(s.bots.find((b) => b.isMain), { computerId: "c_route", computerStatus: "ready" }));
 await R.setRelay(true);
@@ -2362,5 +2364,7 @@ assert.ok(toOrgo.every((c) => c.headers["x-bops-telemetry"] === undefined), "Org
 console.log(`all cloud tests passed (${cloud.requests.length} requests to the fake cloud, ${cloud.connections.length} tunnels, ${web.calls.length} stubbed calls, none to the network)`);
 // The link to the project's node_modules goes first, on its own, so nothing behind it is touched.
 unlinkSync(join(scratch, "node_modules"));
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

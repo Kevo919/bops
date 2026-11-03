@@ -11,13 +11,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -104,11 +104,11 @@ globalThis.Audio = class {
   }
 };
 
-const Panel = await import(pathToFileURL(`${root}/components/app/bot-panel.tsx`).href);
-const Page = await import(pathToFileURL(`${root}/components/app/bot-settings.tsx`).href);
-const Words = await import(pathToFileURL(`${root}/lib/bot-settings.ts`).href);
-const Seq = await import(pathToFileURL(`${root}/lib/sequences.ts`).href);
-const { CHART_WORDS } = await import(pathToFileURL(`${root}/components/app/team-chart.tsx`).href);
+const Panel = await import(`${root}/components/app/bot-panel.tsx`);
+const Page = await import(`${root}/components/app/bot-settings.tsx`);
+const Words = await import(`${root}/lib/bot-settings.ts`);
+const Seq = await import(`${root}/lib/sequences.ts`);
+const { CHART_WORDS } = await import(`${root}/components/app/team-chart.tsx`);
 const { createElement: h, act, useState } = await import("react");
 const { createRoot } = await import("react-dom/client");
 const W = Words.SETTINGS_WORDS;

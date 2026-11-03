@@ -25,7 +25,7 @@ import { accessSync, constants, existsSync, mkdirSync, mkdtempSync, readdirSync,
 import { createRequire, registerHooks, syncBuiltinESMExports } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { gunzipSync } from "node:zlib";
 
 if (process.platform !== "darwin") {
@@ -52,12 +52,14 @@ for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAI
 process.env.BOPS_RESPONSES_WS = "0";
 // This Mac, as the user's state knows it (persist-cloud.ts deviceIdFor), without asking ioreg.
 process.env.BOPS_DEVICE_SEED = "test-mac";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 // Modules that would start processes when loaded (the relay's agent) or that Node can't load are stand-ins: each of their exports does nothing.
 const STAND_INS = new Set(["relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -90,7 +92,7 @@ process.chdir(scratch);
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 // Some modules read files through the working folder (the browser tools' package).
-symlinkSync(join(root, "node_modules"), join(scratch, "node_modules"));
+symlinkSync(join(rootPath, "node_modules"), join(scratch, "node_modules"));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(check, what, ms = 15_000) {
   for (const end = Date.now() + ms; Date.now() < end; await sleep(25)) {
@@ -138,7 +140,7 @@ if (process.argv[2] === "exec-server") setInterval(() => process.ppid === 1 && p
 `,
   { mode: 0o755 },
 );
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 
 // Every executor Bops starts is noted (what it ran, with what environment and folder), with what it printed.
 const cp = createRequire(import.meta.url)("node:child_process");
@@ -252,8 +254,8 @@ const InputRoute = await import(`${root}/app/api/input/route.ts`);
 const CodexRoute = await import(`${root}/app/api/mac/codex/route.ts`);
 const FA = await import(`${root}/lib/server/full-access.ts`);
 const BotsRoute = await import(`${root}/app/api/bots/route.ts`);
-const ReplyRoute = await import(pathToFileURL(join(root, "app/api/sessions/[sessionId]/reply/route.ts")).href);
-const WhereRoute = await import(pathToFileURL(join(root, "app/api/sessions/[sessionId]/where/route.ts")).href);
+const ReplyRoute = await import(pathToFileURL(join(rootPath, "app/api/sessions/[sessionId]/reply/route.ts")).href);
+const WhereRoute = await import(pathToFileURL(join(rootPath, "app/api/sessions/[sessionId]/where/route.ts")).href);
 
 // Signed in, as the app does it: the user's state loaded from Bops Cloud first (here a new user's,
 // fresh), then the account. Until then there's no state, and no Mac task can have a folder.
@@ -281,7 +283,7 @@ const walk = (dir) => {
     else if (/\.(ts|tsx|mjs|cjs|js|py)$/.test(name) || dir.endsWith("/bin")) sources.push(p);
   }
 };
-for (const dir of ["app", "lib", "components", "desktop", "vm", "cloud", "edge", "slack"]) if (existsSync(join(root, dir))) walk(join(root, dir));
+for (const dir of ["app", "lib", "components", "desktop", "vm", "cloud", "edge", "slack"]) if (existsSync(join(rootPath, dir))) walk(join(rootPath, dir));
 assert.ok(sources.length > 100, "the app's sources were read");
 const FORBIDDEN = [/["'`]app-server["'`]/, /account\/login/, /account\/read/, /chatgptDeviceCode/, /type:\s*["'`]chatgpt["'`]/, /signInToCodex|openCodexApp/];
 for (const p of sources) {
@@ -289,7 +291,7 @@ for (const p of sources) {
   for (const re of FORBIDDEN) assert.ok(!re.test(text), `${p.slice(root.length + 1)} matches ${re}`);
 }
 // No screen in the app names ChatGPT (a plan, a sign-in, tokens "on ChatGPT").
-for (const p of sources.filter((p) => p.startsWith(join(root, "components")))) assert.ok(!/chatgpt/i.test(readFileSync(p, "utf8")), `${p.slice(root.length + 1)} names ChatGPT`);
+for (const p of sources.filter((p) => p.startsWith(join(rootPath, "components")))) assert.ok(!/chatgpt/i.test(readFileSync(p, "utf8")), `${p.slice(root.length + 1)} names ChatGPT`);
 
 // The Mac is ready with the Codex CLI (to run bots' tools) and Chrome; no sign-in step, and looking ran no Codex.
 await M.checkMac();
@@ -369,9 +371,9 @@ assert.deepEqual(browser.allowed_tools, L.MAC_BROWSER_TOOLS);
 for (const t of ["browser_navigate", "browser_snapshot", "browser_click", "browser_type", "browser_fill_form", "browser_tabs"]) assert.ok(browser.allowed_tools.includes(t), t);
 assert.ok(!browser.allowed_tools.includes("browser_run_code_unsafe"));
 // Each of them is one Playwright MCP has (a tool renamed in an update would quietly go missing).
-const playwrightTools = readdirSync(join(root, "node_modules/playwright-core/lib"))
+const playwrightTools = readdirSync(join(rootPath, "node_modules/playwright-core/lib"))
   .filter((f) => f.endsWith(".js"))
-  .map((f) => readFileSync(join(root, "node_modules/playwright-core/lib", f), "utf8"))
+  .map((f) => readFileSync(join(rootPath, "node_modules/playwright-core/lib", f), "utf8"))
   .join("\n");
 for (const t of [...browser.allowed_tools, "browser_run_code_unsafe"]) assert.ok(playwrightTools.includes(`name: "${t}"`), `Playwright MCP has ${t}`);
 assert.match(body.agent.instructions, /Use only the browser tools/);
@@ -806,7 +808,7 @@ assert.ok(!JSON.stringify(appsBody).includes(S.getState().bots.find((b) => b.id 
 assert.match(appsBody.agent.instructions, /find_app_actions, then use_app/);
 assert.match(appsBody.agent.instructions, /Use only the browser tools, your apps/);
 assert.doesNotMatch(appsBody.agent.instructions, /can't be reached from this computer/);
-assert.ok(!existsSync(join(root, "vm/apps-mcp.mjs")), "no apps server to put in a sandbox any more");
+assert.ok(!existsSync(join(rootPath, "vm/apps-mcp.mjs")), "no apps server to put in a sandbox any more");
 // Its apps go with the access: taken away (no access, not the default), the thread picks up without them.
 S.update((s) => (s.bots.find((b) => b.id === main.id).access = { acc_notion: "none" }));
 X.replyToSession(next.id, "Never mind");
@@ -1571,6 +1573,8 @@ assert.ok(!existsSync(join(scratch, ".data", "state.json")) && !stateFiles(join(
 await S.releaseSignOut();
 assert.throws(() => L.taskDir("ses_after"), /Sign in to Bops first/);
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log("mac tasks: all passed");
 process.exit(0);

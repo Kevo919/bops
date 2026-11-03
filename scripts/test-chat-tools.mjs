@@ -27,7 +27,7 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 // The user (and this process) is in New York.
@@ -39,12 +39,12 @@ process.env.OPENAI_API_KEY = "sk-test-chat-tools";
 process.env.COMPOSIO_API_KEY = "ck-test";
 process.env.AGENTMAIL_API_KEY = "am-test";
 process.env.BOPS_OWNER_PHONES = "+15551230000";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-chat-tools-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 globalThis.bopsOrgoKey = "sk_orgo_test_chat_tools";
@@ -56,7 +56,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -2554,6 +2554,8 @@ await check("no dashes in anything Bops said or told the model", () => {
 });
 
 server.close();
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`chat tools: ${passed} passed, ${failures} failed${warned.length ? ` (warnings: ${warned.length})` : ""}`);
 process.exit(failures ? 1 : 0);

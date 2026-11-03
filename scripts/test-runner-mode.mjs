@@ -17,11 +17,11 @@ import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, w
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 import { unfaked } from "./fake-exports.mjs";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const scratch = mkdtempSync(join(tmpdir(), "bops-runner-mode-"));
 
 // Run again with --start, this checks how a runner starts on its own: there what it starts with is faked
@@ -48,7 +48,7 @@ const loaded = [];
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -413,12 +413,12 @@ await check("a runner refuses to start without a window token, off loopback, on 
 });
 
 await check("started on its own, a runner starts only what it runs", () => {
-  const run = spawnSync(process.execPath, ["--conditions=react-server", new URL(import.meta.url).pathname, "--start"], { encoding: "utf8" });
+  const run = spawnSync(process.execPath, ["--conditions=react-server", import.meta.url, "--start"], { encoding: "utf8" });
   assert.equal(run.status, 0, `${run.stdout}${run.stderr}`.split("\n").filter((l) => /FAIL|passed|^\s{2}/.test(l)).join("\n"));
 });
 
 await check("a runner's calls to Orgo use only its computer's key, read again after a 401", () => {
-  const run = spawnSync(process.execPath, ["--conditions=react-server", new URL(import.meta.url).pathname, "--orgo"], { encoding: "utf8" });
+  const run = spawnSync(process.execPath, ["--conditions=react-server", import.meta.url, "--orgo"], { encoding: "utf8" });
   assert.equal(run.status, 0, `${run.stdout}${run.stderr}`.split("\n").filter((l) => /FAIL|passed|^\s{2}/.test(l)).join("\n"));
 });
 
@@ -517,6 +517,8 @@ await check("chooseWhere never picks the Mac on a runner", async () => {
   asMac();
 });
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`runner mode: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

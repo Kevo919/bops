@@ -8,14 +8,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -49,8 +49,8 @@ globalThis.fetch = async () => Response.json({ ok: true });
 const emitWarning = process.emitWarning.bind(process);
 process.emitWarning = (warning, ...rest) => (rest[0]?.code === "MODULE_TYPELESS_PACKAGE_JSON" ? undefined : emitWarning(warning, ...rest));
 
-const D = await import(pathToFileURL(`${root}/components/app/message-deletes.tsx`).href);
-const { ChatView } = await import(pathToFileURL(`${root}/components/app/chat-view.tsx`).href);
+const D = await import(`${root}/components/app/message-deletes.tsx`);
+const { ChatView } = await import(`${root}/components/app/chat-view.tsx`);
 const { sharedWsId } = await import(`${root}/lib/shared.ts`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");

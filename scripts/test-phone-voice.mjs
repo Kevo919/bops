@@ -14,7 +14,7 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 // Self-hosting, on a made-up OpenAI key pointed at the fake; the state in a throwaway file store; no other service.
 for (const k of ["BOPS_DATABASE_URL", "AGENTMAIL_API_KEY", "BOPS_MAIL_DOMAIN", "HONCHO_API_KEY", "COMPOSIO_API_KEY", "TYPESAFE_API_KEY", "ORGO_API_KEY", "TAILSCALE_AUTH_KEY", "BOPS_PHONE_MODEL", "BOPS_CHAT_MODEL", "OPENAI_WEBHOOK_SECRET"])
   delete process.env[k];
@@ -28,14 +28,14 @@ Object.assign(process.env, {
 });
 const OWNER = "+14155550100";
 const LINE = "+14155550199";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 // Modules that would start processes when loaded (the Mac check, the relay's agent) or that Node can't load
 // (the desktop look draws the mascot's JSX, mirror.ts has parameter properties) are stand-ins: each of
 // their exports does nothing (as scripts/test-plan.mjs).
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -404,5 +404,7 @@ const until = async (check, what, ms = 5000) => {
 
 console.log(`all phone voice tests passed (${asked.length} fake OpenAI calls, none to the network)`);
 fake.close();
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

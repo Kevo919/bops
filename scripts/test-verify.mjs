@@ -8,17 +8,17 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 // The state in a throwaway file store, as a self-hosted install keeps it (the Mac app keeps it in Bops Cloud, per user: test-profiles.mjs).
 process.env.BOPS_SELF_HOSTED = "1";
 for (const k of ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_VERIFY_SERVICE_SID", "TWILIO_API_KEY_SID", "TWILIO_API_KEY_SECRET", "BOPS_VERIFY_EMAIL", "BOPS_VERIFY_COUNTRIES"]) delete process.env[k];
 // The state goes to a throwaway file store, never a database, a real .data or a mail domain from the shell.
 for (const k of ["BOPS_DATABASE_URL", "BOPS_OWNER_EMAILS", "BOPS_MAIL_DOMAIN", "AGENTMAIL_API_KEY"]) delete process.env[k];
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 // The server modules import "@/lib/…" and "./store" (no extension), the way Next resolves them.
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -725,5 +725,7 @@ O.setSignInEmailCounted(false);
 
 console.log(`all verify tests passed (${calls.length} fake HTTP calls, none to the network)`);
 // Gone before the store's next save could make the folder again.
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

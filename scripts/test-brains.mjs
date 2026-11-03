@@ -37,24 +37,26 @@ process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 process.env.BOPS_APP_VERSION = "9.9.9";
 const UI = "ui-token-test-brains";
 process.env.BOPS_UI_TOKEN = UI;
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+// The same root as an OS path, for the file system (the URL form is for imports).
+const rootPath = fileURLToPath(new URL("..", import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-brains-"));
 const fakebin = join(scratch, "fakebin");
 mkdirSync(fakebin);
 writeFileSync(join(fakebin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${fakebin}:${process.env.PATH}`;
+process.env.PATH = `${fakebin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 globalThis.bopsOrgoKey = "sk_orgo_test_brains";
 // The app's own files (vm/bin) are read from where it runs: here, a throwaway folder with them in it.
 const work = join(scratch, "work");
 mkdirSync(work);
-symlinkSync(join(root, "vm"), join(work, "vm"));
+symlinkSync(join(rootPath, "vm"), join(work, "vm"));
 process.chdir(work);
 
 /* ---------------- Loading the app's modules ---------------- */
 
-const fileUrl = (p) => pathToFileURL(`${root}/${p}`).href;
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 // sessions.ts is the app's task runner: here, the takeover and the computer's setup, as calls written down.
 const SESSIONS_OWN = `
 import { update } from ${JSON.stringify(fileUrl("lib/server/store.ts"))};
@@ -81,7 +83,7 @@ registerHooks({
   resolve(specifier, context, next) {
     // Only the server may import these; here everything is the server, and the window's code too.
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -425,7 +427,7 @@ await test("Claude Code is npm's own package at the pinned version, into Bops' f
   assert.match(cmd, /npm install -g --prefix \/opt\/bops\/claude --no-audit --no-fund --loglevel=error @anthropic-ai\/claude-code@2\.1\.292 /);
   assert.doesNotMatch(cmd, /ignore-scripts|--force|patch|sed /, "installed as it comes");
   assert.match(cmd, /DISABLE_AUTOUPDATER=1 \/opt\/bops\/claude\/bin\/claude --version/);
-  assert.match(readFileSync(join(root, "orgo/bops-base.mjs"), "utf8"), /const CLAUDE_CODE_VERSION = "2\.1\.292";/, "the next image has the same one");
+  assert.match(readFileSync(join(rootPath, "orgo/bops-base.mjs"), "utf8"), /const CLAUDE_CODE_VERSION = "2\.1\.292";/, "the next image has the same one");
   await B.ensureClaudeCode("pc-x");
   await B.ensureClaudeCode("pc-x");
   assert.equal(pc("pc-x").installs, 1, "asked once per computer");
@@ -438,7 +440,7 @@ await test("Claude Code is npm's own package at the pinned version, into Bops' f
 
 await test("the brain scripts go on a computer as they are in vm/bin, and only when they changed", async () => {
   await B.ensureBrainTools("pc-main");
-  for (const f of ["bops-brain", "bops-brain-browser"]) assert.equal(readFileSync(join(pc("pc-main").bin, f), "utf8"), readFileSync(join(root, "vm/bin", f), "utf8"));
+  for (const f of ["bops-brain", "bops-brain-browser"]) assert.equal(readFileSync(join(pc("pc-main").bin, f), "utf8"), readFileSync(join(rootPath, "vm/bin", f), "utf8"));
   const n = pc("pc-main").commands.length;
   await B.ensureBrainTools("pc-main");
   assert.equal(pc("pc-main").commands.length, n, "checked once per run of Bops");
@@ -721,7 +723,7 @@ if (REAL_CLAUDE)
     mkdirSync(join(brains, "brain_real"), { recursive: true });
     writeFileSync(join(brains, "brain_real", ".computer"), "this-mac");
     const out = await new Promise((resolve) =>
-      execFile(join(root, "vm/bin/bops-brain"), ["status", "brain_real", "this-mac"], { env: { PATH: process.env.PATH, BOPS_BRAINS: brains, BOPS_CLAUDE: real, BOPS_HOME: process.env.HOME, ...PLANTED } }, (_e, so, se) => resolve(`${so}${se}`)),
+      execFile(join(rootPath, "vm/bin/bops-brain"), ["status", "brain_real", "this-mac"], { env: { PATH: process.env.PATH, BOPS_BRAINS: brains, BOPS_CLAUDE: real, BOPS_HOME: process.env.HOME, ...PLANTED } }, (_e, so, se) => resolve(`${so}${se}`)),
     );
     assert.deepEqual(B.parseStatus(out), { loggedIn: false });
   });
@@ -913,12 +915,14 @@ await test("a bot's profile says which brain its tasks run on, by its role", asy
 
 await test("the brain files have no long dashes in what they say", () => {
   for (const f of ["components/app/brains.tsx", "lib/server/brains.ts", "lib/server/cli-agents.ts", "vm/bin/bops-brain", "vm/bin/bops-brain-browser", "vm/bin/bops-agent", "app/api/brains/route.ts", "app/api/brains/bot/route.ts", "app/api/brains/sign-in/route.ts", "app/api/brains/sign-out/route.ts", "app/api/sessions/[sessionId]/terminal/route.ts"])
-    noDashes(readFileSync(join(root, f), "utf8"), f);
+    noDashes(readFileSync(join(rootPath, f), "utf8"), f);
 });
 
 // Fake sign-ins still waiting stop before their folder goes.
 writeFileSync(STOP, "");
 await new Promise((r) => setTimeout(r, 300));
 console.log(`\n${passed} passed`);
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 process.exit(0);

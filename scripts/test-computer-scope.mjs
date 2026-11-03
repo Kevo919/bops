@@ -15,10 +15,10 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-computer-scope-"));
 process.chdir(scratch);
 process.env.HOME = scratch;
@@ -26,7 +26,7 @@ process.env.HOME = scratch;
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -1124,7 +1124,9 @@ try {
   console.warn = quiet.warn;
   server.close();
   process.chdir(tmpdir());
-  rmSync(scratch, { recursive: true, force: true });
+  try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 }
 
 console.log(`computer scope: ${passed} passed, ${failures} failed`);
