@@ -19,3 +19,4 @@ d3d39c26007b4a6ac6355edd2b7c09ba131a810c:scripts/test-repo-recipes.mjs:generic-a
 6a4ab46cf162a293dbeebc144b2c8ad456e654c0:scripts/test-repos.mjs:github-pat:217
 6a4ab46cf162a293dbeebc144b2c8ad456e654c0:scripts/test-repos.mjs:generic-api-key:172
 6a4ab46cf162a293dbeebc144b2c8ad456e654c0:scripts/test-repos.mjs:generic-api-key:217
+6a4ab46cf162a293dbeebc144b2c8ad456e654c0:scripts/test-repos.mjs:github-pat:172
