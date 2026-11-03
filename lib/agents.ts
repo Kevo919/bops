@@ -351,14 +351,15 @@ export const keyVendor = (x: Pick<BotAgent, "kind" | "pays" | "model">) => ROUTE
 /** The plan an agent's account is signed in with ("max"), on `computerId` first. */
 const planOf = (x: Pick<BotAgent, "account">, state: Pick<AppState, "brains">, computerId?: string) => {
   const acct = accountOf(x, state);
-  return (acct && signInOn(acct, computerId)?.account?.plan) ?? acct?.signIns?.[0]?.account?.plan;
+  return computerId ? acct && signInOn(acct, computerId)?.account?.plan : acct?.signIns?.[0]?.account?.plan;
 };
 
 /** How it pays, in a few words: "credit", "your Max plan", "your Anthropic key". `computerId`: where its plan is signed in. */
 export function paysLabel(x: Pick<BotAgent, "kind" | "pays" | "model" | "account">, state: Pick<AppState, "brains">, computerId?: string) {
   if (x.pays === "credit") return "credit";
-  if (x.pays === "key") return `your ${keyVendor(x)} key`;
-  return `your ${(x.kind === "codex" ? "ChatGPT plan" : planName(planOf(x, state, computerId)))}`;
+  if (x.pays === "key") return gateRoute(x) === "zai-coding" ? "your Z.ai Coding Plan" : `your ${keyVendor(x)} key`;
+  const plan = planOf(x, state, computerId);
+  return x.kind === "codex" ? "your ChatGPT plan" : `your ${plan ? `Claude ${planName(plan)}` : "Claude plan"}`;
 }
 
 /** Where an agent's words come from: the bot it belongs to, so two agents of one kind can be told apart. */
@@ -376,7 +377,7 @@ export function agentTag(x: Pick<BotAgent, "id" | "kind" | "pays" | "model" | "a
   const same = agents.filter((y) => y.kind === x.kind && (!anyModel(x.kind) || model(y) === model(x)));
   if (same.length < 2 || !same.some((y) => y.id === x.id)) return undefined;
   const host = workBot(at.bot, at.state.bots).computerId;
-  const word = (y: Pick<BotAgent, "kind" | "pays" | "model" | "account">) => (y.pays === "credit" ? "Credit" : y.pays === "key" ? `${keyVendor(y)} key` : (y.kind === "codex" ? "ChatGPT plan" : planName(planOf(y, at.state, host))));
+  const word = (y: Pick<BotAgent, "kind" | "pays" | "model" | "account">) => y.pays === "credit" ? "Credit" : paysLabel(y, at.state, host).replace(/^your /, "");
   const mine = word(x);
   const before = same.slice(0, same.findIndex((y) => y.id === x.id)).filter((y) => word(y) === mine).length;
   return before ? `${mine} ${before + 1}` : mine;
