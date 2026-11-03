@@ -3284,12 +3284,13 @@ function AppApprovalCard({ state, approval: a, className = "" }: { state: AppSta
   const api = apiAskOf(a);
   // What went wrong answering it from a shared workspace (it shows again, with why).
   const [error, setError] = useState<string | null>(null);
-  const decide = async (reply: "once" | "always" | "reject", message?: string) => {
+  const decide = async (reply: "once" | "session" | "always" | "reject", message?: string) => {
     setBusy(true);
     const note = message?.trim() ? { message: message.trim() } : {};
     // In a shared workspace, a viewer with Write on its bot answers through the owner's Bops (shared-act.ts): named as theirs there.
     if (state.shared) {
-      const r = await memberAct({ act: "answer", askId: a.id, reply, ...note });
+      // Members' answers can't scope to a thread (the button is hidden in a shared workspace; a stray call lands as once).
+      const r = await memberAct({ act: "answer", askId: a.id, reply: reply === "session" ? "once" : reply, ...note });
       setError(r.ok ? null : (r.error ?? null));
       setBusy(false);
       return;
@@ -3354,6 +3355,12 @@ function AppApprovalCard({ state, approval: a, className = "" }: { state: AppSta
             <button disabled={busy} onClick={() => void decide("always")} title={alwaysScope(name, a)} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
               Always allow
             </button>
+            {/* A thread's own asks only (permission.ts Session.allowedAsks): the same thing runs on without asking again, this thread alone. */}
+            {!!a.threadId && (
+              <button disabled={busy} onClick={() => void decide("session")} title="This thread runs the same thing on without asking again; a new thread asks as new" className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
+                Allow for this thread
+              </button>
+            )}
             <button disabled={busy} onClick={() => void decide("once")} className={`${btn} bg-ink text-white`}>
               Allow once
             </button>

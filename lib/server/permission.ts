@@ -124,11 +124,24 @@ export function declined(a: Pick<AppApproval, "reply">): string {
   return said ? `Declined: ${said}` : `Declined: ${ownerName()} said no. Don't do it, and don't do it another way.`;
 }
 
+/**
+ * Whether the owner allowed exactly this ask's action for this one thread (Allow for this thread):
+ * the same ask runs without pausing again while this thread runs, and a fresh thread asks as fresh.
+ * Threads only - a chat turn has no thread to be allowed for.
+ */
+export function threadAllows(botId: string, threadId: string | undefined, action: string): boolean {
+  if (!threadId) return false;
+  const s = getState().sessions.find((x) => x.id === threadId);
+  return !!s && s.botId === botId && (s.allowedAsks ?? []).includes(action);
+}
+
 const mine = (a: AppApproval, me = stateDevice()) => (a.askedBy ?? null) === (me ?? null);
 
 /**
- * The user's reply to request `askId`, from one of their own Bops (the card's Allow once, Always allow or Deny):
- * written into the shared state, where the Bops that asked reads it and carries its run on. Always allow saves a
+ * The user's reply to request `askId`, from one of their own Bops (the card's Allow once, Allow for this thread,
+ * Always allow or Deny): written into the shared state, where the Bops that asked reads it and carries its run on.
+ * Allow for this thread records the action on that thread alone (Session.allowedAsks, threadAllows): the same ask
+ * doesn't pause that thread again; a fresh thread asks as fresh. Always allow saves a
  * rule for the bot and the action, whatever its recipients or details (Claude Code's "don't ask again"), and answers
  * the bot's other requests for that action (as OpenCode does). Never from a bot's computer, never twice. Says why
  * when it isn't taken; undefined when it is. A request a bot's computer made wakes that computer, its run going on
@@ -149,6 +162,14 @@ export function replyToAsk(askId: string, reply: AskReply, message?: string, mem
     if (!x || x.reply) return;
     x.reply = answer;
     answered.push(x);
+    // Allow for this thread: the action goes on the thread's own list (Session.allowedAsks), so its run
+    // doesn't pause for the same thing again. Only a thread's request has a thread to be allowed for.
+    if (reply === "session") {
+      if (!x.threadId) return void (x.reply = { ...answer, reply: "once" });
+      const t = s.sessions.find((y) => y.id === x.threadId);
+      if (t) t.allowedAsks = [...new Set([...(t.allowedAsks ?? []), x.action])].slice(-50);
+      return;
+    }
     if (reply !== "always") return;
     const b = s.bots.find((y) => y.id === x.botId);
     if (!b) return;

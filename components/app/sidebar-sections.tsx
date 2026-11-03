@@ -208,11 +208,12 @@ function AskCard({ ask: a, botName, where, shared, onOpen }: { ask: AppApproval;
   // From a shared workspace, the answer as it stands (AppApproval.memberSend): waits while it's on its way, says why it didn't go.
   const sent = a.memberSend;
   const busy = working || (!!sent && sent.state !== "failed");
-  const decide = async (reply: "once" | "always" | "reject") => {
+  const decide = async (reply: "once" | "session" | "always" | "reject") => {
     setBusy(true);
     // In a shared workspace (a bot the viewer has at Write): through the owner's Bops (shared-act.ts).
     if (shared) {
-      const r = await memberAct({ act: "answer", askId: a.id, reply });
+      // Members' answers can't scope to a thread (the button is hidden in a shared workspace; a stray call lands as once).
+      const r = await memberAct({ act: "answer", askId: a.id, reply: reply === "session" ? "once" : reply });
       setError(r.ok ? null : (r.error ?? null));
       setBusy(false);
       return;
@@ -247,6 +248,12 @@ function AskCard({ ask: a, botName, where, shared, onOpen }: { ask: AppApproval;
         <button disabled={busy} onClick={() => void decide("always")} title={scope} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
           Always allow
         </button>
+        {/* A thread's own ask, answered from the owner's own Bops (members' answers can't scope to a thread). */}
+        {!!a.threadId && !shared && (
+          <button disabled={busy} onClick={() => void decide("session")} title="This thread runs the same thing on without asking again" className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
+            For this thread
+          </button>
+        )}
         <button disabled={busy} onClick={() => void decide("once")} className={`${btn} bg-ink text-white`}>
           Allow once
         </button>
