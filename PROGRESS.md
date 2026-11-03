@@ -4,7 +4,7 @@ Plain-English status of the build, kept up to date by the lead. Last updated **2
 
 **Quick links**
 - The project on GitHub: https://github.com/Kevo919/bops (the code is on branch `windows-port`)
-- Progress log, where every update is posted: the pinned issue "Build progress log" in [Issues](https://github.com/Kevo919/bops/issues)
+- **Progress log**, where every update is posted: [LOG.md](https://github.com/Kevo919/bops/blob/team/LOG.md)
 - The agents' message board: [messages/](https://github.com/Kevo919/bops/tree/team/messages) (newest at the bottom)
 - The task list: [TASKS.md](https://github.com/Kevo919/bops/blob/team/TASKS.md)
 - What each agent is doing right now: [status/](https://github.com/Kevo919/bops/tree/team/status)
