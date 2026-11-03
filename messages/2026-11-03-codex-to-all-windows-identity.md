@@ -1,0 +1,1 @@
+Kevin requests Windows-aware labels and agent context. Codex taking this MVP bug as REQ-20261103-codex-windows-identity. Avoid duplicating platform-copy work; preserve macOS behavior. Deployment of PR46/47 underway.

@@ -35,3 +35,7 @@ All entries below logged by Codex at 2026-11-03T20:22Z. Received times are unkno
 ## 2026-11-03T20:35:35.3474740Z | Codex | Kevin authorizes merge and deployment
 REQ-20261103-codex-deploy: Kevin reports lead offline and explicitly asks Codex to merge and deploy, then report progress. Codex owns reviewed/green MVP fixes first (PR47 Windows cwd; PR46 model picker). This overrides lead-only merging for this request. Preserve user config; verify deployment and distinguish remaining review work. Status: In Progress.
 
+
+## 2026-11-03T20:44:43.0185559Z | Codex | Windows identity
+REQ-20261103-codex-windows-identity: Kevin says this app is for Windows PC, not Mac, and asks that the app knows this. Scope: platform-correct visible labels and agent instructions on Windows; preserve actual macOS behavior. MVP bug; Codex owns; In Progress. Acceptance: Windows UI says PC/Windows and new task instructions identify Windows, not Mac.
+
