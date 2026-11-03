@@ -244,6 +244,12 @@ const ICONS = {
       <path d="M5 7V5a3 3 0 015.8-1.1" />
     </svg>
   ),
+  phone: (
+    <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4.5" y="1.5" width="7" height="13" rx="1.5" />
+      <path d="M7 12.2h2" />
+    </svg>
+  ),
   relay: (
     <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
       <circle cx="8" cy="8" r="6.2" />
@@ -408,6 +414,7 @@ export function ThisMacSettings({ state }: { state: AppState }) {
       </div>
       <Cards items={items} />
       <FullAccessCard items={items} />
+      <PhoneCard />
       <UpdateSettings />
     </div>
   );
@@ -495,6 +502,74 @@ function FullAccessCard({ items }: { items: Items }) {
       <button onClick={() => void post("/api/mac", { fullAccess: !on }, "PATCH")} className={on ? light : dark}>
         {on ? "Turn off" : "Turn on"}
       </button>
+    </Card>
+  );
+}
+
+type Remote = { paired: boolean; created: number | null; code?: string; addresses: { tailnet: string[]; home: string[]; public: string | null } };
+
+/**
+ * The Bops Android app (lib/server/remote.ts): pair it here, and it reaches this Bops from the phone over
+ * Tailscale (or the home wifi, or a public address). The code is shown once, right after pairing; pairing
+ * again makes a new one and the phone paired before stops working, and so does Unpair.
+ */
+function PhoneCard() {
+  const [r, setR] = useState<Remote | null>(null);
+  const [code, setCode] = useState<string | null>(null);
+  const load = useCallback(() => void fetch("/api/remote").then((x) => (x.ok ? x.json() : null)).then(setR).catch(() => {}), []);
+  useEffect(load, [load]);
+  if (!r) return null;
+  const where = r.addresses.public ?? r.addresses.tailnet[0] ?? r.addresses.home[0] ?? null;
+  const pairNow = async () => {
+    const res = await post("/api/remote", {});
+    const body = (await res.json().catch(() => null)) as Remote | null;
+    if (body?.code) setCode(body.code);
+    load();
+  };
+  const unpairNow = async () => {
+    await post("/api/remote", {}, "DELETE");
+    setCode(null);
+    load();
+  };
+  return (
+    <Card
+      icon={ICONS.phone}
+      title="Your phone"
+      chip={r.paired ? "Paired" : undefined}
+      line="Chat with your bots and answer their questions from the Bops app on your phone."
+      tone={r.paired ? "ok" : "off"}
+      status={
+        r.paired
+          ? `Paired ${r.created ? new Date(r.created).toLocaleDateString() : ""}`.trim()
+          : r.addresses.tailnet.length || r.addresses.public
+            ? "Not paired"
+            : "Not paired. Install Tailscale on this computer and your phone so the phone can reach Bops away from home."
+      }
+      below={
+        code ? (
+          <div className="flex flex-col gap-1.5 text-[12.5px] leading-5">
+            <span className="text-pencil">In the Bops app on your phone, enter:</span>
+            <span>
+              Address: <code className="select-all font-mono">{where ?? "this computer's address"}</code>
+            </span>
+            <span>
+              Pairing code: <code className="select-all break-all font-mono">{code}</code>
+            </span>
+            <span className="text-pencil">This code is shown only now. Anyone with it can use your bots, so keep it to yourself.</span>
+          </div>
+        ) : undefined
+      }
+    >
+      <div className="flex gap-1.5">
+        <button onClick={() => void pairNow()} className={r.paired ? light : dark}>
+          {r.paired ? "Pair again" : "Pair a phone"}
+        </button>
+        {r.paired && (
+          <button onClick={() => void unpairNow()} className={light}>
+            Unpair
+          </button>
+        )}
+      </div>
     </Card>
   );
 }

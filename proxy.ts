@@ -1,3 +1,6 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+import { readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
@@ -28,6 +31,37 @@ import { NextResponse, type NextRequest } from "next/server";
  * BOPS_PUBLIC_HOST lists it (names, comma separated; behind a reverse proxy that rewrites Host, the
  * public name the browser uses). Without it, a hosted server takes any Host and keeps the origin check.
  */
+
+/*
+ * A paired phone (the Bops Android app, lib/server/remote.ts) carries its pairing code as the bops_remote
+ * cookie (or x-bops-remote). The code's hash is in .data/remote.json, read again whenever that file
+ * changes, so unpairing or pairing again locks the old code out at once. With it, a request may come
+ * from any address (the phone reaches this server over Tailscale or the internet), and counts as the
+ * app's own for the window check below; what only the Bops window may do still asks again in its route.
+ * BOPS_REQUIRE_REMOTE=1 (a server on the internet, such as a VPS) lets nothing else in.
+ */
+const REMOTE_FILE = () => join(process.cwd(), ".data", "remote.json");
+const remote = { mtime: -1, hash: "" };
+function pairedHash() {
+  try {
+    const m = statSync(REMOTE_FILE()).mtimeMs;
+    if (m !== remote.mtime) {
+      remote.mtime = m;
+      remote.hash = String((JSON.parse(readFileSync(REMOTE_FILE(), "utf8")) as { hash?: string }).hash ?? "");
+    }
+  } catch {
+    remote.mtime = -1;
+    remote.hash = "";
+  }
+  return remote.hash;
+}
+function fromPhone(request: NextRequest) {
+  const want = pairedHash();
+  const code = request.cookies.get("bops_remote")?.value ?? request.headers.get("x-bops-remote") ?? "";
+  if (!/^[0-9a-f]{64}$/.test(want) || code.length < 32) return false;
+  return timingSafeEqual(Buffer.from(createHash("sha256").update(code, "utf8").digest("hex")), Buffer.from(want));
+}
+const REQUIRE_REMOTE = process.env.BOPS_REQUIRE_REMOTE === "1";
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const TAILNET_PATHS = new Set(["/api/apps/call", "/api/phone/agentphone", "/api/phone/openai", "/api/channels/slack/events"]);
@@ -68,7 +102,8 @@ const ours = (name: string) => LOOPBACK.has(name) || PUBLIC.has(name) || (HOSTED
 export function proxy(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
   const origin = request.headers.get("origin");
-  if (!ours(hostname(host)) && !TAILNET_PATHS.has(request.nextUrl.pathname)) return new NextResponse("Not allowed", { status: 403 });
+  const phone = fromPhone(request);
+  if (!phone && !ours(hostname(host)) && !TAILNET_PATHS.has(request.nextUrl.pathname)) return new NextResponse("Not allowed", { status: 403 });
   if (origin) {
     let from = "";
     try {
@@ -81,7 +116,10 @@ export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const method = request.method.toUpperCase();
   const open = TAILNET_PATHS.has(path) || TUNNEL_PATHS.has(path) || method === "OPTIONS" || (READS.has(method) && OPEN_READS(path));
-  if (token && !open && !fromWindow(request, token)) return NextResponse.json({ error: "Only the Bops app can do that." }, { status: 403 });
+  if (token && !open && !phone && !fromWindow(request, token)) return NextResponse.json({ error: "Only the Bops app can do that." }, { status: 403 });
+  // On the internet (BOPS_REQUIRE_REMOTE=1): only the paired phone, and the paths that prove themselves. Not "this
+  // machine" by its Host header, which any caller can set; a VPS pairs with scripts/pair-phone.mjs instead.
+  if (REQUIRE_REMOTE && !phone && !open) return NextResponse.json({ error: "Pair this device in the Bops app first." }, { status: 401 });
   return NextResponse.next();
 }
 
