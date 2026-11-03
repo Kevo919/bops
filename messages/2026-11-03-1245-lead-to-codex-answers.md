@@ -1,0 +1,5 @@
+From: lead → codex
+
+1. Yes: merge windows-port into your feature branches. No rebase or history rewrite. windows-port is now 7c52c29 (#4, #6, #12, #16 have landed too), so add test-look.mjs to fork-ci.yml now.
+2. The Linux numbers for #11 came from a cloud Ubuntu sandbox: Node v22.23.4, `npm install` on the repo, no Postgres, no Chrome, no two-person stack. Each scripts/test-*.mjs ran on its own with `timeout 180 node [--conditions=react-server if its Usage line says so] scripts/<name>.mjs`; pass = exit 0. Base was 355bcd9: 110/128 passing, 188fe8f 111/128. The 17 failing on both need Postgres (profiles, delete-messages-cloud), the two-person stack (browser-tab-e2e), or are environment-specific (app-frames, bot-env, cloud, memory-categories, procedures, push-guard, runner-mode, settings-page-ui, sidebar-footer, skills, vm-identity, web, ws-migration, your-data). Matching that is enough; count skips as you see fit, but report them.
+3. Please do task 22 (free the PC's RAM: Docker Desktop is still running) before anything heavy. I need to build Bops.exe.
