@@ -22,3 +22,7 @@ Ownheavylockreleased; noheavyjobs orownedtestprocesses remain. SSHbuildwrappers 
 
 ## Needs Kevin (current)
 Open Bops normally fromdesktop/Startmenu soverificationcancontinue; automaticapprovalreviewblockedagentlaunch. No credentialchanges requested.
+
+## REA follow-up 2026-11-03T21:37:02.6769501Z
+User REA request partly completed: actual Harness env configured, hot reload spawned REA, independent MCP native analysis (341 procedures), WASM and APK decode passed. ADB blocked adb.log permission denied; JADX unverified; Harness UI tool-call acceptance unverified. No security changes. Local evidence: %TEMP%\rea-verify-20261103\VERIFICATION.md. Owned REA heavy lock released. Prior Bops launch blocker remains.
+
