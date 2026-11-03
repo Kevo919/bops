@@ -1,7 +1,11 @@
 import "server-only";
 import { execFile, spawn } from "node:child_process";
 import { onRunner } from "./persist";
+import { fileDeleteSecret, fileGetSecret, fileSetSecret } from "./secret-file";
 import { stateUser } from "./store";
+
+/** Off the Mac (Windows, a Linux server) there's no `security` command: secrets go to an encrypted file instead (secret-file.ts). */
+const onMac = process.platform === "darwin";
 
 /**
  * Secrets in the Mac's Keychain, under "Bops Vault". Values go to `security` on stdin, hex-encoded,
@@ -14,6 +18,7 @@ const NOT_HERE = "This is kept only in the Bops app on your Mac.";
 
 export function setSecret(account: string, value: string) {
   if (onRunner()) return Promise.reject(new Error(NOT_HERE));
+  if (!onMac) return fileSetSecret(account, value);
   return new Promise<void>((resolve, reject) => {
     const p = spawn("security", ["-i"], { stdio: ["pipe", "ignore", "pipe"] });
     let err = "";
@@ -25,6 +30,7 @@ export function setSecret(account: string, value: string) {
 
 export function getSecret(account: string) {
   if (onRunner()) return Promise.resolve(null);
+  if (!onMac) return fileGetSecret(account);
   return new Promise<string | null>((resolve) =>
     execFile("security", ["find-generic-password", "-s", SERVICE, "-a", account, "-w"], (e, out) => resolve(e ? null : out.replace(/\n$/, ""))),
   );
@@ -32,6 +38,7 @@ export function getSecret(account: string) {
 
 export function deleteSecret(account: string) {
   if (onRunner()) return Promise.resolve();
+  if (!onMac) return fileDeleteSecret(account);
   return new Promise<void>((resolve) => execFile("security", ["delete-generic-password", "-s", SERVICE, "-a", account], () => resolve()));
 }
 

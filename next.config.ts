@@ -11,7 +11,8 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   // Loaded by Node, not bundled: the AgentMail SDK lazily imports optional payment packages
   // (@x402/fetch, mppx) that aren't installed, which the bundler can't resolve.
-  serverExternalPackages: ["agentmail"],
+  // @napi-rs/keyring is a native module (Windows Credential Manager, lib/server/secret-file.ts): loaded by Node too.
+  serverExternalPackages: ["agentmail", "@napi-rs/keyring"],
   // The Mac app ships this server prebuilt (.next/standalone, started by desktop/main.cjs).
   output: "standalone",
   // Images are served as they are: resizing them on a local server isn't worth shipping sharp and

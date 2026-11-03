@@ -13,11 +13,32 @@ let holders = 0;
 let caffeinate: ChildProcess | undefined;
 
 /** Hold the Mac awake; call what it returns to let go (once is enough, twice does nothing). */
+/**
+ * Windows has no caffeinate: a hidden PowerShell asks Windows to stay out of idle sleep
+ * (SetThreadExecutionState with ES_CONTINUOUS | ES_SYSTEM_REQUIRED, which holds only while that
+ * process lives), and waits on this server's process, so it ends with it, like caffeinate -w.
+ */
+const WINDOWS_AWAKE = `
+Add-Type -Name P -Namespace Bops -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint f);'
+[void][Bops.P]::SetThreadExecutionState([uint32]"0x80000001")
+try { Wait-Process -Id $env:BOPS_AWAKE_FOR } catch {}
+`;
+
+function startAwake(): ChildProcess {
+  if (process.platform === "win32")
+    return spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", WINDOWS_AWAKE], {
+      stdio: "ignore",
+      windowsHide: true,
+      env: { ...process.env, BOPS_AWAKE_FOR: String(process.pid) },
+    });
+  return spawn("/usr/bin/caffeinate", ["-i", "-w", String(process.pid)], { stdio: "ignore" });
+}
+
 export function holdAwake(): () => void {
-  if (process.platform !== "darwin" || process.env.BOPS_KEEP_AWAKE === "0") return () => {};
+  if ((process.platform !== "darwin" && process.platform !== "win32") || process.env.BOPS_KEEP_AWAKE === "0") return () => {};
   holders++;
   if (!caffeinate) {
-    const c = spawn("/usr/bin/caffeinate", ["-i", "-w", String(process.pid)], { stdio: "ignore" });
+    const c = startAwake();
     c.on("error", () => caffeinate === c && (caffeinate = undefined));
     c.on("exit", () => caffeinate === c && (caffeinate = undefined));
     caffeinate = c;

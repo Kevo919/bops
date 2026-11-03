@@ -5,6 +5,7 @@
  */
 const { app, autoUpdater, BrowserWindow, clipboard, desktopCapturer, dialog, ipcMain, nativeImage, Notification, powerMonitor, screen, session, shell, systemPreferences } = require("electron");
 const { execFile, execFileSync, spawn } = require("node:child_process");
+const win = require("./windows.cjs");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const net = require("node:net");
@@ -55,6 +56,7 @@ function windowToken() {
  * from an earlier start reaches it too). A path too long for a socket goes in this user's own temp folder.
  */
 function renderSocket() {
+  if (win.isWindows) return win.renderPipe();
   const file = path.join(app.getPath("userData"), "render.sock");
   return Buffer.byteLength(file) < 100 ? file : path.join(os.tmpdir(), "bops-render.sock");
 }
@@ -109,6 +111,7 @@ let shellPath;
 /** The login shell still being asked, so quitting can stop it. */
 let pathProbe;
 function loginPath() {
+  if (win.isWindows) return (shellPath ??= Promise.resolve(win.windowsPath()));
   shellPath ??= new Promise((resolve) => {
     const fallback = [...new Set([...(process.env.PATH ?? "").split(":").filter(Boolean), ...FALLBACK_PATH])].join(":");
     let out = "";
@@ -225,6 +228,15 @@ async function whoAnswers() {
  * its id, name, user, parent and folder. Null when there's none, or it can't be seen (another user's).
  */
 async function listener() {
+  if (win.isWindows) {
+    const l = await win.listener(PORT);
+    if (!l) return null;
+    // Windows has no process names Next can set and no user ids per process: a Bops server is a node
+    // running Next from this app's folder (or its source, in development), and only this user's
+    // processes can be listed here anyway.
+    const ours = /next/i.test(l.cmdline) && [serverHome(), REPO].some((d) => l.cmdline.toLowerCase().includes(realpath(d).toLowerCase()));
+    return { ...l, comm: ours ? "next-server" : l.name, uid: 0, home: ours ? serverHome() : undefined };
+  }
   const out = (await output("lsof", ["-b", "-w", "-nP", `-iTCP:${PORT}`, "-sTCP:LISTEN", "-Fpc"])) ?? "";
   // One entry per process ("p<pid>" then "c<name>"); a port can have more than one (127.0.0.1 and ::1).
   const found = [...out.matchAll(/^p(\d+)\n(?:c(.*))?/gm)].map((m) => ({ pid: Number(m[1]), name: m[2] || "a program" })).filter((l) => l.pid > 1);
@@ -250,7 +262,9 @@ const looksLikeBops = (l) => !!l && (l.comm.startsWith("next-server") || l.comm.
  * copy from opening, but an old copy from before it can still be open).
  */
 const stoppable = (l) =>
-  looksLikeBops(l) && l.uid === process.getuid() && !!l.home && realpath(l.home) === realpath(serverHome()) && (l.ppid === 1 || l.ppid === process.pid);
+  win.isWindows
+    ? looksLikeBops(l) && (l.ppid === process.pid || !win.alive(l.ppid))
+    : looksLikeBops(l) && l.uid === process.getuid() && !!l.home && realpath(l.home) === realpath(serverHome()) && (l.ppid === 1 || l.ppid === process.pid);
 
 /**
  * Stops a server by its process group (its bots' tools with it): SIGINT first, which lets one in the
@@ -268,15 +282,7 @@ async function stopProcess(pid) {
     }
   };
   const holding = async () => running() || (await portTaken());
-  const kill = (sig) => {
-    try {
-      process.kill(-pid, sig);
-    } catch {
-      try {
-        process.kill(pid, sig);
-      } catch {}
-    }
-  };
+  const kill = (sig) => void signalTree(pid, sig);
   kill("SIGINT");
   for (let i = 0; i < 28 && (await holding()); i++) await sleep(250);
   if (await holding()) {
@@ -342,6 +348,37 @@ function nodeBinary() {
   return fs.existsSync(helper) ? helper : process.execPath;
 }
 
+/**
+ * Signal a process and everything it started. On the Mac its process group (a negative pid); Windows
+ * has neither groups nor SIGTERM between processes, so SIGKILL stops the tree at once and anything
+ * gentler asks the server to save first, then stops the tree (desktop/windows.cjs). False when it's gone.
+ */
+function signalTree(pid, sig) {
+  if (win.isWindows) {
+    if (!win.alive(pid)) return false;
+    if (sig === "SIGKILL") win.killTree(pid);
+    else win.stopServerTree(pid, PORT, windowToken());
+    return true;
+  }
+  try {
+    process.kill(-pid, sig);
+  } catch {
+    try {
+      process.kill(pid, sig);
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+/** Bots' Chrome on this computer, closed with the server. */
+function stopBotChrome() {
+  if (win.isWindows) return win.killBotChrome();
+  try {
+    execFileSync("pkill", ["-f", ".bops/chrome/"]);
+  } catch {}
+}
+
 /** How the server we started ended, while it hasn't been replaced: "exited with code 1", "stopped by SIGKILL". */
 let serverEnded;
 /** Quitting or restarting: the server going away then is expected. */
@@ -385,13 +422,16 @@ async function spawnServer() {
         },
         stdio: ["ignore", packaged.log, packaged.log],
         detached: true,
+        windowsHide: true,
       })
-    : spawn("npx", ["next", "dev", "--port", String(PORT)], {
+    : spawn(win.npx().command, ["next", "dev", "--port", String(PORT)], win.hidden({
         cwd: REPO,
         env: { ...process.env, PATH, BOPS_UI_TOKEN: windowToken(), BOPS_RENDER_SOCKET: renderSocket() },
         stdio: "ignore",
-        detached: true,
-      });
+        // On Windows a detached child gets a console window of its own; the app's own windows are enough.
+        detached: !win.isWindows,
+        shell: win.npx().shell,
+      }));
   if (packaged) fs.closeSync(packaged.log);
   server = child;
   // A server that can't start, or stops later, is noticed now, not after a long wait on its port.
@@ -1125,13 +1165,7 @@ async function stopForRestart(why = "Restart Bops") {
     const l = await listener();
     if (stoppable(l)) {
       mainLog(`restart: the server (pid ${l.pid}) still holds the port: SIGKILL`);
-      try {
-        process.kill(-l.pid, "SIGKILL");
-      } catch {
-        try {
-          process.kill(l.pid, "SIGKILL");
-        } catch {}
-      }
+      signalTree(l.pid, "SIGKILL");
       for (let i = 0; i < 20 && (await portTaken()); i++) await sleep(250);
     }
   }
@@ -1175,18 +1209,8 @@ async function stopOtherServer(pid) {
   if (!isRelease()) return false;
   const l = await listener();
   if (!stoppable(l) || (pid && l.pid !== pid)) return false;
-  try {
-    process.kill(-l.pid, "SIGTERM");
-  } catch {
-    try {
-      process.kill(l.pid, "SIGTERM");
-    } catch {
-      return false;
-    }
-  }
-  try {
-    execFileSync("pkill", ["-f", ".bops/chrome/"]);
-  } catch {}
+  if (!signalTree(l.pid, "SIGTERM")) return false;
+  stopBotChrome();
   return true;
 }
 
@@ -1405,33 +1429,19 @@ function stopServer() {
   if (!pid) return false;
   server = undefined;
   watchAdopted(undefined);
-  try {
-    process.kill(-pid, "SIGTERM");
-  } catch {
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {}
-  }
-  try {
-    execFileSync("pkill", ["-f", ".bops/chrome/"]);
-  } catch {}
+  signalTree(pid, "SIGTERM");
+  stopBotChrome();
   return true;
 }
 
 app.on("will-quit", () => {
   leaving = true;
   renderService?.close();
-  if (lettingGo)
-    try {
-      process.kill(-lettingGo, "SIGKILL");
-    } catch {
-      try {
-        process.kill(lettingGo, "SIGKILL");
-      } catch {}
-    }
+  if (lettingGo) signalTree(lettingGo, "SIGKILL");
   const pid = server?.pid ?? adopted;
   // A server too stuck to act on SIGTERM would outlive Bops: stopped hard once its exit work's 8s are up.
-  if (stopServer() && pid)
+  // (On Windows the stop already ends with the tree stopped hard: desktop/windows.cjs stopServerTree.)
+  if (stopServer() && pid && !win.isWindows)
     try {
       spawn("/bin/sh", ["-c", `sleep 10; kill -KILL -${pid} 2>/dev/null || kill -KILL ${pid} 2>/dev/null`], { detached: true, stdio: "ignore" }).unref();
     } catch {}
