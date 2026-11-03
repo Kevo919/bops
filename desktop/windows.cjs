@@ -81,12 +81,23 @@ function killBotChrome() {
 /**
  * Who listens on `port`, the Windows equal of main.cjs's lsof and ps: its process id, its parent's,
  * its name and its command line (which says whether it's a Bops server, and from which folder).
+ *
+ * Some Windows builds report a loopback listener's owner as process 0 (netstat too). Then the server
+ * is found by what it runs instead: a node or Bops process running Next from one of `dirs` (the app's
+ * source in development) or the bundled server (BOPS_SERVER_JS), the first of a chain (npx, then node).
  */
-function listener(port) {
-  const script = `$c = Get-NetTCPConnection -LocalPort ${Number(port)} -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($c) { $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($c.OwningProcess)"; "$($p.ProcessId)|$($p.ParentProcessId)|$($p.Name)|$($p.CommandLine)" }`;
+function listener(port, dirs = []) {
+  const like = dirs.map((d) => `$_.CommandLine -like '*${String(d).replace(/'/g, "''")}*'`).join(" -or ") || "$false";
+  const script = `$c = Get-NetTCPConnection -LocalPort ${Number(port)} -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 4 } | Select-Object -First 1
+if ($c) { $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($c.OwningProcess)" }
+elseif (Get-NetTCPConnection -LocalPort ${Number(port)} -State Listen -ErrorAction SilentlyContinue) {
+  $all = @(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and (($_.CommandLine -like '*next*' -and (${like})) -or $_.CommandLine -like '*BOPS_SERVER_JS*') })
+  $ids = $all | ForEach-Object { $_.ProcessId }
+  $p = $all | Where-Object { $ids -notcontains $_.ParentProcessId } | Select-Object -First 1
+}
+if ($p) { "$($p.ProcessId)|$($p.ParentProcessId)|$($p.Name)|$($p.CommandLine)" }`;
   return new Promise((resolve) =>
-    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 8000 }, (err, out) => {
+    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 10000 }, (err, out) => {
       const m = /^(\d+)\|(\d+)\|([^|]*)\|(.*)$/m.exec(String(out ?? "").trim());
       if (err || !m) return resolve(null);
       resolve({ pid: Number(m[1]), ppid: Number(m[2]), name: m[3] || "a program", cmdline: m[4] });

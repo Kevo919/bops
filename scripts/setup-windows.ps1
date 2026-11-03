@@ -14,7 +14,8 @@ Write-Host "Setting up $root"
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) { Write-Error "Install Node 22 or newer first (https://nodejs.org)."; exit 1 }
 $major = [int](node -p "process.versions.node.split('.')[0]")
 if ($major -lt 22) { Write-Error "Node $major is too old: Bops needs Node 22 or newer (https://nodejs.org)."; exit 1 }
-npm install --no-audit --no-fund
+# --include=dev: with NODE_ENV=production set in the environment, npm would skip the build tools Bops needs.
+npm install --include=dev --no-audit --no-fund
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 # 2. Settings.

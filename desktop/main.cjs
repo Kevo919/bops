@@ -229,7 +229,7 @@ async function whoAnswers() {
  */
 async function listener() {
   if (win.isWindows) {
-    const l = await win.listener(PORT);
+    const l = await win.listener(PORT, [serverHome(), REPO]);
     if (!l) return null;
     // Windows has no process names Next can set and no user ids per process: a Bops server is a node
     // running Next from this app's folder (or its source, in development), and only this user's

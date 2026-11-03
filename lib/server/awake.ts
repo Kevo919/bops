@@ -12,7 +12,6 @@ import { spawn, type ChildProcess } from "node:child_process";
 let holders = 0;
 let caffeinate: ChildProcess | undefined;
 
-/** Hold the Mac awake; call what it returns to let go (once is enough, twice does nothing). */
 /**
  * Windows has no caffeinate: a hidden PowerShell asks Windows to stay out of idle sleep
  * (SetThreadExecutionState with ES_CONTINUOUS | ES_SYSTEM_REQUIRED, which holds only while that
@@ -34,6 +33,7 @@ function startAwake(): ChildProcess {
   return spawn("/usr/bin/caffeinate", ["-i", "-w", String(process.pid)], { stdio: "ignore" });
 }
 
+/** Hold this computer awake; call what it returns to let go (once is enough, twice does nothing). */
 export function holdAwake(): () => void {
   if ((process.platform !== "darwin" && process.platform !== "win32") || process.env.BOPS_KEEP_AWAKE === "0") return () => {};
   holders++;
