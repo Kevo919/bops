@@ -1255,7 +1255,7 @@ const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_w
  * The owner's drafts are left out with the tools themselves; the Connected apps and keys this bot has are there, asking
  * the owner before anything that changes something.
  */
-const NOT_FROM_MEMBER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "create_bot", "change_look", "remember", "recall", "text_me", ...ORBIT_OWNER_ONLY]);
+const NOT_FROM_MEMBER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "create_bot", "change_look", "call_mcp", "remember", "recall", "text_me", ...ORBIT_OWNER_ONLY]);
 /**
  * Not on a chat turn a computer's runner answers (runner-chat.ts): what writes parts of the state a computer may not
  * (routines, watches, skills, bots: cloud/computer-scope.ts would hold them back, and the bot would say it did what never
