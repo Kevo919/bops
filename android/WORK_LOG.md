@@ -36,3 +36,11 @@
 - Risks/blockers: No physical device, real server pairing, or real microphone tested. Seven-day backup cleanup occurs on next store access, not through a dedicated timer while the app is stopped. Existing deprecation warnings remain.
 - Remaining work: Lead reviews and publishes this commit, incorporates it into the stacked LLM-settings branch, and runs its settings suite.
 - Next recommended action: Review the Android-only diff and push PR1 updates; do not merge without lead review.
+### 2026-11-03T05:04:00Z | Codex | Feature | Review Needed
+- Summary: Team task 4 adds native Settings with read-only configured models for the selected server.
+- Files touched: android/README.md, WORK_LOG.md, MainActivity.kt, LlmCatalog.kt, MultiServerTests.kt, LlmCatalogChecks.kt.
+- Details: GET /api/state reads state.llms with that server's cookie, finite timeouts and redirects disabled. Shows model name/provider/id, starter and jobs, with loading/empty/error/refresh states. 401/403 revokes only the selected pairing. Late responses cannot replace a newer screen. Settings preserves the existing WebView on return; microphone requests are denied while native settings are visible. No config writes, dependencies or changes outside android/.
+- Verification: gradlew.bat assembleDebug assembleDebugAndroidTest lintDebug passed (lint 0 errors, 20 warnings). API 35 emulator full suite PASS, including new parser/request policy and native loading/data/empty/error/refresh, stale response, same-WebView return and isolated revocation checks. Settings screenshot inspected. Independent static review found no material defects after preserving the WebView.
+- Limits: Catalog HTTP responses are injected fixtures, not a live Bops/config reload integration test. Same-WebView identity verified; actual unsent drafts and live calls not exercised.
+- Remaining work: Lead reviews task 4 PR, after task 1 PR #1. Branch feature/android-llms is stacked on feature/android-multi until #1 merges; PR targets windows-port as requested.
+- Next recommended action: Review the task 4-only delta against feature/android-multi, merge #1 first, then validate the native model list against a live server.
