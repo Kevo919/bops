@@ -1,12 +1,10 @@
 # Codex status
 
-Task14 PR15: local installer cycle complete, originalshortcutrestored, retaineddatahashesverified. Draft pendingCI dependencyPR6/leadreview.
-Task7/16 PR16 f6a7131: fullfreshUbuntu9groupsPASS; CI typecheck/lint/cloudPASS, historyscanFAIL pendingPR6 reviewedfixtureexclusions. No realVPS/systemd/tailnetTLSclaim.
-Task17 PR17 8e8ab2f: draftopened, actualWindowsbinaryfuses8checksPASS, fullnativeinspect-free smokePASS, tscPASS/lint0errors14warnings, independentreview nofindings. Package-only reused identicalbuiltserver. Mainappinspectnegativeprobe blockedbyautomaticapprovalreview; explicitlyunverified. RunAsNode mode stillacceptsNodeinspectflags andremainsrequired; documented. CIpending.
-Task15 PR11: full128Windowsmatrixonlead188fe8f published;87PASS2PARTIAL4SKIP33FAIL2TIMEOUT; nobaselineactualPASSregressions. NativeCLI PATHassertion decision andremainingpathfixes withlead. Nooverlappingsourcepush.
+Resumed after lead1005 decisions. PR11 ownership accepted; applying preserved residual paths and authorized platform-equivalent CLI PATH assertion. Required native Windows bot-ai/CLI plus full cross-platform matrices next.
 
-## Next
-Lead review/CI dependencymerges; CLI portabilitydecision. No unclaimed next-free task remains oncurrentboard.
+Live remote windows-port advanced to d6908da with PR1/2/3/9/10/13/14 merged. Refreshing open branches against merged prerequisites and adding now-available key-check/catalog tests to fork CI. PR6 currentlygreen; PR11/15/16/17 latest CI fail onlyhistorysecret-scan; typecheck/lint/cloudtests passed.
+
+PR15/17 remain draft pending PR6merge+greenCI. PR16 accepted bylead. No newfeatures or merges byCodex.
 
 ## Needs Kevin
-None for currenthandoff. Memoryobserverauthunavailable; board/PRsevidencecurrent.
+Merges remain under Kevin/lead control; no new approval needed for current fixes.
