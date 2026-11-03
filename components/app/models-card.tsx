@@ -172,7 +172,7 @@ export function ModelsCard() {
               className={`size-[7px] shrink-0 rounded-full ${info.llms.length ? "bg-[#2BB673]" : "bg-[#C9C9C6]"}`}
             />
             {info.llms.length
-              ? `${info.llms.length} model${info.llms.length === 1 ? "" : "s"} · Chats start on ${chat ? chat.name : "Auto (OpenAI)"}`
+              ? `${info.llms.length} model${info.llms.length === 1 ? "" : "s"} · New chats start on ${chat ? chat.name : "Auto (OpenAI)"}`
               : "No models yet"}
           </span>
         </div>
@@ -504,7 +504,7 @@ function ModelRow({
             )}
             <label
               className="flex items-center gap-1.5"
-              title="New chats, and chats you haven't picked a model for, answer on this one"
+              title="Chats you make from now on start on this one (when its key is set). Chats you have already keep their model, and Auto can always be picked in a chat."
             >
               <input
                 type="radio"
@@ -514,11 +514,11 @@ function ModelRow({
                 onChange={() =>
                   void update(
                     { chatDefault: true },
-                    () => `Chats now start on ${l.name}.`,
+                    () => `New chats now start on ${l.name}.`,
                   )
                 }
               />
-              Default for chat
+              Default for new chats
             </label>
             {!p?.chatOnly && (
               <label
@@ -838,7 +838,7 @@ function AddModel({
               checked={chatDefault}
               onChange={(e) => setChatDefault(e.target.checked)}
             />
-            Make it the default for chats
+            Make it the default for new chats
           </label>
         </div>
       )}

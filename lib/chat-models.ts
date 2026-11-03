@@ -30,9 +30,9 @@ export function chatModels(): ChatModel[] {
 }
 
 /**
- * The model a chat with none picked starts on: Your LLMs' chat default (config/llms.yaml chat_default, Settings,
- * Models), when its provider has a key here (`keys`: provider to set or not, never a key). Undefined: Auto
- * (OpenAI), as before. A pick in the chat's box wins over it.
+ * The model new chats start on: Your LLMs' chat default (config/llms.yaml chat_default, Settings, Models), when
+ * its provider has a key here (`keys`: provider to set or not, never a key). Set once on a chat as it's made
+ * (lib/server/chat-default.ts); chats there already keep their model, or Auto. Undefined: new chats start on Auto.
  */
 export function chatDefault(keys: Partial<Record<string, boolean>>): ChatModel | undefined {
   const l = llms().find((x) => x.chatDefault);

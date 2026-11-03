@@ -5,7 +5,7 @@ import type { AppState, Chat } from "@/lib/types";
 import { chatKeyName, chatModels, chatModelShown, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
 import type { AgentRoute } from "@/lib/agents";
 import { post } from "./ui";
-// The chat default (Settings, Models): what a chat with no model picked answers on.
+// The default for new chats (Settings, Models), named in the box's hint.
 import { chatDefault } from "@/lib/chat-models";
 
 /**
@@ -25,12 +25,12 @@ export function ChatModelPick({ state, chat: c, onError }: { state: AppState; ch
   // One no longer in the list (taken out of config/llms.yaml): still shown, so the box says what the chat is on.
   const gone = value && !models.some((m) => m.id === value) ? value : null;
   const current = models.find((m) => m.id === value);
-  // None picked: the chat default from Settings, Models, when its key is set; else Auto (OpenAI).
+  // What new chats start on (Settings, Models), for the box's hint; this chat's own pick, or Auto, is what it runs on.
   const fallback = chatDefault(keys);
   return (
     <select
       aria-label="Model for this chat"
-      title={current ? `Replies in this chat run on ${current.name}` : `Replies in this chat run on ${fallback ? `${fallback.name}, your chat default` : "Auto (OpenAI)"}`}
+      title={`${current ? `Replies in this chat run on ${current.name}` : "Replies in this chat run on Auto (OpenAI)"}${fallback ? `. Default for new chats: ${fallback.name}` : ""}`}
       value={value}
       disabled={saving}
       onChange={async (e) => {
@@ -48,7 +48,7 @@ export function ChatModelPick({ state, chat: c, onError }: { state: AppState; ch
       }}
       className="h-[30px] max-w-[150px] shrink-0 cursor-pointer truncate rounded-full bg-transparent px-2 text-[12.5px] leading-4 text-[#3A3A38] outline-none hover:bg-[#F2F2F0]"
     >
-      <option value="">{fallback ? `Default: ${fallback.name}` : "Auto (OpenAI)"}</option>
+      <option value="">Auto (OpenAI)</option>
       {[...groups].map(([provider, list]) => (
         <optgroup key={provider} label={providerName(provider)}>
           {list.map((m) => (

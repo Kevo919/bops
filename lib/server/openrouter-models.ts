@@ -10,8 +10,36 @@ export type OpenRouterModel = { id: string; name: string; context?: number; inPe
 const URL_ = "https://openrouter.ai/api/v1/models";
 const KEEP_MS = 6 * 60 * 60 * 1000;
 const TIMEOUT_MS = 8000;
+/** A failure is kept this long, so opening Add a model offline doesn't wait out the timeout every time. */
+const FAILED_MS = 2 * 60 * 1000;
+/** OpenRouter's answer is under 1 MB today; past this, it's cut off and taken as a failure. */
+const MAX_BYTES = 5 * 1024 * 1024;
 const MODEL = /^[A-Za-z0-9._:/-]{1,120}$/;
-const g = globalThis as unknown as { __bopsOpenRouter?: { at: number; models: OpenRouterModel[] } };
+const g = globalThis as unknown as { __bopsOpenRouter?: { at: number; models: OpenRouterModel[] }; __bopsOpenRouterFailed?: number };
+
+/** The body as JSON, read up to MAX_BYTES (more aborts the request and throws). */
+async function readCapped(res: Response, abort: AbortController): Promise<unknown> {
+  if (Number(res.headers.get("content-length") ?? 0) > MAX_BYTES) {
+    abort.abort();
+    throw new Error("too big");
+  }
+  if (!res.body) return JSON.parse(await res.text());
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BYTES) {
+      abort.abort();
+      await reader.cancel().catch(() => {});
+      throw new Error("too big");
+    }
+    chunks.push(value);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
 
 const perM = (v: unknown) => {
   const n = typeof v === "string" || typeof v === "number" ? Number(v) : NaN;
@@ -36,18 +64,28 @@ export function trimModels(body: unknown): OpenRouterModel[] {
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** The list, kept KEEP_MS; `offline` when OpenRouter couldn't be reached (with the last list, when there is one). */
+/**
+ * The list, kept KEEP_MS; `offline` when OpenRouter couldn't be reached, answered too slowly or too much (with the
+ * last list, when there is one). A failure is kept FAILED_MS before OpenRouter is asked again.
+ */
 export async function openRouterModels(): Promise<{ models: OpenRouterModel[]; offline?: true }> {
   const kept = g.__bopsOpenRouter;
   if (kept && Date.now() - kept.at < KEEP_MS) return { models: kept.models };
+  if (g.__bopsOpenRouterFailed && Date.now() - g.__bopsOpenRouterFailed < FAILED_MS) return { models: kept?.models ?? [], offline: true };
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(URL_, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { accept: "application/json" } });
+    const res = await fetch(URL_, { signal: abort.signal, headers: { accept: "application/json" } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const models = trimModels(await res.json());
+    const models = trimModels(await readCapped(res, abort));
     if (!models.length) throw new Error("no models");
     g.__bopsOpenRouter = { at: Date.now(), models };
+    delete g.__bopsOpenRouterFailed;
     return { models };
   } catch {
+    g.__bopsOpenRouterFailed = Date.now();
     return { models: kept?.models ?? [], offline: true };
+  } finally {
+    clearTimeout(timer);
   }
 }

@@ -181,7 +181,7 @@ await act(async () => {
 try {
   await test("each model in plain words: name, provider, model id, its jobs, Run by, and the chat default", async () => {
     const text = box.textContent;
-    for (const w of ["Models", "Claude Sonnet 5.5", "Claude Opus 5.5", "claude-opus-5-5", "Anthropic", "Use for", "Run by", "Default for chat", "Default for bot tasks", "Chats start on Claude Sonnet 5.5"]) assert.ok(text.includes(w), `says ${w}`);
+    for (const w of ["Models", "Claude Sonnet 5.5", "Claude Opus 5.5", "claude-opus-5-5", "Anthropic", "Use for", "Run by", "Default for new chats", "Default for bot tasks", "New chats start on Claude Sonnet 5.5"]) assert.ok(text.includes(w), `says ${w}`);
     const opus = row(box, "anthropic/claude-opus-5-5");
     assert.deepEqual([...opus.querySelectorAll("[data-job][aria-pressed=true]")].map((b) => b.textContent), ["Planning", "Thinking"]);
     assert.equal(row(box, "anthropic/claude-sonnet-5-5").querySelector("input[name=models-chat-default]").checked, true);
@@ -261,13 +261,13 @@ try {
     assert.deepEqual(bops.sent.at(-1), { op: "add", name: "deepseek-v4-pro", provider: "openrouter", model: "deepseek/deepseek-v4-pro", useFor: [] });
   });
 
-  await test("Default for chat and Remove (which asks first)", async () => {
+  await test("Default for new chats and Remove (which asks first)", async () => {
     await act(async () => {
       row(box, "openrouter/deepseek/deepseek-v4-pro").querySelector("input[name=models-chat-default]").dispatchEvent(new win.Event("click", { bubbles: true }));
       await settle();
     });
     assert.deepEqual(bops.sent.at(-1), { op: "update", id: "openrouter/deepseek/deepseek-v4-pro", chatDefault: true });
-    assert.match(box.textContent, /Chats start on deepseek-v4-pro/);
+    assert.match(box.textContent, /New chats start on deepseek-v4-pro/);
     const r = row(box, "openrouter/deepseek/deepseek-v4-pro");
     await click(button(r, "Remove"));
     assert.match(r.textContent, /Remove deepseek-v4-pro\?/);

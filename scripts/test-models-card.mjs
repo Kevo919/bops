@@ -103,6 +103,7 @@ try {
   const orRoute = await import(pathToFileURL(join(root, "app/api/models/openrouter/route.ts")).href);
   const A = await import(pathToFileURL(join(root, "lib/agents.ts")).href);
   const chatModels = await import(pathToFileURL(join(root, "lib/chat-models.ts")).href);
+  const { newChatModel } = await import(pathToFileURL(join(root, "lib/server/chat-default.ts")).href);
 
   const TOKEN = "synthetic-window-token";
   const req = (method = "GET", { body, headers = {}, host = "localhost:3210", path = "/api/models" } = {}) =>
@@ -227,12 +228,17 @@ try {
     assert.equal(r.status, 400, "can't become a model already in the list");
   });
 
-  await test("one chat default and one starter: picking one takes it from the other; chats use it when its key is set", async () => {
+  await test("one default for new chats and one starter: picking one takes it from the other; a new chat starts on it when its key is set", async () => {
     let r = await post({ op: "update", id: "openrouter/deepseek/deepseek-v4-flash", chatDefault: true });
     assert.equal(r.body.llms.filter((l) => l.chatDefault).length, 1);
     assert.match(yamlNow(), /chat_default: true/);
     assert.equal(chatModels.chatDefault({ openrouter: false }), undefined, "no key: Auto, as before");
     assert.deepEqual(chatModels.chatDefault({ openrouter: true }), { id: "openrouter/deepseek/deepseek-v4-flash", name: "DeepSeek Pro", provider: "openrouter" });
+    // What a new owner chat is given as it's made (lib/server/chat-default.ts): only with the key set here.
+    assert.equal(newChatModel(), undefined, "no OPENROUTER_API_KEY: a new chat starts on Auto");
+    process.env.OPENROUTER_API_KEY = "SYNTHETIC_SECRET_MUST_NOT_ESCAPE";
+    assert.equal(newChatModel(), "openrouter/deepseek/deepseek-v4-flash");
+    delete process.env.OPENROUTER_API_KEY;
     r = await post({ op: "update", id: "anthropic/claude-opus-5-5", chatDefault: true, starter: true });
     assert.deepEqual(r.body.llms.filter((l) => l.chatDefault).map((l) => l.model), ["claude-opus-5-5"]);
     assert.deepEqual(r.body.llms.filter((l) => l.starter).map((l) => l.model), ["claude-opus-5-5"]);
@@ -241,6 +247,18 @@ try {
     assert.ok(!yamlNow().includes("# inline note"), "the starter's own value went with it");
     r = await post({ op: "update", id: "anthropic/claude-opus-5-5", chatDefault: false });
     assert.equal(chatModels.chatDefault({ anthropic: true }), undefined);
+    assert.equal(newChatModel(), undefined);
+  });
+
+  await test("the default only goes on chats as they're made: existing, pair and app chats never fall through to it", async () => {
+    const src = (f) => readFileSync(join(root, f), "utf8");
+    // A chat with no model answers on Auto (chatModelOf reads only the chat's own pick).
+    const chatTs = src("lib/server/chat.ts");
+    assert.match(chatTs, /const chatModelOf = \(chatId: string \| undefined\) => \{\n {2}const m = chatId \? chat\(chatId\)\?\.model : undefined;\n {2}return m && providerOf\(m\) \? m : undefined;\n\};/);
+    assert.ok(!/chatDefault|newChatModel/.test(chatTs), "nothing in chat.ts picks the default");
+    // Only the owner's new chats get it: a bot's own chat, a new workspace's main chat, a group chat.
+    for (const f of ["lib/server/bots.ts", "lib/server/workspaces.ts", "app/api/chats/route.ts"]) assert.match(src(f), /const model = newChatModel\(\);\n[^\n]*(chats\.push\(|const chat: Chat = )\{[^\n]*\.\.\.\(model \? \{ model \} : \{\}\) \}/, f);
+    assert.ok(!/newChatModel/.test(src("lib/server/store.ts")), "chats made again on load keep Auto");
   });
 
   await test("remove: gone from the file and from this server, the rest kept", async () => {
@@ -262,14 +280,19 @@ try {
     writeFileSync(yamlPath, YAML_FILE);
   });
 
-  await test("OpenRouter's list: fetched once, trimmed to plain ids, kept; offline says so", async () => {
+  await test("OpenRouter's list: fetched once, trimmed to plain ids, kept; offline says so, and is kept a little while", async () => {
     delete globalThis.__bopsOpenRouter;
+    delete globalThis.__bopsOpenRouterFailed;
     fetches = [];
     reply = () => {
       throw new Error("offline");
     };
     let res = await orRoute.GET(req("GET", { headers: win, path: "/api/models/openrouter" }));
     assert.deepEqual(await res.json(), { models: [], offline: true });
+    res = await orRoute.GET(req("GET", { headers: win, path: "/api/models/openrouter" }));
+    assert.deepEqual(await res.json(), { models: [], offline: true });
+    assert.equal(fetches.length, 1, "a failure is kept: the next open doesn't wait on OpenRouter again");
+    globalThis.__bopsOpenRouterFailed = Date.now() - 3 * 60 * 1000;
     reply = () =>
       Response.json({
         data: [
@@ -297,6 +320,30 @@ try {
     const stale = await (await orRoute.GET(req("GET", { headers: win, path: "/api/models/openrouter" }))).json();
     assert.equal(stale.offline, true);
     assert.equal(stale.models.length, 2);
+  });
+
+  await test("OpenRouter's answer is capped at 5 MB: a bigger one is cut off and taken as offline", async () => {
+    const or = await import(pathToFileURL(join(root, "lib/server/openrouter-models.ts")).href);
+    delete globalThis.__bopsOpenRouter;
+    delete globalThis.__bopsOpenRouterFailed;
+    // Said too big up front.
+    reply = () => new Response("{}", { headers: { "content-length": String(6 * 1024 * 1024) } });
+    assert.deepEqual(await or.openRouterModels(), { models: [], offline: true });
+    // Not said, and streamed past the cap: read stops there.
+    delete globalThis.__bopsOpenRouterFailed;
+    let pulled = 0;
+    reply = () =>
+      new Response(
+        new ReadableStream({
+          pull(c) {
+            pulled++;
+            if (pulled > 100) return c.close();
+            c.enqueue(new Uint8Array(1024 * 1024).fill(32));
+          },
+        }),
+      );
+    assert.deepEqual(await or.openRouterModels(), { models: [], offline: true });
+    assert.ok(pulled <= 8, `stopped reading near 5 MB (read ${pulled} MB)`);
   });
 
   console.log(`PASS: ${passed} Models card checks (temporary config, fake network)`);

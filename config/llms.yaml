@@ -6,7 +6,8 @@
 #
 #  THE EASY WAY: Settings → This Mac → Models (the same on Windows). Add, change or remove a model
 #  there, pick what each one is for, and it saves here (keeping these notes) and
-#  works at once, with no restart.
+#  works at once, with no restart. (This file is part of Bops' code, so those
+#  changes show up in git as local edits.)
 #
 #  TO ADD AN LLM BY HAND
 #    1. Copy one of the blocks below (from "- name:" down), paste it at the end.
@@ -19,8 +20,9 @@
 #         dsh                 DeepSeek Harness
 #       (Claude Code and Codex run on an account you connect in a bot's AI section.
 #        Ollama runs chats only, so it takes no use_for, run_by or starter.)
-#    5. Optional: chat_default: true  on one of them: chats you haven't picked a
-#       model for answer on it (when its key is set). Without one, chats use Auto (OpenAI).
+#    5. Optional: chat_default: true  on one of them ("Default for new chats"): chats
+#       made from then on start on it (when its key is set). Chats you already have keep
+#       their model, and you can still pick Auto (OpenAI) in any chat.
 #    6. Save this file, then restart Bops (tray icon by the clock → Quit Bops, then open it again).
 #    7. Add that provider's key in Bops (Keys → Add a key), under the key name in the list below.
 #       Never paste a key into this file.
