@@ -35,8 +35,12 @@
 #                                                 ZAI_CODING_CN_API_KEY
 #    zai          Z.ai GLM, pay as you go         ZAI_API_KEY
 #    deepseek     DeepSeek                        DEEPSEEK_API_KEY
-#    openrouter   OpenRouter (hundreds of models; model looks like "deepseek/deepseek-chat")
+#    openrouter   OpenRouter (hundreds of models; model looks like "deepseek/deepseek-chat",
+#                 or "vendor/model:free"; "openrouter/auto" is OpenRouter's Auto Router)
 #                                                 OPENROUTER_API_KEY
+#                 An OpenRouter PRESET (made at openrouter.ai/settings/presets) is written as
+#                 its model, in quotes:  model: "@preset/your-preset-slug"
+#                 A preset runs chats and chat routines only (no use_for, run_by or starter).
 #    deepinfra    DeepInfra                       DEEPINFRA_API_KEY
 #    ollama       Ollama, free, on your own server (chats only; model looks like "qwen2.5:3b")
 #                                                 no key: set OLLAMA_BASE_URL in .env.local

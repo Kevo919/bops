@@ -1,7 +1,8 @@
 import "@/lib/server/llms";
 import { fromThisMac } from "@/lib/server/owner-email";
 import { fromBopsWindow } from "@/lib/server/ui-token";
-import { JOB_NAMES, JOB_HELP, ROUTE_KEYS, ROUTE_NAMES, setLlms, type AgentRoute, type Job } from "@/lib/agents";
+import { isPreset, JOB_NAMES, JOB_HELP, ROUTE_KEYS, ROUTE_NAMES, setLlms, type AgentRoute, type Job } from "@/lib/agents";
+import { knownOpenRouterIds } from "@/lib/server/openrouter-models";
 
 export const dynamic = "force-dynamic";
 
@@ -92,5 +93,20 @@ export async function POST(request: Request) {
   }
   // In at once: new threads, bots and chats use it from now on.
   setLlms(f.read(root, () => {}));
-  return Response.json({ ok: true, moved: done.moved ?? [], ...described() }, { headers });
+  return Response.json({ ok: true, moved: done.moved ?? [], ...warningFor(op as { op?: string; provider?: unknown; model?: unknown; id?: unknown }, done.list), ...described() }, { headers });
+}
+
+/**
+ * An OpenRouter model id that isn't in OpenRouter's list as this server last read it (lib/server/openrouter-models.ts):
+ * said, never refused (the list can be a few hours behind, and a new model works before it's there). Nothing is
+ * said without a list, for a preset (the user's own, not in the list), or for another provider.
+ */
+function warningFor(op: { op?: string; provider?: unknown; model?: unknown; id?: unknown }, list: Entry[]): { warning?: string } {
+  if (op.op !== "add" && op.op !== "update") return {};
+  if (op.op === "update" && op.model === undefined && op.provider === undefined) return {};
+  const l = op.op === "add" ? list[list.length - 1] : list.find((x) => x.from === op.id);
+  if (!l || l.provider !== "openrouter" || isPreset(l.provider, l.model)) return {};
+  const known = knownOpenRouterIds();
+  if (!known || known.has(l.model)) return {};
+  return { warning: `Saved, but OpenRouter's model list doesn't have "${l.model}". Check the id at openrouter.ai/models: a chat on it fails if OpenRouter doesn't know it.` };
 }
