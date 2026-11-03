@@ -29,6 +29,8 @@
 #    anthropic    Claude                          ANTHROPIC_API_KEY
 #    openai       OpenAI GPT                      OPENAI_API_KEY
 #    zai-coding   Z.ai GLM, on your Coding Plan   ZAI_API_KEY
+#    zai-coding-cn  Z.ai GLM, on your Coding Plan, China region (open.bigmodel.cn)
+#                                                 ZAI_CODING_CN_API_KEY
 #    zai          Z.ai GLM, pay as you go         ZAI_API_KEY
 #    deepseek     DeepSeek                        DEEPSEEK_API_KEY
 #    openrouter   OpenRouter (hundreds of models; model looks like "deepseek/deepseek-chat")

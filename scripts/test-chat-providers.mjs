@@ -24,7 +24,7 @@ const UI = process.argv.includes("--ui");
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|ANTHROPIC|ZAI|DEEPSEEK|OPENROUTER|DEEPINFRA|OLLAMA|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.OPENAI_API_KEY = "sk-test-openai";
-const KEYS = { ANTHROPIC_API_KEY: "sk-ant-test-SECRET123", ZAI_API_KEY: "zai-test-SECRET456", DEEPSEEK_API_KEY: "ds-test-SECRET789", OPENROUTER_API_KEY: "or-test-SECRET000" };
+const KEYS = { ANTHROPIC_API_KEY: "sk-ant-test-SECRET123", ZAI_API_KEY: "zai-test-SECRET456", ZAI_CODING_CN_API_KEY: "zaicn-test-SECRET321", DEEPSEEK_API_KEY: "ds-test-SECRET789", OPENROUTER_API_KEY: "or-test-SECRET000" };
 Object.assign(process.env, KEYS);
 const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
 const rootUrl = pathToFileURL(rootPath).href;
@@ -97,13 +97,16 @@ await check("the window's picker: Auto first, the models by provider, (no key) w
   const { ChatModelPick, chatModelHint } = await import(`${rootUrl}/components/app/chat-model.tsx`);
   const { renderToStaticMarkup } = await import("react-dom/server");
   const { createElement: h } = await import("react");
-  const state = { chatKeys: { anthropic: true, openai: true, zai: false, "zai-coding": false, deepseek: false, openrouter: true } };
+  const state = { chatKeys: { anthropic: true, openai: true, zai: false, "zai-coding": false, "zai-coding-cn": false, deepseek: false, openrouter: true } };
   const html = renderToStaticMarkup(h(ChatModelPick, { state, chat: { id: chatId, model: "zai-coding/glm-5.3" } }));
   assert.match(html, /aria-label="Model for this chat"/);
   assert.match(html, /^<select[^>]*><option value="" ?>Auto \(OpenAI\)<\/option>/);
   assert.match(html, /<optgroup label="Anthropic"><option value="anthropic\/claude-sonnet-5-5">Claude Sonnet 5\.5<\/option>/);
   assert.match(html, /<option value="zai-coding\/glm-5\.3" selected="">GLM 5\.3 \(Coding Plan\) \(no key\)<\/option>/);
   assert.match(html, /<optgroup label="DeepSeek"><option value="deepseek\/deepseek-chat">DeepSeek Chat \(no key\)/);
+  assert.match(html, /<optgroup label="Z\.ai Coding Plan \(China\)"><option value="zai-coding-cn\/glm-5\.3">GLM 5\.3 \(Coding Plan, China\) \(no key\)<\/option><\/optgroup>/);
+  assert.equal(chatModelHint(state, { model: "zai-coding-cn/glm-5.3" }), "Z.ai Coding Plan (China) has no key on this server yet: add ZAI_CODING_CN_API_KEY to .env.local, then restart Bops.");
+  assert.equal(chatModelHint({ chatKeys: { ...state.chatKeys, "zai-coding-cn": true } }, { model: "zai-coding-cn/glm-5.3" }), null, "its own key, not Z.ai's");
   assert.ok(!/Claude Opus 5\.5 \(no key\)/.test(html));
   assert.equal(chatModelHint(state, { model: "zai-coding/glm-5.3" }), "Z.ai Coding Plan has no key on this server yet: add ZAI_API_KEY to .env.local, then restart Bops.");
   assert.equal(chatModelHint(state, { model: "anthropic/claude-opus-5-5" }), null);
@@ -145,7 +148,7 @@ globalThis.fetch = async (input, init) => {
     openaiAsked.push(b);
     return json({ id: `resp_oa_${openaiAsked.length}`, object: "response", model: "gpt-test", status: "completed", output: [{ id: "m", type: "message", role: "assistant", content: [{ type: "output_text", text: "From OpenAI.", annotations: [] }] }], usage: { input_tokens: 1, output_tokens: 1, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } });
   }
-  if (["api.anthropic.com", "api.z.ai", "api.deepseek.com", "openrouter.ai", "api.deepinfra.com"].includes(url.host)) {
+  if (["api.anthropic.com", "api.z.ai", "open.bigmodel.cn", "api.deepseek.com", "openrouter.ai", "api.deepinfra.com"].includes(url.host)) {
     const body = JSON.parse(await req.text());
     sent.push({ url: req.url, headers: Object.fromEntries(req.headers), body });
     const answer = next.shift();
@@ -258,6 +261,24 @@ await check("z.ai Coding Plan: a tool call and its result go on through previous
   assert.deepEqual(m2[2], { role: "assistant", content: null, tool_calls: [{ id: "call_9", type: "function", function: { name: "recall", arguments: '{"question":"dog"}' } }] });
   assert.deepEqual(m2[3], { role: "tool", tool_call_id: "call_9", content: "Rex" });
   assert.equal(r2.output_text, "It's Rex.");
+});
+
+await check("z.ai Coding Plan in the China region: open.bigmodel.cn's coding address, on its own key, a tool call carried on", async () => {
+  sent.length = 0;
+  next.push(() => json(chatSays(null, [{ id: "call_cn", type: "function", function: { name: "recall", arguments: '{"question":"cat"}' } }])), () => json(chatSays("It's Mimi.")));
+  const r1 = await P.createOnProvider({ ...base, model: "zai-coding-cn/glm-5.3", input: "What's my cat called?" });
+  assert.equal(sent[0].url, "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions");
+  assert.equal(sent[0].headers.authorization, `Bearer ${KEYS.ZAI_CODING_CN_API_KEY}`, "its own key, never Z.ai's");
+  assert.equal(sent[0].body.model, "glm-5.3");
+  assert.ok(sent[0].body.messages[0].content.includes(P.NO_WEB_SEARCH));
+  assert.equal(r1.output.find((o) => o.type === "function_call").call_id, "call_cn");
+  const r2 = await P.createOnProvider({ ...base, model: "zai-coding-cn/glm-5.3", previous_response_id: r1.id, input: [{ type: "function_call_output", call_id: "call_cn", output: "Mimi" }] });
+  assert.equal(sent[1].url, "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions");
+  assert.deepEqual(sent[1].body.messages[3], { role: "tool", tool_call_id: "call_cn", content: "Mimi" });
+  assert.equal(r2.output_text, "It's Mimi.");
+  await P.createOnProvider({ model: "zai-coding-cn/glm-5.2", input: "hi" });
+  assert.equal(sent[2].body.model, "glm-5.2");
+  assert.equal(sent[2].url, "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions");
 });
 
 await check("the other providers' addresses and keys; z.ai pay as you go; DeepSeek gets no images, OpenRouter does", async () => {
@@ -420,6 +441,14 @@ await check("a provider's no is plain words naming the provider and the fix, wit
   const zai = await fails({ model: "zai-coding/glm-5.3", input: "hi" }, () => json({ error: { code: "1113", message: "Insufficient balance or no resource package. Please recharge." } }, 429));
   assert.match(zai.message, /^z\.ai says your account has no balance or Coding Plan/);
   assert.equal(zai.status, 429, "the status stays what z.ai said");
+  assert.equal(zai.message, "z.ai says your account has no balance or Coding Plan (this model runs on the Coding Plan). Top up or subscribe at z.ai, or pick another model.");
+
+  const zaiCn = await fails({ model: "zai-coding-cn/glm-5.3", input: "hi" }, () => json({ error: { code: "1113", message: "余额不足或无可用资源包,请充值。" } }, 429));
+  assert.equal(zaiCn.message, "z.ai (China) says your account has no balance or Coding Plan (this model runs on the Coding Plan). Top up or subscribe at open.bigmodel.cn, or pick another model.");
+  assert.equal(zaiCn.status, 429);
+  assert.equal(zaiCn.provider, "zai-coding-cn");
+  const cn401 = await fails({ model: "zai-coding-cn/glm-5.3", input: "hi" }, () => json({ error: { code: "1000", message: `bad key ${KEYS.ZAI_CODING_CN_API_KEY}` } }, 401));
+  assert.equal(cn401.message, "z.ai (China) turned this down: your open.bigmodel.cn key isn't valid. Check ZAI_CODING_CN_API_KEY in .env.local, then restart Bops.");
 
   const busy = await fails({ model: "openrouter/x/y", input: "hi" }, () => json({ error: { message: "Rate limit exceeded" } }, 429));
   assert.match(busy.message, /^OpenRouter is getting too many requests/);
@@ -432,7 +461,7 @@ await check("a provider's no is plain words naming the provider and the fix, wit
   const e404 = await fails({ model: "zai/glm-9", input: "hi" }, () => json({ error: { message: "Model not found" } }, 404));
   assert.match(e404.message, /^z\.ai doesn't know the model "glm-9"/);
 
-  for (const e of [e401, lowClaude, e402, zai, busy, e500, e404]) for (const k of Object.values(KEYS)) assert.ok(!e.message.includes(k), "no key in the words");
+  for (const e of [e401, lowClaude, e402, zai, zaiCn, cn401, busy, e500, e404]) for (const k of Object.values(KEYS)) assert.ok(!e.message.includes(k), "no key in the words");
   for (const e of [e401, e402, e500]) assert.ok(e instanceof P.ChatProviderError);
 });
 
@@ -508,7 +537,9 @@ await check("the models offered: Your LLMs first, then the built in ones they do
   ]);
   const ids = M.chatModels().map((m) => m.id);
   assert.deepEqual(ids.slice(0, 2), ["anthropic/claude-sonnet-5-5", "openrouter/moonshotai/kimi-k3"]);
-  for (const b of ["openai/gpt-6.1-sol", "anthropic/claude-opus-5-5", "anthropic/claude-haiku-5-5", "zai-coding/glm-5.3", "zai/glm-5.2", "deepseek/deepseek-chat", "deepseek/deepseek-reasoner"]) assert.ok(ids.includes(b), b);
+  for (const b of ["openai/gpt-6.1-sol", "anthropic/claude-opus-5-5", "anthropic/claude-haiku-5-5", "zai-coding/glm-5.3", "zai/glm-5.2", "zai-coding-cn/glm-5.3", "deepseek/deepseek-chat", "deepseek/deepseek-reasoner"]) assert.ok(ids.includes(b), b);
+  assert.equal(M.providerOf("zai-coding-cn/glm-5.3"), "zai-coding-cn");
+  assert.equal(M.chatKeyName("zai-coding-cn"), "ZAI_CODING_CN_API_KEY");
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(M.providerOf("openrouter/moonshotai/kimi-k3"), "openrouter");
   assert.equal(M.providerOf("gpt-6.1-sol"), undefined);
@@ -548,6 +579,9 @@ await check("POST /api/chats/model: only the Bops window, only a model from the 
   assert.equal(S.chat(chatId).model, "openrouter/moonshotai/kimi-k3");
   assert.equal((await post({ chatId, model: "zai-coding/glm-5.3" }, win)).status, 200, "a built in one");
   assert.equal(S.chat(chatId).model, "zai-coding/glm-5.3");
+  assert.equal((await post({ chatId, model: "zai-coding-cn/glm-5.3" }, win)).status, 200, "the China Coding Plan one");
+  assert.equal(S.chat(chatId).model, "zai-coding-cn/glm-5.3");
+  assert.equal((await post({ chatId, model: "zai-coding-cn/glm-made-up" }, win)).status, 400, "only its listed models");
   assert.equal((await post({ chatId, model: "ollama/qwen2.5:3b" }, win)).status, 200, "Ollama's, colon and all");
   assert.equal(S.chat(chatId).model, "ollama/qwen2.5:3b");
   assert.equal((await post({ chatId, model: null }, win)).status, 200);

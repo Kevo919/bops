@@ -10,7 +10,7 @@ export type KeyCheckResult = {
 
 type Probe = { key: string; label: string; url: string; kind: "openai" | "anthropic" | "models" | "openrouter" | "orgo" | "ollama" };
 const provider = (route: AgentRoute, url: string, kind: Probe["kind"]): Probe => ({ key: ROUTE_KEYS[route], label: ROUTE_NAMES[route], url, kind });
-// Scope is intentionally these five providers plus the executor, Orgo and Ollama, not every Vault service.
+// Scope is intentionally these six providers plus the executor, Orgo and Ollama, not every Vault service.
 // Fixed HTTPS destinations: request data and environment overrides cannot redirect a secret. Ollama is the one
 // exception: its address is the owner's own setting, and the only secret sent there is its own (OLLAMA_API_KEY).
 const probes: Probe[] = [
@@ -18,6 +18,7 @@ const probes: Probe[] = [
   { key: "OPENAI_EXECUTOR_API_KEY", label: "OpenAI executor", url: "https://api.openai.com/v1/chat/completions", kind: "openai" },
   provider("anthropic", "https://api.anthropic.com/v1/models", "anthropic"),
   provider("zai", "https://api.z.ai/api/paas/v4/models", "models"),
+  provider("zai-coding-cn", "https://open.bigmodel.cn/api/paas/v4/models", "models"),
   provider("deepseek", "https://api.deepseek.com/models", "models"),
   provider("openrouter", "https://openrouter.ai/api/v1/key", "openrouter"),
   { key: "ORGO_API_KEY", label: "Orgo", url: "https://www.orgo.ai/api/account/capacity", kind: "orgo" },
