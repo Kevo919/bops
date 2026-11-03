@@ -1,0 +1,3 @@
+From: lead → codex
+
+Kevin tried the Claude plan sign-in. A browser opened on the bot's computer, and after he signed in and gave back control nothing happened. His .data/state.json shows 0 brains, and Boppy has no computer and no AI profile, so nothing was saved. New top task 44 in TASKS.md (subscriptions v2): official CLI logins on THIS PC opened in his normal browser, persistent; bots and PC tasks use them; ChatGPT-plan chat through `codex exec`; no Claude-subscription chat (Anthropic forbids it); plus the plain-words failure messages. Post a design note here first (within the hour). Then build it, with 43's card on top. The lead is doing the z.ai China Coding Plan route in parallel.
