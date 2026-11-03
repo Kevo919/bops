@@ -38,6 +38,8 @@ class MainActivity : Activity() {
     private var screen = 0
     private var showingServers = false
     private var current: Server? = null
+    private var llmCatalog = LlmCatalog()
+    private var settingsPage: android.view.View? = null
     private val servers by lazy { ServerStore(this) }
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var pendingMic: PermissionRequest? = null
@@ -75,6 +77,7 @@ class MainActivity : Activity() {
     private fun leavePage() {
         screen++
         showingServers = false
+        settingsPage = null
         pendingMic?.deny(); pendingMic = null
         fileCallback?.onReceiveValue(null); fileCallback = null
         current = null
@@ -322,7 +325,7 @@ class MainActivity : Activity() {
                 }
                 override fun onPermissionRequest(request: PermissionRequest) {
                     // Only the microphone, only for your own Bops (a call with a bot).
-                    if (current?.id != server.id || !sameSite(web?.url ?: "", address) || !sameSite(request.origin.toString(), address) || !request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) return request.deny()
+                    if (settingsPage != null || current?.id != server.id || !sameSite(web?.url ?: "", address) || !sameSite(request.origin.toString(), address) || !request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) return request.deny()
                     if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
                     else { pendingMic = request; requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC) }
                 }
@@ -330,6 +333,7 @@ class MainActivity : Activity() {
         }
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         root.addView(Button(this).apply { text = "Servers · ${server.name}"; setOnClickListener { showServers() } })
+        root.addView(Button(this).apply { text = "Settings"; setOnClickListener { showSettings(server) } })
         root.addView(web, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         showContent(root)
         web?.loadUrl("$address/")
@@ -338,6 +342,79 @@ class MainActivity : Activity() {
         if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFY)
         PingService.startIfWanted(this)
+    }
+
+    private fun showSettings(server: Server) {
+        // Keep this WebView and its draft/navigation intact while native settings are visible.
+        screen++
+        pendingMic?.deny(); pendingMic = null
+        settingsPage = findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+        val generation = screen
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, pad, pad, pad)
+        }
+        fun label(value: String, size: Float = 16f) = TextView(this).apply {
+            text = value; textSize = size; setPadding(0, pad / 2, 0, pad / 2)
+        }
+        root.addView(label("Settings · ${server.name}", 24f))
+        root.addView(label(server.address))
+        root.addView(label("Configured models", 20f))
+        root.addView(label("Read-only list from this server. To change it, edit config/llms.yaml on that server and restart Bops."))
+        root.addView(Button(this).apply {
+            text = "Back to Bops"
+            setOnClickListener { returnFromSettings() }
+        })
+        root.addView(Button(this).apply { text = "Saved servers"; setOnClickListener { showServers() } })
+        val refresh = Button(this).apply { text = "Refresh" }
+        root.addView(refresh)
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        root.addView(list)
+        showContent(android.widget.ScrollView(this).apply { addView(root) })
+        fun load() {
+            list.removeAllViews()
+            list.addView(label("Loading configured models…"))
+            refresh.isEnabled = false
+            thread {
+                val result = llmCatalog.load(server)
+                runOnUiThread {
+                    if (generation != screen || isDestroyed) return@runOnUiThread
+                    // The watcher can revoke a code while this request is in flight.
+                    val saved = servers.all().find { it.id == server.id }
+                    if (saved == null || saved.code != server.code) { showServers(); return@runOnUiThread }
+                    refresh.isEnabled = true
+                    list.removeAllViews()
+                    when (result) {
+                        CatalogResult.Unpaired -> forget(server, "Bops didn't take the pairing code anymore. Pair again.")
+                        is CatalogResult.Error -> list.addView(label(result.message))
+                        is CatalogResult.Loaded -> {
+                            if (result.models.isEmpty()) list.addView(label("No models configured on this server."))
+                            for (model in result.models) {
+                                list.addView(label(model.name, 20f))
+                                list.addView(label("Provider: ${model.provider}\nModel: ${model.model}"))
+                                if (model.starter) list.addView(label("Default for new bots"))
+                                list.addView(label("Use for: " + model.jobs.joinToString(", ").ifEmpty { "No jobs assigned" }))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        refresh.setOnClickListener { load() }
+        load()
+    }
+
+    private fun returnFromSettings() {
+        val page = settingsPage ?: return
+        val server = current
+        if (server == null || servers.all().find { it.id == server.id }?.code != server.code) {
+            showServers()
+            return
+        }
+        screen++
+        settingsPage = null
+        setContentView(page)
     }
 
     private fun forget(server: Server, why: String) {
@@ -368,7 +445,8 @@ class MainActivity : Activity() {
 
     @Deprecated("Predictive back needs AndroidX; the WebView's own history is what back means here")
     override fun onBackPressed() {
-        if (web?.canGoBack() == true) web?.goBack() else if (showingServers) super.onBackPressed() else showServers()
+        if (settingsPage != null) returnFromSettings()
+        else if (web?.canGoBack() == true) web?.goBack() else if (showingServers) super.onBackPressed() else showServers()
     }
 
     companion object {

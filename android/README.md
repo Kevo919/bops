@@ -36,3 +36,11 @@ adb shell am instrument -w bot.bops.remote.test/bot.bops.remote.MultiServerTests
 The last command must print `PASS:` (the custom runner prints `FAIL:` plus a stack trace on assertion failure). Tests cover migration/idempotence, list changes, per-server histories, stale revocation, address/origin policy, HTTP polling with loopback fixtures, notification attribution, switcher navigation, QR confirmation and WebView cookie isolation. Loopback fixtures call the polling method directly; production polling still rejects ordinary HTTP addresses outside Tailscale. A switcher screenshot is written to the emulator's app-specific external files directory as `multi-server-switcher.png`.
 
 See [WORK_LOG.md](WORK_LOG.md) for verification evidence and remaining device checks.
+
+## Configured models (read-only)
+
+While connected, tap **Settings** above the Bops page. The app loads the selected server's configured model names, providers, model IDs, default-for-new-bots flag and assigned jobs from `GET /api/state` (`state.llms`). Tap **Refresh** to read it again, **Back to Bops** to return to the existing page without reloading it, or **Saved servers** to switch servers.
+
+This screen cannot change configuration or provider keys. Edit `config/llms.yaml` on the server and restart Bops to change its list. Empty, missing/older-server, unreachable and invalid-response states are shown explicitly. A rejected pairing returns to setup for that server only. Late responses are discarded after leaving settings. New microphone requests are denied while native settings are visible.
+
+The instrumentation suite also checks the catalog parser/request policy and native settings loading, data, empty/error/refresh, retained WebView, stale-response and revocation behavior with injected HTTP fixtures. It does not prove live server integration. The emulator screenshot is `llm-settings.png` in the app-specific external files directory.

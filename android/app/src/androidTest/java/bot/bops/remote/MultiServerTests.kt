@@ -50,8 +50,9 @@ class MultiServerTests : Instrumentation() {
             prefs.edit().clear().commit()
             storageRecoveryChecks()
             pollingChecks()
+            LlmCatalogChecks.clientChecks()
             uiChecks()
-            result.putString("stream", "PASS: migration, idempotence, independent seen keys, add/update/rename/remove/select, stale revocation, isolated revocation, address/origin policy, HTTP polling, UI switcher, QR confirmation, cookie isolation\n")
+            result.putString("stream", "PASS: migration, idempotence, independent seen keys, add/update/rename/remove/select, stale revocation, isolated revocation, address/origin policy, HTTP polling, UI switcher, QR confirmation, cookie isolation, LLM catalog settings/client\n")
             finish(Activity.RESULT_OK, result)
         } catch (failure: Throwable) {
             result.putString("stream", "FAIL: ${failure.stackTraceToString()}\n")
@@ -285,6 +286,7 @@ class MultiServerTests : Instrumentation() {
             }
             bitmap.recycle()
         }
+        LlmCatalogChecks.uiChecks(this, activity, a, b)
         runOnMainSync { activity.finish() }
         prefs.edit().clear().commit()
     }
