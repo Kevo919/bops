@@ -57,13 +57,19 @@ chmod 755 "$scratch/docker-gate/ss" "$scratch/docker-gate/apt-get" "$scratch/doc
 if PATH="$scratch/docker-gate" /bin/bash "$setup" bops.example.test /unused >"$scratch/docker-443.log" 2>&1; then fail 'docker-published 443 accepted'; fi
 grep -q 'container already publishes' "$scratch/docker-443.log" || fail 'docker-published diagnostic'
 ! grep -q PACKAGE_GATE_REACHED "$scratch/docker-443.log" || fail 'docker-published reached mutations'
+for mapping in '0.0.0.0:79-81->79-81/tcp' '[::]:442-444->442-444/tcp' '127.0.0.1:80-80->8080-8080/tcp'; do
+  printf '#!/bin/bash\nprintf "range %s\\n"\n' "$mapping" >"$scratch/docker-gate/docker"
+  if PATH="$scratch/docker-gate" /bin/bash "$setup" bops.example.test /unused >"$scratch/docker-range.log" 2>&1; then fail 'docker-published range accepted'; fi
+  grep -q 'container already publishes' "$scratch/docker-range.log" || fail 'docker range containing 80/443 bypassed guard'
+  ! grep -q PACKAGE_GATE_REACHED "$scratch/docker-range.log" || fail 'docker range reached mutations'
+done
 printf '#!/bin/bash\nexit 1\n' >"$scratch/docker-gate/docker"
 if PATH="$scratch/docker-gate" /bin/bash "$setup" bops.example.test /unused >"$scratch/docker-down.log" 2>&1; then fail 'failed docker ps accepted'; fi
 grep -q "'docker ps' failed" "$scratch/docker-down.log" || fail 'failed docker ps diagnostic'
-printf '#!/bin/bash\nprintf "n8n 0.0.0.0:5678->5678/tcp\\nweb 0.0.0.0:8080->80/tcp\\n"\n' >"$scratch/docker-gate/docker"
+printf '#!/bin/bash\nprintf "n8n 0.0.0.0:5678->5678/tcp\\nweb 0.0.0.0:8080->80/tcp, [::]:8081-8083->441-443/tcp\\n"\n' >"$scratch/docker-gate/docker"
 if PATH="$scratch/docker-gate" /bin/bash "$setup" bops.example.test /unused >"$scratch/docker-free.log" 2>&1; then fail 'package gate did not stop docker-free fixture'; fi
 grep -q PACKAGE_GATE_REACHED "$scratch/docker-free.log" || fail 'unrelated docker ports rejected'
-pass 'docker-published 80/443 and failed docker ps refuse; other ports pass preflight'
+pass 'docker-published 80/443 including ranges and failed docker ps refuse; other host ports pass preflight'
 
 # Only Ubuntu and Debian: the Tailscale repo path is built from os-release's ID and VERSION_CODENAME.
 cp /etc/os-release "$scratch/os-release.orig"
@@ -103,6 +109,10 @@ if PATH="$scratch/caddy-gate" /bin/bash "$setup" bops.example.test /unused >"$sc
 ! grep -q PACKAGE_GATE_REACHED "$scratch/mixed-caddy.log" || fail 'mixed Caddy reached mutations'
 rm /etc/systemd/system/bops.service
 pass 'foreign/stopped/mixed Caddy refused; exact owned configuration passes preflight'
+if [[ ${BOPS_VPS_TEST_PREFLIGHT_ONLY:-} == 1 ]]; then
+  echo 'PASS: preflight-only checks complete; package installation/runtime checks intentionally skipped.'
+  exit 0
+fi
 
 # Infrastructure for test listeners and local fixture; sudo deliberately NOT preinstalled.
 apt-get update -y >"$scratch/bootstrap.log" 2>&1
@@ -149,7 +159,8 @@ case "$*" in
   # Logged out until an unattended up with the required flags and a private key file.
   'status --peers=false') [[ -f /tmp/bops-tailscale.up ]];;
   'up --accept-dns=false --netfilter-mode=off --auth-key=file:'*)
-    key=${*##*--auth-key=file:}
+    [[ $# == 4 ]] || exit 94
+    key=${4#--auth-key=file:}
     [[ $(stat -c '%a' "$key") == 600 && $(cat "$key") == tskey-fixture ]] || exit 94
     printf '%s\n' "$key" >/tmp/bops-tailscale.up;;
   'debug prefs') printf '{"CorpDNS":false,"NetfilterMode":0}\n';;

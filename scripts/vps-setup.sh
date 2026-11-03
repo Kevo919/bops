@@ -90,7 +90,23 @@ if [ "$tailscale_mode" != "1" ]; then
       echo "Cannot check Docker's published ports: 'docker ps' failed. Start Docker (or fix access to it), then run setup again. Nothing was changed." >&2
       exit 1
     fi
-    if taken=$(grep -E ':(80|443)->' <<<"$published"); then
+    taken=""
+    while IFS= read -r mapping; do
+      remaining="$mapping"
+      # Docker compresses adjacent mappings (e.g. :79-81->79-81/tcp). Inspect
+      # the published HOST interval, never the container-side destination ports.
+      while [[ "$remaining" =~ :([0-9]+)(-([0-9]+))?-\> ]]; do
+        matched="${BASH_REMATCH[0]}"
+        low="${BASH_REMATCH[1]}"
+        high="${BASH_REMATCH[3]:-${BASH_REMATCH[1]}}"
+        if (( (10#$low <= 80 && 10#$high >= 80) || (10#$low <= 443 && 10#$high >= 443) )); then
+          taken+="$mapping"$'\n'
+          break
+        fi
+        remaining=${remaining#*"$matched"}
+      done
+    done <<<"$published"
+    if [ -n "$taken" ]; then
       echo "A Docker container already publishes port 80 or 443:" >&2
       echo "$taken" >&2
       echo "This setup would put Caddy on those ports and won't touch what's running." >&2
