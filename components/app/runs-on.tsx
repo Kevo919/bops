@@ -1,4 +1,5 @@
 "use client";
+import { useComputerWords } from "./computer-words";
 
 import { useEffect, useState } from "react";
 import { workBot, type AppState, type Bot, type RunnerState } from "@/lib/types";
@@ -50,6 +51,7 @@ function computersOf(state: AppState): { id: string; host: Bot }[] {
  * answers: nothing is picked yet. Exported for the tests.
  */
 export function RunsOnChoice({ state, info, busy, error, onPick }: { state: AppState; info: RunsOnInfo | null; busy: boolean; error: string | null; onPick: (to: "cloud" | "mac") => void }) {
+  const computerWords = useComputerWords();
   const on = info?.missing ? "mac" : (info?.runsOn ?? undefined);
   const unheard = !!info && !info.missing && !info.runsOn;
   const computers = computersOf(state);
@@ -66,10 +68,10 @@ export function RunsOnChoice({ state, info, busy, error, onPick }: { state: AppS
             className={`flex flex-1 flex-col gap-1.5 rounded-[14px] p-3.5 text-left disabled:cursor-default ${option(on === c.id)} ${c.id === "cloud" && info?.missing ? "opacity-50" : ""}`}
           >
             <span className="flex items-center justify-between">
-              <span className="text-[14px] font-semibold">{c.name}</span>
+              <span className="text-[14px] font-semibold">{computerWords(c.name)}</span>
               {radio(on === c.id)}
             </span>
-            <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">{c.line}</span>
+            <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">{computerWords(c.line)}</span>
           </button>
         ))}
       </div>

@@ -58,6 +58,11 @@ jobs:
         run: node scripts/test-windows-fuses.mjs
       - name: Agents API Windows path serialization tests
         run: node scripts/test-agent-api-path.mjs
+      - name: Host computer identity tests
+        run: |
+          node scripts/test-computer-identity.mjs win32
+          node scripts/test-computer-identity.mjs darwin
+          node scripts/test-computer-identity.mjs linux
       - name: Config tests
         run: node scripts/test-config.mjs
       - name: Chat provider tests
