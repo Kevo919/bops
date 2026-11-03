@@ -12,3 +12,5 @@ CI: PR6merged before followuppush; creating CImaintenancePR for provider/key/cat
 None for currentwork; lead owns review/merge understandingapproval.
 
 Update: PR18 CI-followup bothworkflowsgreen/ready. PR15/17 baseintegrationCIgreen;15task42shortcutcodependinglivevalidation. Task18code-onlystarted;19designinspectionunderway.
+
+Task19 designposted; awaitingrecipeformat+sandbox/privateclone/registration/phonegate decisions. Task18inprogress. Heavyworkstillheldforleadfirst20min.
