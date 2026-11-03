@@ -21,13 +21,13 @@ keys_optional:
     for: Codex/OpenAI-based agents
 keys_required:
   - name: GITHUB_TOKEN
-    for: Read access to the private repo for git clone (passed through a credential helper, never in the URL)
+    for: Read access to the private repo. Bops' server fetches a pinned tarball through its key broker (GitHub API); the token never reaches the bot's computer, a URL, .git/config or a log
 env:
   PAPERCLIP_HOME: /tmp/paperclip-home
-clone: git -c credential.helper='!f() { echo username=x-access-token; echo password=$GITHUB_TOKEN; }; f' clone --depth 1 https://github.com/Kevo919/paperclip.git kevo919-paperclip
+clone: "broker-tarball: Kevo919/paperclip at the commit shown in the approval (fetched by Bops' server, unpacked into kevo919-paperclip on the bot's computer)"
 install:
   - npm install -g pnpm@9.15.4
-  - mkdir -p /tmp/paperclip-home && chmod 777 /tmp/paperclip-home
+  - mkdir -p /tmp/paperclip-home && chmod 700 /tmp/paperclip-home
   - pnpm install --frozen-lockfile
   - pnpm --filter @paperclipai/plugin-sdk build
   - pnpm --filter @paperclipai/paperclip-runner build:binary

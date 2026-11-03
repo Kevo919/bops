@@ -27,7 +27,7 @@ env:
 clone: git clone --depth 1 https://github.com/paperclipai/paperclip.git paperclip
 install:
   - npm install -g pnpm@9.15.4
-  - mkdir -p /tmp/paperclip-home && chmod 777 /tmp/paperclip-home
+  - mkdir -p /tmp/paperclip-home && chmod 700 /tmp/paperclip-home
   - pnpm install --frozen-lockfile
   - pnpm --filter @paperclipai/plugin-sdk build
   - pnpm --filter @paperclipai/paperclip-runner build:binary
