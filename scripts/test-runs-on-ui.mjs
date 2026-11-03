@@ -89,15 +89,15 @@ const state = (o = {}) => ({
 const render = (props) => renderToStaticMarkup(h(R.RunsOnChoice, { busy: false, error: null, onPick: noop, ...props }));
 // The cards, in order: whether each is picked (its radio's dot) and whether it can be picked.
 const cards = (html) =>
-  [...html.matchAll(/<button([^>]*)>(.*?)<\/button>/g)].map(([, attrs, inner]) => ({ name: text(inner).split(" ")[0] === "This" ? "This Mac" : text(inner).split(" ")[0], picked: inner.includes("bg-highlighter"), disabled: /\sdisabled=""/.test(attrs) }));
+  [...html.matchAll(/<button([^>]*)>(.*?)<\/button>/g)].map(([, attrs, inner]) => ({ name: text(inner).split(" ")[0] === "This" ? text(inner).split(" ").slice(0, 2).join(" ") : text(inner).split(" ")[0], picked: inner.includes("bg-highlighter"), disabled: /\sdisabled=""/.test(attrs) }));
 
 await test("Cloud and This Mac, a line each; nothing picked until Bops says which", () => {
   const html = render({ state: state(), info: null });
   const t = text(html);
-  assert.match(t, /^Where routines run Cloud Tasks keep running when your Mac is closed\. This Mac Only while Bops is open on this Mac\.$/, t);
+  assert.match(t, /^Where routines run Cloud Tasks keep running when your computer is closed\. This computer Only while Bops is open on this computer\.$/, t);
   assert.deepEqual(cards(html), [
     { name: "Cloud", picked: false, disabled: true },
-    { name: "This Mac", picked: false, disabled: true },
+    { name: "This computer", picked: false, disabled: true },
   ]);
   assert.ok(!DASHES.test(t), t);
 });
@@ -112,7 +112,7 @@ await test("in the Cloud: Cloud picked, and each computer of the workspace's bot
   const html = render({ state: state({ runners }), info: { runsOn: "cloud", missing: false, asleep: [] } });
   assert.deepEqual(cards(html), [
     { name: "Cloud", picked: true, disabled: false },
-    { name: "This Mac", picked: false, disabled: false },
+    { name: "This computer", picked: false, disabled: false },
   ]);
   const t = text(html);
   // Max shares Boppy's computer: one row for it. Ace's is another workspace's.
@@ -151,20 +151,20 @@ await test("on This Mac: This Mac picked; no computers, but a runner still being
     cards(html).map((c) => c.picked),
     [false, true],
   );
-  assert.ok(!text(html).includes("computer"), text(html));
+  assert.doesNotMatch(text(html), /(?:Boppy|Max|Iris)'s computer/, "no cloud computer cards while routines run locally");
   const stopping = text(render({ state: state({ runners: { [C2]: { status: "stopping", version: "1", buildId: "b", by: "d", at: Date.now() } } }), info: { runsOn: "mac", missing: false, asleep: [] } }));
-  assert.match(stopping, /This Mac Only while Bops is open on this Mac\. Iris's computer Stopping$/, stopping);
+  assert.match(stopping, /This computer Only while Bops is open on this computer\. Iris's computer Stopping$/, stopping);
 });
 
 await test("an Orgo that can't keep it yet: This Mac, Cloud can't be picked, and it says so", () => {
   const html = render({ state: state(), info: { runsOn: "mac", missing: true, asleep: [] } });
   assert.deepEqual(cards(html), [
     { name: "Cloud", picked: false, disabled: true },
-    { name: "This Mac", picked: true, disabled: false },
+    { name: "This computer", picked: true, disabled: false },
   ]);
   const t = text(html);
   assert.ok(t.endsWith("Cloud isn't available yet."), t);
-  assert.ok(!t.includes("computer"), "no runners to show");
+  assert.doesNotMatch(t, /(?:Boppy|Max|Iris)'s computer/, "no runners to show");
 });
 
 await test("Orgo didn't answer: neither picked (never This Mac by default), and it says so", () => {
@@ -172,22 +172,27 @@ await test("Orgo didn't answer: neither picked (never This Mac by default), and 
   const html = render({ state: state({ runners }), info: { runsOn: null, missing: false, asleep: [] } });
   assert.deepEqual(cards(html), [
     { name: "Cloud", picked: false, disabled: false },
-    { name: "This Mac", picked: false, disabled: false },
+    { name: "This computer", picked: false, disabled: false },
   ]);
   const t = text(html);
-  assert.match(t, /on this Mac\. Couldn't reach Orgo\. Try again\. Boppy's computer Running$/, t);
+  assert.match(t, /on this computer\. Couldn't reach Orgo\. Try again\. Boppy's computer Running$/, t);
   assert.ok(!DASHES.test(t), t);
 });
 
 await test("busy: neither can be picked; an error shows under the cards", () => {
   const html = render({ state: state(), info: { runsOn: "cloud", missing: false, asleep: [] }, busy: true, error: "Couldn't reach Orgo. Try again in a moment." });
   assert.ok(cards(html).every((c) => c.disabled));
-  assert.match(text(html), /on this Mac\. Couldn't reach Orgo\. Try again in a moment\. Boppy's computer/);
+  assert.match(text(html), /on this computer\. Couldn't reach Orgo\. Try again in a moment\. Boppy's computer/);
 });
 
 await test("a pick calls back with the card's choice (React's click, from the element tree)", () => {
   const picked = [];
-  const el = R.RunsOnChoice({ state: state(), info: { runsOn: "cloud", missing: false, asleep: [] }, busy: false, error: null, onPick: (to) => picked.push(to) });
+  let el;
+  function Capture() {
+    el = R.RunsOnChoice({ state: state(), info: { runsOn: "cloud", missing: false, asleep: [] }, busy: false, error: null, onPick: (to) => picked.push(to) });
+    return el;
+  }
+  renderToStaticMarkup(h(Capture)); // Render inside React so the platform hook has a dispatcher.
   const find = (n, out = []) => {
     if (!n || typeof n !== "object") return out;
     if (Array.isArray(n)) n.forEach((c) => find(c, out));

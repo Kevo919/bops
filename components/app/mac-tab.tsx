@@ -1,5 +1,7 @@
 "use client";
 
+import { useComputerWords } from "./computer-words";
+
 import { useEffect, useState } from "react";
 import { live, type AppState } from "@/lib/types";
 import { MacStream, useAppWindowSource } from "./mac-screens";
@@ -22,6 +24,7 @@ export function MacIcon({ size = 14, color = "currentColor" }: { size?: number; 
 
 /** Your Mac's settings, a page of the Your Mac tab: whether bots can work here, and the words that mean the Mac. */
 export function MacSettings({ state }: { state: AppState }) {
+  const computerWords = useComputerWords();
   const m = state.mac;
   const retry = m?.next === "codex" && !m.installing;
   const [rule, setRule] = useState("");
@@ -37,10 +40,10 @@ export function MacSettings({ state }: { state: AppState }) {
             <MacIcon size={20} />
           </span>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="text-[20px] font-semibold leading-6 tracking-[-0.01em]">Your Mac</span>
+            <span className="text-[20px] font-semibold leading-6 tracking-[-0.01em]">{computerWords("Your Mac")}</span>
             <span className="flex items-center gap-1.5 text-[13px] leading-[19px] text-[#6B6B6B]">
               <span className={`size-2 rounded-full ${m?.ready ? "bg-[#2BB673]" : "bg-[#C9C9C6]"}`} />
-              {m?.ready ? "Bots can browse here in a Chrome of their own, on your home internet, on your credit. They can't use your Mac's apps for now." : (m?.reason ?? "Checking…")}
+              {m?.ready ? computerWords("Bots can browse here in a Chrome of their own, on your home internet, on your credit. They can't use your Mac's apps for now.") : (m?.reason ?? "Checking…")}
             </span>
           </div>
           {/* An install of Codex that failed (it runs bots' tools here) starts again; anything else is looked at again. */}
@@ -54,8 +57,8 @@ export function MacSettings({ state }: { state: AppState }) {
 
         <div className={section}>
           <div className="flex flex-col gap-0.5">
-            <span className={heading}>These mean your Mac</span>
-            <span className={sub}>A task that mentions one of these runs on your Mac. Otherwise Bops decides, and asks you when it can&apos;t tell.</span>
+            <span className={heading}>{computerWords("These mean your Mac")}</span>
+            <span className={sub}>{computerWords("A task that mentions one of these runs on your Mac. Otherwise Bops decides, and asks you when it can't tell.")}</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {m?.rules.map((r) => (
@@ -92,6 +95,7 @@ export function MacWindow({ app, max = 640, className = "" }: { app: string; max
 }
 
 function MacWindowPicture({ app, max = 640, className = "" }: { app: string; max?: number; className?: string }) {
+  const computerWords = useComputerWords();
   const [tick, setTick] = useState(0);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -104,7 +108,7 @@ function MacWindowPicture({ app, max = 640, className = "" }: { app: string; max
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={`/api/mac/window?app=${encodeURIComponent(app)}&max=${max}&t=${tick}`}
-        alt={`${app} on your Mac`}
+        alt={computerWords`${app} on your Mac`}
         onError={() => setFailed(true)}
         onLoad={() => setFailed(false)}
         className={`h-full w-full object-contain ${failed ? "invisible" : ""}`}
@@ -125,6 +129,7 @@ export function useMacTiles(state: AppState | null) {
 
 /** The preview tiles themselves, shared by the corner preview in Bops and its popped-out window. */
 export function MacTiles({ tiles, onOpen, max = 480, tall = false }: { tiles: ReturnType<typeof useMacTiles>; onOpen: () => void; max?: number; tall?: boolean }) {
+  const computerWords = useComputerWords();
   return (
     <>
       {tiles.map(({ s, app, b }) => (
@@ -136,7 +141,7 @@ export function MacTiles({ tiles, onOpen, max = 480, tall = false }: { tiles: Re
             </span>
             {live(s) ? <span className="size-1.5 animate-pulse rounded-full bg-[#2BB673]" title="Working" /> : <span className="text-[11px] text-[#9A9A98]">done</span>}
           </div>
-          <button onClick={onOpen} title={`${s.title}: open Your Mac`} className={`block w-full ${tall ? "min-h-0 flex-1" : ""}`}>
+          <button onClick={onOpen} title={computerWords`${s.title}: open Your Mac`} className={`block w-full ${tall ? "min-h-0 flex-1" : ""}`}>
             <MacWindow app={app} max={max} className={tall ? "h-full w-full" : "h-[150px] w-full"} />
           </button>
         </div>
@@ -155,6 +160,7 @@ export const PIP_KEY = "bops.macPreview.popped";
  * window that floats over every app; or fold it into a pill.
  */
 export function MacPreviews({ state, onOpen }: { state: AppState; onOpen: () => void }) {
+  const computerWords = useComputerWords();
   const [small, setSmall] = useState(false);
   const tiles = useMacTiles(state);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(() => {
@@ -209,7 +215,7 @@ export function MacPreviews({ state, onOpen }: { state: AppState; onOpen: () => 
         className="fixed z-40 flex items-center gap-2 rounded-full bg-white py-1.5 pl-2 pr-3 text-[12.5px] font-medium shadow-[0_0_0_1px_#0000000F,0_10px_30px_-12px_#00000059]"
       >
         <span className="size-2 animate-pulse rounded-full bg-[#2BB673]" />
-        {tiles.length === 1 ? `${tiles[0].b?.name ?? "A bot"} is using ${tiles[0].app}` : `${tiles.length} windows in use on your Mac`}
+        {tiles.length === 1 ? `${tiles[0].b?.name ?? "A bot"} is using ${tiles[0].app}` : computerWords`${tiles.length} windows in use on your Mac`}
       </button>
     );
   return (
@@ -227,7 +233,7 @@ export function MacPreviews({ state, onOpen }: { state: AppState; onOpen: () => 
           <circle cx="3" cy="8" r="1" />
           <circle cx="7" cy="8" r="1" />
         </svg>
-        <span className="flex-1 truncate pl-1 text-[11.5px] font-medium text-[#6B6B6B]">On your Mac</span>
+        <span className="flex-1 truncate pl-1 text-[11.5px] font-medium text-[#6B6B6B]">{computerWords("On your Mac")}</span>
         {canPop && (
           <button
             onClick={() => (window as unknown as { bopsMac: { popOut: () => void } }).bopsMac.popOut()}
