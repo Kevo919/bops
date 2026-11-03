@@ -31,6 +31,7 @@ import { whenText } from "@/cloud/schedule";
 import { buildApp, madeApp } from "./made-apps";
 import { appWork, askDeploy, botSite, deployForBot, hostedAppsLine, localForBot, readReposAhead } from "./hosted-apps";
 import { savePage } from "./pages";
+import { saveDoc } from "./docs";
 import { onRunner } from "./persist";
 import { currentTurn, noteActing, stillTurn } from "./turn-context";
 import { createRoutine, deleteRoutine, describeSchedule, editRoutine, isNothing, NO_CREDIT_FOR_ROUTINES, routinesNote, runRoutine, setRoutineEnabled, setRoutineWhere, skipRoutine, unskipRoutine, zoneOf } from "./routines";
@@ -1230,7 +1231,7 @@ type ChatPause = Omit<TurnOptions, "group" | "background" | "resume"> & {
  * it, talk in the chat, or ask a teammate. Those are for the user's own turns. (It can open and update
  * Orbit's issues.)
  */
-const NOT_IN_BACKGROUND = new Set(["react", "schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "remember", "make_page", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "hand_off", "tell_task", "ask_teammate", "create_bot", ...ORBIT_OWNER_ONLY]);
+const NOT_IN_BACKGROUND = new Set(["react", "schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "remember", "make_page", "make_doc", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "hand_off", "tell_task", "ask_teammate", "create_bot", ...ORBIT_OWNER_ONLY]);
 
 /**
  * What a turn someone else started (an email, a text or a call from outside) never has: anything that sets
@@ -1241,7 +1242,7 @@ const NOT_IN_BACKGROUND = new Set(["react", "schedule", "manage_routine", "watch
 /** All a sample (BackgroundJob.sample) has: finding an app's actions and running the ones that only read. */
 const SAMPLE_TOOLS = new Set(["find_app_actions", "use_app"]);
 
-const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "create_bot"]);
+const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "make_doc", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "create_bot"]);
 
 /**
  * What a member's turn (TurnOptions.member) never has: what sets up or changes what the bots do on their own
@@ -1260,7 +1261,7 @@ const NOT_FROM_MEMBER = new Set(["schedule", "manage_routine", "watch", "stop_wa
  * landed), what keeps files on the owner's Mac (pages, pictures, apps), and work handed to another bot, which may be on
  * another computer. Those wait for the owner's Mac.
  */
-const NOT_ON_RUNNER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "propose_skill_change", "create_bot", "change_look", "make_page", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "hand_off", "ask_teammate"]);
+const NOT_ON_RUNNER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "propose_skill_change", "create_bot", "change_look", "make_page", "make_doc", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "hand_off", "ask_teammate"]);
 /** Tools that only read: calling them is nothing that can't be done twice (turn-context.ts noteActing). */
 const ONLY_READS = new Set(["find_app_actions", "recall", "check_email", "read_email", "web_fetch", "read_skill", "react"]);
 const notFromMember = (apps: boolean) => (apps ? NOT_FROM_MEMBER : new Set([...NOT_FROM_MEMBER, "make_app", "change_app", "work_on_app", "deploy_app", "local_app"]));
@@ -2051,6 +2052,35 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
             "A complete, self-contained HTML document: inline CSS and JavaScript only, no external scripts, fonts, images or network requests (they're blocked). Write its text in the same ASD-STE100 style. Interactive where it helps: steps you can click through, toggles, a diagram that highlights.",
         },
       }),
+      // A real file for the owner to keep (lib/server/docs.ts): Word, PowerPoint or Excel, downloaded
+      // from the chat. Only plain content travels from the model - Bops builds the file itself - so
+      // nothing of the page's or an email's words can run in it. Not on a routine's run or a runner.
+      ...(bg || onRunner()
+        ? []
+        : [
+            fn("make_doc", `Make ${owner} a real document to keep and open in their own app (a Word file, a PowerPoint deck or an Excel workbook) when they ask for one ("make me a Word doc of...", "a deck for...", "a spreadsheet of..."). Not for what a reply or a page says better. Reply in one sentence.`, {
+              kind: { type: "string", enum: ["docx", "pptx", "xlsx"], description: "docx: Word document. pptx: PowerPoint deck. xlsx: Excel workbook." },
+              title: { type: "string", description: "Its name, a few words (also the file's name)." },
+              sections: {
+                type: "array",
+                description: "In order. Word: each a headed part of the document. PowerPoint: each one slide. Excel: each a block on one sheet.",
+                items: {
+                  type: "object",
+                  properties: {
+                    heading: { type: ["string", "null"], description: "The section's heading (the slide's title). Null when it has none." },
+                    bullets: { type: ["array", "null"], items: { type: "string" }, description: "Its points, each one line. Null when none." },
+                    table: {
+                      type: ["object", "null"],
+                      description: "A table (on a slide, kept as lines). Null when none.",
+                      properties: { columns: { type: "array", items: { type: "string" } }, rows: { type: "array", items: { type: "array", items: { type: "string" } } } },
+                      required: ["columns", "rows"],
+                    },
+                    notes: { type: ["string", "null"], description: "Speaker notes (a deck), or an aside in italics. Null when none." },
+                  },
+                },
+              },
+            }),
+          ]),
       ...(relayed
         ? []
         : [
@@ -2879,6 +2909,17 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       if (item.name === "make_page") {
         const { title, html } = JSON.parse(item.arguments) as { title: string; html: string };
         pages.push(`[${title.replace(/[[\]]/g, "")}](/api/pages/${savePage(title, html)})`);
+        continue;
+      }
+      if (item.name === "make_doc") {
+        // A file for the owner to keep (lib/server/docs.ts): built by Bops from plain content, never
+        // from anything the model could make run. Its link lands beside a page's, as a download.
+        try {
+          const doc = await saveDoc(JSON.parse(item.arguments));
+          pages.push(`[${doc.name}](/api/docs/${doc.id})`);
+        } catch (e) {
+          notes.push(`Couldn't make the document: ${(e as Error).message}`);
+        }
         continue;
       }
       if (item.name === "make_app" || item.name === "change_app") {
