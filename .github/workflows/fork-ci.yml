@@ -54,6 +54,8 @@ jobs:
         run: node scripts/test-brains.mjs
       - name: CLI agent tests
         run: node --conditions=react-server scripts/test-cli-agents.mjs
+      - name: Windows fuse and authenticated shutdown tests
+        run: node scripts/test-windows-fuses.mjs
       - name: Config tests
         run: node scripts/test-config.mjs
       - name: Chat provider tests
