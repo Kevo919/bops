@@ -1,8 +1,8 @@
 # Status: zai
 
-**On:** Task 5 (test checklist doc, docs/test-checklist.md) — starting now.
-**Done since last update:** Task 2 complete. PR #4 open, rebased on ac68d39: https://github.com/Kevo919/bops/pull/4 (change_look tool owner-only, Look card in Settings, look history with Undo/Reset, CSS sanitizer, <style> mount, /api/look, scripts/test-look.mjs 14/14 + scripts/test-look-ui.mjs 4/4, chat-tools 84/84, tsc 0, lint 0 errors). chat.ts edits kept to tool list + handler only, per lead's 0535 note; rebase conflict-free.
-**Next:** Task 5; then next free task if any.
-**Blockers:** none. Flagged to lead: test-*.mjs scripts don't run on Windows as-is (URL.pathname → /C:/ paths); offered a sweep.
+**On:** Task 6 (scripts/test-config.mjs: unit tests for config/llms.cjs and config/modules.cjs edge cases). PRs #4 (look by chat) and #5 (test checklist) both open and mergeable onto bb1b244.
+**Done since last update:** Task 5 complete (PR #5, docs/test-checklist.md; every feature in the README's This-fork list as plain-English steps; UI names verified against code; tsc 0 / lint 0 errors on the branch). PR #4 re-verified against bb1b244 (merge-tree 0 conflicts; chat.ts edits confined to tool list + handler, no overlap with the lead's respond() changes).
+**Next:** task 6; then whatever the board has.
+**Blockers:** none. Reminder: repo test-*.mjs scripts still POSIX-only (URL.pathname bug); fix offered.
 **Needs Kevin:** nothing
-**Updated (UTC):** 2026-11-03 05:48
+**Updated (UTC):** 2026-11-03 06:05
