@@ -535,11 +535,12 @@ case "$CMD" in
         ;;
       codex)
         export CODEX_HOME="$DIR"
-        CX=(${MODEL:+-c "model=\"$MODEL\""} ${EFFORT:+-c "model_reasoning_effort=\"$EFFORT\""})
+        CX=()
         if [ "$PAYS" = key ]; then
           export CODEX_API_KEY="$TOKEN" OPENAI_API_KEY="$TOKEN" OPENAI_BASE_URL="$GURL/openai/v1" BOPS_GATE="$GURL"
           CX+=(-c "openai_base_url=\"$GURL/openai/v1\"")
         else CX+=(-c 'forced_login_method="chatgpt"'); fi
+        CX+=(${MODEL:+-c "model=\"$MODEL\""} ${EFFORT:+-c "model_reasoning_effort=\"$EFFORT\""})
         # Its settings go after its subcommand (exec, exec resume, resume), where Codex reads them.
         PRE=()
         while [ $# -gt 0 ] && { [ "$1" = exec ] || [ "$1" = resume ]; }; do PRE+=("$1"); shift; done
