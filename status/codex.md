@@ -19,3 +19,5 @@ None for current work. Lead owns review and merge.
 Task18 draft PR20 opened at 5ab23bb; CI pending. PR11 native bot-ai passed 25. Repos design approved but network/control-socket isolation gap posted to lead; recipe branch still unpublished.
 
 Priority now18→43→installer→Repos. PR11 b774ab5 pushed; native bot-ai25/CLI40 passed, Docker stopped. Task18 7e67a42 fixes CI lint; local checks running. Task43 implementation started in bops-subscriptions, stacked on PR20.
+
+PR20 now16f6e79: local typegen/tsc pass, lint0errors14warnings. CI bot-ai27 passed; existingCLI key-mode argument-order regression fixed without assertion changes; freshCI pending. Task43 draftunderway. Sharedlock now available for Task43focusedchecks only.
