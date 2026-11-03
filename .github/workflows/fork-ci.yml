@@ -46,6 +46,8 @@ jobs:
           node scripts/test-subscriptions-ui.mjs --brains-off
       - name: Local subscription authentication tests
         run: node --conditions=react-server scripts/test-local-subscriptions.mjs
+      - name: Local Codex conversation process tests
+        run: node --conditions=react-server scripts/test-local-codex-chat.mjs
       - name: Desktop and phone proxy boundary tests
         run: node --conditions=react-server scripts/test-proxy.mjs
       - name: Brain accounts and sign-in tests
