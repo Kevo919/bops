@@ -341,6 +341,7 @@ await test("a saved state's brains come back in shape: real bots only, Codex on 
         { id: "brain_bad", kind: "gemini", name: "?", auth: "plan", bots: [], createdAt: 3 },
         { id: "brain_away", kind: "claude", name: "Claude Code", auth: "plan", bots: [], workspaceId: "ws_deleted", createdAt: 4 },
         { id: "brain_old", kind: "claude", name: "Claude Code 2", auth: "plan", bots: ["boppy"], createdAt: 5, signIns: [{ computerId: "pc-replaced", at: 1, account: { plan: "pro" } }, { computerId: "pc-now", at: 2, account: { plan: "max" } }] },
+        { id: "brain_invalid_auth", kind: "codex", name: "Invalid auth", auth: "invalid", bots: [], workspaceId: "ws_main", createdAt: 6 },
         null,
       ],
       workspaces: [{ id: "ws_main", name: "Main", createdAt: 1 }],
@@ -349,13 +350,14 @@ await test("a saved state's brains come back in shape: real bots only, Codex on 
   const before = structuredClone(S.getState());
   await S.bindSignIn("u-norm");
   const st = S.getState();
-  assert.deepEqual(st.brains.map((x) => x.id), ["brain_ok", "brain_cx", "brain_old"], "a deleted workspace's brain goes with it");
+  assert.deepEqual(st.brains.map((x) => x.id), ["brain_ok", "brain_cx", "brain_old", "brain_invalid_auth"], "a deleted workspace's brain goes with it");
   assert.deepEqual(st.brains[2].signIns.map((x) => x.computerId), ["pc-now"], "signed in only on a computer a bot has");
   const [ok, cx] = st.brains;
   assert.deepEqual(ok.bots, ["boppy"], "a bot that isn't here is dropped");
   assert.equal(ok.workspaceId, "ws_main");
   assert.equal(ok.signingIn, undefined, "a sign-in that was going can't be watched now");
-  assert.equal(cx.auth, "key", "Codex signs in with a key only");
+  assert.equal(cx.auth, "plan", "a persisted Codex ChatGPT plan survives the real state-load normalizer");
+  assert.equal(st.brains.find((x) => x.id === "brain_invalid_auth").auth, "key", "invalid auth still defaults to key");
   assert.deepEqual(cx.bots, []);
   assert.equal(cx.signingIn.failed, "it took too long.", "a failed one stays, saying why");
   assert.equal(st.bots.find((b) => b.id === "boppy").brain, "brain_ok");
@@ -369,7 +371,10 @@ await test("a saved state's brains come back in shape: real bots only, Codex on 
 
 let planId;
 await test("brains are added to the workspace with the bots picked, named after what they are", () => {
-  assert.throws(() => B.addBrain({ kind: "codex", auth: "plan" }), /OpenAI API key only/);
+  const codexPlan = B.addBrain({ kind: "codex", auth: "plan" });
+  assert.equal(codexPlan.auth, "plan");
+  assert.equal(codexPlan.keyName, undefined);
+  B.removeBrain(codexPlan.id);
   assert.throws(() => B.addBrain({ kind: "gemini", auth: "key" }), /Claude Code or Codex/);
   const x = B.addBrain({ kind: "claude", auth: "plan", bots: ["otto", "rook", "kai", "otto", "nobody"], use: true });
   planId = x.id;
@@ -467,7 +472,7 @@ await test("a sign-in opens Claude Code's own on a free screen of the bot's comp
   assert.equal(brain(planId).signingIn.computerId, "pc-main");
   await until("the sign-in to finish", () => brain(planId).signIns?.length);
   const c = pc("pc-main");
-  assert.ok(c.commands.some((x) => x === `bops-brain login ${planId} 101 pc-main`), "Claude Code's sign-in, on that screen");
+  assert.ok(c.commands.some((x) => x === `bops-brain login ${planId} 101 pc-main claude`), "Claude Code's sign-in, on that screen");
   assert.ok(sessionCalls.some((x) => x[0] === "ensureScreens" && x[1] === "pc-main"));
   // The terminal on screen 101, running Claude Code's own login.
   assert.match(lines("terminal.log"), new RegExp(`--disable-server --title Sign in to Claude Code .* -x .*bops-brain sign-in ${planId} 101`));
@@ -649,7 +654,7 @@ await test("a key brain's key comes from the Vault for its run only, and isn't k
 await test("a sign-in asked for on another computer closes the one going first: its terminal and page, and its screen back", async () => {
   writeFileSync(SLOW, "");
   const first = await B.startSignIn(planId, "otto");
-  await until("the first sign-in to open", () => pc("pc-main").commands.includes(`bops-brain login ${planId} ${first.display} pc-main`));
+  await until("the first sign-in to open", () => pc("pc-main").commands.includes(`bops-brain login ${planId} ${first.display} pc-main claude`));
   assert.equal(S.getState().takeover?.display, first.display);
   const n = pc("pc-main").commands.length;
   const handed = sessionCalls.filter((c) => c[0] === "returnControl").length;
@@ -673,7 +678,11 @@ await test("the routes are the Bops window's only, and add, change, sign in and 
   const { brain: cx } = await add.json();
   assert.equal(cx.name, "Codex");
   assert.equal(bot("boppy").brain, cx.id);
-  assert.equal((await R.POST(fromWindow("/api/brains", { kind: "codex", auth: "plan" }))).status, 400);
+  const planResponse = await R.POST(fromWindow("/api/brains", { kind: "codex", auth: "plan" }));
+  assert.equal(planResponse.status, 200);
+  const { brain: codexPlan } = await planResponse.json();
+  assert.equal(codexPlan.auth, "plan");
+  await R.DELETE(fromWindow("/api/brains", { id: codexPlan.id }, "DELETE"));
   assert.deepEqual((await (await R.GET(fromWindow("/api/brains", undefined, "GET"))).json()).brains.map((x) => x.id), [planId, cx.id]);
   assert.equal((await (await R.PATCH(fromWindow("/api/brains", { id: cx.id, name: "Codex (work)" }, "PATCH"))).json()).brain.name, "Codex (work)");
   assert.equal((await R.PATCH(fromWindow("/api/brains", { id: cx.id, botId: "otto", level: "sure" }, "PATCH"))).status, 400);

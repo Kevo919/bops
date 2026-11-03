@@ -145,7 +145,7 @@ function brains(state: AppState) {
   state.brains = state.brains.filter((x) => !!x && typeof x.id === "string" && (x.kind === "claude" || x.kind === "codex"));
   for (const x of state.brains) {
     x.bots = (Array.isArray(x.bots) ? x.bots : []).filter((botId) => here.has(botId));
-    if (x.kind === "codex" || (x.auth !== "plan" && x.auth !== "key")) x.auth = "key";
+    if (x.auth !== "plan" && x.auth !== "key") x.auth = "key";
     x.workspaceId ??= MAIN_WORKSPACE;
     if (x.signingIn && !x.signingIn.failed) delete x.signingIn;
     if (x.signIns) {
