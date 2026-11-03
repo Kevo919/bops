@@ -60,6 +60,8 @@ jobs:
         run: node --conditions=react-server scripts/test-look.mjs
       - name: Repo recipe tests
         run: node scripts/test-repo-recipes.mjs
+      - name: Voice typing card UI tests
+        run: node scripts/test-handy-card-ui.mjs
 
   android:
     if: github.repository != 'OrgoAI/bops'
