@@ -55,3 +55,6 @@ next-env.d.ts
 # Bops Cloud installs its two dependencies here on its box
 /cloud/node_modules
 .scratch/
+
+# Your module settings (config/modules.cjs): made from config/bops.example.yaml, never committed.
+config/bops.yaml

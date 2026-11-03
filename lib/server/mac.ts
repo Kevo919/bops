@@ -29,7 +29,7 @@ export const DEFAULT_MAC_RULES =
 export const emptyMac = (): MacState => ({ ready: false, rules: [...DEFAULT_MAC_RULES] });
 
 /** This server runs on the user's Mac (not a hosted one), where bots can work. */
-const onTheMac = () => (process.platform === "darwin" || process.platform === "win32") && !onPostgres();
+const onTheMac = () => (process.platform === "darwin" || process.platform === "win32") && !onPostgres() && process.env.BOPS_THIS_COMPUTER !== "0";
 /** What to call this computer in what the app says: the Mac, or (Windows) this PC. */
 const here = process.platform === "win32" ? "this PC" : "this Mac";
 

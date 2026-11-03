@@ -1,0 +1,84 @@
+# Bops' modules, one section each (config/modules.cjs). Copy this file to config/bops.yaml and change what
+# you want, or change them in Bops: Settings, Modules. Every line here is commented out: Bops' defaults.
+# Keys and secrets go in .env.local, never here. Changes take effect when Bops restarts.
+
+# AI models. The models your bots think with. Any provider with OpenAI's Responses API works for
+# chat (OpenAI, Azure OpenAI, OpenRouter, a local server); tasks on computers use OpenAI's Agents
+# API and computer tool, so they need OpenAI or a provider that copies those.
+# ai:
+#   baseURL:                      # Provider address
+#   chat: gpt-6.1-sol             # Chat model
+#   chatEffort: medium            # Chat effort (low, medium, high)
+#   tasks: gpt-6.1-sol            # Task model
+#   hardTasks: gpt-6-astra        # Hard task model
+#   light: gpt-6-luna             # Quick model (routing, memory, watches)
+#   phone:                        # Phone call model
+#   image: gpt-image-2.5-flare    # Image model
+#   imageEdit:                    # Image editing model
+
+# Bots' computers. The cloud computers bots work on (Orgo).
+# Keys (in .env.local): ORGO_API_KEY
+# computers:
+#   enabled: true
+#   workspace: bops               # Orgo workspace
+#   template:                     # Computer template
+#   diskGB:                       # Disk size (GB)
+#   computerTool: true            # Use OpenAI's computer tool
+
+# This computer. Bots doing tasks on this PC (or Mac), in a Chrome of their own. Full access is
+# its own switch in Settings.
+# thisComputer:
+#   enabled: true
+#   chromeWindows: false          # Show their Chrome windows
+#   keepAwake: true               # Keep the computer awake during tasks
+
+# Memory. What your bots remember about you, across chats (Honcho).
+# Keys (in .env.local): HONCHO_API_KEY
+# memory:
+#   enabled: true
+#   workspace:                    # Honcho workspace
+
+# Your apps. Gmail, Calendar and about 1,400 more apps (Composio).
+# Keys (in .env.local): COMPOSIO_API_KEY
+# apps:
+#   enabled: true
+
+# Business data. Companies, people, emails and phone numbers to look up (treg).
+# Keys (in .env.local): TREG_TOKEN
+# businessData:
+#   enabled: true
+
+# Quick judgments. Small yes-or-no calls: is this risky, which bot should take it (TypeSafe).
+# Keys (in .env.local): TYPESAFE_API_KEY
+# judge:
+#   enabled: true
+
+# Bots' email. Your main bot's own email address (AgentMail).
+# Keys (in .env.local): AGENTMAIL_API_KEY
+# email:
+#   enabled: true
+#   domain:                       # Email domain
+
+# Texts and calls. Your main bot's own phone number (AgentPhone).
+# Keys (in .env.local): AGENTPHONE_API_KEY
+# phone:
+#   enabled: true
+#   area:                         # Area code for new numbers
+#   hookURL:                      # Webhook address
+
+# Your phone and the internet. Reaching this Bops from the Bops Android app, or from the internet.
+# remote:
+#   enabled: true
+#   publicURL:                    # Public https address
+#   requirePairing: false         # Only the paired phone may connect (for a server on the internet)
+
+# Agent harnesses. Let bots run Claude Code, OpenCode and other agents on their computers (rebuild
+# to apply).
+# brains:
+#   enabled: true
+
+# Usage data. Counts sent to Orgo when signed in with Orgo (never what you or your bots write).
+# Self-hosted sends nothing.
+# privacy:
+#   enabled: true
+#   telemetry: true               # Share usage data

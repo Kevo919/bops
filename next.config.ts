@@ -3,6 +3,12 @@ import { networkInterfaces } from "node:os";
 import { join } from "node:path";
 import type { NextConfig } from "next";
 
+// Bops' modules (config/modules.cjs): config/bops.yaml goes into this server's settings first, so every
+// module (AI models, computers, memory, apps, email, phone…) is switched and swapped there.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const applied = (require("./config/modules.cjs") as { apply: (root: string) => string[] }).apply(process.cwd());
+if (applied.length) console.log(`[modules] from config/bops.yaml: ${applied.join(", ")}`);
+
 // This app's version, built in: the server tells Bops Cloud which app is calling (lib/server/app-version.ts).
 const { version } = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8")) as { version: string };
 

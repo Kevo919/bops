@@ -15,6 +15,9 @@ const eslintConfig = defineConfig([
     // The Electron shell is plain CommonJS, and so are the test harnesses that run its page reader and its apps' fence.
     "desktop/**",
     "scripts/render-harness.cjs",
+    // CommonJS by design (desktop/main.cjs and next.config.ts load them): the module catalog and its example writer.
+    "config/**/*.cjs",
+    "scripts/modules-example.cjs",
     "scripts/test-app-frames.electron.cjs",
     // Release output (the built app) and the downloaded relay agent (scripts/release.sh).
     "dist-desktop/**",

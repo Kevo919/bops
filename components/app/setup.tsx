@@ -244,6 +244,14 @@ const ICONS = {
       <path d="M5 7V5a3 3 0 015.8-1.1" />
     </svg>
   ),
+  modules: (
+    <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round">
+      <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1" />
+      <rect x="9" y="1.5" width="5.5" height="5.5" rx="1" />
+      <rect x="1.5" y="9" width="5.5" height="5.5" rx="1" />
+      <rect x="9" y="9" width="5.5" height="5.5" rx="1" />
+    </svg>
+  ),
   phone: (
     <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
       <rect x="4.5" y="1.5" width="7" height="13" rx="1.5" />
@@ -415,6 +423,7 @@ export function ThisMacSettings({ state }: { state: AppState }) {
       <Cards items={items} />
       <FullAccessCard items={items} />
       <PhoneCard />
+      <ModulesCard />
       <UpdateSettings />
     </div>
   );
@@ -581,6 +590,101 @@ function PhoneCard() {
           </button>
         )}
       </div>
+    </Card>
+  );
+}
+
+type ModuleSetting = { key: string; label: string; help: string | null; type: "text" | "toggle" | string[]; placeholder: string | null; value: unknown };
+type ModuleInfo = { id: string; name: string; help: string; required: boolean; enabled: boolean; keysSet: boolean; keys: string[]; settings: ModuleSetting[] };
+
+/**
+ * Bops' modules (config/modules.cjs): each part that can be swapped or switched off, like DeepSeek
+ * Harness's plugins: the AI provider and models, the bots' computers, memory, apps, email, phone and
+ * the rest. Saved to config/bops.yaml; Bops restarts to use them. Keys stay in .env.local.
+ */
+function ModulesCard() {
+  const [mods, setMods] = useState<ModuleInfo[] | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Record<string, Record<string, unknown>>>({});
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => void fetch("/api/modules").then((x) => (x.ok ? x.json() : null)).then((b) => b && setMods(b.modules)).catch(() => {}), []);
+  if (!mods) return null;
+  const value = (m: ModuleInfo, key: string, fallback: unknown) => (draft[m.id] && key in draft[m.id] ? draft[m.id][key] : fallback);
+  const change = (id: string, key: string, v: unknown) => setDraft((d) => ({ ...d, [id]: { ...d[id], [key]: v } }));
+  const dirty = Object.keys(draft).length > 0;
+  const save = async () => {
+    setError(null);
+    const res = await fetch("/api/modules", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modules: draft }) });
+    const body = (await res.json().catch(() => null)) as { modules?: ModuleInfo[]; error?: string } | null;
+    if (!res.ok || !body?.modules) return setError(body?.error ?? "Couldn't save.");
+    setMods(body.modules);
+    setDraft({});
+    setSaved(true);
+  };
+  const on = mods.filter((m) => m.enabled && m.keysSet).length;
+  return (
+    <Card
+      icon={ICONS.modules}
+      title="Modules"
+      line="Every part of Bops you can swap or switch off: the AI provider and models, computers, memory, apps, email, phone and more. Saved in config/bops.yaml; keys stay in .env.local."
+      tone="ok"
+      status={`${on} of ${mods.length} on and set up`}
+      below={
+        <div className="flex flex-col gap-1.5">
+          {mods.map((m) => {
+            const enabled = Boolean(value(m, "enabled", m.enabled));
+            return (
+              <div key={m.id} className="rounded-md px-2 py-1.5 shadow-[0_0_0_1px_#E6E6E3]">
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setOpen(open === m.id ? null : m.id)} className="flex min-w-0 flex-1 flex-col text-left">
+                    <span className="text-[12.5px] font-medium leading-4">{m.name}</span>
+                    <span className="truncate text-[12px] leading-4 text-pencil">{!enabled ? "Off" : m.keysSet ? m.help : `Needs ${m.keys.join(", ")} in .env.local`}</span>
+                  </button>
+                  {!m.required && (
+                    <label className="flex items-center gap-1 text-[12px]">
+                      <input type="checkbox" checked={enabled} onChange={(e) => change(m.id, "enabled", e.target.checked)} />
+                      On
+                    </label>
+                  )}
+                </div>
+                {open === m.id && m.settings.length > 0 && (
+                  <div className="mt-1.5 flex flex-col gap-1.5 border-t border-[#EEEEEC] pt-1.5">
+                    {m.settings
+                      .filter((st) => st.key !== "enabled")
+                      .map((st) => (
+                        <label key={st.key} className="flex flex-col gap-0.5 text-[12px]">
+                          <span className="text-pencil">{st.label}</span>
+                          {st.type === "toggle" ? (
+                            <input type="checkbox" className="self-start" checked={Boolean(value(m, st.key, st.value))} onChange={(e) => change(m.id, st.key, e.target.checked)} />
+                          ) : Array.isArray(st.type) ? (
+                            <select className="rounded border border-[#E6E6E3] px-1.5 py-1" value={String(value(m, st.key, st.value) ?? "")} onChange={(e) => change(m.id, st.key, e.target.value)}>
+                              <option value="">Default</option>
+                              {st.type.map((o) => (
+                                <option key={o} value={o}>
+                                  {o}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input className="rounded border border-[#E6E6E3] px-1.5 py-1 font-mono" placeholder={st.placeholder ?? "Default"} value={String(value(m, st.key, st.value) ?? "")} onChange={(e) => change(m.id, st.key, e.target.value)} />
+                          )}
+                          {st.help && <span className="text-pencil">{st.help}</span>}
+                        </label>
+                      ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {error && <span className="text-[12px] text-[#B00020]">{error}</span>}
+          {saved && <RestartAsk compact onCancel={() => setSaved(false)} />}
+        </div>
+      }
+    >
+      <button onClick={() => void save()} disabled={!dirty} className={dirty ? dark : light}>
+        Save
+      </button>
     </Card>
   );
 }
