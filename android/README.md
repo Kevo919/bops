@@ -39,7 +39,7 @@ See [WORK_LOG.md](WORK_LOG.md) for verification evidence and remaining device ch
 
 ## Configured models (read-only)
 
-While connected, tap **Settings** above the Bops page. The app loads the selected server's configured model names, providers, model IDs, default-for-new-bots flag and assigned jobs from `GET /api/state` (`state.llms`). Tap **Refresh** to read it again, **Back to Bops** to return to the existing page without reloading it, or **Saved servers** to switch servers.
+While connected, tap **Settings** above the Bops page. The app loads the selected server's configured model names, providers, model IDs, default-for-new-bots flag and assigned jobs from `GET /api/llms` (`llms`). Only a 404 response triggers compatibility fallback to `GET /api/state` (`state.llms`) for older servers; authentication failures, redirects, network errors and malformed responses do not trigger fallback. Tap **Refresh** to read it again, **Back to Bops** to return to the existing page without reloading it, or **Saved servers** to switch servers.
 
 This screen cannot change configuration or provider keys. Edit `config/llms.yaml` on the server and restart Bops to change its list. Empty, missing/older-server, unreachable and invalid-response states are shown explicitly. A rejected pairing returns to setup for that server only. Late responses are discarded after leaving settings. New microphone requests are denied while native settings are visible.
 

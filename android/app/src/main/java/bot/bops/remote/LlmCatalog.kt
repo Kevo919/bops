@@ -19,9 +19,14 @@ internal class LlmCatalog(private val connection: (URL) -> HttpURLConnection = {
     fun load(server: Server): CatalogResult {
         val code = server.code ?: return CatalogResult.Unpaired
         ServerSafety.safeAddress(server.address)?.let { return CatalogResult.Error(it) }
+        return fetch(server, code, legacy = false)
+    }
+
+    private fun fetch(server: Server, code: String, legacy: Boolean): CatalogResult {
         var request: HttpURLConnection? = null
         return try {
-            request = connection(URL("${server.address}/api/state"))
+            val path = if (legacy) "/api/state" else "/api/llms"
+            request = connection(URL("${server.address}$path"))
             request.apply {
                 requestMethod = "GET"
                 instanceFollowRedirects = false
@@ -31,7 +36,11 @@ internal class LlmCatalog(private val connection: (URL) -> HttpURLConnection = {
             }
             when (val status = request.responseCode) {
                 401, 403 -> CatalogResult.Unpaired
-                200 -> request.inputStream.use { readResponse(it) }
+                200 -> request.inputStream.use { readResponse(it, legacy) }
+                404 -> if (!legacy) {
+                    request.disconnect()
+                    fetch(server, code, legacy = true)
+                } else CatalogResult.Error("${server.name} answered 404. Update Bops on the server and try Refresh.")
                 else -> CatalogResult.Error("${server.name} answered $status. Try Refresh in a moment.")
             }
         } catch (_: Exception) {
@@ -40,23 +49,23 @@ internal class LlmCatalog(private val connection: (URL) -> HttpURLConnection = {
     }
 
     /** Count actual bytes, including when Content-Length is absent or incorrect. */
-    private fun readResponse(input: InputStream): CatalogResult {
+    private fun readResponse(input: InputStream, legacy: Boolean): CatalogResult {
         val bytes = ByteArrayOutputStream()
         val buffer = ByteArray(8192)
         while (bytes.size() < MAX_RESPONSE_BYTES) {
             val count = input.read(buffer, 0, minOf(buffer.size, MAX_RESPONSE_BYTES - bytes.size()))
-            if (count == -1) return parse(bytes.toString("UTF-8"))
+            if (count == -1) return parse(bytes.toString("UTF-8"), legacy)
             bytes.write(buffer, 0, count)
         }
         // One extra byte distinguishes an exactly-at-limit response from an oversized stream.
         if (input.read() != -1)
             return CatalogResult.Error("This server's response exceeds the 5 MiB limit. The model list couldn't be loaded.")
-        return parse(bytes.toString("UTF-8"))
+        return parse(bytes.toString("UTF-8"), legacy)
     }
 
-    internal fun parse(body: String): CatalogResult = try {
-        val state = JSONObject(body).getJSONObject("state")
-        val rows = state.optJSONArray("llms")
+    internal fun parse(body: String, legacy: Boolean = false): CatalogResult = try {
+        val root = JSONObject(body)
+        val rows = (if (legacy) root.getJSONObject("state") else root).optJSONArray("llms")
         if (rows == null) CatalogResult.Error("This server didn't provide its configured models. Update Bops on the server and try Refresh.")
         else CatalogResult.Loaded((0 until rows.length()).map { index ->
             val row = rows.getJSONObject(index)
