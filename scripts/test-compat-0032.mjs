@@ -66,8 +66,8 @@ if (!merge32 || !access32) {
 const dir = mkdtempSync(join(tmpdir(), "bops-test-compat-"));
 writeFileSync(join(dir, "state-merge.ts"), merge32);
 writeFileSync(join(dir, "member-access.ts"), access32);
-const V32 = await import(join(dir, "state-merge.ts"));
-const A32 = await import(join(dir, "member-access.ts"));
+const V32 = await import(pathToFileURL(join(dir, "state-merge.ts")).href);
+const A32 = await import(pathToFileURL(join(dir, "member-access.ts")).href);
 const NOW = await import(`${rootUrl}/lib/server/state-merge.ts`);
 
 /*

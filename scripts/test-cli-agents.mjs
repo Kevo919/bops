@@ -26,16 +26,27 @@
 // with Anthropic and OpenAI keys and tokens planted in it. Bops Cloud (OpenAI behind it) is a fake too. Nothing reaches a real service. The window's cards for
 // these threads are rendered to HTML by a child of the test (--render: the window's code isn't react-server).
 //
+// On Windows, Docker runs only the fake Linux computers (node:24, no network).
+// App modules, assertions and UI rendering run in native Windows Node. Python 3
+// must be available as python. The PATH assertion checks the remote Node folder.
 // Usage: node --conditions=react-server scripts/test-cli-agents.mjs
 //        REAL_CLAUDE=1 node --conditions=react-server scripts/test-cli-agents.mjs
 //          also runs this Mac's own Claude Code (signed in as it is here, with no Anthropic key or token in its
 //          environment) through the same fake computer, on "Reply with the word ok.", and prints the events it saw.
 import assert from "node:assert/strict";
-import { execFile, execFileSync } from "node:child_process";
-import { accessSync, constants, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { execFile as nativeExecFile, execFileSync as nativeExecFileSync } from "node:child_process";
+import { linuxComputerFixture } from "./cli-computer-fixture.mjs";
+import * as fs from "node:fs";
+const { constants, mkdtempSync } = fs;
+let fixture;
+const mappedFs = (name) => (...args) => (fixture?.fs[name] ?? fs[name])(...args);
+const [accessSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmdirSync, rmSync, writeFileSync] = ["accessSync", "existsSync", "mkdirSync", "readdirSync", "readFileSync", "realpathSync", "rmdirSync", "rmSync", "writeFileSync"].map(mappedFs);
+const execFile = (...args) => (fixture?.execFile ?? nativeExecFile)(...args);
+const execFileSync = (...args) => (fixture?.execFileSync ?? nativeExecFileSync)(...args);
 import { registerHooks } from "node:module";
 import { homedir, tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, join as nativeJoin } from "node:path";
+const join = (...parts) => (fixture?.join ?? nativeJoin)(...parts);
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
@@ -128,22 +139,31 @@ if (process.argv[2] === "--render") {
   process.exit(0);
 }
 
-const scratch = mkdtempSync(join(tmpdir(), "bops-test-cli-agents-"));
+const nativeScratch = mkdtempSync(join(tmpdir(), "bops-test-cli-agents-"));
+if (process.platform === "win32") {
+  assert.ok(!REAL_CLAUDE, "REAL_CLAUDE is not supported by the isolated Windows fake computers");
+  fixture = linuxComputerFixture(nativeScratch);
+}
+const scratch = fixture?.scratch ?? nativeScratch;
+const computerNode = fixture?.node ?? process.execPath;
 // Whatever the test started from its folder goes with it, also when an assertion fails or it's stopped
 // (Ctrl-C, kill): a stand-in left running would run on forever.
 const sweep = () => {
+  if (fixture) return fixture.stop();
   try {
     execFileSync("pkill", ["-f", "--", scratch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")]);
   } catch {}
 };
 process.on("exit", sweep);
 for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]]) process.on(signal, () => process.exit(code));
-process.chdir(scratch);
-process.env.HOME = join(scratch, "home");
+process.chdir(nativeScratch);
+process.env.HOME = nativeJoin(nativeScratch, "home");
 mkdirSync(process.env.HOME);
 // The app's files (vm/, the browser tools' version) are read from where it runs.
-symlinkSync(join(rootPath, "node_modules"), join(scratch, "node_modules"));
-symlinkSync(join(rootPath, "vm"), join(scratch, "vm"));
+fs.symlinkSync(join(rootPath, "node_modules"), nativeJoin(nativeScratch, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+if (fixture) fs.cpSync(join(rootPath, "vm"), nativeJoin(nativeScratch, "vm"), { recursive: true });
+else fs.symlinkSync(join(rootPath, "vm"), join(scratch, "vm"));
+fixture?.start();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(check, what, ms = 20_000) {
   for (const end = Date.now() + ms; Date.now() < end; await sleep(20)) {
@@ -182,7 +202,7 @@ const args = process.argv.slice(2);
 const pid = process.pid;
 appendFileSync(RUNS, JSON.stringify({ pid, at: Date.now(), args, env: process.env, cwd: process.cwd() }) + "\\n");
 // Gone with the test, however it ended (a stand-in left hanging would run on forever).
-const TEST = ${process.pid};
+const TEST = ${fixture?.parentPid ?? process.pid};
 setInterval(() => { try { process.kill(TEST, 0); } catch (e) { if (e.code === "ESRCH") process.exit(0); } }, 1000).unref();
 const heard = (x) => appendFileSync(HEARD, JSON.stringify({ pid, at: Date.now(), ...x }) + "\\n");
 const D = process.env.CLAUDE_CONFIG_DIR ?? join(process.env.HOME ?? "/", ".claude");
@@ -277,7 +297,7 @@ const args = process.argv.slice(2);
 const pid = process.pid;
 appendFileSync(RUNS, JSON.stringify({ pid, ppid: process.ppid, at: Date.now(), args, env: process.env, cwd: process.cwd() }) + "\\n");
 // Gone with the test, however it ended (a stand-in left hanging would run on forever).
-const TEST = ${process.pid};
+const TEST = ${fixture?.parentPid ?? process.pid};
 setInterval(() => { try { process.kill(TEST, 0); } catch (e) { if (e.code === "ESRCH") process.exit(0); } }, 1000).unref();
 const heard = (x) => appendFileSync(HEARD, JSON.stringify({ pid, at: Date.now(), ...x }) + "\\n");
 if (args[0] === "--version") { console.log("codex-cli 0.160.0"); process.exit(0); }
@@ -330,8 +350,8 @@ async function go() {
 `,
 );
 const fake = (name, body) => writeFileSync(join(fakebin, name), `#!/bin/bash\n${body}\n`, { mode: 0o755 });
-fake("claude", `exec ${JSON.stringify(process.execPath)} ${JSON.stringify(fakeClaude)} "$@"`);
-fake("codex", `exec ${JSON.stringify(process.execPath)} ${JSON.stringify(fakeCodex)} "$@"`);
+fake("claude", `exec ${JSON.stringify(computerNode)} ${JSON.stringify(fakeClaude)} "$@"`);
+fake("codex", `exec ${JSON.stringify(computerNode)} ${JSON.stringify(fakeCodex)} "$@"`);
 // xfce4-terminal: what it was asked (and on which screen), then the command after -x, in its place.
 fake("xfce4-terminal", `echo "$DISPLAY $*" >> ${JSON.stringify(TERMINAL)}\nwhile [ $# -gt 0 ] && [ "$1" != -x ]; do shift; done\nshift\nexec "$@"`);
 fake("setsid", `exec "$@"`);
@@ -365,7 +385,7 @@ const pid = process.pid;
 const flag = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
 const patch = flag("--patch") && existsSync(flag("--patch")) ? JSON.parse(readFileSync(flag("--patch"), "utf8")) : null;
 appendFileSync(RUNS, JSON.stringify({ pid, ppid: process.ppid, at: Date.now(), args, env: process.env, cwd: process.cwd(), patch }) + "\\n");
-const TEST = ${process.pid};
+const TEST = ${fixture?.parentPid ?? process.pid};
 setInterval(() => { try { process.kill(TEST, 0); } catch (e) { if (e.code === "ESRCH") process.exit(0); } }, 1000).unref();
 const heard = (x) => appendFileSync(HEARD, JSON.stringify({ pid, at: Date.now(), ...x }) + "\\n");
 if (args[0] === "--version") { console.log("0.2.2-alpha.2"); process.exit(0); }
@@ -461,7 +481,7 @@ const onPc = (c, path) => (path.startsWith("/usr/local/bin/") ? join(c.bin, path
 const runHere = (c, command) =>
   new Promise((resolve) =>
     execFile(
-      process.platform === "win32" ? "bash" : "/bin/bash",
+      "/bin/bash",
       ["-c", command],
       {
         env: {
@@ -476,7 +496,7 @@ const runHere = (c, command) =>
           BOPS_CODEX: join(fakebin, "codex"),
           // DeepSeek Harness by its Node's path (bops-brain runs it so): this Node, and the fake.
           BOPS_DSH: fakeDsh,
-          BOPS_DSH_NODE: process.execPath,
+          BOPS_DSH_NODE: computerNode,
           BOPS_LOGS: join(c.dir, "logs"),
           BOPS_HOME: c.home,
           ...PLANTED,
@@ -610,6 +630,7 @@ const signIn = (computerId = PC, brainId = PLAN.id) => {
 };
 const agentDir = (sid, computerId = PC) => join(pc(computerId).agents, sid);
 const alive = (pid) => {
+  if (fixture) return fixture.alive(pid);
   try {
     process.kill(pid, 0);
     return true;
@@ -1538,7 +1559,7 @@ await test("a bot's DeepSeek Harness agent runs its thread: dsh --profile headle
   assert.equal(r.env.DSH_TELEMETRY_DISABLED, "1");
   assert.ok(!Object.values(r.env).includes(DEEPSEEK_KEY), "the key is nowhere in its environment");
   for (const k of Object.keys(PLANTED)) assert.equal(r.env[k], undefined, `no ${k}`);
-  assert.ok(r.env.PATH.split(":").at(-1) === join(process.execPath, ".."), "its Node's folder last on PATH: what it runs finds the computer's own first");
+  assert.ok(r.env.PATH.split(fixture ? ":" : delimiter).at(-1) === (fixture ? "/usr/local/bin" : join(computerNode, "..")), "its Node's folder last on PATH: what it runs finds the computer's own first");
   assert.equal(r.env.DISPLAY, `:${t.lastDisplay}`);
   assert.equal(realpathSync(r.cwd), realpathSync(join(pc(PC).dir, "workspace")));
   // The run's patch: Bops' MCP servers and briefing (the thread's), then its provider at the gate (the variable named,
@@ -1725,10 +1746,13 @@ if (REAL_CLAUDE) {
   });
 }
 
-console.log(`\n${passed} passed`);
 for (const c of pcs.values())
   for (const d of existsSync(c.agents) ? readdirSync(c.agents) : []) await new Promise((r) => execFile("/bin/bash", ["-c", `BOPS_AGENTS=${c.agents} ${join(c.bin, "bops-agent")} stop ${d}`], () => r()));
+fixture?.stop();
+// Remove the test junction itself before removing the scratch tree.
+if (fixture) fs.rmdirSync(nativeJoin(nativeScratch, "node_modules"));
 try {
-  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  fs.rmSync(nativeScratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 } catch {}
+console.log(`\n${passed} passed`);
 process.exit(0);

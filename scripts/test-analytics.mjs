@@ -672,7 +672,7 @@ for (const f of files) {
   for (const m of src.matchAll(/\b(trackEvent|trackServerEvent)\(\s*"([^"]+)"/g)) used.set(m[2], [...(used.get(m[2]) ?? []), [SENDERS[m[1]], f]]);
   for (const m of src.matchAll(/\btrackCloudEvent\(\s*[^,()]+(?:\([^)]*\))?,\s*"([^"]+)"/g)) used.set(m[1], [...(used.get(m[1]) ?? []), ["cloud", f]]);
   if (/from "posthog-(js|node)|import\("posthog-js/.test(src))
-    assert.ok(["lib/analytics.ts", "lib/server/analytics.ts", "cloud/analytics.ts"].includes(f.slice(rootPath.length + 1)), `${f} doesn't import PostHog itself`);
+    assert.ok(["lib/analytics.ts", "lib/server/analytics.ts", "cloud/analytics.ts"].includes(f.slice(rootPath.length + 1).replaceAll("\\", "/")), `${f} doesn't import PostHog itself`);
 }
 for (const [event, uses] of used) {
   assert.ok(Object.hasOwn(R.EVENTS, event), `${event} is in the catalog`);

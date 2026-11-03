@@ -287,10 +287,10 @@ assert.ok(sources.length > 100, "the app's sources were read");
 const FORBIDDEN = [/["'`]app-server["'`]/, /account\/login/, /account\/read/, /chatgptDeviceCode/, /type:\s*["'`]chatgpt["'`]/, /signInToCodex|openCodexApp/];
 for (const p of sources) {
   const text = readFileSync(p, "utf8");
-  for (const re of FORBIDDEN) assert.ok(!re.test(text), `${p.slice(rootPath.length + 1)} matches ${re}`);
+  for (const re of FORBIDDEN) assert.ok(!re.test(text), `${p.slice(rootPath.length + 1).replaceAll("\\", "/")} matches ${re}`);
 }
 // No screen in the app names ChatGPT (a plan, a sign-in, tokens "on ChatGPT").
-for (const p of sources.filter((p) => p.startsWith(join(rootPath, "components")))) assert.ok(!/chatgpt/i.test(readFileSync(p, "utf8")), `${p.slice(rootPath.length + 1)} names ChatGPT`);
+for (const p of sources.filter((p) => p.startsWith(join(rootPath, "components")))) assert.ok(!/chatgpt/i.test(readFileSync(p, "utf8")), `${p.slice(rootPath.length + 1).replaceAll("\\", "/")} names ChatGPT`);
 
 // The Mac is ready with the Codex CLI (to run bots' tools) and Chrome; no sign-in step, and looking ran no Codex.
 await M.checkMac();

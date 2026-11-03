@@ -432,7 +432,7 @@ await check("no bot or model can reach reveal: only its route calls it, and no t
       if (f === "node_modules" || f.startsWith(".")) continue;
       const p = join(d, f);
       if (statSync(p).isDirectory()) walk(p);
-      else if (/\.(ts|tsx)$/.test(f) && readFileSync(p, "utf8").includes("revealKey")) users.push(p.slice(rootPath.length + 1));
+      else if (/\.(ts|tsx)$/.test(f) && readFileSync(p, "utf8").includes("revealKey")) users.push(p.slice(rootPath.length + 1).replaceAll("\\", "/"));
     }
   };
   for (const d of ["app", "lib", "components"]) walk(join(rootPath, d));
