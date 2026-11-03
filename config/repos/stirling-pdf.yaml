@@ -1,0 +1,33 @@
+id: stirling-pdf
+name: Stirling-PDF
+repo: Stirling-Tools/Stirling-PDF
+url: https://github.com/Stirling-Tools/Stirling-PDF
+license: "custom: MIT, with proprietary licenses for app/proprietary/ and app/saas/"
+license_note: >-
+  The core is MIT, but code under app/proprietary/ and app/saas/ is under its own proprietary license
+  (paid features); the published Docker image includes it.
+what: A self-hosted web app with dozens of PDF tools (merge, split, OCR, convert, sign, redact).
+good_for: PDF editing tools
+stack: [java, spring, docker]
+requirements:
+  docker: true
+keys_optional: []
+keys_required: []
+clone: git clone --depth 1 https://github.com/Stirling-Tools/Stirling-PDF.git stirling-pdf
+install:
+  - docker pull docker.stirlingpdf.com/stirlingtools/stirling-pdf
+run: docker run -d --name stirling-pdf -p 8080:8080 docker.stirlingpdf.com/stirlingtools/stirling-pdf
+background: false
+kind: web
+port: 8080
+health:
+  http: http://127.0.0.1:8080/api/v1/info/status
+  expect: 200
+fits_bot_computer: false
+fits_reason: The documented quick start is a Docker image; needs a Docker daemon.
+verified: false
+verified_reason: >-
+  Needs Docker here: the sandbox has the Docker CLI but no running daemon. Clone (00cd05d) and LICENSE were
+  read. The run line is the README quick start (docker run -p 8080:8080 ...) with -d and a name added;
+  the health path is the one the repo's compose files health-check (/api/v1/info/status). Open WebUI
+  also defaults to port 8080.

@@ -106,6 +106,23 @@ try {
     assert.match(warnings[0], /left out.*unknown/);
   });
 
+  test("LLMs: Ollama is a provider, its model's colon kept, and the file's commented example reads back", () => {
+    assert.ok(llms.PROVIDERS.includes("ollama"));
+    const root = fixture("read-llms-ollama", "llms.yaml", "llms:\n  - name: Qwen local\n    provider: Ollama\n    model: qwen2.5:3b\n  - provider: ollama\n    model: llama3.2:1b-instruct-q4_K_M\n");
+    const warnings = [];
+    assert.deepEqual(llms.read(root, (text) => warnings.push(text)), [
+      { name: "Qwen local", provider: "ollama", model: "qwen2.5:3b" },
+      { name: "llama3.2:1b-instruct-q4_K_M", provider: "ollama", model: "llama3.2:1b-instruct-q4_K_M" },
+    ]);
+    assert.deepEqual(warnings, []);
+    const yaml = readFileSync(new URL("../config/llms.yaml", import.meta.url), "utf8");
+    assert.match(yaml, /^#    ollama .*free/m, "the file's provider list names it");
+    assert.match(yaml, /OLLAMA_BASE_URL/);
+    // The commented example, uncommented, is a valid entry.
+    const example = yaml.split("\n").filter((l) => /^  # (- name: Qwen|  provider: ollama|  model: qwen2\.5:3b)/.test(l)).map((l) => l.replace(/^  # /, "  ")).join("\n");
+    assert.deepEqual(llms.clean(require("yaml").parse(`llms:\n${example}\n`)), [{ name: "Qwen 2.5 3B (local)", provider: "ollama", model: "qwen2.5:3b" }]);
+  });
+
   test("Modules: missing, empty and malformed YAML safely read as empty", () => {
     assert.deepEqual(modules.read(fixture("missing-modules")), {});
     assert.deepEqual(modules.read(fixture("empty-modules", "bops.yaml", "# empty\n")), {});

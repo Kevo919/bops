@@ -17,6 +17,8 @@ export const BUILTIN_CHAT_MODELS: ChatModel[] = [
   { id: "zai/glm-5.2", name: "GLM 5.2", provider: "zai" },
   { id: "deepseek/deepseek-chat", name: "DeepSeek Chat", provider: "deepseek" },
   { id: "deepseek/deepseek-reasoner", name: "DeepSeek Reasoner", provider: "deepseek" },
+  // Shown only on a server with OLLAMA_BASE_URL set (chatModelShown); other Ollama models go in config/llms.yaml.
+  { id: "ollama/qwen2.5:3b", name: "Qwen 2.5 3B", provider: "ollama" },
 ];
 
 /** Your LLMs first (by their names in the file), then the built in ones they don't already have. */
@@ -44,6 +46,12 @@ export function providerOf(model: string | undefined): AgentRoute | undefined {
   const p = model?.split("/")[0];
   return p && model!.includes("/") && Object.hasOwn(ROUTE_KEYS, p) ? (p as AgentRoute) : undefined;
 }
+
+/**
+ * A model the picker offers on this server: Ollama's only where it's set up (chatKeys.ollama, OLLAMA_BASE_URL set),
+ * so it doesn't show for people without Ollama. Every other provider shows, with "(no key)" when it has none.
+ */
+export const chatModelShown = (m: ChatModel, keys: Partial<Record<string, boolean>>) => m.provider !== "ollama" || !!keys.ollama;
 
 /** The key each provider's chat runs on, and its name for people ("Anthropic"). */
 export const chatKeyName = (p: AgentRoute) => ROUTE_KEYS[p];

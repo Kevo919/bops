@@ -11,7 +11,12 @@ import { BRAINS_ON, planName, signInOn, threadRunner, workBot, workspaceOf, type
  * its folder on the bot's computer (vm/bin/bops-brain), each bot's agents with their own settings there.
  */
 
-export type AgentRoute = "anthropic" | "openai" | "deepinfra" | "zai" | "zai-coding" | "deepseek" | "openrouter";
+export type AgentRoute = "anthropic" | "openai" | "deepinfra" | "zai" | "zai-coding" | "deepseek" | "openrouter" | "ollama";
+/**
+ * Providers a chat can run on but a bot's agents can't: Ollama runs on this server (OLLAMA_BASE_URL), out of
+ * reach of a bot's cloud computer, so its models aren't offered to OpenCode or DeepSeek Harness.
+ */
+export const CHAT_ONLY: ReadonlySet<AgentRoute> = new Set<AgentRoute>(["ollama"]);
 
 /** What each kind of agent is. `soon`: shown, dimmed, with why it isn't in Bops yet. */
 export const AGENTS: Record<AgentKind, { name: string; maker: string; pays: AgentPays[]; soon?: string }> = {
@@ -108,8 +113,9 @@ export const OPENCODE_OTHER = /^(anthropic|openai|deepinfra|zai|zai-coding|deeps
 
 /** The Vault key each provider's agents run on (lib/server/keys.ts KEY_PROVIDERS). */
 // Z.ai: one key for both. "zai-coding" is its GLM Coding Plan (the plan's own address and allowance), "zai" pay as you go.
-export const ROUTE_KEYS: Record<AgentRoute, string> = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", deepinfra: "DEEPINFRA_API_KEY", zai: "ZAI_API_KEY", "zai-coding": "ZAI_API_KEY", deepseek: "DEEPSEEK_API_KEY", openrouter: "OPENROUTER_API_KEY" };
-export const ROUTE_NAMES: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", deepinfra: "DeepInfra", zai: "Z.ai", "zai-coding": "Z.ai Coding Plan", deepseek: "DeepSeek", openrouter: "OpenRouter" };
+// Ollama: no key, its address. OLLAMA_BASE_URL being set is what makes it show (OLLAMA_API_KEY, if any, is sent as Bearer).
+export const ROUTE_KEYS: Record<AgentRoute, string> = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", deepinfra: "DEEPINFRA_API_KEY", zai: "ZAI_API_KEY", "zai-coding": "ZAI_API_KEY", deepseek: "DEEPSEEK_API_KEY", openrouter: "OPENROUTER_API_KEY", ollama: "OLLAMA_BASE_URL" };
+export const ROUTE_NAMES: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", deepinfra: "DeepInfra", zai: "Z.ai", "zai-coding": "Z.ai Coding Plan", deepseek: "DeepSeek", openrouter: "OpenRouter", ollama: "Ollama (free, local)" };
 
 /** Bops agent: every bot has it, always first, and it is every thread's fallback. */
 export const BOPS_AGENT: BotAgent = { id: "bops", kind: "bops", pays: "credit" };
@@ -163,7 +169,7 @@ export function setLlms(list: unknown) {
 const llmModel = (l: Llm) => `${l.provider}/${l.model}`;
 /** The LLMs as models of OpenCode and DeepSeek Harness (and the Claude ones of Claude Code too), the starter first. */
 const llmModels = (kind: AgentKind): (typeof MODELS)[number][] => {
-  const list = [...llms()].sort((a, b) => Number(!!b.starter) - Number(!!a.starter));
+  const list = llms().filter((l) => !CHAT_ONLY.has(l.provider)).sort((a, b) => Number(!!b.starter) - Number(!!a.starter));
   if (anyModel(kind)) return list.map((l) => ({ id: llmModel(l), kind, label: l.name, short: l.name }));
   if (kind === "claude") return list.filter((l) => l.provider === "anthropic").map((l) => ({ id: l.model, kind, label: l.name, short: l.name }));
   return [];
@@ -183,7 +189,7 @@ export const llmAgent = (l: Llm): BotAgent => {
  */
 export function starterAi(): BotAi | undefined {
   if (!BRAINS_ON) return undefined;
-  const list = llms().filter((l) => l.starter || l.useFor?.length).slice(0, MAX_AGENTS - 1);
+  const list = llms().filter((l) => !CHAT_ONLY.has(l.provider) && (l.starter || l.useFor?.length)).slice(0, MAX_AGENTS - 1);
   if (!list.length) return undefined;
   const starter = list.find((l) => l.starter);
   return { agents: [BOPS_AGENT, ...list.map(llmAgent)], default: starter ? llmAgent(starter).id : "bops" };

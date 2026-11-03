@@ -441,12 +441,43 @@ await test("Claude Code is npm's own package at the pinned version, into Bops' f
   assert.equal(pc("pc-y").installs, 2, "one that failed is tried again");
 });
 
-await test("the brain scripts go on a computer as they are in vm/bin, and only when they changed", async () => {
+await test("the brain scripts go on a computer with Linux line endings, and only when they changed", async () => {
   await B.ensureBrainTools("pc-main");
-  for (const f of ["bops-brain", "bops-brain-browser"]) assert.equal(readFileSync(join(pc("pc-main").bin, f), "utf8"), readFileSync(join(rootPath, "vm/bin", f), "utf8"));
+  for (const f of ["bops-brain", "bops-brain-browser"]) assert.equal(readFileSync(join(pc("pc-main").bin, f), "utf8"), readFileSync(join(rootPath, "vm/bin", f), "utf8").replace(/\r\n/g, "\n"));
   const n = pc("pc-main").commands.length;
   await B.ensureBrainTools("pc-main");
   assert.equal(pc("pc-main").commands.length, n, "checked once per run of Bops");
+});
+
+await test("CRLF brain scripts replace stale remote hashes with executable LF uploads", async () => {
+  const fixture = join(scratch, "crlf-source");
+  mkdirSync(join(fixture, "vm/bin"), { recursive: true });
+  const names = ["bops-brain", "bops-brain-browser", "bops-agent", "bops-ai-gate", "bops-exec"];
+  const c = pc("pc-crlf");
+  for (const name of names) {
+    const lf = readFileSync(join(rootPath, "vm/bin", name), "utf8").replace(/\r\n/g, "\n");
+    assert.match(lf, /^#!\/usr\/bin\/env (bash|python3)\n/);
+    const crlf = lf.replace(/\n/g, "\r\n");
+    writeFileSync(join(fixture, "vm/bin", name), crlf);
+    writeFileSync(join(c.bin, name), crlf);
+  }
+  const before = process.cwd();
+  try {
+    process.chdir(fixture);
+    await B.ensureBrainTools("pc-crlf");
+    for (const name of names) {
+      const uploaded = readFileSync(join(c.bin, name));
+      const source = readFileSync(join(fixture, "vm/bin", name));
+      assert.equal(uploaded.toString(), source.toString().replace(/\r\n/g, "\n"));
+      assert.notEqual(createHash("md5").update(uploaded).digest("hex"), createHash("md5").update(source).digest("hex"));
+      assert.ok(c.commands.some((command) => command.endsWith(`> /usr/local/bin/${name} && chmod 0755 /usr/local/bin/${name} && echo ok`)));
+    }
+    const count = c.commands.length;
+    await B.ensureBrainTools("pc-crlf");
+    assert.equal(c.commands.length, count, "normalized content uses the existing cache");
+  } finally {
+    process.chdir(before);
+  }
 });
 
 await test("Claude Code's status is kept to whether it's signed in, how, and whose account", () => {
@@ -516,7 +547,11 @@ await test("nothing of the login, and nothing planted, is in the state, a log or
 
 await test("every Claude Code run here starts with no Anthropic key or token from its environment", () => {
   const runs = claudeRuns();
-  assert.ok(runs.length >= 3);
+  // So the checks below aren't vacuous: the sign-in above ran Claude Code's login and at least one status (the
+  // one that saw it signed in). How many statuses ran first depends on how soon the fake login finished
+  // against the 20ms poll, so the count itself is not something to assert.
+  assert.ok(runs.some((r) => r.args === "auth login"), "its login ran");
+  assert.ok(runs.some((r) => r.args === "auth status --json"), "its status ran");
   for (const r of runs) {
     for (const k of Object.keys(r.env)) assert.ok(!/^ANTHROPIC_|^CLAUDE_CODE_OAUTH|^CLAUDECODE$|^BOPS_/.test(k), `${r.args}: ${k} reached Claude Code`);
     assert.ok(!Object.values(r.env).some((v) => /PLANTED|planted/.test(v)), `${r.args}: something planted reached it`);

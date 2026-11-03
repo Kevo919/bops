@@ -492,14 +492,16 @@ await test("an imported Codex plan is refused at the execution boundary outside 
     delete process.env.BOPS_SELF_HOSTED;
     assert.throws(() => C.agentNow({ sessionId: task.id, agent: run, name: "Codex" }), /self-hosted owner/);
     assert.ok(!C.alsoSpec(bot("rook")).includes("codex:plan"));
-    const sentBefore = commands.length;
+    // Only what reaches Rook's computer counts: an earlier test's cleanup (bot-clear on another computer) may still land meanwhile.
+    const toRook = () => commands.filter((c) => c.computer === "pc-rook").length;
+    const sentBefore = toRook();
     const shell = { botId: "rook", computerId: "pc-rook", display: 100, agent: run, bot: bot("rook") };
     await assert.rejects(C.openShell(shell), /self-hosted owner/);
-    assert.equal(commands.length, sentBefore, "denied before remote prepare or write");
+    assert.equal(toRook(), sentBefore, "denied before remote prepare or write");
     process.env.BOPS_SELF_HOSTED = "1";
     S.update((s) => void (s.shared = { ownerName: "Maya" }));
     await assert.rejects(C.openShell(shell), /self-hosted owner/);
-    assert.equal(commands.length, sentBefore);
+    assert.equal(toRook(), sentBefore);
     assert.throws(() => C.agentNow({ sessionId: task.id, agent: run, name: "Codex" }), /self-hosted owner/);
   } finally {
     process.env.BOPS_SELF_HOSTED = "1";

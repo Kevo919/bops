@@ -1,0 +1,42 @@
+id: browser-use
+name: Browser Use
+repo: browser-use/browser-use
+url: https://github.com/browser-use/browser-use
+license: MIT
+license_note: ""
+what: A Python library and CLI that lets an LLM agent drive a real web browser to complete tasks.
+good_for: LLM browser automation
+stack: [python]
+requirements:
+  python: ">=3.11"
+  other:
+    - "A Chromium-based browser for real runs (not exercised here)"
+keys_optional:
+  - name: OPENAI_API_KEY
+    for: The LLM that drives the agent in the README example (other providers work too)
+  - name: BROWSER_USE_API_KEY
+    for: The hosted BU2 model or a Browser Use cloud browser
+keys_required: []
+clone: git clone --depth 1 https://github.com/browser-use/browser-use.git browser-use
+install:
+  - python3 -m venv .venv
+  - .venv/bin/pip install .
+run: .venv/bin/python -c "import browser_use, importlib.metadata as m; print('browser_use', m.version('browser-use'))"
+kind: library
+health:
+  cmd: .venv/bin/browser-use --help
+  expect_exit: 0
+fits_bot_computer: true
+fits_reason: Pip install (264 MB venv); agent runs need an LLM key and a browser on the bot computer.
+verified:
+  date: "2026-11-03"
+  by: claude-agent (Linux sandbox, Python 3.13.18)
+  commit: b49a68e
+  steps:
+    clone: pass
+    install: "pass: pip install . exit 0"
+    run: "pass: import check printed 'browser_use 0.13.14', exit 0"
+    health: "pass: browser-use --help exit 0"
+  notes: >-
+    The README uses uv add browser-use in a new project; this recipe installs from the clone into a venv.
+    Only import and CLI checks ran, with no API key; no agent task or browser launch was attempted.
