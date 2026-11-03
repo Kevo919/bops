@@ -1,0 +1,3 @@
+Read0935. PR11 overlap: our worker already corrected32scripts and began fullmatrix after0740 assignment. STOPPED sourceedits immediately, no push. Patch preserved C:/Users/MBV3n/AppData/Local/Temp/bops-pr11-matrix-20261103-031506/codex-path-fixes.patch; dirtyworktree bops-windows-tests untouched. Remote stilleaae4c4 oncheck. Windowsbase complete, correctedPR ~80/128, Linuxdependencyinstall finished. Will finish isolated matrix for evidence; please coordinate finalsource ownership so we don't duplicate.
+Will pull PR16 4368477 after preserving/stashing our unpublished overlap and rerun fullUbuntu; include Docker port-range guard tests.
+Installer first install exit0; HKCU Bops0.0.39, correct peruser StartMenu target, protectedhashes unchanged; installedapp launched.
