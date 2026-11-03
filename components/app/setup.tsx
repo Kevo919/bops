@@ -506,7 +506,7 @@ function FullAccessCard({ items }: { items: Items }) {
   );
 }
 
-type Remote = { paired: boolean; created: number | null; code?: string; addresses: { tailnet: string[]; home: string[]; public: string | null } };
+type Remote = { paired: boolean; created: number | null; code?: string; qr?: string | null; addresses: { tailnet: string[]; home: string[]; public: string | null } };
 
 /**
  * The Bops Android app (lib/server/remote.ts): pair it here, and it reaches this Bops from the phone over
@@ -516,6 +516,7 @@ type Remote = { paired: boolean; created: number | null; code?: string; addresse
 function PhoneCard() {
   const [r, setR] = useState<Remote | null>(null);
   const [code, setCode] = useState<string | null>(null);
+  const [qr, setQr] = useState<string | null>(null);
   const load = useCallback(() => void fetch("/api/remote").then((x) => (x.ok ? x.json() : null)).then(setR).catch(() => {}), []);
   useEffect(load, [load]);
   if (!r) return null;
@@ -525,11 +526,13 @@ function PhoneCard() {
     const res = await post("/api/remote", {});
     const body = (await res.json().catch(() => null)) as Remote | null;
     if (body?.code) setCode(body.code);
+    setQr(body?.qr ?? null);
     load();
   };
   const unpairNow = async () => {
     await post("/api/remote", {}, "DELETE");
     setCode(null);
+    setQr(null);
     load();
   };
   return (
@@ -549,7 +552,14 @@ function PhoneCard() {
       below={
         code ? (
           <div className="flex flex-col gap-1.5 text-[12.5px] leading-5">
-            <span className="text-pencil">In the Bops app on your phone, enter:</span>
+            {qr && (
+              <>
+                <span className="text-pencil">Scan this with your phone&apos;s camera (with the Bops app installed):</span>
+                {/* The QR code is an SVG this server made itself (qrcode), never anything from outside. */}
+                <div className="size-40 rounded bg-white p-1" dangerouslySetInnerHTML={{ __html: qr }} />
+              </>
+            )}
+            <span className="text-pencil">{qr ? "Or" : "In the Bops app on your phone,"} enter:</span>
             <span>
               Address: <code className="select-all font-mono">{where ?? "none yet: turn on Tailscale on this computer"}</code>
             </span>

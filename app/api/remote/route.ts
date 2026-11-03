@@ -1,3 +1,4 @@
+import QRCode from "qrcode";
 import { fromThisMac } from "@/lib/server/owner-email";
 import { addresses, pair, pairing, unpair } from "@/lib/server/remote";
 import { fromBopsWindow } from "@/lib/server/ui-token";
@@ -20,11 +21,18 @@ export async function GET(request: Request) {
   return Response.json({ paired: !!p, created: p?.created ?? null, addresses: addresses() });
 }
 
-/** Pair a phone: a new code, shown this once. Any phone paired before stops working. */
+/**
+ * Pair a phone: a new code, shown this once. Any phone paired before stops working. With an address the
+ * phone can use (Tailscale, or https), also a QR code of bops://pair?a=<address>&c=<code>: the phone's
+ * camera opens the Bops app with both filled in, and the app asks before it connects.
+ */
 export async function POST(request: Request) {
   if (!allowed(request)) return no();
   const code = pair();
-  return Response.json({ paired: true, code, addresses: addresses() });
+  const a = addresses();
+  const where = a.public ?? a.tailnet[0];
+  const qr = where ? await QRCode.toString(`bops://pair?a=${encodeURIComponent(where)}&c=${encodeURIComponent(code)}`, { type: "svg", margin: 1, errorCorrectionLevel: "M" }) : null;
+  return Response.json({ paired: true, code, addresses: a, qr });
 }
 
 /** Unpair: the paired phone stops working at once. */

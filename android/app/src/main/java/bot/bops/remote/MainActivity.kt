@@ -44,12 +44,32 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (pairFrom(intent)) return
         // An address kept by an older version that this one wouldn't take asks again.
         if (address == null || code == null || safeAddress(address!!) != null) showSetup(null) else open(address!!, code!!)
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        pairFrom(intent)
+    }
+
+    /**
+     * The QR code from Bops' Settings (bops://pair?a=…&c=…). Any web page could send such a link, so the
+     * app never just follows it: it shows the address and asks, and the code is checked against that
+     * server before anything is kept.
+     */
+    private fun pairFrom(intent: Intent?): Boolean {
+        val data = intent?.data ?: return false
+        if (data.scheme != "bops" || data.host != "pair") return false
+        val a = data.getQueryParameter("a")?.trim()?.trimEnd('/') ?: return false
+        val c = data.getQueryParameter("c")?.trim() ?: return false
+        showSetup(null, a, c)
+        return true
+    }
+
     /** The address and pairing code, checked against the server before they're kept. */
-    private fun showSetup(problem: String?) {
+    private fun showSetup(problem: String?, offeredAddress: String? = null, offeredCode: String? = null) {
         val pad = (20 * resources.displayMetrics.density).toInt()
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -58,15 +78,16 @@ class MainActivity : Activity() {
         }
         fun label(text: String, size: Float = 15f) = TextView(this).apply { this.text = text; textSize = size; setTextColor(Color.BLACK); setPadding(0, pad / 2, 0, pad / 4) }
         root.addView(label("Connect to your Bops", 24f))
-        root.addView(label("In the Bops app on your computer, open Settings, then Your phone, and press Pair a phone. Enter what it shows."))
+        root.addView(label(if (offeredAddress != null) "Connect this phone to the Bops at the address below? Only do this if you just scanned the code from your own Bops." else "In the Bops app on your computer, open Settings, then Your phone, and press Pair a phone. Scan its QR code with your camera, or enter what it shows."))
         val addr = EditText(this).apply {
             hint = "Address, like http://100.101.102.103:3210"
             inputType = InputType.TYPE_TEXT_VARIATION_URI
-            setText(address ?: "")
+            setText(offeredAddress ?: address ?: "")
         }
         val pass = EditText(this).apply {
             hint = "Pairing code"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            if (offeredCode != null) setText(offeredCode)
         }
         val status = label(problem ?: "").apply { setTextColor(Color.rgb(176, 0, 32)) }
         val go = Button(this).apply { text = "Connect" }
