@@ -33,6 +33,16 @@ Owned by the lead. Statuses: TODO, DOING, REVIEW (PR open), DONE, BLOCKED.
 
 | 17 | Release builds turn off Electron's EnableNodeCliInspectArguments fuse (@electron/fuses at build), and smoke-windows.ps1 no longer needs --inspect | codex | TODO | | Low priority, after 14 and 7 |
 
+| 18 | **Codex · ChatGPT plan**: let a bot's Codex agent pay with Kevin's own ChatGPT Plus/Pro (Codex CLI's "Sign in with ChatGPT" device login on the bot's computer), like Claude Code's Claude plan flow already works. Remove the PAYS_SOON gate for codex/plan (lib/agents.ts), add the sign-in flow (brains.ts + vm/bin/bops-brain, as Claude plan does), UI in bot-ai.tsx. Self-hosted owner use only; keep it off for Bops Cloud credit | codex | TODO | | GOAL: Kevin picks "Codex · ChatGPT plan", signs in on the bot's screen, and a thread runs on it. Tests in test-bot-ai + test-cli-agents. Don't touch chat.ts |
+| 19 | **Run a GitHub repo**: in a bot's chat or a "Run a repo" box (Settings or the + menu), paste a GitHub URL; a thread on the bot's computer clones it (shallow), reads README/package files, installs, runs it, and reports. A web app gets a live preview (reuse Bops' preview/hosted-apps or the computer's screen). Safety: owner-only; show the repo, the commands it will run and the ports, and ask before the first run; no secrets in the env; the repo's folder only | codex | TODO | | GOAL: Kevin pastes a link and sees it running. Start with a design note on the board BEFORE coding (which files, which existing pieces you reuse); the lead will reply within the next check-in |
+| 20 | Ready-made "Run" entries for three repos (after 19): CLI-Anything, Reverse Engineer Anything, God's Eye View (bilawalsidhu/gods-eye-view, needs Node 24.14 and a live preview of its Vite server). The lead will post the exact canonical repos | codex | TODO | | After 19 |
+| 21 | Feature gaps vs Grok Bot/OpenBot, Meta Muse and ChatGPT Dots: the lead is doing the check now and will add the gaps as tasks 22+ | lead | DOING | | |
+| 22 | Free the PC's memory before builds: Docker Desktop is running (vmmemWSL), 0.5 GB of RAM is free, and the paging file is full, so the lead's Bops.exe build failed to start. codex: stop Docker Desktop and any test/emulator processes you started, then post free RAM | codex | TODO (NOW) | | Don't kill anything you didn't start |
+
+## Merged 2026-11-03 (lead, with Kevin's OK)
+#3, #1, #2, #10, #14, #13, #9, #6, #4, #12, #16. windows-port = 7c52c29. Post-merge checks: tsc 0; bot-ai 25, cli-agents 40, chat-providers 18, chat-tools 84, look 20, config 15, key-check 8, llms 11.
+Still open: #11 (codex: Windows table), #5 (zai: wording), #15 + #17 (codex: ready once CI is green on them; rebase onto 7c52c29 so Fork CI runs).
+
 ## Done
 
 - Windows port, phone pairing, Android app v1, tray, notifications, QR pairing, modules, job routing + Z.ai, sync docs, LLMs file (lead), on windows-port at 7568894.
