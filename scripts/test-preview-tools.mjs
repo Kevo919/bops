@@ -1,3 +1,4 @@
+import { join } from "node:path";
 // Tests for an app's site beside its bot's chat (components/app/preview-tab.tsx, lib/app-preview.ts), as Lovable has
 // it: the place shown (Local, Preview, Published; one the site doesn't have yet greyed with why), the width it's seen
 // at (kept per app on this Mac, guarded), On its screen saying the screen the server picked, Open in browser for its
@@ -23,10 +24,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const root = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
+// A file URL for import specifiers, from this OS-path root.
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -104,12 +107,12 @@ globalThis.fetch = async (url, init = {}) => {
 };
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-const P = await import(`${root}/lib/app-preview.ts`);
-const { PreviewTab } = await import(pathToFileURL(`${root}/components/app/preview-tab.tsx`).href);
-const { FixPanel } = await import(pathToFileURL(`${root}/components/app/preview-fix.tsx`).href);
-const D = await import(pathToFileURL(`${root}/components/app/preview-draw.tsx`).href);
-const B = await import(pathToFileURL(`${root}/components/app/composer-bridge.tsx`).href);
-const { ChatView } = await import(pathToFileURL(`${root}/components/app/chat-view.tsx`).href);
+const P = await import(fileUrl("lib/app-preview.ts"));
+const { PreviewTab } = await import(fileUrl("components/app/preview-tab.tsx"));
+const { FixPanel } = await import(fileUrl("components/app/preview-fix.tsx"));
+const D = await import(fileUrl("components/app/preview-draw.tsx"));
+const B = await import(fileUrl("components/app/composer-bridge.tsx"));
+const { ChatView } = await import(fileUrl("components/app/chat-view.tsx"));
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createRoot } = await import("react-dom/client");
 const { createElement: h, act } = await import("react");
@@ -670,7 +673,7 @@ await test("Preview and Published load in the same webview and session; a width 
 });
 
 await test("Fix it, Select and Draw ask its site's bot (the one whose Works on is that site), else the app's own, as the server's siteBot does", async () => {
-  const { siteBotOf } = await import(`${root}/lib/types.ts`);
+  const { siteBotOf } = await import(fileUrl("lib/types.ts"));
   const state = {
     bots: [{ id: "boppy", workspaceId: "ws_main" }, { id: "ivy", workspaceId: "ws_main" }, { id: "max", workspaceId: "ws_other" }],
     workspaces: [

@@ -14,11 +14,12 @@ import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -69,7 +70,7 @@ globalThis.fetch = async (url, init = {}) => {
   return { ok: true, status: 200, json: async () => (String(url) === "/api/memory" ? { ok: true, count: 3 } : { ok: true, chain: body.chain }) };
 };
 
-const Chart = await import(pathToFileURL(`${root}/components/app/team-chart.tsx`).href);
+const Chart = await import(`${rootUrl}/components/app/team-chart.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h, act, useState } = await import("react");
 const { createRoot } = await import("react-dom/client");

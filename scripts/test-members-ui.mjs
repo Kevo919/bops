@@ -18,11 +18,12 @@ import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -52,9 +53,9 @@ globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} }
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
 
-const S = await import(pathToFileURL(`${root}/components/app/members.tsx`).href);
-const M = await import(pathToFileURL(`${root}/lib/members.ts`).href);
-const A = await import(pathToFileURL(`${root}/lib/member-access.ts`).href);
+const S = await import(`${rootUrl}/components/app/members.tsx`);
+const M = await import(`${rootUrl}/lib/members.ts`);
+const A = await import(`${rootUrl}/lib/member-access.ts`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -475,7 +476,7 @@ await test("no dashes, and the sheet says the bots you pick, never the saved log
   const noDashes = (text) => assert.ok(!/[–—]/.test(text), `no dashes: ${text}`);
   for (const v of [...Object.values(M.ACCESS_TIPS), ...Object.values(M.ROLE_LINES), ...Object.values(M.ROLE_LINES_SHARED), M.ADMIN_WORDS.toMemberTipShared, M.ADMIN_SHEET_WORDS.ownRole, M.WORDS.sharedOpen, ...Object.values(A.ACCESS_LABELS)]) noDashes(v);
   // What Write lets a member do, and the line a member reads in place of what they can't (lib/shared.ts readOnlyLine): plain words, Knowledge never Orbit.
-  const { readOnlyLine } = await import(`${root}/lib/shared.ts`);
+  const { readOnlyLine } = await import(`${rootUrl}/lib/shared.ts`);
   const lines = [readOnlyLine(), readOnlyLine(["boppy"], { boppy: "read" }), readOnlyLine(["boppy", "sam"], { boppy: "write", sam: "read" })];
   for (const v of [...Object.values(M.ACCESS_TIPS), ...lines]) {
     noDashes(v);
@@ -537,7 +538,7 @@ await test("Member and None say what people get, and keys on the computers are s
 
 /* ---------------- The team chart (team-chart.tsx) ---------------- */
 
-const Chart = await import(pathToFileURL(`${root}/components/app/team-chart.tsx`).href);
+const Chart = await import(`${rootUrl}/components/app/team-chart.tsx`);
 
 await test("the sheet links to the team chart, never with a shared workspace open", async () => {
   bops();
@@ -694,7 +695,7 @@ await test("Use its computer: off for a new invite, only with Write on a bot, on
   await m2.done();
 
   // What a member reads over the message box in a workspace shared with them (lib/shared.ts computerLine).
-  const { computerLine } = await import(`${root}/lib/shared.ts`);
+  const { computerLine } = await import(`${rootUrl}/lib/shared.ts`);
   const shared = (computer) => ({ shared: { projectId: "p9", name: "Acme", owner: "", role: "member", wsId: "shared_p9", ...(computer ? { computer } : {}) } });
   assert.equal(computerLine(shared(true), [{ name: "Max" }]), "You can use Max's computer. What you ask can run there as its administrator.");
   assert.equal(computerLine(shared(false), [{ name: "Max" }]), "The owner hasn't let you use Max's computer, so Max won't answer what you say.");

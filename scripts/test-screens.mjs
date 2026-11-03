@@ -9,18 +9,20 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.OPENAI_API_KEY = "sk-test-routing";
 process.env.TYPESAFE_API_KEY = "ts-test-routing";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-routing-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
@@ -30,7 +32,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -58,9 +60,9 @@ globalThis.fetch = async (input) => {
 };
 console.warn = () => {};
 
-const L = await import(`${root}/lib/screens.ts`);
-const S = await import(`${root}/lib/server/store.ts`);
-const B = await import(`${root}/lib/server/briefing.ts`);
+const L = await import(`${rootUrl}/lib/screens.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const B = await import(`${rootUrl}/lib/server/briefing.ts`);
 
 /* ---------------- Numbers ---------------- */
 
@@ -149,6 +151,8 @@ const teamTold = B.teamBriefing(main.id);
 assert.match(teamTold, /- Jayce \(Outbound\): working on "Evening YC check" \(working, on its computer's screen 1, stuck: needs Alex/);
 assert.match(teamTold, /- CCLC \(Brochures\): working on "Brochure" \(working, on your computer's screen 2/);
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log("screens: all tests passed");
 process.exit(0);

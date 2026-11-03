@@ -15,9 +15,11 @@
 // Pure functions: nothing reaches Bops Cloud.
 // Usage: node scripts/test-state-merge.mjs
 import assert from "node:assert/strict";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
-const M = await import(`${root}/lib/server/state-merge.ts`);
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
+const M = await import(`${rootUrl}/lib/server/state-merge.ts`);
 
 let failures = 0;
 let passed = 0;
@@ -371,7 +373,7 @@ check("a request changed on both sides keeps its reply, never back to unanswered
 
 /* ---------------- A routine edited on one side while the other ran it ---------------- */
 
-const Sched = await import(`${root}/cloud/schedule.ts`);
+const Sched = await import(`${rootUrl}/cloud/schedule.ts`);
 const D = Date.parse("2026-10-20T00:00:00Z");
 /** The next time as persist-cloud.ts works it out, at a fixed now: 10 AM UTC that day. */
 const nextRunOf = (r) => Sched.nextRun(r.schedule, D + 10 * H, r.timeZone, r.lastRunAt);

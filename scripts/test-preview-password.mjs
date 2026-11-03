@@ -35,11 +35,13 @@ const INGOT = "http://ingot.test";
 process.env.BOPS_ORGO_ORIGIN = ORGO;
 process.env.BOPS_INGOT_URL = INGOT;
 const root = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
+// A file URL for import specifiers, from this OS-path root.
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-preview-password-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), '#!/bin/sh\nif [ "$1" = "-i" ]; then cat >/dev/null; exit 0; fi\nexit 44\n', { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
@@ -49,7 +51,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -175,13 +177,13 @@ globalThis.fetch = async (input, init) => {
   throw new TypeError(`fetch failed (the test is offline: ${url.host})`);
 };
 
-const S = await import(`${root}/lib/server/store.ts`);
-const Auth = await import(`${root}/lib/server/orgo-auth.ts`);
-const H = await import(`${root}/lib/server/hosted-apps.ts`);
-const L = await import(`${root}/lib/server/app-labels.ts`);
-const AppsRoute = await import(`${root}/app/api/hosted-apps/route.ts`);
-const AppRoute = await import(`${root}/app/api/hosted-apps/[name]/route.ts`);
-const PassRoute = await import(`${root}/app/api/hosted-apps/[name]/password/route.ts`);
+const S = await import(fileUrl("lib/server/store.ts"));
+const Auth = await import(fileUrl("lib/server/orgo-auth.ts"));
+const H = await import(fileUrl("lib/server/hosted-apps.ts"));
+const L = await import(fileUrl("lib/server/app-labels.ts"));
+const AppsRoute = await import(fileUrl("app/api/hosted-apps/route.ts"));
+const AppRoute = await import(fileUrl("app/api/hosted-apps/[name]/route.ts"));
+const PassRoute = await import(fileUrl("app/api/hosted-apps/[name]/password/route.ts"));
 clearInterval(globalThis.__bopsRoutines);
 await Auth.signIn(KEY, alex);
 
@@ -587,6 +589,8 @@ await check("nothing a person or a bot reads here has a dash", async () => {
   for (const [, s] of src.matchAll(/"([A-Z][^"]*[a-z.?][^"]*)"/g)) assert.doesNotMatch(s, /[‐-―]| - /, s);
 });
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`preview password: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

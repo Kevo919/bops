@@ -11,18 +11,20 @@
 // Usage: node --conditions=react-server scripts/test-runner-chat.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
-import { pathToFileURL } from "node:url";
+
 import { unfaked } from "./fake-exports.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
 process.env.BOPS_RUNNER = "1";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 const FAKES = { store: ["getState", "pullState", "stateReady"], cloud: ["cloudFetch"], "free-hours": ["sayInUse"] };
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -99,8 +101,8 @@ globalThis.__fake = {
   },
 };
 
-const TC = await import(`${root}/lib/server/turn-context.ts`);
-const R = await import(`${root}/lib/server/runner-chat.ts`);
+const TC = await import(`${rootUrl}/lib/server/turn-context.ts`);
+const R = await import(`${rootUrl}/lib/server/runner-chat.ts`);
 
 /** Bops Cloud's answer to a claim: its clock `ahead` ms ahead of this computer's. */
 const claimed = (id, messageId, humanAt, ahead = 0, member) => ({

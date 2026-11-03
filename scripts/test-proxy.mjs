@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire, registerHooks } from "node:module";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 // proxy.ts imports "next/server" the way Next resolves it (the package's CommonJS entry file).
@@ -18,7 +18,7 @@ registerHooks({
   },
 });
 const { NextRequest } = await import("next/server");
-const { proxy } = await import(`${root}/proxy.ts`);
+const { proxy } = await import(pathToFileURL(join(root, "proxy.ts")).href);
 
 const TOKEN = "t".repeat(64);
 const call = (method, path, { host = "localhost:3210", origin = "http://localhost:3210", cookie, header } = {}) => {
