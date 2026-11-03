@@ -40,10 +40,24 @@ jobs:
         run: npm run lint
       - name: Bot AI tests
         run: node scripts/test-bot-ai.mjs
+      - name: Subscription UI tests
+        run: |
+          node scripts/test-subscriptions-ui.mjs
+          node scripts/test-subscriptions-ui.mjs --brains-off
+      - name: Local subscription authentication tests
+        run: node --conditions=react-server scripts/test-local-subscriptions.mjs
+      - name: Local Codex conversation process tests
+        run: node --conditions=react-server scripts/test-local-codex-chat.mjs
+      - name: Desktop and phone proxy boundary tests
+        run: node --conditions=react-server scripts/test-proxy.mjs
       - name: Brain accounts and sign-in tests
         run: node scripts/test-brains.mjs
       - name: CLI agent tests
         run: node --conditions=react-server scripts/test-cli-agents.mjs
+      - name: Windows fuse and authenticated shutdown tests
+        run: node scripts/test-windows-fuses.mjs
+      - name: Agents API Windows path serialization tests
+        run: node scripts/test-agent-api-path.mjs
       - name: Config tests
         run: node scripts/test-config.mjs
       - name: Chat provider tests
@@ -52,8 +66,16 @@ jobs:
         run: node --conditions=react-server scripts/test-key-check.mjs
       - name: LLM catalog tests
         run: node --conditions=react-server scripts/test-llms.mjs
+      - name: Models card tests
+        run: node --conditions=react-server scripts/test-models-card.mjs
+      - name: Models card UI tests
+        run: node scripts/test-models-card-ui.mjs
       - name: Look permission and sanitizer tests
         run: node --conditions=react-server scripts/test-look.mjs
+      - name: Repo recipe tests
+        run: node scripts/test-repo-recipes.mjs
+      - name: Voice typing card UI tests
+        run: node scripts/test-handy-card-ui.mjs
 
   android:
     if: github.repository != 'OrgoAI/bops'
@@ -79,3 +101,10 @@ jobs:
         run: |
           cd android
           ./gradlew assembleDebug lintDebug
+      - name: Keep the debug APK for this pull request
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bops-remote-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

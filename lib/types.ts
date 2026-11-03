@@ -1143,6 +1143,12 @@ export type MemberSend = { state: "sending" | "waiting" | "failed"; error?: stri
 
 /** A session is a long-running task on one screen of a bot's computer, shown as a thread. */
 export type Session = {
+  /**
+   * Ask actions the owner allowed for this thread alone (permission.ts replyToAsk "session"): the same
+   * ask doesn't pause the run again while this thread runs. New here with each Allow for this thread,
+   * so a fresh thread asks as fresh. Unset: every ask pauses, as before.
+   */
+  allowedAsks?: string[];
   /** Started from a text the user sent a workspace's number: its result is texted back to them from that number. */
   textBack?: { botId: string; to: string };
   /** Started from a message in Slack, Telegram or Discord: its result is posted back there. */
@@ -1803,6 +1809,19 @@ export type AppState = {
    */
   runners?: Record<string, RunnerState>;
   /**
+   * The routines' inactivity brake (Settings → Workspace → General): a routine that would speak up is
+   * skipped, its run recorded "away", once the owner hasn't been around this many days by the shared
+   * clock (AppState.ownerSeenAt, lib/server/presence.ts - the same for every Bops and runner of the
+   * user's). Unset: 7. 0: never skip. Quiet routines and reminders always run.
+   */
+  routineAwayDays?: number;
+  /**
+   * When the owner was last around (lib/server/presence.ts): the window's views and their own messages,
+   * written at most once a minute. Shared, so routines on a computer skip by the owner's own devices.
+   * Unset: never seen yet, and the inactivity brake waits for the first sighting.
+   */
+  ownerSeenAt?: number;
+  /**
    * How the window looks (Look): set in Settings, or changed by a bot on the owner's own ask in the chat
    * (change_look). Shared like any setting, so the owner's other Macs take it too. A shared workspace
    * never sees it: the look is the owner's, on their own screens.
@@ -2292,7 +2311,8 @@ export type AppApproval = {
 };
 
 /** How the user answers a request (OpenCode's reply, Codex's ReviewDecision approved / approved_for_session / denied). */
-export type AskReply = "once" | "always" | "reject";
+/** "session": allowed for this one thread (a fresh thread asks again), like Allow once spread over the run (permission.ts). */
+export type AskReply = "once" | "always" | "session" | "reject";
 /** `member`: answered by a member with Write, from their own Bops (the Mac that took it is `by`). */
 export type AskAnswer = { reply: AskReply; message?: string; reason?: "stopped"; by?: string; at: number; member?: MemberWho };
 /** The tool call a run paused at, as the model made it: its name and its arguments (JSON). */

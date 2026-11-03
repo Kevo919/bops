@@ -1,0 +1,45 @@
+id: actual
+name: Actual Budget
+repo: actualbudget/actual
+url: https://github.com/actualbudget/actual
+license: MIT
+license_note: ""
+what: A local-first personal budgeting app; its sync server also serves the web UI.
+good_for: personal budgeting
+stack: [node]
+requirements:
+  node: ">=22.19.0"
+  docker: false
+keys_optional: []
+keys_required: []
+env:
+  ACTUAL_HOSTNAME: 127.0.0.1
+  ACTUAL_PORT: "5006"
+clone: git clone --depth 1 https://github.com/actualbudget/actual.git actual
+install:
+  - npm install --prefix ./.actual-cli @actual-app/sync-server
+  - mkdir -p .actual-data
+run: cd .actual-data && ../.actual-cli/node_modules/.bin/actual-server
+background: true
+kind: web
+port: 5006
+health:
+  http: http://127.0.0.1:5006/health
+  expect: 200
+fits_bot_computer: true
+fits_reason: Runs from the published npm package without Docker (145 MB) and starts in seconds; the first visitor sets the server password.
+verified:
+  date: "2026-11-03"
+  by: claude-agent (Linux sandbox, Node 22.23.4)
+  commit: 0b1eec8
+  steps:
+    clone: pass
+    install: "pass: npm installed @actual-app/sync-server 26.11.0"
+    run: "pass: with ACTUAL_HOSTNAME=127.0.0.1, 'Listening on 127.0.0.1:5006'"
+    health: "pass: GET /health returned 200 {\"status\":\"UP\"}; GET / returned 200"
+  notes: >-
+    Install route is packages/sync-server/README.md (npm install --location=global @actual-app/sync-server),
+    put in a local prefix here. With the default hostname (::) the server printed "Listening on :::5006..."
+    and then exited 0 at once in this sandbox (no IPv6 listen); setting ACTUAL_HOSTNAME=127.0.0.1 fixed it.
+    The data directory is the working folder (.actual-data). The clone is only for docs; the official
+    docs also offer Docker (docker-compose.yml), not used here.

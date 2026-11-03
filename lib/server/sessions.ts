@@ -1,3 +1,4 @@
+import { agentApiPath } from "./agent-api-path";
 import "server-only";
 import { holdAwake } from "./awake";
 import { brainMcp } from "./mcp";
@@ -3205,8 +3206,8 @@ async function run(sessionId: string) {
           },
           environment: {
             type: "self_hosted",
-            workspace_directory: workspace,
-            capability_directories: [`${workspace}/capabilities/skills`],
+            workspace_directory: folder ? agentApiPath(workspace) : workspace,
+            capability_directories: [folder ? agentApiPath(join(workspace, "capabilities", "skills")) : `${workspace}/capabilities/skills`],
           },
         } as never, usageTags("session", b.id))) as unknown as { id: string; environment: { id: string; remote_url: string } };
         patchSession(sessionId, { agentSessionId: created.id, env: { id: created.environment.id, remoteUrl: created.environment.remote_url, workspace, fn: true, ...(full ? { fullAccess: true } : {}), ...(sockets ? { sockets } : {}), ...(fnApps ? { apps: true } : {}), ...(fnData ? { data: true } : {}), ...(macUi ? { ui: "bops" as const } : {}), ...(mac ? {} : { display }) } });

@@ -1,0 +1,60 @@
+id: paperclip
+name: Paperclip
+repo: paperclipai/paperclip
+url: https://github.com/paperclipai/paperclip
+license: MIT
+license_note: ""
+what: An orchestration server and web UI for running a "company" of AI agents with org charts, tasks, budgets and heartbeats.
+good_for: running teams of AI agents
+stack: [node, typescript, pnpm, postgres, rust]
+requirements:
+  node: ">=24.11.0"
+  docker: false
+  other:
+    - "pnpm 9.15+ on PATH (scripts call pnpm themselves)"
+    - "Rust toolchain (cargo) to build the native paperclip runner"
+    - "Embedded PostgreSQL won't run as root: as root it drops to the postgres user, which must exist and be able to reach the clone and PAPERCLIP_HOME"
+keys_optional:
+  - name: ANTHROPIC_API_KEY
+    for: Claude-based agents (and npx paperclipai test-drive)
+  - name: OPENAI_API_KEY
+    for: Codex/OpenAI-based agents
+  - name: OPENROUTER_API_KEY
+    for: Agents through OpenRouter
+keys_required: []
+env:
+  PAPERCLIP_HOME: /tmp/paperclip-home
+clone: git clone --depth 1 https://github.com/paperclipai/paperclip.git paperclip
+install:
+  - npm install -g pnpm@9.15.4
+  - mkdir -p /tmp/paperclip-home && chmod 700 /tmp/paperclip-home
+  - pnpm install --frozen-lockfile
+  - pnpm --filter @paperclipai/plugin-sdk build
+  - pnpm --filter @paperclipai/paperclip-runner build:binary
+run: pnpm dev:once
+background: true
+kind: web
+port: 3100
+health:
+  http: http://127.0.0.1:3100/api/health
+  expect: 200
+fits_bot_computer: true
+fits_reason: Runs without Docker (embedded Postgres), but it is heavy (3 GB node_modules, a Rust build) and needs Node 24.11+ and care when the bot runs as root.
+verified:
+  date: "2026-11-03"
+  by: claude-agent (Linux sandbox, Node 24.22.2 via npx -y node@24, cargo present)
+  commit: dc9f387
+  steps:
+    clone: pass
+    install: "pass: pnpm install 55 s, plugin-sdk build, runner build:binary 65 s (cargo release build), all exit 0"
+    run: "pass: dev:once applied 421 migrations to embedded Postgres and served API + UI on :3100"
+    health: "pass: GET /api/health returned 200 {\"status\":\"starting\",\"version\":\"0.3.1\",\"deploymentMode\":\"local_trusted\",...}; GET / returned 200"
+  notes: >-
+    README route is pnpm install && pnpm dev (or npx paperclipai onboard --yes); dev:once is the same
+    without file watching. Three tries failed before the pass: (1) "spawn .../embedded-postgres/.../bin/initdb
+    EACCES": as root, embedded-postgres runs Postgres as the postgres user, who couldn't traverse the
+    0700 parent folder; (2) "Cannot find module .../@paperclipai/plugin-sdk/dist/index.js" until the
+    plugin-sdk build ran; (3) the native runner's first cargo build outlasted the 3-minute run window,
+    so it moved into install. The pass ran from a bind mount at a world-readable path with
+    PAPERCLIP_HOME on a postgres-writable folder. On a root bot computer, clone outside /root (or run as a
+    non-root user) and make PAPERCLIP_HOME writable by postgres; a root machine with no postgres user fails (embedded-postgres asks for createPostgresUser). Docker is optional (docs Docker guide).

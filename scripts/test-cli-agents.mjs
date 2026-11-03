@@ -34,7 +34,8 @@
 //          also runs this Mac's own Claude Code (signed in as it is here, with no Anthropic key or token in its
 //          environment) through the same fake computer, on "Reply with the word ok.", and prints the events it saw.
 import assert from "node:assert/strict";
-import { execFile as nativeExecFile, execFileSync as nativeExecFileSync } from "node:child_process";
+import { execFile as nativeExecFile, execFileSync as nativeExecFileSync, spawn } from "node:child_process";
+import { createServer, request as httpRequest } from "node:http";
 import { linuxComputerFixture } from "./cli-computer-fixture.mjs";
 import * as fs from "node:fs";
 const { constants, mkdtempSync } = fs;
@@ -126,12 +127,12 @@ if (process.argv[2] === "--render") {
   console.log("ok render: a brain's approval says what it wants to run");
   // Open in the terminal (the takeover the server made): it says where, and a reply closes it; done, it offers to open; a Codex thread has its badge and no terminal.
   const term = text(renderToStaticMarkup(h(ThreadSheet, { state: state(v.terminal, { takeover: v.takeover }), session: v.terminal, onClose: noop, onShowComputer: noop, onShowScreen: noop })));
-  assert.match(term, new RegExp(`^Migration Claude Code · Opus 5\\.5 Your Max plan Boppy · in the terminal · \\d+ steps · left off on screen ${v.screenNo} `), term);
+  assert.match(term, new RegExp(`^Migration Claude Code · Opus 5\\.5 Your Claude Max plan Boppy · in the terminal · \\d+ steps · left off on screen ${v.screenNo} `), term);
   assert.match(term, new RegExp(`Open in the terminal on screen ${v.screenNo}\\. Your next reply closes it, and it carries on here\\. Show`));
   assert.ok(!/Open in terminal|Paused while/.test(term), term);
   console.log("ok render: open in the terminal, the thread says where, and that a reply closes it");
   const done = sheet(v.done);
-  assert.match(done, /^Notes Claude Code · Opus 5\.5 Your Max plan Boppy · finished .* Open in terminal Delete/, done);
+  assert.match(done, /^Notes Claude Code · Opus 5\.5 Your Claude Max plan Boppy · finished .* Open in terminal Delete/, done);
   const codex = sheet(v.codex);
   assert.match(codex, /^Totals Codex · GPT 6\.1 Sol (Your OpenAI key )?Boppy · /, codex);
   console.log("ok render: a thread says which agent ran it, and one Claude Code ran opens in a terminal");
@@ -366,7 +367,9 @@ fake("codex", `exec ${JSON.stringify(computerNode)} ${JSON.stringify(fakeCodex)}
 // xfce4-terminal: what it was asked (and on which screen), then the command after -x, in its place.
 fake("xfce4-terminal", `echo "$DISPLAY $*" >> ${JSON.stringify(TERMINAL)}\nwhile [ $# -gt 0 ] && [ "$1" != -x ]; do shift; done\nshift\nexec "$@"`);
 fake("setsid", `exec "$@"`);
-const lines = (f) => (existsSync(f) ? readFileSync(f, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
+// Each record is one append ending in "\n". A fake may still be writing the last one while a test polls (a run's
+// record has its whole environment), so a last piece with no "\n" yet is left for the next read, not parsed.
+const lines = (f) => (existsSync(f) ? readFileSync(f, "utf8").split("\n").slice(0, -1).filter(Boolean).map((l) => JSON.parse(l)) : []);
 /** Every Claude Code process the fake computers ran for a thread (not its status checks), oldest first. */
 const runs = () => lines(RUNS).filter((r) => r.args.includes("-p"));
 /** Every Claude Code opened in a terminal, oldest first. */
@@ -465,6 +468,7 @@ const response = (id, output) => ({ id, object: "response", model: "gpt-6.1-sol"
 const KEY = "sk-ant-api03-VAULT-KEY-7Qx9";
 const OPENAI_KEY = "sk-proj-VAULT-OPENAI-4Kd2";
 const DEEPSEEK_KEY = "sk-VAULT-DEEPSEEK-9Zp1";
+const ZAI_CN_KEY = "zaicn-VAULT-GLM-3Hq8";
 /** What the computer's environment has besides Bops' own: keys and tokens Claude Code or Codex would use first, and Codex's own folder. */
 const PLANTED = {
   ANTHROPIC_API_KEY: "sk-ant-api03-PLANTED",
@@ -554,6 +558,7 @@ const vault = new Map([
   ["ANTHROPIC_API_KEY", KEY],
   ["OPENAI_API_KEY", OPENAI_KEY],
   ["DEEPSEEK_API_KEY", DEEPSEEK_KEY],
+  ["ZAI_CODING_CN_API_KEY", ZAI_CN_KEY],
 ]);
 let reveals = 0;
 /** The Vault has given all the keys it allows this hour. */
@@ -1688,6 +1693,108 @@ await test("its DeepSeek key turned down: the thread waits on the user with Fini
     if (dshAiBefore === undefined) delete S.bot(main.id).ai;
     else S.bot(main.id).ai = dshAiBefore;
   });
+});
+
+await test("a DeepSeek Harness agent on the China Coding Plan (zai-coding-cn/glm-5.3): its own key's run token, the gate's zai-coding-cn route, never Z.ai's key variable", async () => {
+  const before = structuredClone(S.bot(main.id).ai);
+  const CN = { id: "ag_dshzaicn01", kind: "dsh", pays: "key", model: "zai-coding-cn/glm-5.3" };
+  S.update(() => void (S.bot(main.id).ai = { agents: [{ id: "bops", kind: "bops", pays: "credit" }, CN], default: CN.id }));
+  try {
+    const s = X.startSession({ botId: main.id, goal: "Fix the totals", title: "Totals", where: "cloud", fresh: true });
+    assert.deepEqual(thread(s.id).agent, { id: CN.id, kind: "dsh", model: "zai-coding-cn/glm-5.3" });
+    const t = await ended(s.id);
+    assert.equal(t.status, "done", `it finished (${t.error ?? ""}; ${warned.join(" | ")})`);
+    const r = dshRuns().at(-1);
+    assert.match(r.env.ZAI_CODING_CN_API_KEY, /^bopsrun_[0-9a-f]{64}$/, "the run token in the China plan's own key variable");
+    assert.equal(r.env.ZAI_API_KEY, undefined, "not in Z.ai's");
+    assert.ok(!Object.values(r.env).includes(ZAI_CN_KEY), "the key is nowhere in its environment");
+    const provider = r.patch.find((x) => x.id === "llm-pi-ai").config.providers;
+    assert.deepEqual(Object.keys(provider), ["zai-coding-cn"]);
+    assert.equal(provider["zai-coding-cn"].apiKeyEnv, "ZAI_CODING_CN_API_KEY");
+    assert.equal(provider["zai-coding-cn"].api, "openai-completions");
+    assert.equal(provider["zai-coding-cn"].baseURL, `${r.env.BOPS_GATE}/zai-coding-cn/v1`);
+    assert.deepEqual(provider["zai-coding-cn"].models, [{ id: "glm-5.3", name: "glm-5.3" }]);
+    assert.deepEqual(r.patch.find((x) => x.id === "agent-default-model").config, { provider: "zai-coding-cn", model: "glm-5.3" });
+    assert.ok(!JSON.stringify(r.patch).includes(ZAI_CN_KEY), "nothing secret in it");
+    assert.ok(!pc(PC).commands.some((x) => x.includes(ZAI_CN_KEY)), "no command Bops ran had the key in it");
+  } finally {
+    S.update(() => {
+      if (before === undefined) delete S.bot(main.id).ai;
+      else S.bot(main.id).ai = before;
+    });
+  }
+});
+
+/** One request through a gate on this Mac (node:http: this test's fetch is the fake Orgo's). */
+const viaGate = (port, path, headers, body) =>
+  new Promise((resolve, reject) => {
+    const req = httpRequest({ host: "127.0.0.1", port, path, method: "POST", headers: { "content-type": "application/json", ...headers } }, (res) => {
+      let text = "";
+      res.on("data", (c) => (text += c));
+      res.on("end", () => resolve({ status: res.statusCode, text }));
+    });
+    req.on("error", reject);
+    req.end(body);
+  });
+
+await test("gate routing: zai-coding-cn goes to open.bigmodel.cn's coding API (no /v1), on its key as a Bearer; zai-coding still goes to api.z.ai", async () => {
+  // The real table: each route's fixed upstream and which ones drop the run's /v1 (read from the file, not run).
+  const table = JSON.parse(
+    execFileSync("python3", ["-I", "-c", "import ast, json, sys\nt = ast.parse(open(sys.argv[1]).read())\nout = {}\nfor n in t.body:\n    if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name) and n.targets[0].id in ('UPSTREAMS', 'NO_V1'):\n        v = ast.literal_eval(n.value)\n        out[n.targets[0].id] = sorted(v) if isinstance(v, set) else v\nprint(json.dumps(out))", join(rootPath, "vm/bin/bops-ai-gate")], { env: { PATH: REAL_PATH } }).toString(),
+  );
+  assert.equal(table.UPSTREAMS["zai-coding-cn"], "https://open.bigmodel.cn/api/coding/paas/v4");
+  assert.equal(table.UPSTREAMS["zai-coding"], "https://api.z.ai/api/coding/paas/v4");
+  assert.deepEqual(table.NO_V1, ["zai", "zai-coding", "zai-coding-cn"]);
+  // Every route bops-brain's --route takes is one the gate knows, and the other way round.
+  const brain = readFileSync(join(rootPath, "vm/bin/bops-brain"), "utf8");
+  const routes = brain.match(/\[\[ "\$ROUTE" =~ \^\(([a-z|-]+)\)\$ \]\]/)[1].split("|");
+  assert.deepEqual([...routes].sort(), Object.keys(table.UPSTREAMS).sort());
+  assert.match(brain, /"zai-coding-cn": \{ "npm": "@ai-sdk\/openai-compatible", "name": "Z\.ai Coding Plan \(China\)", "options": \{ "baseURL": "\{env:BOPS_GATE\}\/zai-coding-cn\/v1", "apiKey": "\{env:ZAI_CODING_CN_API_KEY\}" \} \}/, "OpenCode's provider at the gate");
+  assert.equal(brain.match(/zai-coding-cn\) export ZAI_CODING_CN_API_KEY="\$TOKEN" ;;/g)?.length, 2, "OpenCode's and DeepSeek Harness's key variable");
+  // A real gate on this Mac, in front of a fake provider: what reaches it, for each Z.ai coding route.
+  const got = [];
+  const upstream = createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      got.push({ path: req.url, auth: req.headers.authorization, apiKey: req.headers["x-api-key"], body });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ choices: [{ message: { role: "assistant", content: "ok" } }] }));
+    });
+  });
+  await new Promise((r) => upstream.listen(0, "127.0.0.1", r));
+  const up = `http://127.0.0.1:${upstream.address().port}`;
+  const gates = [];
+  try {
+    for (const [route, key] of [["zai-coding-cn", ZAI_CN_KEY], ["zai-coding", "zai-VAULT-GLOBAL-1"]]) {
+      // The gate runs here on the host (not on a fake computer), so its port file is a host path.
+      const pf = nativeJoin(nativeScratch, `gate-${route}.port`);
+      const token = `bopsrun_${"ab".repeat(32)}`;
+      const g = spawn(process.platform === "win32" ? "python" : "python3", ["-I", join(rootPath, "vm/bin/bops-ai-gate"), "--route", route, "--port-file", pf], { env: { PATH: REAL_PATH, BOPS_GATE_TEST: "1", BOPS_GATE_UPSTREAM: up }, stdio: ["pipe", "ignore", "ignore"] });
+      gates.push(g);
+      g.stdin.end(`${token}\n${key}\n`);
+      await until(() => fs.existsSync(pf), `${route}'s gate to listen`);
+      const port = Number(fs.readFileSync(pf, "utf8"));
+      got.length = 0;
+      const ok = await viaGate(port, `/${route}/v1/chat/completions`, { authorization: `Bearer ${token}` }, JSON.stringify({ model: "glm-5.3", messages: [] }));
+      assert.equal(ok.status, 200, `${route}: ${ok.text}`);
+      assert.deepEqual(got.map((x) => x.path), ["/chat/completions"], `${route}: the run's /v1 dropped, as the coding API has none`);
+      assert.equal(got[0].auth, `Bearer ${key}`, `${route}: the key, as a Bearer`);
+      assert.equal(got[0].apiKey, undefined);
+      assert.equal(JSON.parse(got[0].body).model, "glm-5.3");
+      got.length = 0;
+      const wrong = await viaGate(port, `/${route}/v1/chat/completions`, { authorization: "Bearer bopsrun_wrong" }, "{}"); // gitleaks:allow (fake token)
+      assert.equal(wrong.status, 401);
+      const other = await viaGate(port, `/${route === "zai-coding-cn" ? "zai-coding" : "zai-coding-cn"}/v1/chat/completions`, { authorization: `Bearer ${token}` }, "{}");
+      assert.equal(other.status, 404, `${route}'s gate takes only its own route`);
+      const offV1 = await viaGate(port, `/${route}/chat/completions`, { authorization: `Bearer ${token}` }, "{}");
+      assert.equal(offV1.status, 404);
+      assert.equal(got.length, 0, "a wrong token, another route or a path off /v1 never reaches the provider");
+    }
+  } finally {
+    for (const g of gates) g.kill("SIGTERM");
+    await new Promise((r) => upstream.close(r));
+  }
 });
 
 await test("the thread's words have no long dashes", () => {

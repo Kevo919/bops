@@ -10,3 +10,14 @@ ac68d39cf9284a1e96c6b698c4299ca3df98c95e:scripts/test-cli-agents.mjs:generic-api
 # Synthetic recipe-validator rejection fixtures; exact historical findings only.
 d3d39c26007b4a6ac6355edd2b7c09ba131a810c:scripts/test-repo-recipes.mjs:aws-access-token:228
 d3d39c26007b4a6ac6355edd2b7c09ba131a810c:scripts/test-repo-recipes.mjs:generic-api-key:229
+# fork test fixture, fake value (fake provider fetch; three static sentinels on this line)
+86346d477659a875b1a3fea5d5a90e4738e5c922:scripts/test-chat-providers.mjs:generic-api-key:26
+# fork test fixture, fake value (fake vault and CLI environment isolation sentinel)
+86346d477659a875b1a3fea5d5a90e4738e5c922:scripts/test-cli-agents.mjs:generic-api-key:437
+# Fake fixtures on open PR branches (the whole-history scan reads every branch): exact findings only.
+09d02152afbebf4e672eef26e9449fdeb2f08298:scripts/test-connections-ui.mjs:generic-api-key:113
+501534ba3dd83ec0b32532176dd459bcae134730:scripts/test-connections-ui.mjs:generic-api-key:113
+6a4ab46cf162a293dbeebc144b2c8ad456e654c0:scripts/test-repos.mjs:github-pat:172
+6a4ab46cf162a293dbeebc144b2c8ad456e654c0:scripts/test-repos.mjs:github-pat:217
+6a4ab46cf162a293dbeebc144b2c8ad456e654c0:scripts/test-repos.mjs:generic-api-key:172
+6a4ab46cf162a293dbeebc144b2c8ad456e654c0:scripts/test-repos.mjs:generic-api-key:217

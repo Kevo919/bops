@@ -1,0 +1,47 @@
+id: aider
+name: Aider
+repo: Aider-AI/aider
+url: https://github.com/Aider-AI/aider
+license: Apache-2.0
+license_note: ""
+what: An AI pair-programming CLI that edits code in a local git repo through chat with an LLM.
+good_for: AI code edits in a repo
+stack: [python]
+requirements:
+  python: ">=3.10,<3.15"
+  other:
+    - git
+keys_optional:
+  - name: OPENAI_API_KEY
+    for: OpenAI models
+  - name: ANTHROPIC_API_KEY
+    for: Anthropic Claude models
+  - name: OPENROUTER_API_KEY
+    for: Models through OpenRouter
+  - name: DEEPSEEK_API_KEY
+    for: DeepSeek models
+keys_required: []
+clone: git clone --depth 1 https://github.com/Aider-AI/aider.git aider
+install:
+  - python3 -m venv .venv
+  - .venv/bin/pip install .
+run: .venv/bin/aider --help
+kind: cli
+health:
+  cmd: .venv/bin/aider --version
+  expect_exit: 0
+fits_bot_computer: true
+fits_reason: Plain pip install (565 MB venv); it needs one LLM provider key to do real work.
+verified:
+  date: "2026-11-03"
+  by: claude-agent (Linux sandbox, Python 3.13.18)
+  commit: 5dc9490
+  steps:
+    clone: pass
+    install: "pass: pip install . exit 0"
+    run: "pass: aider --help exit 0"
+    health: "pass: aider --version printed 'aider 0.86.3.dev+less', exit 0"
+  notes: >-
+    The README's own route is python -m pip install aider-install && aider-install; this recipe installs
+    from the clone into a venv instead. No key is needed to start, but chatting needs at least one
+    provider key (any of keys_optional, or others aider supports). No model call was made.
