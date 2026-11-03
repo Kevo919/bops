@@ -1,5 +1,6 @@
 import { windowsTaskInstructions } from "@/lib/windows-task-instructions";
 import { computerWords, computerWordsFor } from "@/lib/computer-words";
+import { sendExecutorInput, withExecutor } from "./executor-lifecycle";
 import { agentApiPath } from "./agent-api-path";
 import "server-only";
 import { holdAwake } from "./awake";
@@ -3233,10 +3234,14 @@ async function run(sessionId: string) {
       // How far this run has read the thread's own items, so each look reads only what's new. One picked
       // back up reads on from what its agent session did before, which is in its steps already.
       const at: ReadAt = resuming ? { root: await lastItem(agentSessionId) } : {};
-      turn = async (input, resume) => {
-        await runTurn(sessionId, agentSessionId, input, seen, at, resume);
+      turn = (input, resume) => withExecutor(executor, async (signal) => {
+        await runTurn(sessionId, agentSessionId, input, seen, at, resume, signal);
+        signal?.throwIfAborted();
         return finalAnswer(agentSessionId);
-      };
+      }, () => {
+        interrupts.get(sessionId)?.();
+        void cancelTurn(agentSessionId);
+      });
     }
     step(sessionId, "setup", "At the computer");
     // The cursor says something from the first moment; Jev's read of the steps takes over from here.
@@ -3608,13 +3613,16 @@ async function answerPausedCall(sessionId: string, agentSessionId: string, a: Ap
   await toolResult(agentSessionId, call, output);
 }
 
-async function runTurn(sessionId: string, agentSessionId: string, input: string | undefined, seen: Set<string>, at: ReadAt, resume?: AppApproval) {
+async function runTurn(sessionId: string, agentSessionId: string, input: string | undefined, seen: Set<string>, at: ReadAt, resume?: AppApproval, executorSignal?: AbortSignal) {
+  executorSignal?.throwIfAborted();
   const stream = await client.beta.agents.sessions.events.stream(agentSessionId);
+  if (executorSignal?.aborted) { stream.controller.abort(); executorSignal.throwIfAborted(); }
   interrupts.set(sessionId, () => stream.controller.abort());
   // A run that paused for the user's OK goes on from where it waited (requires_action): that call's result first,
   // then what the user said meanwhile, which steers it.
   if (resume) await answerPausedCall(sessionId, agentSessionId, resume);
-  if (input) await sendMessage(agentSessionId, input);
+  executorSignal?.throwIfAborted();
+  if (input) await sendExecutorInput(executorSignal, () => sendMessage(agentSessionId, input), () => cancelTurn(agentSessionId));
   // Stopped while that was on its way: Stop's cancel landed before the turn existed.
   if (stopped.has(sessionId)) {
     await cancelTurn(agentSessionId);
