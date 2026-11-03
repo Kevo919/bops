@@ -2221,8 +2221,7 @@ function SystemNote({ text }: { text: string }) {
   );
 }
 
-/** Something a bot remembered, with Undo (and Forget old for what it replaced): neither when `readOnly` (a shared workspace's, its owner's memory). */
-/** A look change a bot made in the chat (Message.look): what changed, with Undo (the look before it, kept on the message) and Reset (Bops' own look). */
+/** A look change a bot made in the chat (Message.look): what changed, with Undo (the last look change, off the look's history, the same as Settings' Undo) and Reset (Bops' own look). */
 function LookNote({ m, readOnly = false, className = "" }: { m: Message; readOnly?: boolean; className?: string }) {
   const look = m.look!;
   const [busy, setBusy] = useState(false);
@@ -2241,7 +2240,7 @@ function LookNote({ m, readOnly = false, className = "" }: { m: Message; readOnl
         </svg>
         <div className="min-w-0 flex-1 pt-px">
           <span className="font-medium text-[#6B6B6B]">{done ?? "New look"}</span>
-          <span className={`line-clamp-2 text-[#3A3A3A ${done ? " text-[#9A9A98] line-through" : ""}`} title={look.summary}>
+          <span className={`line-clamp-2 text-[#3A3A3A]${done ? " text-[#9A9A98] line-through" : ""}`} title={look.summary}>
             {look.summary}
           </span>
         </div>
@@ -2260,6 +2259,7 @@ function LookNote({ m, readOnly = false, className = "" }: { m: Message; readOnl
   );
 }
 
+/** Something a bot remembered, with Undo (and Forget old for what it replaced): neither when `readOnly` (a shared workspace's, its owner's memory). */
 function MemoryNote({ m, readOnly = false, className = "" }: { m: Message; readOnly?: boolean; className?: string }) {
   const mem = m.memory!;
   const [busy, setBusy] = useState(false);

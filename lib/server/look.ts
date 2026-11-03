@@ -1,6 +1,6 @@
 import "server-only";
 import { addMessage, getState, update } from "./store";
-import { LOOK_HISTORY, LookError, validateLook } from "../look-theme";
+import { LOOK_HISTORY, LookError, normalizeLook, normalizeLookState, validateLook } from "../look-theme";
 import type { Bot, Look } from "../types";
 
 /**
@@ -9,24 +9,24 @@ import type { Bot, Look } from "../types";
  * twenty so it can be undone, and every field checked here before anything is kept (lib/look-theme.ts).
  */
 
-/** The look on now: nothing set is Bops' own look, which is what Reset goes back to. */
-export const currentLook = (): Look => getState().look?.current ?? {};
+/** The look on now, normalized as it's read (the state file or the cloud's copy may hold anything): nothing set is Bops' own look, which is what Reset goes back to. */
+export const currentLook = (): Look => normalizeLook(getState().look?.current);
 
-/** Put the next look in: what's replaced goes onto the front of the history, so Undo walks back. */
+/** Put the next look in: what's replaced goes onto the front of the history (at most LOOK_HISTORY), so Undo walks back. */
 function setLook(next: Look): Look {
+  const clean = normalizeLook(next);
   update((s) => {
-    const look = s.look ?? { current: {}, history: [] };
+    const look = normalizeLookState(s.look);
     look.history = [look.current, ...look.history].slice(0, LOOK_HISTORY);
-    look.current = next;
+    look.current = clean;
     s.look = look;
   });
-  return next;
+  return clean;
 }
 
 /**
  * Put a change in, over what's on now: only the fields it names move (validateLook has checked them).
- * An empty change is nothing to merge and does nothing; the whole look is put back another way
- * (undoLook, resetLook), so Undo and Reset really do clear it.
+ * The whole look is put back another way (undoLook, resetLook).
  */
 export function applyLook(change: Look): { now: Look; was: Look } {
   const was = currentLook();
@@ -37,20 +37,24 @@ export function applyLook(change: Look): { now: Look; was: Look } {
   return { now: setLook(now), was };
 }
 
-/** A look message's card, as the chat and Settings act on it. */
-type LookCard = NonNullable<import("../types").Message["look"]>;
-
 /**
- * Undo a look change by its card (the Undo button): the look goes back to exactly what the card says
- * was there before, and what's replaced goes onto the history so that can be undone back too.
- * Returns false when there's no such card to undo (already undone, or gone).
+ * Undo the last look change, wherever it was made (the Undo on a chat card, or in Settings): the look
+ * before it comes off the front of the history and is put back, normalized, so Undo again walks back
+ * one more, up to LOOK_HISTORY changes. Pressed on a card, the card says it was undone (and offers
+ * nothing more). Returns false when there's nothing to undo (the history is empty, or the card is
+ * already undone or gone).
  */
-export function undoLook(messageId: string): boolean {
-  const m = getState().messages.find((x) => x.id === messageId);
-  if (!m?.look || m.look.undone) return false;
-  // The look before that change, put back whole (not merged): exactly what the card says was there.
-  setLook(m.look.before);
+export function undoLook(messageId?: string): boolean {
+  if (messageId) {
+    const m = getState().messages.find((x) => x.id === messageId);
+    if (!m?.look || m.look.undone) return false;
+  }
+  if (!getState().look?.history?.length) return false;
   update((s) => {
+    const look = normalizeLookState(s.look);
+    const [back, ...rest] = look.history;
+    s.look = { current: back ?? {}, history: rest };
+    if (!messageId) return;
     const again = s.messages.find((x) => x.id === messageId);
     if (again?.look) again.look.undone = true;
   });
@@ -59,17 +63,22 @@ export function undoLook(messageId: string): boolean {
 
 /**
  * Back to Bops' own look (the Reset button, on a card or in Settings): the whole look goes, not a
- * merge, and what's replaced is kept on the history, so even a reset comes back with the next Undo.
+ * merge, and what it replaced goes onto the history like any change, so the next Undo brings it back.
  * On a card, the card says it was reset.
  */
 export function resetLook(messageId?: string): void {
-  setLook({});
+  // Already Bops' own: nothing to keep for Undo.
+  if (Object.keys(currentLook()).length) setLook({});
+  else update((s) => void (s.look = normalizeLookState(s.look)));
   if (!messageId) return;
   update((s) => {
     const again = s.messages.find((x) => x.id === messageId);
     if (again?.look) again.look.reset = true;
   });
 }
+
+/** A look message's card, as the chat and Settings act on it. */
+type LookCard = NonNullable<import("../types").Message["look"]>;
 
 /** What a look change says it did, for the card and for the bot to tell the owner. */
 const says = (change: Look, was: Look): string => {
@@ -101,10 +110,10 @@ export function changeLookFromChat(b: Bot, input: unknown, chatId: string): stri
     throw e;
   }
   const summary = typeof (input as { summary?: unknown })?.summary === "string" && (input as { summary: string }).summary.trim() ? (input as { summary: string }).summary.trim().slice(0, 200) : fallbackSummary(change, currentLook());
-  const { now, was } = applyLook(change);
-  const card: LookCard = { summary, before: was };
+  const { was } = applyLook(change);
+  const card: LookCard = { summary, before: normalizeLook(was) };
   addMessage({ chatId, role: "system", text: `Look changed: ${summary}`, look: card });
-  return `Done: ${says(change, was)}. ${b.name === "Bops" || b.isMain ? "The owner" : `${b.name}'s owner`} can Undo it under the reply, or reset the look in Settings.`;
+  return `Done: ${says(change, was)}. ${b.name === "Bops" || b.isMain ? "The owner" : `${b.name}'s owner`} can Undo it under the reply or in Settings, or reset the look in Settings.`;
 }
 
 /** Set the look from Settings: checked the same as the chat's changes, and applied at once. */

@@ -3,16 +3,18 @@
 import { useRef, useState } from "react";
 import { post } from "./ui";
 import { Segmented } from "./segmented";
-import { FONT_SCALE_MAX, FONT_SCALE_MIN, LOOK_CSS_LIMIT, LOOK_HISTORY } from "@/lib/look-theme";
+import { FONT_SCALE_MAX, FONT_SCALE_MIN, LOOK_CSS_LIMIT, LOOK_HISTORY, normalizeLook } from "@/lib/look-theme";
 import type { AppState, LookDensity, LookTheme } from "@/lib/types";
 
 /**
  * The Look card in Settings (the "look" pane): the same controls a bot changes the look with in the
- * chat (change_look) plus Reset. Every change goes through /api/look, which checks it like the chat's
+ * chat (change_look) plus Undo (the last change, from here or the chat, while there's one to take
+ * back) and Reset. Every change goes through /api/look, which checks it like the chat's
  * changes and applies it at once (lib/server/look.ts); what comes back here is the state it made.
  */
 export function LookSettings({ state }: { state: AppState }) {
-  const look = state.look?.current ?? {};
+  const look = normalizeLook(state.look?.current);
+  const canUndo = (state.look?.history?.length ?? 0) > 0;
   const [error, setError] = useState("");
   const send = (change: Record<string, unknown>) => {
     setError("");
@@ -89,7 +91,20 @@ export function LookSettings({ state }: { state: AppState }) {
         {error && <div className="mt-1.5 text-[12px] leading-4 text-[#B42318]">{error}</div>}
       </div>
       <div className="flex items-center gap-3">
-        <span className="min-w-0 flex-1 text-[12px] leading-4 text-[#6B6B6B]">Back to Bops&apos; own look. The last {LOOK_HISTORY} changes can still be undone in the chat.</span>
+        <span className="min-w-0 flex-1 text-[12px] leading-4 text-[#6B6B6B]">
+          Undo takes back the last change, made here or in the chat (up to {LOOK_HISTORY}). Reset goes back to Bops&apos; own look, and can be undone too.
+        </span>
+        {canUndo && (
+          <button
+            onClick={() => {
+              setError("");
+              void post("/api/look", { action: "undo" });
+            }}
+            className="rounded-full px-3 py-1 text-[12px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_#D9D9D6] hover:bg-black/[0.04]"
+          >
+            Undo
+          </button>
+        )}
         <button
           onClick={() => {
             setError("");

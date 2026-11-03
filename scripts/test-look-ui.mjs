@@ -1,6 +1,6 @@
 // A smoke test for the look's own window pieces (components/app/look-settings.tsx, look-style.tsx):
 // the Settings card renders with all its controls (theme, accent, text size, spacing, custom CSS,
-// Reset), the style element carries exactly the CSS the look builds, and bad custom CSS in the state
+// Undo while there's a change to take back, Reset), the style element carries exactly the CSS the look builds, and bad custom CSS in the state
 // is dropped by the window's own second check, never painted. Rendered to static markup with React's
 // own server renderer (no DOM, no clicks: the pane's clicking behavior is the settings page's own
 // suite's to cover); .tsx files transpile with the TypeScript in node_modules as they load.
@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 const rootUrl = new URL("..", import.meta.url);
@@ -83,6 +83,24 @@ check("custom CSS the state shouldn't have is dropped by the window's own check"
   const html = renderToStaticMarkup(createElement(LookStyle, { look: { accent: "#1f6f43", css: "@import url(https://evil.example/x.css);" } }));
   assert.ok(!html.includes("evil.example"), "nothing of it painted");
   assert.match(html, /--bops-accent/, "the rest of the look still applies");
+});
+
+check("Undo shows in Settings only while there's a change to take back", () => {
+  const none = renderToStaticMarkup(createElement(LookSettings, { state: { look: { current: { theme: "dark" }, history: [] } } }));
+  assert.ok(!none.includes(">Undo</button>"), "no Undo with an empty history");
+  const some = renderToStaticMarkup(createElement(LookSettings, { state: { look: { current: { theme: "dark" }, history: [{}] } } }));
+  assert.ok(some.includes(">Undo</button>"), "Undo with a change to take back");
+  assert.ok(some.includes("made here or in the chat"), "the words say Undo works from both");
+});
+
+check("a hostile accent, size or spacing in the state paints nothing it shouldn't", () => {
+  const evil = "red;} body{background:url(https://evil.example)} :root{x:y";
+  const html = renderToStaticMarkup(createElement(LookStyle, { look: { accent: evil, fontScale: evil, density: evil, theme: evil, css: "a{color:red}" } }));
+  assert.ok(!html.includes("evil.example"), html);
+  assert.match(html, /a\{color:red\}/, "the good custom CSS still applies");
+  assert.equal(renderToStaticMarkup(createElement(LookStyle, { look: { accent: evil } })), "", "nothing at all when nothing passes");
+  const card = renderToStaticMarkup(createElement(LookSettings, { state: { look: { current: { accent: evil, fontScale: evil }, history: [] } } }));
+  assert.ok(!card.includes("evil.example") && card.includes("100% of the usual"), "Settings shows Bops' own for what doesn't pass");
 });
 
 console.log(`look ui: ${passed} passed, ${failures} failed`);

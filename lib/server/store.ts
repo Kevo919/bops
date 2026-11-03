@@ -2,6 +2,7 @@ import "server-only";
 import { stamp } from "./turn-context";
 import { randomBytes } from "node:crypto";
 import { cleanAi, isCli, legacyAi } from "@/lib/agents";
+import { normalizeLookState } from "@/lib/look-theme";
 import "./llms";
 import { lastWorkOf, live, pausedForOk, workspaceOf, MAIN_WORKSPACE, botChatId, type AppState, type Bot, type Chat, type Message, type Session, type Reaction, type Tapback } from "@/lib/types";
 import { fileStore, onPostgres, onRunner, selfHosted, type Persistence, type StateAccess, type Went } from "./persist";
@@ -47,6 +48,8 @@ function migrate(raw: Record<string, unknown>): AppState {
       delete a.building;
       a.error = "Bops closed before it was done. Ask again.";
     }
+  // The window's look, as loaded: every field checked again (lib/look-theme.ts normalizeLook), whatever the file holds.
+  if (state.look !== undefined) state.look = normalizeLookState(state.look);
   // Workspaces: everything from before belongs to the first one, "Main". Each workspace has a main bot.
   state.workspaces ??= [{ id: MAIN_WORKSPACE, name: "Main", createdAt: Date.now() }];
   if (!state.workspaces.some((w) => w.id === state.workspace)) state.workspace = state.workspaces[0].id;

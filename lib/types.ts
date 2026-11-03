@@ -867,8 +867,9 @@ export type Message = {
   memory?: { ws: string; /** Saved to this bot's own bank (it keeps its memory to itself: lib/chain.ts). */ bot?: string; id: string; fact: string; undone?: boolean; old?: { id: string; text: string; forgotten?: boolean } };
   /**
    * Set on Bops' line about a look a bot changed in the chat (chat.ts change_look, the owner's own turn
-   * only): what changed in one line, and the whole look before it, so the line can Undo (put that back)
-   * or Reset (back to Bops' own look). `undone`/`reset` once the owner pressed the button.
+   * only): what changed in one line, and the whole look before it (a record only: Undo takes the last
+   * change back off AppState.look's history, never from here). The line offers Undo and Reset (back to
+   * Bops' own look); `undone`/`reset` once the owner pressed the button.
    */
   look?: { summary: string; before: Look; undone?: true; reset?: true };
   /**
@@ -1620,7 +1621,8 @@ export type LookState = {
   current: Look;
   /**
    * The looks before the current one, newest first, at most LOOK_HISTORY (lib/server/look.ts): each
-   * change pushes what it replaced, so Undo walks back one at a time and Reset empties the list.
+   * change (Reset too) pushes what it replaced, and Undo, from the chat or Settings, takes the newest
+   * back off, so it walks back one change at a time.
    */
   history: Look[];
 };

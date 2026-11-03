@@ -1788,6 +1788,19 @@ function ownerAskedForProd(chatId: string, member?: MemberTurn): boolean {
 const ASKS_TO_CHANGE = /\b(?:make|build|create|change|add|update|fix|edit|put|remove|redo|rewrite|move)\b/i;
 const NAMES_A_SITE = /\b(?:apps?|sites?|website|web ?pages?)\b/i;
 
+/** The owner's words about how the window looks (change_look): a theme, a color, the text size, spacing, styles. */
+export const ASKS_ABOUT_LOOK = /\b(?:look\w*|theme\w*|colou?r\w*|dark\w*|light\w*|font\w*|text size|bigger|smaller|larger|compact|roomy|spacing|css|style\w*|accent\w*|zoom|sidebar)\b/i;
+
+/**
+ * Whether the owner's own latest message is about how the window looks (change_look). On the owner's
+ * turn, what came in from outside earlier (an email, a text) is still in the history, so its words
+ * could ask for a restyle; only the owner's own latest words can.
+ */
+function ownerAskedForLook(chatId: string): boolean {
+  const mine = speakerSaid(chatId);
+  return !!mine && ASKS_ABOUT_LOOK.test(mine.text ?? "");
+}
+
 /**
  * Whether the user's own latest message here asks for this, for their apps on the web: "deploy", to put
  * one live or roll it back (their words must say so); "change", to build or change one (their words, or a
@@ -2625,6 +2638,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       // changed, like a skill isn't saved: a page's, an email's or an app's words could be what asked.
       if (name === "change_look") {
         if (outsideRead) return `Not changed: this turn read something from outside Bops (a page, an email, an app or data), and that can't change how the window looks. Ask ${owner} to say it themselves in the chat.`;
+        if (!ownerAskedForLook(chatId)) return `Not changed: ${owner}'s own message didn't ask about how the window looks, so it stays as it is. Ask ${owner} to say it themselves in the chat.`;
         return changeLookFromChat(b, a, chatId);
       }
       if (name === "deploy_app") {
