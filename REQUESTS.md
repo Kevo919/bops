@@ -39,3 +39,7 @@ REQ-20261103-codex-deploy: Kevin reports lead offline and explicitly asks Codex 
 ## 2026-11-03T20:44:43.0185559Z | Codex | Windows identity
 REQ-20261103-codex-windows-identity: Kevin says this app is for Windows PC, not Mac, and asks that the app knows this. Scope: platform-correct visible labels and agent instructions on Windows; preserve actual macOS behavior. MVP bug; Codex owns; In Progress. Acceptance: Windows UI says PC/Windows and new task instructions identify Windows, not Mac.
 
+
+## 2026-11-03T20:53:52.5452210Z | Codex | Retried task stalls at startup
+REQ-20261103-codex-executor-lifecycle: During authorized postdeployretry, originalcwd400 no longer immediate but task remains getting started and read-only process inspection finds no Bops executor. Source review found startExecutor assumes readiness after3seconds and does not propagate laterexit. Actualexitcause unknown, not provennamespacefailure. MVP bug; Codex investigating. Need bounded redacted diagnostics, lifecyclefailure propagation, tests; coordinate with Windowsidentity files.
+
