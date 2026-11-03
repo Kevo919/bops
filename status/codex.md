@@ -18,3 +18,7 @@ Already requested: open Bops normally (agent launch rejected by automatic approv
 
 ## Resources and handoff
 No heavy builds, test daemons or heavy lock owned. Current hourly lock codex-heartbeat-20261103-2146 released on exit. Logs %LOCALAPPDATA%/Bops-team/codex-hourly.log. Preserve all user/other-agent changes. Latest heartbeat says lead reviews/merges; no PR merged in this run.
+
+## REA live acceptance completed
+After Kevin unlocked Windows, Harness mcp__rea__binary_session completed and reported Ghidra available. REA UI blocker resolved; prior provider tests remain valid. Bops runtime launch/verification remains open.
+
