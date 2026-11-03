@@ -1,0 +1,46 @@
+id: kevo919-paperclip
+name: Paperclip (Kevo919 fork)
+repo: Kevo919/paperclip
+url: https://github.com/Kevo919/paperclip
+private: true
+needs_token: GITHUB_TOKEN
+license: "custom: unknown (private fork; upstream paperclipai/paperclip is MIT)"
+license_note: Private repo; its LICENSE couldn't be read here. Upstream is MIT.
+what: The owner's private fork of Paperclip, the orchestration server and UI for teams of AI agents.
+good_for: owner's Paperclip fork
+stack: [node, typescript, pnpm, postgres, rust]
+requirements:
+  node: ">=24.11.0"
+  docker: false
+  other:
+    - "Same as the paperclip recipe: pnpm 9.15+, cargo, and a postgres user that can reach the clone when run as root"
+keys_optional:
+  - name: ANTHROPIC_API_KEY
+    for: Claude-based agents
+  - name: OPENAI_API_KEY
+    for: Codex/OpenAI-based agents
+keys_required:
+  - name: GITHUB_TOKEN
+    for: Read access to the private repo for git clone (passed through a credential helper, never in the URL)
+env:
+  PAPERCLIP_HOME: /tmp/paperclip-home
+clone: git -c credential.helper='!f() { echo username=x-access-token; echo password=$GITHUB_TOKEN; }; f' clone --depth 1 https://github.com/Kevo919/paperclip.git kevo919-paperclip
+install:
+  - npm install -g pnpm@9.15.4
+  - mkdir -p /tmp/paperclip-home && chmod 777 /tmp/paperclip-home
+  - pnpm install --frozen-lockfile
+  - pnpm --filter @paperclipai/plugin-sdk build
+  - pnpm --filter @paperclipai/paperclip-runner build:binary
+run: pnpm dev:once
+background: true
+kind: web
+port: 3100
+health:
+  http: http://127.0.0.1:3100/api/health
+  expect: 200
+fits_bot_computer: true
+fits_reason: Assumed to match upstream paperclip (verified there); it needs GITHUB_TOKEN to clone.
+verified: false
+verified_reason: >-
+  Private repo: it can't be cloned in this sandbox without a token. Steps copy the verified upstream
+  paperclip recipe and assume the fork hasn't changed its build; recheck after the first real clone.

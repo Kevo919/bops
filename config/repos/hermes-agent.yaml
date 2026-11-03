@@ -1,0 +1,39 @@
+id: hermes-agent
+name: Hermes Agent
+repo: NousResearch/hermes-agent
+url: https://github.com/NousResearch/hermes-agent
+license: MIT
+license_note: ""
+what: A self-improving personal AI agent CLI with tools, memory, skills, scheduled automations and a messaging gateway.
+good_for: personal agent with messaging gateway
+stack: [python, uv]
+requirements:
+  python: ">=3.11,<3.15"
+  docker: true
+  other:
+    - "The documented native install is a curl | bash script that brings its own uv; Docker compose is the alternative"
+keys_optional:
+  - name: OPENROUTER_API_KEY
+    for: Models through OpenRouter
+  - name: OPENAI_API_KEY
+    for: OpenAI models
+  - name: GEMINI_API_KEY
+    for: Google Gemini models
+keys_required: []
+clone: git clone --depth 1 https://github.com/NousResearch/hermes-agent.git hermes-agent
+install:
+  - curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+run: hermes doctor
+kind: cli
+health:
+  cmd: hermes --help
+  expect_exit: 0
+fits_bot_computer: false
+fits_reason: Untested; pip install from the clone is refused by the project, and the remaining routes (curl | bash installer or Docker) were not run here.
+verified: false
+verified_reason: >-
+  Not run end to end. Clone (c314285f) and LICENSE were read. pip install . from the clone failed:
+  "RuntimeError: Building wheels or sdists for hermes-agent is not supported." The README install is
+  curl -fsSL .../install.sh | bash (not run, to avoid piping a remote script as root), and docker-compose.yml
+  needs Docker, whose daemon isn't running here. Provider keys can also be set with hermes setup or
+  hermes model.
