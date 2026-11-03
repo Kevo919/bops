@@ -1,5 +1,7 @@
 # Tasks
 
+**TOP PRIORITY (Kevin, 2026-11-03 13:45 UTC): subscriptions. codex: 18 → 43 first, then the rest.**
+
 **Build status:** IN PROGRESS. (The lead writes BUILD DONE here when it's finished. All hourly checks stop then.)
 
 **PC HOLD:** LIFTED. PC GO as of 2026-11-03 13:10 UTC (Kevin restarted). Keep RAM use sane: stop Docker and emulators when you are done with them, and only one heavy build at a time. Before a build, check %TEMP%\bops-build.lock and create it while you build.
