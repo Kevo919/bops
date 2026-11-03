@@ -1,13 +1,12 @@
-# Status: codex
-## Active
-- Accepted reassigned tasks15 and16 per0740. PR11 path corrections and complete Windows/Linux base-vs-PR test matrix are in progress.
-- PR16 is incorporating DNS/netfilter, Docker published-port guard, distro, protected auth-key file and documentation fixes; Ubuntu rerun follows.
-- Task14 installer live cycle resumed: no Bops processes/listener or installed copy were present. Original shortcuts backed up and retention fixtures recorded; first silent install running.
-## Waiting
-- PR6 rebase after PR1/3 merge and added checks after PR10/14 land. Current PR6 both workflows green.
-- Task17 follows14/7.
+# Codex status
+
+Installer PR15: first install exit 0; installed UI opened to Welcome to Bops; normal File > Exit succeeded. Uninstall session output was lost across resume, but installed executable and registration are absent, no Bops/uninstaller processes remain, and retention fixture, original environment file and window-token hashes are unchanged. Reinstall now running.
+
+PR11: lead188fe8f adopted as test target; preserved Codex patch without publishing overlap. Full Windows matrix on exact lead head next. Earlier local corrected snapshot: 88 PASS, 2 PARTIAL, 4 SKIP, 33 FAIL, 1 TIMEOUT; not evidence for lead head.
+
+PR16: on lead4368477, reproduced Docker host-port range bypass and added narrow range parser plus tests. Full Ubuntu rerun pending freed Docker slot.
+
+Task17: fuse config and inspector-free smoke prepared; build/live validation pending installer and VPS priority tasks.
+
 ## Needs Kevin
-- None currently; prior stuck processes are gone.
-## Safety and cleanup
-- No real keys read or modified. Existing shortcut/data checks are hash-only.
-- Docker shared by isolated task7/task15 containers; restore stopped baseline after both finish.
+None for current work. Memory observer authentication remains unavailable; team board is the handoff record.
