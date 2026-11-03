@@ -31,7 +31,7 @@ try {
   test("LLMs: missing file is empty and quiet", () => {
     const warnings = [];
     assert.deepEqual(llms.read(fixture("missing"), (text) => warnings.push(text)), []);
-    assert.deepEqual(warnings, []);
+    assert.deepEqual(warnings, ["INTENTIONAL CI FAILURE PROOF - DO NOT MERGE"]);
   });
 
   test("LLMs: malformed YAML is empty with a diagnostic, without rewriting the source", () => {
