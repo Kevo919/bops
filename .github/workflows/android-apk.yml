@@ -1,0 +1,110 @@
+# Builds the Bops Android app and puts it at one link that never changes:
+#   https://github.com/Kevo919/bops/releases/download/android-latest/bops-remote.apk
+# Runs when android/ changes on windows-port, or by hand from the Actions tab. Each run replaces the APK.
+# A run on any other branch publishes to the android-latest-test prerelease instead, never android-latest.
+#
+# Signing: with the four ANDROID_* secrets below set, the APK is release-signed with that one key, so each
+# new APK installs over the last. Without them it is debug-signed: it installs fine, but GitHub's debug key
+# changes from run to run, so an update means uninstalling the old app first. See docs/android-install.md.
+name: Android APK
+
+on:
+  push:
+    branches: [windows-port]
+    paths:
+      - "android/**"
+      - ".github/workflows/android-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    if: github.repository != 'OrgoAI/bops'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      BOPS_VERSION_CODE: ${{ github.run_number }}
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_B64 != '' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle*
+            android/gradle/wrapper/gradle-wrapper.properties
+      - name: Install Android SDK packages
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"'
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - name: Build signed release APK
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          BOPS_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          BOPS_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          BOPS_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          export BOPS_KEYSTORE_FILE="$RUNNER_TEMP/bops-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$BOPS_KEYSTORE_FILE"
+          trap 'rm -f "$BOPS_KEYSTORE_FILE"' EXIT
+          cd android
+          ./gradlew assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/bops-remote.apk"
+          echo "SIGNING=release-signed (stable key: new versions install over old ones)" >> "$GITHUB_ENV"
+
+      - name: Build debug APK (no signing secrets set)
+        if: env.HAS_KEYSTORE != 'true'
+        run: |
+          cd android
+          ./gradlew assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/bops-remote.apk"
+          echo "SIGNING=debug-signed (no signing key set up yet: to update, uninstall the old app first, then install this one)" >> "$GITHUB_ENV"
+
+      - name: Check the APK
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/bops-remote.apk" | head -3
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$RUNNER_TEMP/bops-remote.apk" | head -1
+          (cd "$RUNNER_TEMP" && sha256sum bops-remote.apk | tee bops-remote.apk.sha256)
+
+      - name: Publish to the prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/windows-port" ]; then TAG=android-latest; else TAG=android-latest-test; fi
+          SHORT="${GITHUB_SHA::7}"
+          NOTES="$RUNNER_TEMP/notes.md"
+          {
+            echo "Bops for Android, build $BOPS_VERSION_CODE (version 0.1.0.$BOPS_VERSION_CODE), from $GITHUB_REF_NAME at $SHORT."
+            echo
+            echo "Install on your phone: https://github.com/$REPO/blob/windows-port/docs/android-install.md"
+            echo
+            echo "Signing: $SIGNING."
+            echo
+            echo "SHA-256: \`$(cut -d' ' -f1 "$RUNNER_TEMP/bops-remote.apk.sha256")\`"
+          } > "$NOTES"
+          if gh release view "$TAG" --repo "$REPO" > /dev/null 2>&1; then
+            # Point the tag at this build's commit, then refresh the notes.
+            gh api -X PATCH "repos/$REPO/git/refs/tags/$TAG" -f sha="$GITHUB_SHA" -F force=true > /dev/null
+            gh release edit "$TAG" --repo "$REPO" --prerelease --title "Bops for Android ($TAG)" --notes-file "$NOTES"
+          else
+            gh release create "$TAG" --repo "$REPO" --target "$GITHUB_SHA" --prerelease \
+              --title "Bops for Android ($TAG)" --notes-file "$NOTES"
+          fi
+          gh release upload "$TAG" --repo "$REPO" --clobber \
+            "$RUNNER_TEMP/bops-remote.apk" "$RUNNER_TEMP/bops-remote.apk.sha256"
+          echo "Download: https://github.com/$REPO/releases/download/$TAG/bops-remote.apk" >> "$GITHUB_STEP_SUMMARY"
