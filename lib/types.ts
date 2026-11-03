@@ -1137,6 +1137,12 @@ export type MemberSend = { state: "sending" | "waiting" | "failed"; error?: stri
 
 /** A session is a long-running task on one screen of a bot's computer, shown as a thread. */
 export type Session = {
+  /**
+   * Ask actions the owner allowed for this thread alone (permission.ts replyToAsk "session"): the same
+   * ask doesn't pause the run again while this thread runs. New here with each Allow for this thread,
+   * so a fresh thread asks as fresh. Unset: every ask pauses, as before.
+   */
+  allowedAsks?: string[];
   /** Started from a text the user sent a workspace's number: its result is texted back to them from that number. */
   textBack?: { botId: string; to: string };
   /** Started from a message in Slack, Telegram or Discord: its result is posted back there. */
@@ -2299,7 +2305,8 @@ export type AppApproval = {
 };
 
 /** How the user answers a request (OpenCode's reply, Codex's ReviewDecision approved / approved_for_session / denied). */
-export type AskReply = "once" | "always" | "reject";
+/** "session": allowed for this one thread (a fresh thread asks again), like Allow once spread over the run (permission.ts). */
+export type AskReply = "once" | "always" | "session" | "reject";
 /** `member`: answered by a member with Write, from their own Bops (the Mac that took it is `by`). */
 export type AskAnswer = { reply: AskReply; message?: string; reason?: "stopped"; by?: string; at: number; member?: MemberWho };
 /** The tool call a run paused at, as the model made it: its name and its arguments (JSON). */
