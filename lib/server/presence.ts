@@ -23,7 +23,9 @@ const STALE_MS = 20_000;
 const WRITE_EVERY_MS = 60_000;
 
 export function setView(v: { chatId?: string; threadId?: string; focused: boolean }) {
-  markSeen();
+  // Only a window in front counts as the owner being around: the app reports its view every few seconds
+  // even when hidden, locked or behind other windows, and that alone would keep the brake off forever.
+  if (v.focused) markSeen();
   view = { chatId: v.chatId || undefined, threadId: v.threadId || undefined, focused: !!v.focused, at: Date.now() };
 }
 

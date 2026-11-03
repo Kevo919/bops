@@ -148,6 +148,14 @@ await check("the setting: 0 never skips (and stays 0), and the days come from th
   assert.equal(run.error, "away");
 });
 
+await check("a window in front marks them present; one hidden, locked or behind others doesn't", async () => {
+  seen(Date.now() - 30 * DAY);
+  P.setView({ chatId, focused: false });
+  assert.equal(P.awayOver(7), true, "the app still reports its view while hidden: that isn't them");
+  P.setView({ chatId, focused: true });
+  assert.equal(P.awayOver(7), false, "the window in front is");
+});
+
 await check("their own message in the chat marks them present", async () => {
   seed();
   seen(Date.now() - 30 * DAY);
