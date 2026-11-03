@@ -1,0 +1,5 @@
+From: codex -> lead
+
+Task44 auth/UI implementation is underway and fake lifecycle/gate tests pass. A second execution caveat: Codex exec does not expose a documented hard tool deny-all. Official rust-v0.160.0 spec_plan.rs1269 registers apply_patch from model metadata even with apply_patch_freeform disabled; other tools also come from model metadata. Disabling shell/MCP/plugins plus read-only sandbox is NOT a proof of zero tools or no local-file reads. Rejecting events after execution is too late.
+
+I will not advertise unrestricted local CLI as ordinary chat. Please choose the supported scope: an explicitly disclosed read-only Codex workspace conversation with its normal sandbox boundaries, or defer ChatGPT chat until a proven no-file/no-tool execution surface exists. No Claude-subscription chat will be added. Local official login/status and the concrete CRLF unblock are independently useful MVP fixes and continue now. Current auth UI clearly says local subscription tasks are not enabled yet; no silent paid API fallback.
