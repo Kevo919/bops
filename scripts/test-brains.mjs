@@ -763,7 +763,7 @@ await test("Settings, Brain: Bops agent first with its bots, then each brain and
   noDashes(t, "Settings, Brain");
   assert.match(t, /^Brain What your bots work with\. Bops agent runs on your credit\. Claude Code and Codex run on your own plan or key\. Add a brain/);
   assert.match(t, /Bops agent Credit Boppy Rook Claude Code/, "Bops agent's bots: those on no brain");
-  assert.match(t, /Claude Code Max plan · signed in on Boppy's computer Sign in on Rook's computer/, "Rook's own computer isn't signed in");
+  assert.match(t, /Claude Code Claude Max plan · signed in on Boppy's computer Sign in on Rook's computer/, "Rook's own computer isn't signed in");
   assert.match(t, /Otto .*Rook not picked/);
   assert.match(t, /Sign out on Boppy's computer/);
   assert.match(t, /Claude Code \(work\) Not signed in/);
@@ -777,9 +777,9 @@ await test("Settings, Brain: Bops agent first with its bots, then each brain and
   assert.equal(brainLine(view(BRAINS), BRAINS[2], []), "Key: ANTHROPIC_API_KEY · not in Logins");
   assert.equal(brainLine(view(BRAINS), { ...BRAINS[1], signingIn: { botId: "rook", computerId: "pc-rook", display: 100, at: 1, failed: "it took too long." } }), "Sign-in didn't finish");
   // A plan per computer, when they differ; one, when they agree; never a computer no bot has now.
-  assert.equal(brainLine(view(BRAINS), { ...BRAINS[0], signIns: [...BRAINS[0].signIns, { computerId: "pc-rook", at: 2, account: { plan: "pro" } }] }), "Max plan on Boppy's computer, Pro plan on Rook's computer");
-  assert.equal(brainLine(view(BRAINS), { ...BRAINS[0], signIns: [...BRAINS[0].signIns, { computerId: "pc-rook", at: 2, account: { plan: "max" } }] }), "Max plan · signed in on Boppy's and Rook's computers");
-  assert.equal(brainLine(view(BRAINS), { ...BRAINS[0], signIns: [{ computerId: "pc-gone", at: 0, account: { plan: "pro" } }, ...BRAINS[0].signIns] }), "Max plan · signed in on Boppy's computer");
+  assert.equal(brainLine(view(BRAINS), { ...BRAINS[0], signIns: [...BRAINS[0].signIns, { computerId: "pc-rook", at: 2, account: { plan: "pro" } }] }), "Claude Max plan on Boppy's computer, Claude Pro plan on Rook's computer");
+  assert.equal(brainLine(view(BRAINS), { ...BRAINS[0], signIns: [...BRAINS[0].signIns, { computerId: "pc-rook", at: 2, account: { plan: "max" } }] }), "Claude Max plan · signed in on Boppy's and Rook's computers");
+  assert.equal(brainLine(view(BRAINS), { ...BRAINS[0], signIns: [{ computerId: "pc-gone", at: 0, account: { plan: "pro" } }, ...BRAINS[0].signIns] }), "Claude Max plan · signed in on Boppy's computer");
 });
 
 await test("adding a brain asks how it signs in, in Claude Code's own words, even with a key saved; Codex takes a key", () => {
