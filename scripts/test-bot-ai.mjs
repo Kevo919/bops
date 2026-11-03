@@ -73,7 +73,7 @@ writeFileSync(
 
 /* ---------------- Loading the app's modules ---------------- */
 
-const fileUrl = (p) => pathToFileURL(`${root}/${p}`).href;
+const fileUrl = (p) => pathToFileURL(join(root, p)).href;
 // sessions.ts is a stand in: what setBotAi asks of it is recorded.
 const SESSIONS_OWN = `
 const calls = (globalThis.__sessionCalls ??= []);
@@ -86,7 +86,7 @@ const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
     } catch (e) {
@@ -180,7 +180,9 @@ if (OFF) {
     assert.ok(!/Claude Code|Codex|OpenCode|agy|\+ Add|Open its terminal/.test(section), section);
     assert.match(section, /Chat, threads, memory and calls run on credit\./);
   });
-  rmSync(scratch, { recursive: true, force: true });
+  try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
   process.stdout.write(`brains off: ${passed} passed\n`);
   process.exit(0);
 }
@@ -816,7 +818,9 @@ await test("a build without brains (a release): the --off pass", async () => {
   assert.match(out, /brains off: 1 passed/, out);
 });
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 assert.ok(!logged.some((l) => /bopsrun_[0-9a-f]{16}|sk-ant-|sk-proj-/.test(l)), "nothing secret in what Bops logged");
 process.stdout.write(`bot ai: ${passed} passed\n`);
 process.exit(0);

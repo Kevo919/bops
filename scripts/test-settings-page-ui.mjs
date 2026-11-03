@@ -18,10 +18,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 process.env.NEXT_PUBLIC_BOPS_BRAINS = "1";
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -95,10 +96,10 @@ globalThis.fetch = async (url, init = {}) => {
 
 const { createElement: h, act } = await import("react");
 const { createRoot } = await import("react-dom/client");
-const App = await import(pathToFileURL(`${root}/components/app/bops-app.tsx`).href);
-const { YouMenu } = await import(pathToFileURL(`${root}/components/app/sidebar.tsx`).href);
-const { BotMenu } = await import(pathToFileURL(`${root}/components/app/bot-menu.tsx`).href);
-const { Members } = await import(pathToFileURL(`${root}/components/app/members.tsx`).href);
+const App = await import(`${rootUrl}/components/app/bops-app.tsx`);
+const { YouMenu } = await import(`${rootUrl}/components/app/sidebar.tsx`);
+const { BotMenu } = await import(`${rootUrl}/components/app/bot-menu.tsx`);
+const { Members } = await import(`${rootUrl}/components/app/members.tsx`);
 
 let passed = 0;
 const test = async (name, f) => {
@@ -255,7 +256,7 @@ await test("Back leaves the page; each asking goes to its place again, even one 
 });
 
 await test("the app: the page beside the sidebar, which stays to go anywhere; Esc goes back; the old sheets are gone", () => {
-  const app = readFileSync(`${root}/components/app/bops-app.tsx`, "utf8");
+  const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
   // Past the sidebar only, sliding with it; what's under it kept but out of reach.
   assert.match(app, /const sidebarWidth = sidebarOpen \? 340 : 72;/);
   assert.match(app, /\{settings && \([\s\S]{0,200}absolute inset-y-0 right-0 z-30 flex bg-white \$\{PAGE_SLIDE\}`\} style=\{\{ left: sidebarWidth \}\}/, "Settings past the sidebar");
@@ -367,7 +368,7 @@ await test("Team asks Remove under the person's row, never over the page", async
 });
 
 await test("no modal is left in components/app but the ones kept on purpose; no browser alert, confirm or prompt", () => {
-  const dir = `${root}/components/app`;
+  const dir = `${rootPath}/components/app`;
   const files = [
     "account.tsx", "apps.tsx", "bops-app.tsx", "bot-menu.tsx", "chat-view.tsx", "logins.tsx", "mac-computer.tsx", "mail-address.tsx", "members.tsx", "memory-sheet.tsx", "new-thread.tsx", "notice-popup.tsx", "restart.tsx", "setup.tsx", "sidebar.tsx", "sign-in.tsx", "skill-dialog.tsx", "team-chart.tsx",
   ];

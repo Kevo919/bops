@@ -24,7 +24,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
 const pg = require("pg");
@@ -44,7 +45,7 @@ for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAI
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-profiles-"));
 process.chdir(scratch);
 process.env.HOME = scratch;
-symlinkSync(join(root, "node_modules"), join(scratch, "node_modules"));
+symlinkSync(join(rootPath, "node_modules"), join(scratch, "node_modules"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 mkdirSync(join(scratch, "keychain"));
@@ -75,7 +76,7 @@ if (process.argv[2] === "-i") {
 `,
   { mode: 0o755 },
 );
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 const keychain = () => readdirSync(join(scratch, "keychain")).map(decodeURIComponent).sort();
 
 const freePort = () =>
@@ -130,7 +131,7 @@ const CLOUD = `http://127.0.0.1:${cloudPort}`;
 process.env.BOPS_CLOUD_URL = CLOUD;
 const cloud = { child: null, log: "" };
 async function startCloudServer() {
-  const child = spawn(process.execPath, [join(root, "cloud/server.ts")], {
+  const child = spawn(process.execPath, [join(rootPath, "cloud/server.ts")], {
     env: { PATH: process.env.PATH, HOME: scratch, BOPS_DATABASE_URL: DB, BOPS_CLOUD_PORT: String(cloudPort), BOPS_CLOUD_SECRET: randomBytes(32).toString("base64"), BOPS_ORGO_ORIGIN: ORGO },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -197,10 +198,10 @@ writeFileSync(
 // Modules that would start something (Bops Cloud's tunnel, the relay, the bots' sessions, the Mac
 // check that installs the Codex CLI, the desktop and mirror) are stand-ins: each of their exports does nothing.
 const STAND_INS = new Set(["cloud-tunnel", "relay", "sessions", "mac", "desktop", "mirror"]);
-const project = pathToFileURL(root).href + "/";
+const project = pathToFileURL(rootPath).href + "/";
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -240,15 +241,15 @@ const quiet = { info: console.info, warn: console.warn, error: console.error };
 console.info = () => {};
 console.warn = () => {};
 
-const S = await import(`${root}/lib/server/store.ts`);
-const L = await import(`${root}/lib/server/orgo-sign-in.ts`);
-const U = await import(`${root}/lib/server/user-paths.ts`);
-const Up = await import(`${root}/lib/server/uploads.ts`);
-const K = await import(`${root}/lib/server/keychain.ts`);
-const M = await import(`${root}/lib/server/state-merge.ts`);
-const SO = await import(`${root}/app/api/auth/signout/route.ts`);
-const OA = await import(`${root}/lib/server/orgo-auth.ts`);
-const OW = await import(`${root}/app/api/owner/route.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const L = await import(`${rootUrl}/lib/server/orgo-sign-in.ts`);
+const U = await import(`${rootUrl}/lib/server/user-paths.ts`);
+const Up = await import(`${rootUrl}/lib/server/uploads.ts`);
+const K = await import(`${rootUrl}/lib/server/keychain.ts`);
+const M = await import(`${rootUrl}/lib/server/state-merge.ts`);
+const SO = await import(`${rootUrl}/app/api/auth/signout/route.ts`);
+const OA = await import(`${rootUrl}/lib/server/orgo-auth.ts`);
+const OW = await import(`${rootUrl}/app/api/owner/route.ts`);
 const setOwner = async (name) => {
   const res = await OW.POST(new Request("http://localhost/api/owner", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) }));
   return res.status;
@@ -611,7 +612,7 @@ try {
 
   /* ---------------- A bot's turn still waiting on the model when A signs out and B signs in ---------------- */
 
-  const C = await import(`${root}/lib/server/chat.ts`);
+  const C = await import(`${rootUrl}/lib/server/chat.ts`);
   assert.equal((await signOut()).status, 200);
   await signIn(A);
   const fake = globalThis.__fakeOpenAI;
@@ -747,7 +748,9 @@ try {
   await db.query("DELETE FROM bops.app_state WHERE user_id = ANY($1::text[])", [users]).catch(() => {});
   await db.end();
   process.chdir(tmpdir());
-  rmSync(scratch, { recursive: true, force: true });
+  try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 }
 console.log("profile tests passed");
 process.exit(0);

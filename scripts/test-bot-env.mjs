@@ -576,7 +576,9 @@ try {
   for (const t of [...Object.values(threads), { id: "s_samclaude2" }, ...["s_twoclaude1", "s_twoclaude2", "s_twocodex1", "s_twocodex2", "s_twooc1", "s_twooc2", "s_rebincodex"].map((id) => ({ id }))]) await sh(`bops-agent stop ${t.id}`);
   await sh(`pkill -f '[b]ops-ai-gate .*${d.bots}/' ; true`);
   upstream.close();
-  if (!process.env.KEEP) rmSync(scratch, { recursive: true, force: true });
+  if (!process.env.KEEP) try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
   else console.log("kept", scratch);
 }
 console.log("all ok");

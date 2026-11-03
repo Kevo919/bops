@@ -13,7 +13,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG|INGOT)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
@@ -24,13 +25,14 @@ const ORGO = "http://orgo.test";
 const INGOT = "http://ingot.test";
 process.env.BOPS_ORGO_ORIGIN = ORGO;
 process.env.BOPS_INGOT_URL = INGOT;
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-hosted-apps-swap-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 // The Keychain: a write (security -i) takes, a read finds nothing.
 writeFileSync(join(bin, "security"), '#!/bin/sh\nif [ "$1" = "-i" ]; then cat >/dev/null; exit 0; fi\nexit 44\n', { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
@@ -45,7 +47,7 @@ writeFileSync(join(vendor, "ingot-linux-amd64"), BINARY);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -148,11 +150,11 @@ globalThis.fetch = async (input, init) => {
   throw new TypeError(`fetch failed (the test is offline: ${url.host})`);
 };
 
-const S = await import(`${root}/lib/server/store.ts`);
-const Auth = await import(`${root}/lib/server/orgo-auth.ts`);
-const H = await import(`${root}/lib/server/hosted-apps.ts`);
-const { SWAPPED } = await import(`${root}/lib/server/ingot.ts`);
-const { botChatId } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const Auth = await import(`${rootUrl}/lib/server/orgo-auth.ts`);
+const H = await import(`${rootUrl}/lib/server/hosted-apps.ts`);
+const { SWAPPED } = await import(`${rootUrl}/lib/server/ingot.ts`);
+const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
 clearInterval(globalThis.__bopsRoutines);
 
 // Bob has used Bops on this Mac before: his own state, its main workspace on his own Orgo project, his own computer.
@@ -426,6 +428,8 @@ await check("nothing unexpected: no rejections", () => {
 
 await S.flushState?.(2000);
 console.log(`\napps across a sign-in: ${passed} passed, ${failed} failed`);
-if (!failed) rmSync(scratch, { recursive: true, force: true });
+if (!failed) try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 else console.log(`The throwaway folder is kept for a look: ${scratch}`);
 process.exit(failed ? 1 : 0);

@@ -22,7 +22,7 @@ registerHooks({
     return next(specifier, context);
   },
 });
-const { USAGE_CARD } = await import(`${repo}/lib/plan-includes.ts`);
+const { USAGE_CARD } = await import(pathToFileURL(`${repo}/lib/plan-includes.ts`).href);
 
 const site = fileURLToPath(new URL("../site", import.meta.url));
 const MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";

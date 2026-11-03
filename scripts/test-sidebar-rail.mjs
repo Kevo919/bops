@@ -17,11 +17,12 @@ import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -54,9 +55,9 @@ globalThis.localStorage = { getItem: (k) => stored.get(k) ?? null, setItem: (k, 
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
 
-const { SidebarRail } = await import(pathToFileURL(`${root}/components/app/sidebar-rail.tsx`).href);
-const { railMark, attentionOf, needsByBot } = await import(pathToFileURL(`${root}/components/app/sidebar-sections.tsx`).href);
-const { openFooterPage, footerPageOf } = await import(pathToFileURL(`${root}/components/app/sidebar-footer.tsx`).href);
+const { SidebarRail } = await import(`${rootUrl}/components/app/sidebar-rail.tsx`);
+const { railMark, attentionOf, needsByBot } = await import(`${rootUrl}/components/app/sidebar-sections.tsx`);
+const { openFooterPage, footerPageOf } = await import(`${rootUrl}/components/app/sidebar-footer.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -184,7 +185,7 @@ await test("on top the toggle and Search; tooltips open to the right", () => {
   assert.match(html, /<aside data-tip-side="right" aria-label="Sidebar, collapsed" class="flex min-h-0 w-\[72px\] shrink-0 flex-col px-3/);
   assert.ok(html.indexOf('aria-label="Expand the sidebar"') < html.indexOf('aria-label="Search"'));
   assert.match(html, /data-tip="Expand the sidebar \(⌘\\\)"/);
-  const tip = readFileSync(`${root}/components/app/tooltip.tsx`, "utf8");
+  const tip = readFileSync(`${rootPath}/components/app/tooltip.tsx`, "utf8");
   assert.match(tip, /data-tip-side\]"\)\?\.getAttribute\("data-tip-side"\) === "right"/);
 });
 
@@ -215,12 +216,12 @@ await test("the workspace's initial when there's another to switch to, which exp
   assert.match(two, /aria-label="Main: switch workspaces"[^>]*><span aria-hidden="true">M<\/span>/);
   const one = render(world({ workspaces: [{ id: "ws_main", name: "Main", createdAt: 1 }] }));
   assert.doesNotMatch(one, /switch workspaces/);
-  const side = readFileSync(`${root}/components/app/sidebar.tsx`, "utf8");
+  const side = readFileSync(`${rootPath}/components/app/sidebar.tsx`, "utf8");
   assert.match(side, /<WorkspaceSwitcher state=\{state\} opened=\{workspaces\}(?: onTeamChart=\{onTeamChart\})? \/>/);
 });
 
 await test("the app: a 72px rail, its column sliding with the title bar's, and no toggle in the title bar", () => {
-  const app = readFileSync(`${root}/components/app/bops-app.tsx`, "utf8");
+  const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
   assert.match(app, /const sidebarWidth = sidebarOpen \? 340 : 72;/);
   assert.match(app, /const columns = \{ gridTemplateColumns: gridColumns\(sidebarWidth, wide \? null : chatWidth\) \};/);
   assert.match(app, /columns=\{columns\}\n\s+slide=\{slide\}/, "the title bar's columns are the grid's");
@@ -236,9 +237,9 @@ await test("the app: a 72px rail, its column sliding with the title bar's, and n
 });
 
 await test("the account menu opens over the chat column's sheets; the update button only expands", () => {
-  const side = readFileSync(`${root}/components/app/sidebar.tsx`, "utf8");
+  const side = readFileSync(`${rootPath}/components/app/sidebar.tsx`, "utf8");
   assert.match(side, /absolute bottom-\[calc\(100%\+8px\)\] left-0 z-\[60\] flex w-\[248px\]/);
-  const update = readFileSync(`${root}/components/app/update-notice.tsx`, "utf8");
+  const update = readFileSync(`${rootPath}/components/app/update-notice.tsx`, "utf8");
   const button = update.slice(update.indexOf("export function UpdateButton"), update.indexOf("function useUpdate"));
   assert.match(button, /onClick=\{onOpen\}/);
   assert.doesNotMatch(button, /\.install\?\.\(/, "never restarts into it itself");

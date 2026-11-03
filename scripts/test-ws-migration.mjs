@@ -23,19 +23,21 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.BOPS_APP_VERSION = "9.9.9";
 const UI = "ui-token-test-ws";
 process.env.BOPS_UI_TOKEN = UI;
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-ws-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
-process.env.PATH = `${bin}:${process.env.PATH}`;
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
 const ORGO_KEY = "sk_orgo_test_ws";
@@ -48,7 +50,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -289,15 +291,15 @@ async function check(name, fn) {
   }
 }
 
-const S = await import(`${root}/lib/server/store.ts`);
-const O = await import(`${root}/lib/server/orgo.ts`);
-const Wk = await import(`${root}/lib/server/workspaces.ts`);
-const Sk = await import(`${root}/lib/server/workspace-skills.ts`);
-const K = await import(`${root}/lib/server/keys.ts`);
-const Rm = await import(`${root}/lib/server/remove.ts`);
-const Route = await import(`${root}/app/api/workspaces/route.ts`);
-const Merge = await import(`${root}/lib/server/state-merge.ts`);
-const KeysRoute = await import(`${root}/app/api/keys/route.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const O = await import(`${rootUrl}/lib/server/orgo.ts`);
+const Wk = await import(`${rootUrl}/lib/server/workspaces.ts`);
+const Sk = await import(`${rootUrl}/lib/server/workspace-skills.ts`);
+const K = await import(`${rootUrl}/lib/server/keys.ts`);
+const Rm = await import(`${rootUrl}/lib/server/remove.ts`);
+const Route = await import(`${rootUrl}/app/api/workspaces/route.ts`);
+const Merge = await import(`${rootUrl}/lib/server/state-merge.ts`);
+const KeysRoute = await import(`${rootUrl}/app/api/keys/route.ts`);
 
 /**
  * A clean state: four workspaces besides the default, each team with its computers as the dry run has them:
@@ -1118,7 +1120,7 @@ await check("The name bops stays the default's: once its project took the user's
 });
 
 await check("A workspace with no Orgo project gets one at start: the default's bops project made when the account has none, the rest under their names; one Orgo can't make is tried again; then its routines go in full", async () => {
-  const RS = await import(`${root}/lib/server/routine-sync.ts`);
+  const RS = await import(`${rootUrl}/lib/server/routine-sync.ts`);
   world({ modern: true });
   seed();
   // An account whose bots never needed a computer: no Bops project at all yet (and no free computer).
@@ -1218,7 +1220,7 @@ await check("Delete: Orgo not answering, or no one signed in, deletes nothing (n
 });
 
 await check("Deleting a bot takes its channels with it (no listener or token left), as Orgo's map drops them", async () => {
-  const BS = await import(`${root}/lib/server/bops-sync.ts`);
+  const BS = await import(`${rootUrl}/lib/server/bops-sync.ts`);
   world({ modern: true });
   seed();
   assert.equal((await Wk.migrateWorkspacesToOrgo()).status, "done");
@@ -1280,6 +1282,8 @@ await check("Nothing unexpected: no stray warnings or rejections", async () => {
 
 server.close();
 console.log(`\nws migration: ${passed} passed, ${failed} failed`);
-if (!failed) rmSync(scratch, { recursive: true, force: true });
+if (!failed) try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 else console.log(`The throwaway folder is kept for a look: ${scratch}`);
 process.exit(failed ? 1 : 0);

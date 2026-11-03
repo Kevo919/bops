@@ -442,5 +442,7 @@ test("after a failed download the next try fetches it, not Squirrel's cached zip
   assert.equal(n.u.state().failed, true);
 });
 
-rmSync(scratch, { recursive: true, force: true });
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`${passed} passed`);

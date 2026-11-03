@@ -27,13 +27,15 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
 import { unfaked } from "./fake-exports.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 const { deviceIdOf } = await import(new URL("../cloud/device.ts", import.meta.url).href);
 
 process.env.TZ = "America/New_York";
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 const FAKES = {
   store: ["addMessage", "bot", "flushState", "getState", "id", "ownerName", "ownSession", "patchSession", "pullState", "session", "startLanded", "stateDevice", "stateEpoch", "stateInCloud", "statePulledAt", "stateReady", "stateTooNew", "update"],
@@ -63,7 +65,7 @@ const FAKES = {
 };
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -252,12 +254,12 @@ globalThis.__fake = {
   keychain: { getUserSecret: async () => null, setUserSecret: async () => {}, deleteUserSecret: async () => {} },
 };
 
-const R = await import(`${root}/lib/server/runner.ts`);
-const I = await import(`${root}/lib/server/runner-install.ts`);
-const Sync = await import(`${root}/lib/server/routine-sync.ts`);
-const Rt = await import(`${root}/lib/server/routines.ts`);
-const V = await import(`${root}/lib/server/vault.ts`);
-const { computerWait, DISPLAYS, onceDone, pausedForOk } = await import(`${root}/lib/types.ts`);
+const R = await import(`${rootUrl}/lib/server/runner.ts`);
+const I = await import(`${rootUrl}/lib/server/runner-install.ts`);
+const Sync = await import(`${rootUrl}/lib/server/routine-sync.ts`);
+const Rt = await import(`${rootUrl}/lib/server/routines.ts`);
+const V = await import(`${rootUrl}/lib/server/vault.ts`);
+const { computerWait, DISPLAYS, onceDone, pausedForOk } = await import(`${rootUrl}/lib/types.ts`);
 globalThis.__pausedForOk = pausedForOk;
 const tick = () => globalThis.__bopsRoutineTick();
 const T = Sync.routineSyncForTests;
@@ -1827,7 +1829,7 @@ await check("a run on a computer's runner reaches nothing past it until Bops Clo
       "still due in Bops Cloud: the Mac runs them, once",
     );
     // A task's thread waits for Bops Cloud the same way before it does anything (sessions.ts route).
-    assert.match(readFileSync(`${root}/lib/server/sessions.ts`, "utf8"), /if \(onRunner\(\) && !\(await startLanded\(\(st\) => Array\.isArray\(st\.sessions\) && st\.sessions\.some\(/);
+    assert.match(readFileSync(`${rootPath}/lib/server/sessions.ts`, "utf8"), /if \(onRunner\(\) && !\(await startLanded\(\(st\) => Array\.isArray\(st\.sessions\) && st\.sessions\.some\(/);
     // Its start taken: the check's failure is said and texted from the runner, as before.
     reset();
     state.routines = [routine("r_check", "otto", { ...check, nextRunAt: Date.now() - 1000 })];

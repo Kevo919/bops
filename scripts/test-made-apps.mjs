@@ -6,13 +6,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 import { chromium } from "playwright";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -25,9 +27,9 @@ registerHooks({
     }
   },
 });
-const P = await import(`${root}/lib/made-app-page.ts`);
-const runtimes = { react: readFileSync(`${root}/public/made-apps/react-19.2.8.js`, "utf8"), tailwind: readFileSync(`${root}/public/made-apps/tailwind-browser-4.3.3.js`, "utf8") };
-const CSP = readFileSync(`${root}/app/api/made-apps/[appId]/view/route.ts`, "utf8").match(/"(sandbox allow-scripts;[^"]+)"/)[1];
+const P = await import(`${rootUrl}/lib/made-app-page.ts`);
+const runtimes = { react: readFileSync(`${rootPath}/public/made-apps/react-19.2.8.js`, "utf8"), tailwind: readFileSync(`${rootPath}/public/made-apps/tailwind-browser-4.3.3.js`, "utf8") };
+const CSP = readFileSync(`${rootPath}/app/api/made-apps/[appId]/view/route.ts`, "utf8").match(/"(sandbox allow-scripts;[^"]+)"/)[1];
 
 /* ---------------- Compiling ---------------- */
 
