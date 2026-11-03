@@ -66,6 +66,7 @@ const nextConfig: NextConfig = {
       "./db/**",
       "./desktop/**",
       "./dist-desktop/**",
+      "./android/**",
       "./docs/**",
       "./edge/**",
       "./envs/**",

@@ -93,7 +93,10 @@
         "filter": [
           "**/*",
           "!.env*",
-          "!.data/**"
+          "!.data/**",
+          "!dist-desktop/**",
+          "!android/**",
+          "!dist-runner/**"
         ]
       },
       {
