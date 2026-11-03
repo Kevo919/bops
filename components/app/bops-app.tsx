@@ -13,6 +13,8 @@ import { TeamChart } from "./team-chart";
 import { BotPanel, type Section } from "./bot-panel";
 import { BotBrowser, WatchChip } from "./bot-browser";
 import { ChatEdge, gridColumns, storedChatWidth } from "./chat-edge";
+import { LookStyle } from "./look-style";
+import { LookSettings } from "./look-settings";
 import { BotComputers } from "./bot-computers";
 import { BrainSettings } from "./brains";
 import { CallBar } from "./call-bar";
@@ -118,6 +120,8 @@ export function BopsApp() {
   if (auth?.cloudProblem) return <CloudUnreachable onRetry={retry} />;
   return (
     <>
+      {/* How the window looks (AppState.look): one style element over everything, even the screens before Bops opens. */}
+      <LookStyle look={state?.look?.current} />
       <Bops state={auth ? state : null} />
       {pick.view && <PickComputer view={pick.view} onDone={pick.done} />}
     </>
@@ -1878,7 +1882,7 @@ function WhereBotsWork({ state }: { state: AppState }) {
 }
 
 /** Settings' places: Account (yours, in every workspace), then Workspace (the one open now), then Orgo's team's own. */
-export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains";
+export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains" | "look";
 
 /** A place in Settings' nav: its name, its glyph, and a quiet value on the right. */
 type NavItem = { id: SettingsPane; name: string; icon: React.ReactNode; value?: string | number };
@@ -1904,6 +1908,7 @@ const GLYPHS: Record<SettingsPane, string> = {
   email: "M2 3.5h12v9H2zM2 4l6 4.5L14 4",
   apps: "M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9h4.5v4.5H2.5zM9 9h4.5v4.5H9z",
   domains: "M8 14a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14M8 2C6.2 3.7 5.4 5.7 5.4 8s.8 4.3 2.6 6",
+  look: "M8 2.5a5.5 5.5 0 0 0 0 11C9.4 13.5 10.5 12.4 10.5 11c0-1-.8-1.8-1.8-1.8 1 0 1.8-.8 1.8-1.8S10.7 5.6 9.7 5.6C10.7 5.6 11.5 4.8 11.5 3.8 11.5 3.1 10 2.5 8 2.5zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
 };
 
 /** A pane's title and what it's for, above what it holds. */
@@ -2070,7 +2075,8 @@ export function Settings({
   const apps = appsShown(state);
   // An Admin of a shared workspace has its Team too (who's in: lib/server/shared-people.ts); never its chart or email.
   const adminHere = state.shared?.role === "admin";
-  const fits = (p?: SettingsPane) => !!p && (p !== "domains" || domains) && (p !== "apps" || apps) && (!state.shared || ((p !== "team" || adminHere) && p !== "chart" && p !== "email"));
+  // The look is the owner's own window (never a shared workspace's): its pane is theirs alone too.
+  const fits = (p?: SettingsPane) => !!p && (p !== "domains" || domains) && (p !== "apps" || apps) && (p !== "look" || !state.shared) && (!state.shared || ((p !== "team" || adminHere) && p !== "chart" && p !== "email"));
   const [pane, setPane] = useState<SettingsPane>(fits(at) ? at! : "profile");
   const [was, setWas] = useState(`${at}:${atAt}`);
   if (was !== `${at}:${atAt}`) {
@@ -2107,6 +2113,7 @@ export function Settings({
     item("reach", "How bots reach you"),
     ...(BRAINS_ON ? [item("ai", "AI plans")] : []),
     ...(!selfHosted ? [item("privacy", "Privacy")] : []),
+    item("look", "Look"),
     item("mac", "This Mac"),
   ];
   const workspace: NavItem[] = [
@@ -2209,6 +2216,14 @@ export function Settings({
         {!selfHosted && <UsageData />}
         {/* Where the user's things are kept and for how long: their own, never a shared workspace's owner's. */}
         {!selfHosted && !shared && <YourData />}
+      </>
+    );
+  // How this window looks (AppState.look): the owner's own, never a shared workspace's (fits keeps it out).
+  else if (pane === "look" && !shared)
+    body = (
+      <>
+        <PaneHead title="Look" sub="How this window looks. Ask a bot in the chat to change it too." />
+        <LookSettings state={state} />
       </>
     );
   else if (pane === "mac")
