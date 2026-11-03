@@ -19,3 +19,5 @@ Manual run started13:58UTC, overlap lock codex-mvp-20261103-1358, checkpoint by1
 
 ## Needs Kevin
 No new action now. Actual official login will require Kevin to complete the provider browser flow when implementation is ready; lead coordinates.
+
+14:22 update: PR24 pushed8c3647a, exact2 synthetic fixture fingerprints added; full504commit redacted scan0leaks. NewCIpending. Installer compile53s successful, remaining build stages running.
