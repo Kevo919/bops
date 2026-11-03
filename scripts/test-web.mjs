@@ -10,9 +10,11 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 
 import zlib from "node:zlib";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^BOPS_/.test(k)) delete process.env[k];
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 // DNS for safe-fetch.ts is this table: a name not in it isn't found, and every lookup is counted.
 const dns = { table: new Map(), calls: [] };
@@ -33,7 +35,7 @@ registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "node:dns/promises" && context.parentURL?.endsWith("/lib/server/safe-fetch.ts")) return { url: FAKE_DNS, format: "module", shortCircuit: true };
     if (specifier === "node:os" && context.parentURL?.endsWith("/lib/server/safe-fetch.ts")) return { url: FAKE_OS, format: "module", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -47,8 +49,8 @@ registerHooks({
   },
 });
 
-const { FetchRefused, checkUrl, isBlockedAddress, safeFetch } = await import(`${root}/lib/server/safe-fetch.ts`);
-const { READ_PAGE_MAX_CHARS, htmlLines, pageLines, readPage } = await import(`${root}/lib/server/web-page.ts`);
+const { FetchRefused, checkUrl, isBlockedAddress, safeFetch } = await import(`${rootUrl}/lib/server/safe-fetch.ts`);
+const { READ_PAGE_MAX_CHARS, htmlLines, pageLines, readPage } = await import(`${rootUrl}/lib/server/web-page.ts`);
 
 /* ---------------- The fixture pages ---------------- */
 

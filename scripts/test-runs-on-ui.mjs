@@ -15,14 +15,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -51,8 +52,8 @@ globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} }
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
 
-const R = await import(`${root}/components/app/runs-on.tsx`);
-const B = await import(`${root}/components/app/bot-computers.tsx`);
+const R = await import(`${rootUrl}/components/app/runs-on.tsx`);
+const B = await import(`${rootUrl}/components/app/bot-computers.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -270,8 +271,8 @@ await test("Orgo couldn't say (a 405, a timeout, unreachable: left out) or hasn'
 
 await test("one place only: Where routines run says nothing of keys, and the window asks Bops only, never Orgo", () => {
   assert.ok(!/Orgo key/.test(text(render({ state: state({ runners: { [C1]: running } }), info: CLOUD }))));
-  assert.ok(!readFileSync(`${root}/components/app/runs-on.tsx`, "utf8").includes("runs-on/keys"));
-  const src = readFileSync(`${root}/components/app/bot-computers.tsx`, "utf8");
+  assert.ok(!readFileSync(`${rootPath}/components/app/runs-on.tsx`, "utf8").includes("runs-on/keys"));
+  const src = readFileSync(`${rootPath}/components/app/bot-computers.tsx`, "utf8");
   const urls = [...src.matchAll(/fetch\(\s*([`"'])([^`"']*)/g)].map((m) => m[2]);
   assert.ok(urls.length >= 1 && urls.every((u) => u.startsWith("/api/runs-on/keys?ids=")), urls.join(" "));
 });

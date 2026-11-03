@@ -20,9 +20,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
 const pg = require("pg");
@@ -142,10 +141,10 @@ const live = async () => (await rowsAfter(0)).rows.map(([id]) => id).sort();
 /* ---------------- The app's modules ---------------- */
 
 const STAND_INS = new Set(["cloud-tunnel", "relay", "sessions", "mac", "desktop", "mirror"]);
-const project = pathToFileURL(root).href + "/";
+const project = pathToFileURL(rootPath).href + "/";
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -179,14 +178,14 @@ console.warn = (...a) => warned.push(a.join(" "));
 const emitWarning = process.emitWarning.bind(process);
 process.emitWarning = (warning, ...rest) => (rest[0]?.code === "MODULE_TYPELESS_PACKAGE_JSON" ? undefined : emitWarning(warning, ...rest));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const L = await import(`${root}/lib/server/orgo-sign-in.ts`);
-const Up = await import(`${root}/lib/server/uploads.ts`);
-const Del = await import(`${root}/lib/server/deleted.ts`);
-await import(`${root}/lib/server/privacy.ts`);
-const PrivacyRoute = await import(`${root}/app/api/privacy/route.ts`);
-const MessagesRoute = await import(`${root}/app/api/chats/[chatId]/messages/route.ts`);
-const { botChatId } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const L = await import(`${rootUrl}/lib/server/orgo-sign-in.ts`);
+const Up = await import(`${rootUrl}/lib/server/uploads.ts`);
+const Del = await import(`${rootUrl}/lib/server/deleted.ts`);
+await import(`${rootUrl}/lib/server/privacy.ts`);
+const PrivacyRoute = await import(`${rootUrl}/app/api/privacy/route.ts`);
+const MessagesRoute = await import(`${rootUrl}/app/api/chats/[chatId]/messages/route.ts`);
+const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
 
 let failures = 0;
 let passed = 0;

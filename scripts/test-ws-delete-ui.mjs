@@ -6,14 +6,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -43,7 +44,7 @@ globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {}, 
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
 
-const { DeleteConfirm } = await import(`${root}/components/app/sidebar.tsx`);
+const { DeleteConfirm } = await import(`${rootUrl}/components/app/sidebar.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 

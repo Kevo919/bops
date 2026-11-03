@@ -15,14 +15,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { unfaked } from "./fake-exports.mjs";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO|NEXT_PUBLIC_BOPS)_/.test(k)) delete process.env[k];
 // A build with brains (lib/types.ts BRAINS_ON, read as it loads): this file runs itself once more as one, for the brains' checks.
 const BRAINS_BUILD = process.argv.includes("--brains-build");
 if (BRAINS_BUILD) process.env.NEXT_PUBLIC_BOPS_BRAINS = "1";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-map-"));
 
 const FAKES = {
@@ -32,7 +33,7 @@ const FAKES = {
 };
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {

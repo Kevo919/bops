@@ -11,6 +11,7 @@ import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 
 process.env.BOPS_SELF_HOSTED = "1";
@@ -18,7 +19,8 @@ for (const k of ["ORGO_API_KEY", "BOPS_ORGO_WORKSPACE", "BOPS_DATABASE_URL", "TA
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 process.env.HOSTNAME = "127.0.0.1";
 process.env.BOPS_TELEMETRY = "0";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-shared-people-"));
 mkdirSync(join(scratch, "bin"));
 writeFileSync(join(scratch, "bin", "security"), "#!/bin/sh\nexit 44\n");
@@ -39,7 +41,7 @@ export const sharedOpen = () => !!globalThis.__shared.open;
 `;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -120,11 +122,11 @@ function fresh(o = {}) {
   };
 }
 
-const Caps = await import(`${root}/lib/server/cloud-caps.ts`);
-const R = await import(`${root}/app/api/workspaces/shared/people/route.ts`);
-const S = await import(`${root}/app/api/workspaces/shared/settings/route.ts`);
-const W = await import(`${root}/app/api/workspaces/shared/wake/route.ts`);
-const M = await import(`${root}/lib/members.ts`);
+const Caps = await import(`${rootUrl}/lib/server/cloud-caps.ts`);
+const R = await import(`${rootUrl}/app/api/workspaces/shared/people/route.ts`);
+const S = await import(`${rootUrl}/app/api/workspaces/shared/settings/route.ts`);
+const W = await import(`${rootUrl}/app/api/workspaces/shared/wake/route.ts`);
+const M = await import(`${rootUrl}/lib/members.ts`);
 delete process.env.BOPS_SELF_HOSTED;
 const caps = (list) => Caps.resetCloudCaps({ health: async () => ({ ok: true, macs: 0, caps: list }) });
 caps(["roles", "admin_powers"]);

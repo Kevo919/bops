@@ -17,12 +17,11 @@ import { registerHooks } from "node:module";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^BOPS_/.test(k)) delete process.env[k];
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 // The sites remembered as needing the browser go in .data/ under the working folder: a throwaway one.
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-render-"));
 process.chdir(scratch);
@@ -44,7 +43,7 @@ registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "node:dns/promises" && context.parentURL?.endsWith("/lib/server/safe-fetch.ts")) return { url: FAKE_DNS, format: "module", shortCircuit: true };
     if (specifier === "node:os" && context.parentURL?.endsWith("/lib/server/safe-fetch.ts")) return { url: FAKE_OS, format: "module", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -58,10 +57,10 @@ registerHooks({
   },
 });
 
-const { FetchRefused } = await import(`${root}/lib/server/safe-fetch.ts`);
-const render = await import(`${root}/lib/server/web-render.ts`);
-const { openGuard } = await import(`${root}/lib/server/render-guard.ts`);
-const { pageLines, readPage } = await import(`${root}/lib/server/web-page.ts`);
+const { FetchRefused } = await import(`${rootUrl}/lib/server/safe-fetch.ts`);
+const render = await import(`${rootUrl}/lib/server/web-render.ts`);
+const { openGuard } = await import(`${rootUrl}/lib/server/render-guard.ts`);
+const { pageLines, readPage } = await import(`${rootUrl}/lib/server/web-page.ts`);
 const { CHALLENGE, RENDER_LIMIT_MS, browserStatus, forgetSites, lastGuardRefusals, needsBrowser, rememberSite, renderPage, siteNeedsBrowser } = render;
 
 /* ---------------- The fixture pages ---------------- */

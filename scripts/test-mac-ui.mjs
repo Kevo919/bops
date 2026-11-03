@@ -24,9 +24,7 @@ if (process.platform !== "darwin") {
   console.log("mac ui: skipped (macOS only)");
   process.exit(0);
 }
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
 const script = join(rootPath, "vm/mac-ui-mcp.mjs");
 const U = await import(script);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

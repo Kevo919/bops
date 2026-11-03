@@ -17,6 +17,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
@@ -25,7 +26,8 @@ process.env.OPENAI_API_KEY = "sk-test-labels-unsorted";
 const UI = "ui-token-test-labels-unsorted";
 process.env.BOPS_UI_TOKEN = UI;
 process.env.BOPS_ORGO_ORIGIN = "http://orgo.test";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-labels-unsorted-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
@@ -42,7 +44,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -163,13 +165,13 @@ async function check(name, fn) {
 const heard = [];
 const hear = (x) => (heard.push(typeof x === "string" ? x : JSON.stringify(x)), x);
 
-const S = await import(`${root}/lib/server/store.ts`);
-const W = await import(`${root}/lib/server/workspace-skills.ts`);
-const B = await import(`${root}/lib/server/skill-bundle.ts`);
-const L = await import(`${root}/lib/skill-labels.ts`);
-const O = await import(`${root}/lib/server/sync-outbox.ts`);
-const M = await import(`${root}/lib/server/skill-label-model.ts`);
-const Route = await import(`${root}/app/api/skills/route.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const W = await import(`${rootUrl}/lib/server/workspace-skills.ts`);
+const B = await import(`${rootUrl}/lib/server/skill-bundle.ts`);
+const L = await import(`${rootUrl}/lib/skill-labels.ts`);
+const O = await import(`${rootUrl}/lib/server/sync-outbox.ts`);
+const M = await import(`${rootUrl}/lib/server/skill-label-model.ts`);
+const Route = await import(`${rootUrl}/app/api/skills/route.ts`);
 clearInterval(globalThis.__bopsRoutines);
 const route = async (body) => {
   const res = await Route.POST(new Request("http://localhost:3210/api/skills", { method: "POST", headers: { "content-type": "application/json", "x-bops-window": UI }, body: JSON.stringify(body) }));

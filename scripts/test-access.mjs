@@ -18,10 +18,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { fill } from "./fake-exports.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|COMPOSIO|ORGO)_/.test(k)) delete process.env[k];
 process.env.COMPOSIO_API_KEY = "test-composio";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-access-"));
 
 const forward = (mod, names) => names.map((n) => `export const ${n} = (...a) => globalThis.__fake[${JSON.stringify(mod)}].${n}(...a);`).join("\n");
@@ -40,7 +42,7 @@ const COMPOSIO = `export class Composio { constructor(o) { globalThis.__fake.com
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "@composio/core") return { url: "fake:composio", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -169,12 +171,12 @@ globalThis.__fake = {
   },
 };
 
-const T = await import(`${root}/lib/types.ts`);
-const C = await import(`${root}/lib/server/composio.ts`);
-const P = await import(`${root}/lib/server/permission.ts`);
-const R = await import(`${root}/lib/permission.ts`);
-const A = await import(`${root}/lib/server/access-sync.ts`);
-const O = await import(`${root}/lib/server/sync-outbox.ts`);
+const T = await import(`${rootUrl}/lib/types.ts`);
+const C = await import(`${rootUrl}/lib/server/composio.ts`);
+const P = await import(`${rootUrl}/lib/server/permission.ts`);
+const R = await import(`${rootUrl}/lib/permission.ts`);
+const A = await import(`${rootUrl}/lib/server/access-sync.ts`);
+const O = await import(`${rootUrl}/lib/server/sync-outbox.ts`);
 const bot = (id) => state.bots.find((b) => b.id === id);
 const account = (id) => state.accounts.find((a) => a.id === id);
 
@@ -253,7 +255,7 @@ await check("a member's task (one they started or told something, or a part of o
 });
 
 await check("Used in: an account switched on in another workspace is every bot's there by default, the picker narrowing it; off, no bot there has it, whatever it was given", async () => {
-  const L = await import(`${root}/lib/server/logins.ts`);
+  const L = await import(`${rootUrl}/lib/server/logins.ts`);
   const lo = bot("lo");
   const gmail = account("ca_gmail");
   assert.equal(T.levelIn(state, lo, gmail), null, "Lo, of Local, hasn't Main's Gmail");
@@ -728,7 +730,7 @@ await check("signing in again keeps the account's check (it moves to the new acc
 });
 
 await check("POST /api/apps takes How often from the Bops window only, as a schedule Bops keeps", async () => {
-  const route = await import(`${root}/app/api/apps/route.ts`);
+  const route = await import(`${rootUrl}/app/api/apps/route.ts`);
   const post = (body, headers = {}) => route.POST(new Request("http://localhost/api/apps", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) }));
   state.connecting = [];
   let res = await post({ app: "gmail", grant: { bots: ["boppy"], level: "read", check: { kind: "daily", time: "8 AM" } } });

@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
@@ -26,9 +26,8 @@ process.env.OPENAI_API_KEY = "sk-test-made-apps-sync";
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 const ORGO_KEY = "sk_orgo_test_made_apps_sync";
 globalThis.bopsOrgoKey = ORGO_KEY;
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 process.env.BOPS_SERVER_JS = join(rootPath, "server.js");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-made-apps-sync-"));
 const bin = join(scratch, "bin");
@@ -44,7 +43,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -262,12 +261,12 @@ globalThis.fetch = async (input, init) => {
 
 /* ---------------- Bops ---------------- */
 
-const S = await import(`${root}/lib/server/store.ts`);
-const A = await import(`${root}/lib/server/made-apps.ts`);
-const F = await import(`${root}/lib/server/made-apps-sync.ts`);
-const O = await import(`${root}/lib/server/sync-outbox.ts`);
-const R = await import(`${root}/lib/server/remove.ts`);
-const { appsStayLine, botChatId } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const A = await import(`${rootUrl}/lib/server/made-apps.ts`);
+const F = await import(`${rootUrl}/lib/server/made-apps-sync.ts`);
+const O = await import(`${rootUrl}/lib/server/sync-outbox.ts`);
+const R = await import(`${rootUrl}/lib/server/remove.ts`);
+const { appsStayLine, botChatId } = await import(`${rootUrl}/lib/types.ts`);
 const T = F.madeAppsSyncForTests;
 // Signed in with an @orgo.ai email: apps are open to it (lib/apps-access.ts). A check below signs in as someone else.
 const TEAM = { user: { id: "u_alex", email: "alex@orgo.ai", name: "Alex" }, signedInAt: 1 };

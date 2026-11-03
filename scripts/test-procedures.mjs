@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 // A self-hosted install: the state is a file in the working folder, the model is OpenAI on its own key.
@@ -25,9 +25,8 @@ process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 process.env.OPENAI_API_KEY = "sk-test-procedures";
 process.env.HONCHO_API_KEY = "hc-test-procedures";
 process.env.BOPS_CHAT_MODEL = "gpt-test-chat";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-procedures-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
@@ -43,7 +42,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -107,12 +106,12 @@ process.emitWarning = (warning, ...rest) => (rest[0]?.code === "MODULE_TYPELESS_
 const rejections = [];
 process.on("unhandledRejection", (e) => rejections.push(String(e?.stack ?? e)));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const P = await import(`${root}/lib/server/procedures.ts`);
-const W = await import(`${root}/lib/server/workspace-skills.ts`);
-const R = await import(`${root}/app/api/skills/route.ts`);
-const Mem = await import(`${root}/lib/server/memory.ts`);
-const { botChatId, runningNow } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const P = await import(`${rootUrl}/lib/server/procedures.ts`);
+const W = await import(`${rootUrl}/lib/server/workspace-skills.ts`);
+const R = await import(`${rootUrl}/app/api/skills/route.ts`);
+const Mem = await import(`${rootUrl}/lib/server/memory.ts`);
+const { botChatId, runningNow } = await import(`${rootUrl}/lib/types.ts`);
 
 /* ---------------- Helpers ---------------- */
 
@@ -608,7 +607,7 @@ await part("Draft: a failed call no one was asked about never reads as the user'
 });
 
 await part("Two Macs: a thing changed on one side is that side's; changed on both, this Mac's whole copy", async () => {
-  const M = await import(`${root}/lib/server/state-merge.ts`);
+  const M = await import(`${rootUrl}/lib/server/state-merge.ts`);
   const base = { procedures: [{ id: "p1", name: "Close", steps: "1. Old", uses: 1, usedAt: 1, updatedAt: 1 }] };
   const mine = { procedures: [{ id: "p1", name: "Close", steps: "1. Old", uses: 2, usedAt: 5, updatedAt: 1 }] };
   const theirs = { procedures: [{ id: "p1", name: "Close", steps: "1. New steps", uses: 1, usedAt: 1, updatedAt: 9 }] };
@@ -632,7 +631,7 @@ await part("Two Macs: a thing changed on one side is that side's; changed on bot
 });
 
 await part("Two Macs: a state loaded at sign-in keeps its routine runs as they are, and its secret marks are known at a glance", async () => {
-  const { userDataDir } = await import(`${root}/lib/server/user-paths.ts`);
+  const { userDataDir } = await import(`${rootUrl}/lib/server/user-paths.ts`);
   const user = "u_two_macs";
   mkdirSync(userDataDir(user), { recursive: true });
   // Another Mac's state, mid-run there: a chat run and a thread run going, and a long chat with ten secrets.
@@ -769,7 +768,7 @@ await part("Route: draft, then save it over the one it updates (a draft of its n
 await part("A deleted bot's skills stay: one only it had goes to every bot, never deleted", async () => {
   let Rm;
   try {
-    Rm = await import(`${root}/lib/server/remove.ts`);
+    Rm = await import(`${rootUrl}/lib/server/remove.ts`);
   } catch (e) {
     throw new Error(`remove.ts didn't load (another part of the app may be mid-change): ${e.message}`);
   }

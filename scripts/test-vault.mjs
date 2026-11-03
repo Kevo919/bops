@@ -5,12 +5,14 @@
 // Usage: node scripts/test-vault.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -23,7 +25,7 @@ registerHooks({
     }
   },
 });
-const V = await import(`${root}/lib/vault-services.ts`);
+const V = await import(`${rootUrl}/lib/vault-services.ts`);
 
 let n = 0;
 const account = (app, appName, o = {}) => ({ id: `ca_${++n}`, app, appName, status: "active", at: 1000, ...o });

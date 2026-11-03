@@ -12,11 +12,13 @@ import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
 
 import { unfaked } from "./fake-exports.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 process.env.TZ = "America/New_York";
 delete process.env.BOPS_UI_TOKEN;
 delete process.env.BOPS_DATABASE_URL;
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 const FAKES = {
   store: ["addMessage", "bot", "getState", "id", "ownerName", "ownSession", "patchSession", "pullState", "session", "stateEpoch", "statePulledAt", "stateReady", "stateTooNew", "update"],
@@ -32,7 +34,7 @@ const FAKES = {
 };
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {

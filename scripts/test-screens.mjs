@@ -9,13 +9,15 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.OPENAI_API_KEY = "sk-test-routing";
 process.env.TYPESAFE_API_KEY = "ts-test-routing";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-routing-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
@@ -30,7 +32,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -58,9 +60,9 @@ globalThis.fetch = async (input) => {
 };
 console.warn = () => {};
 
-const L = await import(`${root}/lib/screens.ts`);
-const S = await import(`${root}/lib/server/store.ts`);
-const B = await import(`${root}/lib/server/briefing.ts`);
+const L = await import(`${rootUrl}/lib/screens.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const B = await import(`${rootUrl}/lib/server/briefing.ts`);
 
 /* ---------------- Numbers ---------------- */
 

@@ -36,7 +36,7 @@ import { accessSync, constants, existsSync, mkdirSync, mkdtempSync, readdirSync,
 import { registerHooks } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const REAL_CLAUDE = process.env.REAL_CLAUDE === "1";
@@ -51,14 +51,13 @@ process.env.BOPS_RESPONSES_WS = "0";
 // Bops listens on this Mac only, as the Mac app does by default: computers get no address for it, and
 // nothing asks this Mac's Tailscale (composio.ts bopsAddress).
 process.env.HOSTNAME = "127.0.0.1";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 // Modules that would start processes when loaded are stand-ins: each export does nothing.
 const STAND_INS = new Set(["relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -95,7 +94,7 @@ if (process.argv[2] === "--render") {
   globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
   globalThis.matchMedia = () => ({ matches: false });
   globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
-  const { ThreadSheet, ChatView } = await import(`${root}/components/app/chat-view.tsx`);
+  const { ThreadSheet, ChatView } = await import(`${rootUrl}/components/app/chat-view.tsx`);
   const { renderToStaticMarkup } = await import("react-dom/server");
   const { createElement: h } = await import("react");
   const v = JSON.parse(readFileSync(process.argv[3], "utf8"));
@@ -578,12 +577,12 @@ globalThis.fetch = async (input, init) => {
 const warned = [];
 console.warn = (...a) => warned.push(a.join(" "));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const X = await import(`${root}/lib/server/sessions.ts`);
-const C = await import(`${root}/lib/server/cli-agents.ts`);
-const A = await import(`${root}/lib/asks.ts`);
-const Cx = await import(`${root}/lib/server/composio.ts`);
-const P = await import(`${root}/lib/server/permission.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const X = await import(`${rootUrl}/lib/server/sessions.ts`);
+const C = await import(`${rootUrl}/lib/server/cli-agents.ts`);
+const A = await import(`${rootUrl}/lib/asks.ts`);
+const Cx = await import(`${rootUrl}/lib/server/composio.ts`);
+const P = await import(`${rootUrl}/lib/server/permission.ts`);
 P.askTimingHeld.pollMs = 20;
 C.cliTiming.pollMs = 25;
 
@@ -621,8 +620,8 @@ const alive = (pid) => {
 const details = (id) => thread(id).steps.map((x) => x.detail);
 /** Threads as the server left them, for the --render pass. */
 const views = {};
-const { screenMap } = await import(`${root}/lib/screens.ts`);
-const T = await import(`${root}/lib/types.ts`);
+const { screenMap } = await import(`${rootUrl}/lib/screens.ts`);
+const T = await import(`${rootUrl}/lib/types.ts`);
 const { DISPLAYS } = T;
 const screenMapOf = () => screenMap(S.getState(), main.id);
 
@@ -1400,7 +1399,7 @@ await test("a thread Bops agent took over stays on Bops agent when its bot goes 
 });
 
 await test("taking an agent off the bot, or removing its account, stops what it runs now, saying why", async () => {
-  const B = await import(`${root}/lib/server/brains.ts`);
+  const B = await import(`${rootUrl}/lib/server/brains.ts`);
   const s = X.startSession({ botId: main.id, goal: "SLOW: migrate the database", title: "Migrate", where: "cloud", fresh: true });
   await until(() => runs().some((r) => heardBy(r.pid).some((h) => h.got?.startsWith("SLOW: migrate"))), "it to start");
   const r = runs().at(-1);

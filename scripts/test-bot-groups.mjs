@@ -23,10 +23,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 /** lib/server/bot-groups.ts reaches the store and Orgo: both fakes here (globalThis.__g). */
 const FAKES = {
   "fake:store": "export const getState = () => globalThis.__g.state; export const update = (fn) => { fn(globalThis.__g.state); globalThis.__g.updates++; }; export const bot = (id) => globalThis.__g.state.bots.find((b) => b.id === id);",
@@ -37,7 +38,7 @@ registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "fake:server-only", shortCircuit: true };
     if (/\/lib\/server\/bot-groups\.ts$/.test(context.parentURL ?? "") && (specifier === "./store" || specifier === "./orgo")) return { url: `fake:${specifier.slice(2)}`, shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -111,13 +112,13 @@ globalThis.fetch = async (url, init = {}) => {
   return json({}, 404);
 };
 
-const G = await import(`${root}/lib/bot-groups.ts`);
-const BG = await import(`${root}/components/app/bot-groups.tsx`);
-const { Sidebar } = await import(`${root}/components/app/sidebar.tsx`);
-const { SidebarRail } = await import(`${root}/components/app/sidebar-rail.tsx`);
-const { BotMoodsFrom } = await import(`${root}/components/app/mascot.tsx`);
-const Server = await import(`${root}/lib/server/bot-groups.ts`);
-const Slice = await import(`${root}/cloud/ws-slice.ts`);
+const G = await import(`${rootUrl}/lib/bot-groups.ts`);
+const BG = await import(`${rootUrl}/components/app/bot-groups.tsx`);
+const { Sidebar } = await import(`${rootUrl}/components/app/sidebar.tsx`);
+const { SidebarRail } = await import(`${rootUrl}/components/app/sidebar-rail.tsx`);
+const { BotMoodsFrom } = await import(`${rootUrl}/components/app/mascot.tsx`);
+const Server = await import(`${rootUrl}/lib/server/bot-groups.ts`);
+const Slice = await import(`${rootUrl}/cloud/ws-slice.ts`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h, act } = await import("react");
 const { createRoot } = await import("react-dom/client");

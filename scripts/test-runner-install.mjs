@@ -27,11 +27,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { unfaked } from "./fake-exports.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.example";
 process.env.BOPS_CLOUD_URL = "https://bops.example/api";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 const FAKES = {
   store: ["flushState", "getState", "stateDevice", "stateInCloud", "stateReady", "stateTooNew", "update"],
@@ -47,7 +49,7 @@ const FAKES = {
 const VALUES = { runner: { RUNNER_CONF: "/etc/supervisor/conf.d/bops-runner.conf", RUNNER_WRAPPER: "/opt/bops/runner/run.sh" } };
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -285,7 +287,7 @@ globalThis.fetch = async (url, init = {}) => {
   return new Response(null, { status: 200 });
 };
 
-const I = await import(`${root}/lib/server/runner-install.ts`);
+const I = await import(`${rootUrl}/lib/server/runner-install.ts`);
 const T = I.runnerInstallForTests;
 
 function reset() {
@@ -1124,7 +1126,7 @@ await check("phase 1: the key step is today's whatever identity answers, the pro
   assert.ok(I.installScript({ name: "b.tgz", sha256: "0".repeat(64), version: "1", buildId: "x" }, "").includes("rm -f /opt/bops/runner/auth"), "a new start writes it afresh");
   rmSync(dir, { recursive: true, force: true });
   // Settings shows it (types.ts: a runner up on identity doesn't count on a key).
-  const { runnerNeedsKey } = await import(`${root}/lib/types.ts`);
+  const { runnerNeedsKey } = await import(`${rootUrl}/lib/types.ts`);
   assert.equal(runnerNeedsKey({ status: "running", auth: "identity" }), false);
   assert.equal(runnerNeedsKey({ status: "running", auth: "key" }), true);
 });

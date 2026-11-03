@@ -5,12 +5,14 @@
 // Usage: node scripts/test-asks.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -23,7 +25,7 @@ registerHooks({
     }
   },
 });
-const A = await import(`${root}/lib/asks.ts`);
+const A = await import(`${rootUrl}/lib/asks.ts`);
 
 const now = Date.now();
 let n = 0;
@@ -63,7 +65,7 @@ assert.equal(A.needsYou(thread({ status: "running" })), false, "working");
 // Waiting for your OK is the thread's request for it, unanswered (lib/types.ts waitsForOk), never a mark on the thread:
 // Sam answering its question in the thread doesn't take it off, only a reply to the request does; and the thread
 // itself asks nothing then (its request's card does, with Deny, Always allow and Allow once).
-const T = await import(`${root}/lib/types.ts`);
+const T = await import(`${rootUrl}/lib/types.ts`);
 const okAfterReply = thread({ status: "queued", answer: "Send it to Dana or Bob?", replies: [{ id: "rb", role: "bot", text: "Send it to Dana or Bob?", at: now - 1000 }, { id: "ru", role: "user", text: "Dana", at: now }] });
 const ask = { id: "apr_1", threadId: okAfterReply.id, botId: "boppy", askedBy: "dev_runner_c1", action: "Send an email", resources: ["dana@example.com"], preview: "To: dana@example.com", at: now };
 const okState = { appApprovals: [ask], sessions: [okAfterReply] };

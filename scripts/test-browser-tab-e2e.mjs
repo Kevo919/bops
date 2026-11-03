@@ -56,9 +56,7 @@ import { checkTake, describe } from "./check-takes.mjs";
 import { removeTemp } from "./fixtures/cleanup.mjs";
 import { ACCOUNT, BOT, SAM, PROJECT } from "./fixtures/two-person.mjs";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
 const OUT = process.env.B2_OUT || join(rootPath, ".scratch", "B2");
 const TAKES = process.argv.includes("--takes");
 for (const d of ["shots", ...(TAKES ? ["takes/stills"] : [])]) mkdirSync(join(OUT, d), { recursive: true });

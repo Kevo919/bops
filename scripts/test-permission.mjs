@@ -8,12 +8,14 @@
 // Usage: node scripts/test-permission.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -26,7 +28,7 @@ registerHooks({
     }
   },
 });
-const P = await import(`${root}/lib/permission.ts`);
+const P = await import(`${rootUrl}/lib/permission.ts`);
 
 /* ---------------- A rule is for its action, whoever it's for ---------------- */
 

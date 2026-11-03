@@ -37,9 +37,7 @@ process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 process.env.BOPS_APP_VERSION = "9.9.9";
 const UI = "ui-token-test-brains";
 process.env.BOPS_UI_TOKEN = UI;
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-brains-"));
 const fakebin = join(scratch, "fakebin");
 mkdirSync(fakebin);
@@ -56,7 +54,7 @@ process.chdir(work);
 
 /* ---------------- Loading the app's modules ---------------- */
 
-const fileUrl = (p) => pathToFileURL(join(root, p)).href;
+const fileUrl = (p) => pathToFileURL(join(rootPath, p)).href;
 // sessions.ts is the app's task runner: here, the takeover and the computer's setup, as calls written down.
 const SESSIONS_OWN = `
 import { update } from ${JSON.stringify(fileUrl("lib/server/store.ts"))};

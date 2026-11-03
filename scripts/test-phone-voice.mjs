@@ -14,6 +14,7 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 // Self-hosting, on a made-up OpenAI key pointed at the fake; the state in a throwaway file store; no other service.
 for (const k of ["BOPS_DATABASE_URL", "AGENTMAIL_API_KEY", "BOPS_MAIL_DOMAIN", "HONCHO_API_KEY", "COMPOSIO_API_KEY", "TYPESAFE_API_KEY", "ORGO_API_KEY", "TAILSCALE_AUTH_KEY", "BOPS_PHONE_MODEL", "BOPS_CHAT_MODEL", "OPENAI_WEBHOOK_SECRET"])
@@ -28,14 +29,15 @@ Object.assign(process.env, {
 });
 const OWNER = "+14155550100";
 const LINE = "+14155550199";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 // Modules that would start processes when loaded (the Mac check, the relay's agent) or that Node can't load
 // (the desktop look draws the mascot's JSX, mirror.ts has parameter properties) are stand-ins: each of
 // their exports does nothing (as scripts/test-plan.mjs).
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -109,10 +111,10 @@ globalThis.fetch = async (input, init) => {
   return realFetch(input, init);
 };
 
-const S = await import(`${root}/lib/server/store.ts`);
-const P = await import(`${root}/lib/server/phone.ts`);
-const V = await import(`${root}/lib/server/phone-voice.ts`);
-const route = await import(`${root}/app/api/phone/agentphone/route.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const P = await import(`${rootUrl}/lib/server/phone.ts`);
+const V = await import(`${rootUrl}/lib/server/phone-voice.ts`);
+const route = await import(`${rootUrl}/app/api/phone/agentphone/route.ts`);
 
 // The main bot (Boppy) has the workspace's number, on AgentPhone agent agt_ws.
 S.update((s) => {
@@ -377,7 +379,7 @@ const until = async (check, what, ms = 5000) => {
   await assert.rejects(P.searchNumbers("4155"), /3 digits/);
 
   // The route the picker asks: this Mac only.
-  const numbers = await import(`${root}/app/api/phone/numbers/route.ts`);
+  const numbers = await import(`${rootUrl}/app/api/phone/numbers/route.ts`);
   const r = await numbers.GET(new Request("http://127.0.0.1:3210/api/phone/numbers?areaCode=415"));
   assert.equal(r.status, 200);
   assert.equal((await r.json()).options[0].areaCode, "628");
@@ -393,7 +395,7 @@ const until = async (check, what, ms = 5000) => {
   assert.equal(bought.at(-1).country, "US");
   assert.equal(S.getState().bots.find((x) => x.id === other.id).phone, "+16285550123");
   // The API route passes the area code on (the fake lists no numbers, so it buys again).
-  const phoneRoute = await import(`${root}/app/api/phone/route.ts`);
+  const phoneRoute = await import(`${rootUrl}/app/api/phone/route.ts`);
   const provision = (areaCode) => phoneRoute.POST(new Request("http://127.0.0.1:3210/api/phone", { method: "POST", body: JSON.stringify({ action: "provision", botId: other.id, areaCode }) }));
   const res = await provision("510");
   assert.deepEqual(await res.json(), { phone: "+15105550123" });

@@ -22,6 +22,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
@@ -32,7 +33,8 @@ process.env.ORGO_API_KEY = "sk_test_orbit";
 process.env.OPENAI_API_KEY = "sk-test-orbit";
 process.env.HONCHO_API_KEY = "hc-test-orbit";
 process.env.BOPS_MEMORY_MODEL = "gpt-test-memory";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-orbit-sync-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
@@ -51,7 +53,7 @@ Date.now = () => realNow() + skew;
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -500,14 +502,14 @@ process.emitWarning = (warning, ...rest) => (rest[0]?.code === "MODULE_TYPELESS_
 const rejections = [];
 process.on("unhandledRejection", (e) => rejections.push(String(e?.stack ?? e)));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const Mem = await import(`${root}/lib/server/memory.ts`);
-const MC = await import(`${root}/lib/server/memory-categories.ts`);
-const OS = await import(`${root}/lib/server/orbit-sync.ts`);
-const R = await import(`${root}/app/api/memory/categories/route.ts`);
-const RI = await import(`${root}/app/api/orbit/issues/route.ts`);
-const RI1 = await import(`${root}/app/api/orbit/issues/[id]/route.ts`);
-const { botChatId, MAIN_WORKSPACE } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const Mem = await import(`${rootUrl}/lib/server/memory.ts`);
+const MC = await import(`${rootUrl}/lib/server/memory-categories.ts`);
+const OS = await import(`${rootUrl}/lib/server/orbit-sync.ts`);
+const R = await import(`${rootUrl}/app/api/memory/categories/route.ts`);
+const RI = await import(`${rootUrl}/app/api/orbit/issues/route.ts`);
+const RI1 = await import(`${rootUrl}/app/api/orbit/issues/[id]/route.ts`);
+const { botChatId, MAIN_WORKSPACE } = await import(`${rootUrl}/lib/types.ts`);
 const T = OS.orbitSyncForTests;
 
 /* ---------------- Helpers ---------------- */
@@ -1115,7 +1117,7 @@ await check("a forget Orgo can't take now (401, 403, 409 full, 429) stays to sen
 });
 
 await check("a forget Orgo hadn't taken when Bops quit goes at the next start (workspaces.ts startProjectBinding), not only when Orbit is opened", async () => {
-  const Wk = await import(`${root}/lib/server/workspaces.ts`);
+  const Wk = await import(`${rootUrl}/lib/server/workspaces.ts`);
   seed(MAIN, [["p1", "Pat walks the dog.", [item("people", "Pat", { key: "pat", detail: "Walks the dog" })]]]);
   const pat = one((await refresh(MAIN)).items, "people", "Pat");
   await settle();

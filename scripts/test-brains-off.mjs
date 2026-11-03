@@ -16,7 +16,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 for (const k of Object.keys(process.env))
@@ -26,16 +26,15 @@ delete process.env.NEXT_PUBLIC_BOPS_BRAINS;
 process.env.BOPS_DEVICE_SEED = "test-brains-off";
 process.env.BOPS_RESPONSES_WS = "0";
 process.env.HOSTNAME = "127.0.0.1";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 // Modules that would start processes when loaded are stand-ins: each export does nothing.
 const STAND_INS = new Set(["relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
     // Only the server may import these; here everything is the server, and the window's code too.
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -158,11 +157,11 @@ globalThis.fetch = async (input, init) => {
 const warned = [];
 console.warn = (...a) => warned.push(a.join(" "));
 
-const T = await import(`${root}/lib/types.ts`);
-const S = await import(`${root}/lib/server/store.ts`);
-const X = await import(`${root}/lib/server/sessions.ts`);
-const C = await import(`${root}/lib/server/cli-agents.ts`);
-const A = await import(`${root}/lib/asks.ts`);
+const T = await import(`${rootUrl}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const X = await import(`${rootUrl}/lib/server/sessions.ts`);
+const C = await import(`${rootUrl}/lib/server/cli-agents.ts`);
+const A = await import(`${rootUrl}/lib/asks.ts`);
 
 await S.bindSignIn(USER.id, "sk_orgo_test");
 S.update((s) => {
@@ -327,11 +326,11 @@ await check("Wait, to a thread its brain left at its limit, is the user's words 
 await check("every brain route, and a thread's terminal, answers 404", async () => {
   const req = (url, method, body) => new Request(`http://localhost:3210${url}`, { method, headers: { "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   const routes = {
-    brains: await import(`${root}/app/api/brains/route.ts`),
-    bot: await import(`${root}/app/api/brains/bot/route.ts`),
-    signIn: await import(`${root}/app/api/brains/sign-in/route.ts`),
-    signOut: await import(`${root}/app/api/brains/sign-out/route.ts`),
-    terminal: await import(`${root}/app/api/sessions/[sessionId]/terminal/route.ts`),
+    brains: await import(`${rootUrl}/app/api/brains/route.ts`),
+    bot: await import(`${rootUrl}/app/api/brains/bot/route.ts`),
+    signIn: await import(`${rootUrl}/app/api/brains/sign-in/route.ts`),
+    signOut: await import(`${rootUrl}/app/api/brains/sign-out/route.ts`),
+    terminal: await import(`${rootUrl}/app/api/sessions/[sessionId]/terminal/route.ts`),
   };
   S.update((s) => s.sessions.push(brainThread("ses_term")));
   const calls = [
@@ -406,7 +405,7 @@ const view = (sessions = [], more = {}) => ({ ...structuredClone(S.getState()), 
 const BRAINY = /\bBrain\b|their brain|Claude Code|Bops agent|Codex|Open in terminal|Sign in with your Claude plan/;
 
 await check("Settings has no AI plans place, and This Mac no Brain section", async () => {
-  const { Settings } = await import(`${root}/components/app/bops-app.tsx`);
+  const { Settings } = await import(`${rootUrl}/components/app/bops-app.tsx`);
   const html = renderToStaticMarkup(h(Settings, { state: view(), at: "mac", onClose: noop, onShowScreen: noop, onOpenVault: noop }));
   const t = text(html);
   const nav = [...html.matchAll(/data-settings-nav="([a-z]+)"/g)].map((m) => m[1]);
@@ -417,7 +416,7 @@ await check("Settings has no AI plans place, and This Mac no Brain section", asy
 });
 
 await check("a bot's profile has no Brain and no badge for the brain it was set to: its AI is Bops agent alone", async () => {
-  const { BotPanel } = await import(`${root}/components/app/bot-panel.tsx`);
+  const { BotPanel } = await import(`${rootUrl}/components/app/bot-panel.tsx`);
   const st = view();
   const b = st.bots.find((x) => x.id === main.id);
   for (const section of ["details", "skills"]) {
@@ -434,7 +433,7 @@ await check("a bot's profile has no Brain and no badge for the brain it was set 
 });
 
 await check("a thread Claude Code ran has no badge and no Open in terminal, one waiting on its brain no Sign in, and a Codex thread's reply box reads as Bops agent's", async () => {
-  const { ThreadSheet, ChatView } = await import(`${root}/components/app/chat-view.tsx`);
+  const { ThreadSheet, ChatView } = await import(`${rootUrl}/components/app/chat-view.tsx`);
   const sheetHtml = (s, more) => renderToStaticMarkup(h(ThreadSheet, { state: view([s], more), session: s, onClose: noop, onShowComputer: noop, onShowScreen: noop }));
   const done = text(sheetHtml(brainThread("ses_a")));
   assert.match(done, new RegExp(`^Cart total ${main.name} · finished · 2 steps · left off on screen \\d `), done);

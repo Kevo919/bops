@@ -18,9 +18,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { gunzipSync } from "node:zlib";
 import { WebSocketServer } from "ws";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const ts = createRequire(import.meta.url)("typescript");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Wait for `check` to give something truthy (and return it). */
@@ -149,10 +148,10 @@ web.answer = providers;
 // The server modules import "@/lib/…" and "./store" (no extension), the way Next resolves them. Node only
 // strips types and can't run parameter properties (lib/server/mirror.ts), so the project's TypeScript
 // compiles each file instead.
-const project = pathToFileURL(root).href + "/";
+const project = pathToFileURL(rootPath).href + "/";
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -263,27 +262,27 @@ const g = globalThis;
 g.bopsOrgoKey = null;
 g.bopsOrgoKeyMissAt = Infinity;
 
-const S = await import(`${root}/lib/server/store.ts`);
-const Cl = await import(`${root}/lib/server/cloud.ts`);
-const OA = await import(`${root}/lib/server/openai-client.ts`);
-const P = await import(`${root}/lib/server/phone.ts`);
-const M = await import(`${root}/lib/server/mail.ts`);
-const Mem = await import(`${root}/lib/server/memory.ts`);
-const C = await import(`${root}/lib/server/composio.ts`);
-const D = await import(`${root}/lib/server/decide.ts`);
-const V = await import(`${root}/lib/server/verify.ts`);
-const T = await import(`${root}/lib/server/cloud-tunnel.ts`);
-const R = await import(`${root}/lib/server/relay.ts`);
-const AP = await import(`${root}/app/api/phone/agentphone/route.ts`);
-const OAI = await import(`${root}/app/api/phone/openai/route.ts`);
-const EV = await import(`${root}/app/api/cloud/event/route.ts`);
-const CH = await import(`${root}/lib/server/channels.ts`);
-const SE = await import(`${root}/app/api/channels/slack/events/route.ts`);
-const K = await import(`${root}/lib/server/skills.ts`);
-const U = await import(`${root}/lib/server/usage.ts`);
-const ACCOUNT = await import(`${root}/app/api/account/route.ts`);
-const { MAIN_WORKSPACE, PAIR_CODE_MS, botChatId, levelOf } = await import(`${root}/lib/types.ts`);
-const { buildURL: sidebandURL } = await import(`${root}/node_modules/openai/resources/live/sideband/internal-base.mjs`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const Cl = await import(`${rootUrl}/lib/server/cloud.ts`);
+const OA = await import(`${rootUrl}/lib/server/openai-client.ts`);
+const P = await import(`${rootUrl}/lib/server/phone.ts`);
+const M = await import(`${rootUrl}/lib/server/mail.ts`);
+const Mem = await import(`${rootUrl}/lib/server/memory.ts`);
+const C = await import(`${rootUrl}/lib/server/composio.ts`);
+const D = await import(`${rootUrl}/lib/server/decide.ts`);
+const V = await import(`${rootUrl}/lib/server/verify.ts`);
+const T = await import(`${rootUrl}/lib/server/cloud-tunnel.ts`);
+const R = await import(`${rootUrl}/lib/server/relay.ts`);
+const AP = await import(`${rootUrl}/app/api/phone/agentphone/route.ts`);
+const OAI = await import(`${rootUrl}/app/api/phone/openai/route.ts`);
+const EV = await import(`${rootUrl}/app/api/cloud/event/route.ts`);
+const CH = await import(`${rootUrl}/lib/server/channels.ts`);
+const SE = await import(`${rootUrl}/app/api/channels/slack/events/route.ts`);
+const K = await import(`${rootUrl}/lib/server/skills.ts`);
+const U = await import(`${rootUrl}/lib/server/usage.ts`);
+const ACCOUNT = await import(`${rootUrl}/app/api/account/route.ts`);
+const { MAIN_WORKSPACE, PAIR_CODE_MS, botChatId, levelOf } = await import(`${rootUrl}/lib/types.ts`);
+const { buildURL: sidebandURL } = await import(`${rootUrl}/node_modules/openai/resources/live/sideband/internal-base.mjs`);
 
 const KEY = "orgo_test_key";
 const USER = { id: "u1", email: "me@example.com", name: "Test" };
@@ -719,8 +718,8 @@ console.log("usage: quick checks counted here at Typesafe's tokens, and every ca
 // A task's steps over a socket (responses-ws.ts) and business data (treg.ts) go through the cloud on the
 // Orgo key too, and say which app is calling as every other call does (checked with the rest at the end).
 {
-  const RW = await import(`${root}/lib/server/responses-ws.ts`);
-  const TR = await import(`${root}/lib/server/treg.ts`);
+  const RW = await import(`${rootUrl}/lib/server/responses-ws.ts`);
+  const TR = await import(`${rootUrl}/lib/server/treg.ts`);
   const u = cloud.upgrades.length;
   await assert.rejects(RW.ResponsesSocket.open("boppy", 4000), RW.TransportError, "the fake cloud takes no step sockets");
   assert.deepEqual(cloud.upgrades.slice(u).map((x) => [x.path, x.auth]), [["/proxy/openai/v1/responses", `Bearer ${KEY}`]]);
@@ -851,7 +850,7 @@ console.log("providers: through the cloud on the Orgo key, and directly when sel
 
 /* ---------------- AI credit: out of it, and the Bops plan from Orgo ---------------- */
 
-const L = await import(`${root}/lib/server/plan.ts`);
+const L = await import(`${rootUrl}/lib/server/plan.ts`);
 // What the cloud answers a call that would spend when the user's AI credit is used up.
 const OUT = { error: "You're out of AI credit, so your bots have stopped. Upgrade in Settings to keep them going.", code: "ai_credit_empty", upgrade: true };
 cloud.handle = (r) => (r.path.startsWith("/proxy/") ? { status: 402, json: OUT } : cloudDefault(r));
@@ -918,7 +917,7 @@ bopsPlan.answer = null;
 assert.equal(await L.readBopsPlan(KEY), null, "an Orgo without Bops plans");
 
 /* Billing by use (lib/bops-billing.ts): orgo-web's answer read in one place, never taken for Free. */
-const B = await import(`${root}/lib/bops-billing.ts`);
+const B = await import(`${rootUrl}/lib/bops-billing.ts`);
 bopsPlan.answer = () => Response.json({ billing: "usage", tier: "hacker_v2", balanceCents: 412, computer: { size: "Large", hourlyCents: 11, asleepFree: true }, numberMonthlyCents: 300 });
 assert.deepEqual(await L.readBopsPlan(KEY), {
   billing: "usage",
@@ -1003,10 +1002,10 @@ assert.deepEqual(await refused.json(), {
   code: "bops_usage_billing",
   url: "https://www.orgo.ai/settings/billing",
 });
-const PR = await import(`${root}/lib/server/plan-room.ts`);
+const PR = await import(`${rootUrl}/lib/server/plan-room.ts`);
 assert.equal(PR.planRoom().tier, "usage");
 assert.equal(P.planNeededForNumber(), false, "a number is bought, paid from credit, never needs a plan");
-const PI = await import(`${root}/lib/plan-includes.ts`);
+const PI = await import(`${rootUrl}/lib/plan-includes.ts`);
 assert.equal(PI.numberShort("usage", 4, { isPlanBot: false }), null);
 assert.deepEqual(PI.numberShort("usage", 5, { isPlanBot: false }), { text: "You have 5 phone numbers, the most one account can have for now.", upgrade: null });
 assert.equal(PI.emailShort("usage", 0, { isPlanBot: true }), null, "the main bot's inbox is free");
@@ -1016,15 +1015,15 @@ assert.deepEqual(PI.peopleShort({ plan: "usage", limit: 0, used: 0, caps: { pro_
   text: "Your Orgo plan includes no one else. Upgrade your Orgo plan on orgo.ai to add more.",
   upgrade: null,
 });
-const SH = await import(`${root}/lib/shared.ts`);
+const SH = await import(`${rootUrl}/lib/shared.ts`);
 assert.equal(SH.ownerCredit(Cl.outOfCreditWords()), "I'm out of Orgo credit, so I've stopped.");
 // The card bops.bot and the sheet show, with orgo-web's prices when it said them; no dashes, no Bops plan named.
 assert.deepEqual(PI.usageCard({ hourlyCents: 12, numberCents: 350 }).lines.map((l) => l.text).slice(0, 3), ["Your computer: $0.12 an hour while it works, free while it sleeps", "AI at Orgo's rate", "New Orgo accounts start with $5 of credit"]);
 for (const line of [PI.USAGE_CARD.name, PI.USAGE_CARD.computers.detail, ...PI.USAGE_CARD.lines.map((l) => l.text), B.OUT_OF_CREDIT_WAKE, B.extensionLine(Date.now())])
   assert.ok(!/[\u2013\u2014]|Orbit|\bPro\b|\bMax\b/.test(line), line);
 // Orgo turning a wake down for want of credit: the asleep words, and the chat's card, for a user billed by use.
-const FH = await import(`${root}/lib/server/free-hours.ts`);
-const O = await import(`${root}/lib/server/orgo.ts`);
+const FH = await import(`${rootUrl}/lib/server/free-hours.ts`);
+const O = await import(`${rootUrl}/lib/server/orgo.ts`);
 const noCredit = Object.assign(new O.OrgoError("Add credit to start this computer.", 402), { code: "INSUFFICIENT_COMPUTE_CREDIT" });
 assert.equal(FH.computerOutOfCredit(noCredit), B.OUT_OF_CREDIT_WAKE);
 assert.deepEqual(S.getState().credits && { ...S.getState().credits, at: 0 }, { out: true, at: 0, usage: true, computer: true });
@@ -1242,8 +1241,8 @@ console.log("routes: the tunnel's token is taken as checked, everything else is 
 /* ---------------- Bops addresses: each workspace's handle, picked once; a plan's number and inbox ---------------- */
 
 {
-const HANDLE = await import(`${root}/app/api/mail/handle/route.ts`);
-const PHONE = await import(`${root}/app/api/phone/route.ts`);
+const HANDLE = await import(`${rootUrl}/app/api/mail/handle/route.ts`);
+const PHONE = await import(`${rootUrl}/app/api/phone/route.ts`);
 // The cloud's handles (cloud/handles.ts), as far as the app sees them: "taken-one" is someone else's.
 const handles = { claims: [], current: {} };
 cloud.handle = (r) => {
@@ -1378,8 +1377,8 @@ for (const two of ["Sam <sam@example.com>, Eve <eve@evil.example>", "sam@example
 // Always allow on one email is a rule for that bot's emails, whoever they're to (lib/permission.ts), as its card says:
 // a later email to anyone else goes with no card.
 {
-  const PM = await import(`${root}/lib/server/permission.ts`);
-  const R = await import(`${root}/lib/permission.ts`);
+  const PM = await import(`${rootUrl}/lib/server/permission.ts`);
+  const R = await import(`${rootUrl}/lib/permission.ts`);
   const toDana = await M.sendEmail(main().id, { to: ["Dana <dana@example.com>"], subject: "Hi", text: "Hello" }, {}).then(
     () => null,
     (e) => e,
@@ -2125,7 +2124,7 @@ console.log("tunnel: requests replayed with the token, events acked once handled
 
 /* ---------------- Restart Bops: saved to Bops Cloud, sessions dropped, still signed in ---------------- */
 
-const RESTART = await import(`${root}/app/api/restart/route.ts`);
+const RESTART = await import(`${rootUrl}/app/api/restart/route.ts`);
 await signIn();
 await T.startCloud({ signedIn: true });
 const c5 = await connection(4);
@@ -2307,7 +2306,7 @@ console.log("apps: the fields an action's schema pins to one value filled in whe
 
 /* ---------------- Notices from Orgo: passed on as the cloud sends them, put away there ---------------- */
 
-const NOTICES = await import(`${root}/app/api/notices/route.ts`);
+const NOTICES = await import(`${rootUrl}/app/api/notices/route.ts`);
 await signIn();
 await withSession(SESSION);
 const handleBefore = cloud.handle;

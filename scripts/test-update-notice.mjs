@@ -8,10 +8,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   load(url, context, next) {
@@ -23,7 +24,7 @@ registerHooks({
 });
 globalThis.window = globalThis;
 
-const { UpdateCard, UpdateNotice, UpdateSettings } = await import(`${root}/components/app/update-notice.tsx`);
+const { UpdateCard, UpdateNotice, UpdateSettings } = await import(`${rootUrl}/components/app/update-notice.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -98,7 +99,7 @@ test("what's new shows under the line in every phase", () => {
 test("nothing without the Mac app, and no dashes", () => {
   assert.equal(renderToStaticMarkup(h(UpdateNotice)), "");
   assert.equal(renderToStaticMarkup(h(UpdateSettings)), "");
-  const source = readFileSync(`${root}/components/app/update-notice.tsx`, "utf8");
+  const source = readFileSync(`${rootPath}/components/app/update-notice.tsx`, "utf8");
   for (const s of [...source.matchAll(/"([^"]*)"|>([^<>{}]+)</g)].map((m) => m[1] ?? m[2])) assert.doesNotMatch(s, /[–—]/, s);
   for (const phase of ["ready", "available", "downloading", "manual"]) assert.doesNotMatch(card({ ...base, phase, asked: true }), /[–—]/);
 });

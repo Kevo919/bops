@@ -20,13 +20,15 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.TZ = "America/New_York";
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.OPENAI_API_KEY = "sk-test-chat-compact";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-chat-compact-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
@@ -43,7 +45,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -122,14 +124,14 @@ async function check(name, fn) {
 }
 const DASHES = /[‒–—―]| - /;
 
-const S = await import(`${root}/lib/server/store.ts`);
-const { botChatId, threadCompacts, threadCompactBlocked } = await import(`${root}/lib/types.ts`);
-const Chat = await import(`${root}/lib/server/chat.ts`);
-const Sum = await import(`${root}/lib/server/chat-summary.ts`);
-const Lib = await import(`${root}/lib/chat-summary.ts`);
-const Remove = await import(`${root}/lib/server/remove.ts`);
-const P = await import(`${root}/lib/privacy.ts`);
-const CT = await import(`${root}/lib/server/computer-task.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const { botChatId, threadCompacts, threadCompactBlocked } = await import(`${rootUrl}/lib/types.ts`);
+const Chat = await import(`${rootUrl}/lib/server/chat.ts`);
+const Sum = await import(`${rootUrl}/lib/server/chat-summary.ts`);
+const Lib = await import(`${rootUrl}/lib/chat-summary.ts`);
+const Remove = await import(`${rootUrl}/lib/server/remove.ts`);
+const P = await import(`${rootUrl}/lib/privacy.ts`);
+const CT = await import(`${rootUrl}/lib/server/computer-task.ts`);
 clearInterval(globalThis.__bopsRoutines);
 
 const chatId = botChatId("boppy");

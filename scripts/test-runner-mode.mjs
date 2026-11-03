@@ -19,9 +19,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { unfaked } from "./fake-exports.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-runner-mode-"));
 
 // Run again with --start, this checks how a runner starts on its own: there what it starts with is faked
@@ -48,7 +50,7 @@ const loaded = [];
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -155,7 +157,7 @@ if (START) {
     globalThis.__fake["browser-runner"] = { startBrowserRelay: () => calls.push("browser") };
     globalThis.__fake["orgo-sign-in"] = { authStatus: async () => (calls.push("state"), (ready = ++tries >= 2), {}) };
     Object.assign(process.env, good());
-    const S = await import(`${root}/lib/server/runner-start.ts`);
+    const S = await import(`${rootUrl}/lib/server/runner-start.ts`);
     loaded.length = 0;
     const log = console.log;
     console.log = () => {};
@@ -233,8 +235,8 @@ if (ORGO) {
   // Its computer's identity is test-vm-identity.mjs; here, a runner on its key file alone.
   process.env.BOPS_RUNNER_IDENTITY = "0";
   await check("a runner's calls use only its computer's key, and read it again when Orgo answers 401", async () => {
-    const K = await import(`${root}/lib/server/runner-key.ts`);
-    const O = await import(`${root}/lib/server/orgo.ts`);
+    const K = await import(`${rootUrl}/lib/server/runner-key.ts`);
+    const O = await import(`${rootUrl}/lib/server/orgo.ts`);
     const home = keyHome();
     K.runnerKeyForTests.files([home.secrets, home.env]);
     asRunner();
@@ -301,7 +303,7 @@ if (ORGO) {
   process.exit(failures ? 1 : 0);
 }
 
-const P = await import(`${root}/lib/server/persist.ts`);
+const P = await import(`${rootUrl}/lib/server/persist.ts`);
 
 /* ---------------- The allow-list ---------------- */
 
@@ -362,7 +364,7 @@ const ALLOWED = {
   "permission.ts": "reading the state while one of its own requests for the user's OK is unanswered and it's up (listenForAnswers), so their reply reaches the paused run; and a brain's held call looking for its reply (heldAsk)",
 };
 await check("every loop and timer in lib/server is the Mac's behind its gate, or one a runner runs", () => {
-  const dir = `${root}/lib/server`;
+  const dir = `${rootPath}/lib/server`;
   for (const f of readdirSync(dir).filter((x) => x.endsWith(".ts"))) {
     const src = readFileSync(`${dir}/${f}`, "utf8");
     if (/setInterval\(|^setTimeout\(|watchChanges\(/m.test(src)) assert.ok(GATED[f] || ALLOWED[f], `${f} has a timer: gate it on a runner (persist.ts loopHere) or say here why a runner runs it`);
@@ -376,15 +378,15 @@ await check("every loop and timer in lib/server is the Mac's behind its gate, or
 await check("on a runner the digest timer isn't set, Codex isn't installed, the Mac isn't looked at, and routing does nothing", async () => {
   asRunner();
   delete globalThis.bopsDigestTimer;
-  await import(`${root}/lib/server/attention.ts`);
+  await import(`${rootUrl}/lib/server/attention.ts`);
   assert.equal(globalThis.bopsDigestTimer, undefined, "no digest timer");
-  const codex = await import(`${root}/lib/server/codex-cli.ts`);
+  const codex = await import(`${rootUrl}/lib/server/codex-cli.ts`);
   codex.installCodex();
   assert.equal(codex.installStatus(), undefined, "Codex never installed");
   let changed = 0;
   const was = globalThis.__fake.store.update;
   globalThis.__fake.store.update = (fn) => (changed++, fn(state));
-  const mac = await import(`${root}/lib/server/mac.ts`);
+  const mac = await import(`${rootUrl}/lib/server/mac.ts`);
   assert.equal(await mac.checkMac(), false);
   assert.equal(changed, 0, "no look at a Mac kept in the state");
   globalThis.__fake.store.update = was;
@@ -393,7 +395,7 @@ await check("on a runner the digest timer isn't set, Codex isn't installed, the 
 
 /* ---------------- Starting ---------------- */
 
-const R = await import(`${root}/lib/server/runner-start.ts`);
+const R = await import(`${rootUrl}/lib/server/runner-start.ts`);
 
 await check("a runner refuses to start without a window token, off loopback, on Postgres or a file, or without its computer; its key is no setting of its own", () => {
   assert.equal(R.runnerRefusal(good()), null, "no key file setting needed: it reads its computer's");
@@ -413,12 +415,12 @@ await check("a runner refuses to start without a window token, off loopback, on 
 });
 
 await check("started on its own, a runner starts only what it runs", () => {
-  const run = spawnSync(process.execPath, ["--conditions=react-server", import.meta.url, "--start"], { encoding: "utf8" });
+  const run = spawnSync(process.execPath, ["--conditions=react-server", fileURLToPath(import.meta.url), "--start"], { encoding: "utf8" });
   assert.equal(run.status, 0, `${run.stdout}${run.stderr}`.split("\n").filter((l) => /FAIL|passed|^\s{2}/.test(l)).join("\n"));
 });
 
 await check("a runner's calls to Orgo use only its computer's key, read again after a 401", () => {
-  const run = spawnSync(process.execPath, ["--conditions=react-server", import.meta.url, "--orgo"], { encoding: "utf8" });
+  const run = spawnSync(process.execPath, ["--conditions=react-server", fileURLToPath(import.meta.url), "--orgo"], { encoding: "utf8" });
   assert.equal(run.status, 0, `${run.stdout}${run.stderr}`.split("\n").filter((l) => /FAIL|passed|^\s{2}/.test(l)).join("\n"));
 });
 
@@ -426,8 +428,8 @@ await check("a runner's calls to Orgo use only its computer's key, read again af
 
 await check("a runner's key: /root/.orgo-secrets.env, then /root/.env, as Orgo quotes it, only from a file nobody else can read; no Keychain, no sign-in", async () => {
   asRunner();
-  const K = await import(`${root}/lib/server/runner-key.ts`);
-  const A = await import(`${root}/lib/server/orgo-auth.ts`);
+  const K = await import(`${rootUrl}/lib/server/runner-key.ts`);
+  const A = await import(`${rootUrl}/lib/server/orgo-auth.ts`);
   const home = keyHome();
   K.runnerKeyForTests.files([home.secrets, home.env]);
   const warned = [];
@@ -470,7 +472,7 @@ await check("a runner's key: /root/.orgo-secrets.env, then /root/.env, as Orgo q
   assert.equal(await A.loadOrgoKey(), "sk_runner_key");
   await assert.rejects(A.signIn("sk_other", { id: "u2" }), /Bops app on your Mac/);
   await assert.rejects(A.signOut(), /Bops app on your Mac/);
-  const Kc = await import(`${root}/lib/server/keychain.ts`);
+  const Kc = await import(`${rootUrl}/lib/server/keychain.ts`);
   assert.equal(await Kc.getSecret("anything"), null);
   await assert.rejects(Kc.setSecret("anything", "x"), /only in the Bops app on your Mac/);
   K.runnerKeyForTests.files(undefined);
@@ -482,7 +484,7 @@ await check("a runner's key: /root/.orgo-secrets.env, then /root/.env, as Orgo q
 /* ---------------- In use, and where ---------------- */
 
 await check("a runner says its computer is in use as the runner's, only while a task of its own runs", async () => {
-  const F = await import(`${root}/lib/server/free-hours.ts`);
+  const F = await import(`${rootUrl}/lib/server/free-hours.ts`);
   globalThis.__fake.orgo.orgo = {};
   delete globalThis.bopsOrgoKey;
   // orgoKey comes from orgo-auth (real): the key in memory.
@@ -506,7 +508,7 @@ await check("a runner says its computer is in use as the runner's, only while a 
 });
 
 await check("chooseWhere never picks the Mac on a runner", async () => {
-  const W = await import(`${root}/lib/server/where.ts`);
+  const W = await import(`${rootUrl}/lib/server/where.ts`);
   asMac();
   assert.equal(await W.chooseWhere("boppy", "Write it in Notes on my Mac"), "mac", "the Mac picks it there");
   asRunner();

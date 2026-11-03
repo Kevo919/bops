@@ -23,9 +23,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { crc32, deflateRawSync, gzipSync } from "node:zlib";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-push-guard-"));
 const clone = join(scratch, "clone");
 const secrets = join(scratch, "secrets");
@@ -56,7 +54,7 @@ async function check(name, fn) {
 }
 
 try {
-  execFileSync("git", ["clone", "-q", "--shared", "--no-checkout", root, clone], { env, stdio: "pipe" });
+  execFileSync("git", ["clone", "-q", "--shared", "--no-checkout", rootPath, clone], { env, stdio: "pipe" });
   const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: rootPath, encoding: "utf8" }).trim();
   // The remote has this repo's HEAD (as a clone of the public repo would have its main).
   git(["update-ref", "refs/remotes/origin/base", head]);
@@ -311,7 +309,7 @@ try {
 
   await check("a shallow clone is checked too: only the history check is skipped", () => {
     const shallow = join(scratch, "shallow");
-    execFileSync("git", ["clone", "-q", "--shared", "--no-checkout", root, shallow], { env, stdio: "pipe" });
+    execFileSync("git", ["clone", "-q", "--shared", "--no-checkout", rootPath, shallow], { env, stdio: "pipe" });
     const sh = (args, input) => execFileSync("git", args, { cwd: shallow, env, input, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }).trim();
     sh(["update-ref", "refs/remotes/origin/base", head]);
     writeFileSync(join(sh(["rev-parse", "--path-format=absolute", "--git-dir"]), "shallow"), `${head}\n`);

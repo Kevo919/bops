@@ -16,14 +16,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -88,11 +89,11 @@ const settle = async () => {
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { createRoot } = await import("react-dom/client");
 const { act, createElement: h } = await import("react");
-const P = await import(`${root}/lib/source-parse.ts`);
-const V = await import(`${root}/lib/source-view.ts`);
-const { IssueSource, SourceThread } = await import(`${root}/components/app/source-view.tsx`);
-const { ReplyDrafts } = await import(`${root}/components/app/reply-drafts.tsx`);
-const { viewOnly } = await import(`${root}/components/app/view-only.ts`);
+const P = await import(`${rootUrl}/lib/source-parse.ts`);
+const V = await import(`${rootUrl}/lib/source-view.ts`);
+const { IssueSource, SourceThread } = await import(`${rootUrl}/components/app/source-view.tsx`);
+const { ReplyDrafts } = await import(`${rootUrl}/components/app/reply-drafts.tsx`);
+const { viewOnly } = await import(`${rootUrl}/components/app/view-only.ts`);
 
 async function mount(el) {
   const box = doc.createElement("div");
@@ -452,7 +453,7 @@ await test("nothing of an email is ever HTML: no script runs, no picture loads, 
     assert.ok(![...m.box.querySelectorAll("a")].some((a) => /^javascript:/i.test(a.getAttribute("href") ?? "")));
     assert.equal(globalThis.stolen, undefined);
     // And the view never uses dangerouslySetInnerHTML at all.
-    assert.ok(!readFileSync(`${root}/components/app/source-view.tsx`, "utf8").includes("dangerouslySetInnerHTML"));
+    assert.ok(!readFileSync(`${rootPath}/components/app/source-view.tsx`, "utf8").includes("dangerouslySetInnerHTML"));
   } finally {
     await m.done();
   }
@@ -708,7 +709,7 @@ await test("plain words: no dashes in anything shown or said, no Orbit in the wi
   for (const code of ["signed_out", "no_account", "gone", "down", "unparsed", "shared", "window", "runner", "unsupported"])
     for (const app of ["gmail", "slack", "discord"]) assert.ok(!DASHES.test(V.sourceError(code, app, "Work")));
   for (const file of ["components/app/source-view.tsx", "lib/source-view.ts", "lib/source-parse.ts", "lib/server/issue-source.ts", "app/api/orbit/issues/[id]/source/route.ts", "app/api/drafts/source/route.ts"])
-    readFileSync(`${root}/${file}`, "utf8")
+    readFileSync(`${rootPath}/${file}`, "utf8")
       .split("\n")
       .forEach((line, n) => assert.ok(!DASHES.test(line), `${file}:${n + 1} has a dash`));
 });

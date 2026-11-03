@@ -11,13 +11,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -104,11 +105,11 @@ globalThis.Audio = class {
   }
 };
 
-const Panel = await import(`${root}/components/app/bot-panel.tsx`);
-const Page = await import(`${root}/components/app/bot-settings.tsx`);
-const Words = await import(`${root}/lib/bot-settings.ts`);
-const Seq = await import(`${root}/lib/sequences.ts`);
-const { CHART_WORDS } = await import(`${root}/components/app/team-chart.tsx`);
+const Panel = await import(`${rootUrl}/components/app/bot-panel.tsx`);
+const Page = await import(`${rootUrl}/components/app/bot-settings.tsx`);
+const Words = await import(`${rootUrl}/lib/bot-settings.ts`);
+const Seq = await import(`${rootUrl}/lib/sequences.ts`);
+const { CHART_WORDS } = await import(`${rootUrl}/components/app/team-chart.tsx`);
 const { createElement: h, act, useState } = await import("react");
 const { createRoot } = await import("react-dom/client");
 const W = Words.SETTINGS_WORDS;
@@ -402,7 +403,7 @@ await test("a section picked in the left column: its card opens and takes focus;
 });
 
 await test("closing the page gives focus back to what opened it; a link elsewhere doesn't (bops-app.tsx)", async () => {
-  const src = readFileSync(`${root}/components/app/bops-app.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
   assert.match(src, /onExpand=\{\(at\) => openBotPage\(bot\.id, at\)\}/, "the opener noted as the page opens");
   assert.match(src, /pageOpener\.current = document\.activeElement/);
   assert.match(src, /onBack=\{closePage\}/, "Back and the X");

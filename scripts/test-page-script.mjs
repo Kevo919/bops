@@ -12,9 +12,7 @@ import { copyFileSync, existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
 const chrome = [process.env.CHROME_PATH, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"].find((p) => p && existsSync(p));
 if (!chrome) {
   console.log("page script: skipped (no Chrome here; set CHROME_PATH)");

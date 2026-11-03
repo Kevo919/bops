@@ -18,12 +18,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { unfaked } from "./fake-exports.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 // This process is in New York, like the user (Owner.timeZone).
 process.env.TZ = "America/New_York";
 delete process.env.BOPS_UI_TOKEN;
 delete process.env.BOPS_DATABASE_URL;
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 // The modules routines.ts talks to are fakes that call into globalThis.__fake (set up below).
 const FAKES = {
@@ -43,7 +45,7 @@ const FAKES = {
 };
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -84,7 +86,7 @@ const UTC = "UTC";
 
 /* ---------------- cloud/schedule.ts: the pure math ---------------- */
 
-const S = await import(`${root}/cloud/schedule.ts`);
+const S = await import(`${rootUrl}/cloud/schedule.ts`);
 const eq = (got, want, what) => assert.equal(iso(got), iso(want), what);
 
 await check("daily in New York, Kolkata and UTC", () => {

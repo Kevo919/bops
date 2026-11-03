@@ -21,6 +21,7 @@ import http from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
@@ -32,7 +33,8 @@ process.env.BOPS_CHAT_MODEL = "gpt-test-monitors";
 // The judge runs on the light model (routing.ts LIGHT).
 process.env.BOPS_LIGHT_MODEL = "gpt-test-monitors";
 const JEV_KEY = "ts-test-monitors";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-monitors-"));
 process.env.HOME = join(scratch, "home");
 mkdirSync(process.env.HOME);
@@ -49,7 +51,7 @@ const wait = (minutes) => void (skew += minutes * 60_000);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "local", "mac-windows"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -161,12 +163,12 @@ process.emitWarning = (warning, ...rest) => (rest[0]?.code === "MODULE_TYPELESS_
 const rejections = [];
 process.on("unhandledRejection", (e) => rejections.push(String(e?.stack ?? e)));
 
-const PD = await import(`${root}/cloud/page-diff.ts`);
-const S = await import(`${root}/lib/server/store.ts`);
-const W = await import(`${root}/lib/server/watches.ts`);
-const R = await import(`${root}/app/api/watches/route.ts`);
-const Bots = await import(`${root}/lib/server/bots.ts`);
-const { botChatId, isScreenWatch, PAGE_WATCH_DEFAULT_MIN, PAGE_WATCH_MIN_MIN } = await import(`${root}/lib/types.ts`);
+const PD = await import(`${rootUrl}/cloud/page-diff.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const W = await import(`${rootUrl}/lib/server/watches.ts`);
+const R = await import(`${rootUrl}/app/api/watches/route.ts`);
+const Bots = await import(`${rootUrl}/lib/server/bots.ts`);
+const { botChatId, isScreenWatch, PAGE_WATCH_DEFAULT_MIN, PAGE_WATCH_MIN_MIN } = await import(`${rootUrl}/lib/types.ts`);
 // The loop is the test's to run (one tick: the same look the interval makes), never on its own.
 clearInterval(globalThis.__bopsWatches);
 const tick = (watchId) => globalThis.__bopsLook(watchId);

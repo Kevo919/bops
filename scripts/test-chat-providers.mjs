@@ -15,7 +15,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const UI = process.argv.includes("--ui");
@@ -25,9 +25,8 @@ process.env.BOPS_SELF_HOSTED = "1";
 process.env.OPENAI_API_KEY = "sk-test-openai";
 const KEYS = { ANTHROPIC_API_KEY: "sk-ant-test-SECRET123", ZAI_API_KEY: "zai-test-SECRET456", DEEPSEEK_API_KEY: "ds-test-SECRET789", OPENROUTER_API_KEY: "or-test-SECRET000" };
 Object.assign(process.env, KEYS);
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-chat-providers-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
@@ -46,7 +45,7 @@ const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
     if (UI && specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -94,7 +93,7 @@ if (UI) {
   globalThis.matchMedia = () => ({ matches: false });
   const chatId = "bot:boppy";
 await check("the window's picker: Auto first, the models by provider, (no key) where the server has none, and the hint", async () => {
-  const { ChatModelPick, chatModelHint } = await import(`${root}/components/app/chat-model.tsx`);
+  const { ChatModelPick, chatModelHint } = await import(`${rootUrl}/components/app/chat-model.tsx`);
   const { renderToStaticMarkup } = await import("react-dom/server");
   const { createElement: h } = await import("react");
   const state = { chatKeys: { anthropic: true, openai: true, zai: false, "zai-coding": false, deepseek: false, openrouter: true } };
@@ -144,12 +143,12 @@ const chatSays = (content, tool_calls) => ({ choices: [{ message: { role: "assis
 console.warn = () => {};
 
 
-const S = await import(`${root}/lib/server/store.ts`);
-const P = await import(`${root}/lib/server/chat-providers.ts`);
-const M = await import(`${root}/lib/chat-models.ts`);
-const A = await import(`${root}/lib/agents.ts`);
-const R = await import(`${root}/lib/server/routing.ts`);
-const { botChatId } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const P = await import(`${rootUrl}/lib/server/chat-providers.ts`);
+const M = await import(`${rootUrl}/lib/chat-models.ts`);
+const A = await import(`${rootUrl}/lib/agents.ts`);
+const R = await import(`${rootUrl}/lib/server/routing.ts`);
+const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
 
 const fnTool = { type: "function", name: "recall", description: "Ask memory.", parameters: { type: "object", properties: { question: { type: "string" } }, required: ["question"], additionalProperties: false }, strict: true };
 const webTool = { type: "web_search", search_context_size: "low" };
@@ -370,7 +369,7 @@ await check("respond: another provider's model goes there, openai/ and a plain n
 
 /* ---------------- The list, the API and the window ---------------- */
 
-const Route = await import(`${root}/app/api/chats/model/route.ts`);
+const Route = await import(`${rootUrl}/app/api/chats/model/route.ts`);
 const chatId = botChatId("boppy");
 const post = (body, headers = {}) => Route.POST(new Request("http://localhost/api/chats/model", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) }));
 
@@ -417,7 +416,7 @@ await check("POST /api/chats/model: only the Bops window, only a model from the 
 });
 
 await check("the field survives the state's save and its merge with another device's", async () => {
-  const SM = await import(`${root}/lib/server/state-merge.ts`);
+  const SM = await import(`${rootUrl}/lib/server/state-merge.ts`);
   S.update(() => (S.chat(chatId).model = "deepseek/deepseek-chat"));
   const shared = SM.toShared(JSON.parse(JSON.stringify(S.getState())), "dev_a");
   assert.equal(shared.chats.find((c) => c.id === chatId).model, "deepseek/deepseek-chat");
@@ -432,7 +431,7 @@ await check("the field survives the state's save and its merge with another devi
 });
 
 await check("/api/state says which providers have a key, as true or false only", async () => {
-  const State = await import(`${root}/app/api/state/route.ts`);
+  const State = await import(`${rootUrl}/app/api/state/route.ts`);
   const res = await State.GET(new Request("http://localhost/api/state"));
   const { state } = await res.json();
   assert.equal(state.chatKeys.anthropic, true);
@@ -446,7 +445,7 @@ await check("/api/state says which providers have a key, as true or false only",
 /* ---------------- A whole chat turn on Claude ---------------- */
 
 await check("a chat set to Claude: the turn and its lookup run on Claude, not OpenAI, and web_search is left out", async () => {
-  const Chat = await import(`${root}/lib/server/chat.ts`);
+  const Chat = await import(`${rootUrl}/lib/server/chat.ts`);
   clearInterval(globalThis.__bopsRoutines);
   S.update((s) => {
     s.owner = { name: "Alex", timeZone: "America/New_York" };
@@ -471,7 +470,7 @@ await check("a chat set to Claude: the turn and its lookup run on Claude, not Op
 });
 
 await check("a chat set to Claude whose key is wrong: the chat says so in plain words", async () => {
-  const Chat = await import(`${root}/lib/server/chat.ts`);
+  const Chat = await import(`${rootUrl}/lib/server/chat.ts`);
   next.push(() => json({ type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } }, 401));
   await Chat.handleMessage(chatId, "Hello?");
   const said = S.getState().messages.filter((m) => m.chatId === chatId && m.role === "bot").at(-1);
@@ -479,7 +478,7 @@ await check("a chat set to Claude whose key is wrong: the chat says so in plain 
 });
 
 await check("Auto (no model): the turn goes to OpenAI as before, with web_search", async () => {
-  const Chat = await import(`${root}/lib/server/chat.ts`);
+  const Chat = await import(`${rootUrl}/lib/server/chat.ts`);
   S.update(() => delete S.chat(chatId).model);
   sent.length = 0;
   openaiAsked.length = 0;

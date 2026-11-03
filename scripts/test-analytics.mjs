@@ -20,9 +20,8 @@ import { gunzipSync } from "node:zlib";
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO)_/.test(k)) delete process.env[k];
 delete process.env.DO_NOT_TRACK;
 delete process.env.NODE_ENV;
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const ts = createRequire(import.meta.url)("typescript");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(check, what, ms = 4000) {
@@ -35,10 +34,10 @@ async function until(check, what, ms = 4000) {
 
 // Modules that would start something when loaded or called are stand-ins: each export does nothing.
 const STAND_INS = new Set(["keychain", "cloud-tunnel", "relay", "mac", "desktop", "mirror"]);
-const project = pathToFileURL(root).href + "/";
+const project = pathToFileURL(rootPath).href + "/";
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -100,7 +99,7 @@ async function nothingSent(from, flush, what) {
   );
 }
 
-const R = await import(`${root}/cloud/analytics-rules.ts`);
+const R = await import(`${rootUrl}/cloud/analytics-rules.ts`);
 const sameProject = (v) => v === R.POSTHOG_PROJECT;
 
 /* ---------------- 1. The rules ---------------- */
@@ -308,7 +307,7 @@ Object.defineProperty(globalThis, "localStorage", {
   configurable: true,
   value: { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, String(v)) },
 });
-const A = await import(`${root}/lib/analytics.ts`);
+const A = await import(`${rootUrl}/lib/analytics.ts`);
 const ph = { calls: [], config: null, distinct: "anon", userState: "anonymous" };
 const fake = {
   init: (token, config) => {
@@ -404,7 +403,7 @@ A.stopAnalytics();
 
 // A new window load (a fresh module, posthog-js not loaded yet).
 delete globalThis.bopsAnalytics;
-const A2 = await import(`${root}/lib/analytics.ts?second-window`);
+const A2 = await import(`${rootUrl}/lib/analytics.ts?second-window`);
 // Switched off or signed out while posthog-js was still loading: that stop stands.
 let release;
 const slowLoad = () => new Promise((r) => (release = () => r(fake)));
@@ -437,11 +436,11 @@ process.env.BOPS_APP_VERSION = "0.0.22";
 globalThis.bopsOrgoKey = "sk_test_one";
 const SESSION = { userId: "u-1", publicUrl: "https://bops.orgo.ai/api", agentmail: null, agentphone: null, honcho: null, composio: null, openai: null, typesafe: false, verify: { sms: false, email: false }, slack: null, plan: { tier: "pro_bops", limits: false } };
 globalThis.bopsCloud = { session: { key: "sk_test_one", value: SESSION } };
-const S = await import(`${root}/lib/server/store.ts`);
-const M = await import(`${root}/lib/server/analytics.ts`);
-const V = await import(`${root}/lib/server/app-version.ts`);
-const ROUTE = await import(`${root}/app/api/analytics/route.ts`);
-const SETUP = await import(`${root}/app/api/setup/route.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const M = await import(`${rootUrl}/lib/server/analytics.ts`);
+const V = await import(`${rootUrl}/lib/server/app-version.ts`);
+const ROUTE = await import(`${rootUrl}/app/api/analytics/route.ts`);
+const SETUP = await import(`${rootUrl}/app/api/setup/route.ts`);
 const flushMac = () => M.flushAnalytics();
 
 let mark = sent.length;
@@ -575,7 +574,7 @@ globalThis.__cloudQuery = async (text, values) => {
   db.asked++;
   return { rows: values[0] in db.off ? [{ off: db.off[values[0]] }] : [] };
 };
-const C = await import(`${root}/cloud/analytics.ts`);
+const C = await import(`${rootUrl}/cloud/analytics.ts`);
 const flushCloud = () => C.flushTelemetry();
 const req = (headers = {}) => ({ headers });
 
@@ -673,7 +672,7 @@ for (const f of files) {
   for (const m of src.matchAll(/\b(trackEvent|trackServerEvent)\(\s*"([^"]+)"/g)) used.set(m[2], [...(used.get(m[2]) ?? []), [SENDERS[m[1]], f]]);
   for (const m of src.matchAll(/\btrackCloudEvent\(\s*[^,()]+(?:\([^)]*\))?,\s*"([^"]+)"/g)) used.set(m[1], [...(used.get(m[1]) ?? []), ["cloud", f]]);
   if (/from "posthog-(js|node)|import\("posthog-js/.test(src))
-    assert.ok(["lib/analytics.ts", "lib/server/analytics.ts", "cloud/analytics.ts"].includes(f.slice(root.length + 1)), `${f} doesn't import PostHog itself`);
+    assert.ok(["lib/analytics.ts", "lib/server/analytics.ts", "cloud/analytics.ts"].includes(f.slice(rootPath.length + 1)), `${f} doesn't import PostHog itself`);
 }
 for (const [event, uses] of used) {
   assert.ok(Object.hasOwn(R.EVENTS, event), `${event} is in the catalog`);

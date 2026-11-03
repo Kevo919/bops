@@ -7,14 +7,16 @@ import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
 
 import { exportsOf, fill, unfaked } from "./fake-exports.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 // The store faked with getState alone: runner.ts imports stateEpoch (and more) from it too.
 const FAKES = { store: ["getState"] };
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -33,20 +35,20 @@ registerHooks({
   },
 });
 
-const R = await import(`${root}/lib/server/runner.ts`);
+const R = await import(`${rootUrl}/lib/server/runner.ts`);
 assert.equal(typeof R.runsHere, "function", "runner.ts loads though the fake lists no stateEpoch");
-const S = await import(`${root}/lib/server/store.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
 assert.deepEqual(S.getState(), { bots: [], routines: [], sessions: [] }, "what's listed is the test's fake");
 assert.throws(() => S.stateEpoch(), /^Error: store\.stateEpoch isn't faked in this test: add it to its fakes$/);
 
 // Every kind of export: functions (async too), consts, lets, classes, and export lists (with "as"), never types.
-const store = exportsOf(`${root}/lib/server/store.ts`);
+const store = exportsOf(`${rootUrl}/lib/server/store.ts`);
 for (const n of ["getState", "ownSession", "stateEpoch", "addMessage"]) assert.ok(store.includes(n), n);
-const runner = exportsOf(`${root}/lib/server/runner.ts`);
+const runner = exportsOf(`${rootUrl}/lib/server/runner.ts`);
 for (const n of ["onRunner", "runsHere", "OVERDUE_MS", "runnerForTests", "runnerComputerOf"]) assert.ok(runner.includes(n), n);
 assert.ok(!runner.some((n) => /^type\b/.test(n)));
 // A fake written as a whole source (test-access): what it has stays, several to a line too, and the rest stand in.
-const filled = fill("sessions", `${root}/lib/server/sessions.ts`, "export const startSession = () => undefined; export const stopSession = () => {};");
+const filled = fill("sessions", `${rootUrl}/lib/server/sessions.ts`, "export const startSession = () => undefined; export const stopSession = () => {};");
 assert.equal((filled.match(/export const startSession\b/g) ?? []).length, 1);
 assert.equal((filled.match(/export const stopSession\b/g) ?? []).length, 1);
 assert.match(filled, /export const endSessionOf = \(\) => \{ throw new Error\("sessions\.endSessionOf isn't faked/);

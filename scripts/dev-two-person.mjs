@@ -125,7 +125,7 @@ async function start() {
   mkdirSync(HERE, { recursive: true });
   rmSync(STATE, { force: true });
   const log = openSync(LOG, "w");
-  const child = spawn(process.execPath, [import.meta.url, "serve"], { detached: true, stdio: ["ignore", log, log], cwd: rootPath });
+  const child = spawn(process.execPath, [fileURLToPath(import.meta.url), "serve"], { detached: true, stdio: ["ignore", log, log], cwd: rootPath });
   child.unref();
   const end = Date.now() + 8 * 60_000;
   for (;;) {

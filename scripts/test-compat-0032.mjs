@@ -44,14 +44,15 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { fill } from "./fake-exports.mjs";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const TAG = "v0.0.32";
 const old = (path) => {
   try {
-    return execFileSync("git", ["-C", root, "show", `${TAG}:${path}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    return execFileSync("git", ["-C", rootPath, "show", `${TAG}:${path}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   } catch {
     return null;
   }
@@ -67,7 +68,7 @@ writeFileSync(join(dir, "state-merge.ts"), merge32);
 writeFileSync(join(dir, "member-access.ts"), access32);
 const V32 = await import(join(dir, "state-merge.ts"));
 const A32 = await import(join(dir, "member-access.ts"));
-const NOW = await import(`${root}/lib/server/state-merge.ts`);
+const NOW = await import(`${rootUrl}/lib/server/state-merge.ts`);
 
 /*
  * v0.0.32's own modules, as they are at the tag: a file one of them imports is written from the tag into `tree` (the
@@ -166,7 +167,7 @@ registerHooks({
     if (inTree(parent)) {
       if (specifier === "@composio/core") return { url: "fake32:composio", shortCircuit: true };
       const rel = specifier.startsWith("@/") ? specifier.slice(2) : /^\.{1,2}\//.test(specifier) ? new URL(specifier, `file:///${relIn(parent)}`).pathname.slice(1) : null;
-      if (rel === null) return next(specifier, { ...context, parentURL: `${root}/package.json` });
+      if (rel === null) return next(specifier, { ...context, parentURL: `${rootUrl}/package.json` });
       const url = fromTag(rel);
       if (!url) throw new Error(`${TAG} has no ${rel}`);
       const name = /^lib\/server\/([a-z-]+)\.ts$/.exec(relIn(url))?.[1];
@@ -175,7 +176,7 @@ registerHooks({
     }
     if (/\/lib\/server\/(logins|keys|hosted-apps)\.ts$/.test(parent) && NOW_FAKED.test(specifier)) return { url: `fakenow:${specifier.slice(2)}?${new URL(`${specifier}.ts`, parent).href}`, shortCircuit: true };
     // This build's own files: "@/" is the repo, and an import without its extension is its .ts or .tsx.
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -206,10 +207,10 @@ const CS32 = await import(fromTag("cloud/computer-scope.ts"));
 const C32 = await import(fromTag("lib/server/composio.ts"));
 const K32 = await import(fromTag("lib/server/keys.ts"));
 const VT32 = await import(fromTag("lib/server/vault.ts"));
-const T = await import(`${root}/lib/types.ts`);
-const CS = await import(`${root}/cloud/computer-scope.ts`);
-const L = await import(`${root}/lib/server/logins.ts`);
-const K = await import(`${root}/lib/server/keys.ts`);
+const T = await import(`${rootUrl}/lib/types.ts`);
+const CS = await import(`${rootUrl}/cloud/computer-scope.ts`);
+const L = await import(`${rootUrl}/lib/server/logins.ts`);
+const K = await import(`${rootUrl}/lib/server/keys.ts`);
 
 let passed = 0;
 const check = (name, fn) => {
@@ -381,7 +382,7 @@ check("v0.0.32's save keeps every entry this build keeps: each has a bot (its sh
   const rule = /const showsAny = \(a: MemberAccess\) => (.+);/.exec(src ?? "")?.[1];
   assert.ok(rule, "v0.0.32's showsAny");
   const showsAny32 = new Function("a", `return ${rule};`);
-  const NOW_SRC = readFileSync(`${root}/lib/server/workspaces.ts`, "utf8");
+  const NOW_SRC = readFileSync(`${rootPath}/lib/server/workspaces.ts`, "utf8");
   const rule0 = /const showsAny = \(a: MemberAccess\) => (.+);/.exec(NOW_SRC)?.[1];
   const showsAnyNow = new Function("a", `return ${rule0};`);
   for (const e of [access("write"), access("read", { sam: "none", juno: "write" }), { others: "read", bots: {}, apps: "write" }, { others: "none", bots: {}, apps: "write" }])
@@ -594,7 +595,7 @@ const fieldsOf = (src, name) => {
   return [...body.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/(?:^|[{;\n])\s*([a-zA-Z]+)\??:/g)].map((m) => m[1]).sort();
 };
 const HA32 = old("lib/hosted-apps.ts");
-const HA = readFileSync(`${root}/lib/hosted-apps.ts`, "utf8");
+const HA = readFileSync(`${rootPath}/lib/hosted-apps.ts`, "utf8");
 
 check("The app's record adds only its Preview label's copy, its Local's hints and its Preview password's choice to v0.0.32's fields, optional: AppHosting and AppSiteHosting gain preview, localPort, toldGoogle, passwordOff and passwordSet, AppProjectBehind is as it was", () => {
   const added = ["preview", "localPort", "toldGoogle", "passwordOff", "passwordSet"];
@@ -654,7 +655,7 @@ check("v0.0.32 queueing a deploy (queuedAt) while this build kept a Preview pass
   assert.deepEqual(notesOf(V32.merge3(clone(W1), mine, theirs)), { ...notesOf(theirs), queuedAt: 13 });
 });
 check("A task's app (Session.app) gains only optional site and startHead: v0.0.32 reads name and wsId as before, and keeps a session it didn't change whole", () => {
-  const T = readFileSync(`${root}/lib/types.ts`, "utf8");
+  const T = readFileSync(`${rootPath}/lib/types.ts`, "utf8");
   const T32 = old("lib/types.ts");
   const appOf = (src) => /\n {2}app\?: \{([^}]*)\};/.exec(src)?.[1].split(";").map((x) => x.trim().split(/\??:/)[0]).filter(Boolean).sort();
   assert.deepEqual(appOf(T), [...appOf(T32), "site", "startHead"].sort());
@@ -714,8 +715,8 @@ await checkAsync("v0.0.32's own Deploy on an app with a Staging project beside P
  * This build's own hosted-apps.ts against a fake Orgo (its projects, public URLs and domains on one computer) and a
  * state as v0.0.32 leaves it: what it finds, what it makes, and what it never touches.
  */
-const NOWH = await import(`${root}/lib/server/hosted-apps.ts`);
-const LBL = await import(`${root}/lib/server/app-labels.ts`);
+const NOWH = await import(`${rootUrl}/lib/server/hosted-apps.ts`);
+const LBL = await import(`${rootUrl}/lib/server/app-labels.ts`);
 const REPO = `${PROJ}/field-notes`;
 /** A fake Orgo for this build: projects and public URLs on c_new, every call recorded. */
 function fakeOrgo({ projects = [], urls = [], domains = [] } = {}) {
@@ -880,7 +881,7 @@ await checkAsync("A legacy Published (the live sites' shape: named as the site o
 // site kept on the bot (Bot.site) would be lost there, by v0.0.32 and by this build's own merge alike, as each keeps one
 // Mac's whole copy of a bot changed on both sides (shown last): why it's on the workspace, like botSettings. Lost, or
 // pointing at an app or a bot v0.0.32 removed, the sidebar says the bot's role again and nothing else changes.
-const G = await import(`${root}/lib/bot-groups.ts`);
+const G = await import(`${rootUrl}/lib/bot-groups.ts`);
 const NAMES = { c_sam: "Front desk" };
 const SITES = { juno: { app: "shop", site: "blog" } };
 const SHOP = { botId: "sam", computerId: "c_sam", projectId: "p_shop", sites: [{ name: "blog", projectId: "p_blog" }] };

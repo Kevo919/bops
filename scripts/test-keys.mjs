@@ -19,16 +19,15 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.BOPS_SELF_HOSTED = "1";
 process.env.OPENAI_API_KEY = "sk-test-keys";
 const UI = "ui-token-test-keys";
 process.env.BOPS_UI_TOKEN = UI;
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-keys-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
@@ -46,7 +45,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -188,19 +187,19 @@ const noDashes = (text, where) => assert.ok(!DASHES.test(String(text)), `a dash 
 const spoken = [];
 const hear = (x) => (spoken.push(String(x)), x);
 
-const S = await import(`${root}/lib/server/store.ts`);
-const { botChatId } = await import(`${root}/lib/types.ts`);
-const Keys = await import(`${root}/lib/server/keys.ts`);
-const Chat = await import(`${root}/lib/server/chat.ts`);
-const P = await import(`${root}/lib/server/permission.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
+const Keys = await import(`${rootUrl}/lib/server/keys.ts`);
+const Chat = await import(`${rootUrl}/lib/server/chat.ts`);
+const P = await import(`${rootUrl}/lib/server/permission.ts`);
 /** Wait for something the chat does in the background (a turn going on from a reply). */
 async function until(check, what, ms = 5000) {
   for (const end = Date.now() + ms; Date.now() < end; await new Promise((r) => setTimeout(r, 10))) if (check()) return;
   assert.fail(`timed out waiting for ${what}`);
 }
-const KeysRoute = await import(`${root}/app/api/keys/route.ts`);
-const KeyRoute = await import(`${root}/app/api/keys/[name]/route.ts`);
-const RevealRoute = await import(`${root}/app/api/keys/reveal/route.ts`);
+const KeysRoute = await import(`${rootUrl}/app/api/keys/route.ts`);
+const KeyRoute = await import(`${rootUrl}/app/api/keys/[name]/route.ts`);
+const RevealRoute = await import(`${rootUrl}/app/api/keys/reveal/route.ts`);
 clearInterval(globalThis.__bopsRoutines);
 
 const chatId = botChatId("boppy");
@@ -433,7 +432,7 @@ await check("no bot or model can reach reveal: only its route calls it, and no t
       if (f === "node_modules" || f.startsWith(".")) continue;
       const p = join(d, f);
       if (statSync(p).isDirectory()) walk(p);
-      else if (/\.(ts|tsx)$/.test(f) && readFileSync(p, "utf8").includes("revealKey")) users.push(p.slice(root.length + 1));
+      else if (/\.(ts|tsx)$/.test(f) && readFileSync(p, "utf8").includes("revealKey")) users.push(p.slice(rootPath.length + 1));
     }
   };
   for (const d of ["app", "lib", "components"]) walk(join(rootPath, d));
@@ -686,7 +685,7 @@ await check("Used in: a key of one workspace switched on in another is listed th
   try {
     const all = await Keys.listKeys({ fresh: true });
     assert.ok(!Keys.keysOf(all, "ws_fern").some((k) => k.name === "GITHUB_TOKEN"), "Main's GitHub key isn't Fernway's");
-    const LoginsRoute = await import(`${root}/app/api/logins/route.ts`);
+    const LoginsRoute = await import(`${rootUrl}/app/api/logins/route.ts`);
     const flip = (on, window = true) => LoginsRoute.PATCH(req("PATCH", "/api/logins", { kind: "key", id: `${PROJ_A}:GITHUB_TOKEN`, workspaceId: "ws_fern", on }, window));
     assert.equal((await flip(true, false)).status, 403, "only from the Bops window");
     assert.equal((await flip(true)).status, 200);

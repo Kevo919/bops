@@ -18,6 +18,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 
 // A file store, loaded at once and always ready (lib/server/persist.ts); the Mac app's ways (cloud.ts cloudOn,
@@ -28,12 +29,13 @@ for (const k of ["ORGO_API_KEY", "BOPS_ORGO_WORKSPACE", "BOPS_ORGO_TEMPLATE", "B
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
 // The app's version, which every call to Orgo says (lib/server/app-version.ts orgoHeaders).
 process.env.BOPS_APP_VERSION = "9.9.9";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 // Modules that would start processes when loaded, or that Node can't load, are stand-ins whose exports do nothing (as in test-plan.mjs).
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -139,12 +141,12 @@ const asked = (method, path, since = 0) => calls.slice(since).filter((c) => c.me
 const later = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 const noDashes = (text) => assert.ok(!/[–—]/.test(text), `no dashes: ${text}`);
 
-const T = await import(`${root}/lib/types.ts`);
-const O = await import(`${root}/lib/server/orgo.ts`);
-const S = await import(`${root}/lib/server/store.ts`);
-const X = await import(`${root}/lib/server/sessions.ts`);
-const C = await import(`${root}/app/api/computer/route.ts`);
-const SR = await import(`${root}/app/api/screen/route.ts`);
+const T = await import(`${rootUrl}/lib/types.ts`);
+const O = await import(`${rootUrl}/lib/server/orgo.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const X = await import(`${rootUrl}/lib/server/sessions.ts`);
+const C = await import(`${rootUrl}/app/api/computer/route.ts`);
+const SR = await import(`${rootUrl}/app/api/screen/route.ts`);
 // Loaded: now it's the Mac app, which says when its computer is in use (free-hours.ts sayInUse).
 delete process.env.BOPS_SELF_HOSTED;
 

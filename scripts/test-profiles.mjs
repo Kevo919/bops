@@ -24,9 +24,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
 const pg = require("pg");
@@ -199,10 +198,10 @@ writeFileSync(
 // Modules that would start something (Bops Cloud's tunnel, the relay, the bots' sessions, the Mac
 // check that installs the Codex CLI, the desktop and mirror) are stand-ins: each of their exports does nothing.
 const STAND_INS = new Set(["cloud-tunnel", "relay", "sessions", "mac", "desktop", "mirror"]);
-const project = pathToFileURL(root).href + "/";
+const project = pathToFileURL(rootPath).href + "/";
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -242,15 +241,15 @@ const quiet = { info: console.info, warn: console.warn, error: console.error };
 console.info = () => {};
 console.warn = () => {};
 
-const S = await import(`${root}/lib/server/store.ts`);
-const L = await import(`${root}/lib/server/orgo-sign-in.ts`);
-const U = await import(`${root}/lib/server/user-paths.ts`);
-const Up = await import(`${root}/lib/server/uploads.ts`);
-const K = await import(`${root}/lib/server/keychain.ts`);
-const M = await import(`${root}/lib/server/state-merge.ts`);
-const SO = await import(`${root}/app/api/auth/signout/route.ts`);
-const OA = await import(`${root}/lib/server/orgo-auth.ts`);
-const OW = await import(`${root}/app/api/owner/route.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const L = await import(`${rootUrl}/lib/server/orgo-sign-in.ts`);
+const U = await import(`${rootUrl}/lib/server/user-paths.ts`);
+const Up = await import(`${rootUrl}/lib/server/uploads.ts`);
+const K = await import(`${rootUrl}/lib/server/keychain.ts`);
+const M = await import(`${rootUrl}/lib/server/state-merge.ts`);
+const SO = await import(`${rootUrl}/app/api/auth/signout/route.ts`);
+const OA = await import(`${rootUrl}/lib/server/orgo-auth.ts`);
+const OW = await import(`${rootUrl}/app/api/owner/route.ts`);
 const setOwner = async (name) => {
   const res = await OW.POST(new Request("http://localhost/api/owner", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) }));
   return res.status;
@@ -613,7 +612,7 @@ try {
 
   /* ---------------- A bot's turn still waiting on the model when A signs out and B signs in ---------------- */
 
-  const C = await import(`${root}/lib/server/chat.ts`);
+  const C = await import(`${rootUrl}/lib/server/chat.ts`);
   assert.equal((await signOut()).status, 200);
   await signIn(A);
   const fake = globalThis.__fakeOpenAI;

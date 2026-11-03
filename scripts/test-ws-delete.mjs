@@ -15,6 +15,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
@@ -25,7 +26,8 @@ process.env.HONCHO_API_KEY = "hc-test-ws-delete";
 process.env.BOPS_ORGO_ORIGIN = "http://orgo.test";
 const ORGO_KEY = "sk_orgo_test_ws_delete";
 globalThis.bopsOrgoKey = ORGO_KEY;
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-ws-delete-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
@@ -41,7 +43,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -204,15 +206,15 @@ process.emitWarning = (warning, ...rest) => (rest[0]?.code === "MODULE_TYPELESS_
 const rejections = [];
 process.on("unhandledRejection", (e) => rejections.push(String(e?.stack ?? e)));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const Mem = await import(`${root}/lib/server/memory.ts`);
-const MD = await import(`${root}/lib/server/memory-deletes.ts`);
-const I = await import(`${root}/lib/server/orbit-issues.ts`);
-const Sk = await import(`${root}/lib/server/workspace-skills.ts`);
-const Rm = await import(`${root}/lib/server/remove.ts`);
-const Route = await import(`${root}/app/api/workspaces/route.ts`);
-const { forgetWorkspaceHere } = await import(`${root}/lib/workspace-local.ts`);
-const { botChatId } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const Mem = await import(`${rootUrl}/lib/server/memory.ts`);
+const MD = await import(`${rootUrl}/lib/server/memory-deletes.ts`);
+const I = await import(`${rootUrl}/lib/server/orbit-issues.ts`);
+const Sk = await import(`${rootUrl}/lib/server/workspace-skills.ts`);
+const Rm = await import(`${rootUrl}/lib/server/remove.ts`);
+const Route = await import(`${rootUrl}/app/api/workspaces/route.ts`);
+const { forgetWorkspaceHere } = await import(`${rootUrl}/lib/workspace-local.ts`);
+const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
 clearInterval(globalThis.__bopsRoutines);
 
 /* ---------------- Helpers ---------------- */

@@ -52,14 +52,13 @@ for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAI
 process.env.BOPS_RESPONSES_WS = "0";
 // This Mac, as the user's state knows it (persist-cloud.ts deviceIdFor), without asking ioreg.
 process.env.BOPS_DEVICE_SEED = "test-mac";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
-// The same root as an OS path, for the file system (the URL form is for imports).
-const rootPath = fileURLToPath(new URL("..", import.meta.url));
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 // Modules that would start processes when loaded (the relay's agent) or that Node can't load are stand-ins: each of their exports does nothing.
 const STAND_INS = new Set(["relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -242,18 +241,18 @@ globalThis.fetch = async (input, init) => {
 const warned = [];
 console.warn = (...a) => warned.push(a.join(" "));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const L = await import(`${root}/lib/server/local.ts`);
-const Cl = await import(`${root}/lib/server/cloud.ts`);
-const M = await import(`${root}/lib/server/mac.ts`);
-const Box = await import(`${root}/lib/server/executor-sandbox.ts`);
-const X = await import(`${root}/lib/server/sessions.ts`);
-const MacRoute = await import(`${root}/app/api/mac/route.ts`);
-const TakeoverRoute = await import(`${root}/app/api/takeover/route.ts`);
-const InputRoute = await import(`${root}/app/api/input/route.ts`);
-const CodexRoute = await import(`${root}/app/api/mac/codex/route.ts`);
-const FA = await import(`${root}/lib/server/full-access.ts`);
-const BotsRoute = await import(`${root}/app/api/bots/route.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const L = await import(`${rootUrl}/lib/server/local.ts`);
+const Cl = await import(`${rootUrl}/lib/server/cloud.ts`);
+const M = await import(`${rootUrl}/lib/server/mac.ts`);
+const Box = await import(`${rootUrl}/lib/server/executor-sandbox.ts`);
+const X = await import(`${rootUrl}/lib/server/sessions.ts`);
+const MacRoute = await import(`${rootUrl}/app/api/mac/route.ts`);
+const TakeoverRoute = await import(`${rootUrl}/app/api/takeover/route.ts`);
+const InputRoute = await import(`${rootUrl}/app/api/input/route.ts`);
+const CodexRoute = await import(`${rootUrl}/app/api/mac/codex/route.ts`);
+const FA = await import(`${rootUrl}/lib/server/full-access.ts`);
+const BotsRoute = await import(`${rootUrl}/app/api/bots/route.ts`);
 const ReplyRoute = await import(pathToFileURL(join(rootPath, "app/api/sessions/[sessionId]/reply/route.ts")).href);
 const WhereRoute = await import(pathToFileURL(join(rootPath, "app/api/sessions/[sessionId]/where/route.ts")).href);
 
@@ -288,10 +287,10 @@ assert.ok(sources.length > 100, "the app's sources were read");
 const FORBIDDEN = [/["'`]app-server["'`]/, /account\/login/, /account\/read/, /chatgptDeviceCode/, /type:\s*["'`]chatgpt["'`]/, /signInToCodex|openCodexApp/];
 for (const p of sources) {
   const text = readFileSync(p, "utf8");
-  for (const re of FORBIDDEN) assert.ok(!re.test(text), `${p.slice(root.length + 1)} matches ${re}`);
+  for (const re of FORBIDDEN) assert.ok(!re.test(text), `${p.slice(rootPath.length + 1)} matches ${re}`);
 }
 // No screen in the app names ChatGPT (a plan, a sign-in, tokens "on ChatGPT").
-for (const p of sources.filter((p) => p.startsWith(join(rootPath, "components")))) assert.ok(!/chatgpt/i.test(readFileSync(p, "utf8")), `${p.slice(root.length + 1)} names ChatGPT`);
+for (const p of sources.filter((p) => p.startsWith(join(rootPath, "components")))) assert.ok(!/chatgpt/i.test(readFileSync(p, "utf8")), `${p.slice(rootPath.length + 1)} names ChatGPT`);
 
 // The Mac is ready with the Codex CLI (to run bots' tools) and Chrome; no sign-in step, and looking ran no Codex.
 await M.checkMac();
@@ -626,8 +625,8 @@ assert.equal(S.session(turnedAway).status, "done", S.session(turnedAway).error);
 // on to its end. Stop on another such run: its request rejected, the session's wait cancelled (agent.session.input.cancel).
 {
   process.env.TREG_TOKEN = "treg_test";
-  const P = await import(`${root}/lib/server/permission.ts`);
-  const T = await import(`${root}/lib/types.ts`);
+  const P = await import(`${rootUrl}/lib/server/permission.ts`);
+  const T = await import(`${rootUrl}/lib/types.ts`);
   const lookup = { endpoint: { id: "acme.company_lookup", name: "Company lookup", summary: "Look up a company's numbers", kind: "data", method: "POST", cost: { usd: 0.5 } }, usd_per_call: 0.5 };
   const tregCalls = [];
   web.answer = (c) => {
@@ -907,8 +906,8 @@ else {
 // not talk). Anything else goes to the bot, which sees the whole chat and can send it on (tell_task),
 // in words the task can act on, shown in the chat. "ok that was a test, we can continue", right after
 // a task started, went into that task.
-const Chat = await import(`${root}/lib/server/chat.ts`);
-const chatId = (await import(`${root}/lib/types.ts`)).botChatId(main.id);
+const Chat = await import(`${rootUrl}/lib/server/chat.ts`);
+const chatId = (await import(`${rootUrl}/lib/types.ts`)).botChatId(main.id);
 Cl.cloudSessionNow().typesafe = true;
 const jev = { chat_only: 0.02, for_task: 0.9, thread: null };
 const said = { output: [] };
@@ -1035,7 +1034,7 @@ assert.match(note(before1).content, /"Sam public background" \(ses_research\), r
 // A long chat: its first message stays the same for a few turns, not one turn (24 to 31 messages are read whole).
 // What fell out is in the chat's summary (chat-summary.ts), read first, folded after each turn: until the first fold
 // is in, those are still read whole (16 at most).
-const { foldChat } = await import(`${root}/lib/server/chat-summary.ts`);
+const { foldChat } = await import(`${rootUrl}/lib/server/chat-summary.ts`);
 for (let i = 0; i < 30; i++) S.addMessage({ chatId, role: i % 2 ? "bot" : "user", botId: i % 2 ? main.id : undefined, text: `filler ${i}` });
 const firsts = [];
 for (let i = 0; i < 6; i++) {
@@ -1069,7 +1068,7 @@ Cl.cloudSessionNow().typesafe = false;
 // its record and the page it was on, told to check before doing any of it again; the thread that replaces
 // it is never taken for the same job (Jev called it that, the new thread was deleted, and a third one
 // made), and a second move at once goes to it. An offer to move goes with the run.
-const W = await import(`${root}/lib/server/where.ts`);
+const W = await import(`${rootUrl}/lib/server/where.ts`);
 for (const t of ["do it on my Mac", "Continue on my MacBook Pro please", "move it to my Mac", "No, do it on my Mac", "use my laptop for this", "do this on this Mac", "I don't want it in the cloud, do it on my Mac", "run it on the Mac"])
   assert.equal(W.asksForMac(t), true, t);
 for (const t of ["find a plumber locally", "use my computer", "don't do this on my Mac", "please do not run it on my laptop", "not on my Mac", "Don’t use my Mac", "never on my MacBook", "is it on the Mac App Store?", "my mac is slow", "keep it off my Mac", "without using my Mac", "Do it anywhere but on my Mac", "on my mac? no way", "anything but on my laptop", "except on my Mac"])
@@ -1388,7 +1387,7 @@ Object.assign(jevSame, { choice: "different", confidence: 0.9 });
 // nothing takes it over here, and its routine's next run waits for it, so the email is never sent twice. One quiet on Mac C
 // with a request another Mac made is left behind as any is, and its request is never touched by that.
 {
-  const R = await import(`${root}/lib/server/routines.ts`);
+  const R = await import(`${rootUrl}/lib/server/routines.ts`);
   const later = Date.now() + 60 * 60_000;
   S.update((s) => {
     s.sessions.push(onC("ses_c_ok", "Summary to Dana", { routineId: "r_c_ok", status: "queued" }), onC("ses_c_left", "Invoice to Ava"));
@@ -1535,8 +1534,8 @@ Cl.cloudSessionNow().typesafe = false;
 // writeSkillFiles, from local.ts startExecutor): its agent session's capability directory finds them.
 // Its apps go beside them (capabilities/apps); a draft, or one for another bot, doesn't go.
 {
-  const W = await import(`${root}/lib/server/workspace-skills.ts`);
-  const { workspaceOf } = await import(`${root}/lib/types.ts`);
+  const W = await import(`${rootUrl}/lib/server/workspace-skills.ts`);
+  const { workspaceOf } = await import(`${rootUrl}/lib/types.ts`);
   const ws = workspaceOf(main);
   const body = W.procedureBody({ name: "Weekly invoice summary", whenToUse: "When asked for the week's invoices", steps: "1. Open the Invoices folder\n2. Sum the totals", pitfalls: "Skip drafts" });
   const saved = W.createSkill(ws, { name: "Weekly invoice summary", description: "When asked for the week's invoices", body, files: [{ path: "scripts/sum.sh", content: "#!/bin/sh\necho sum\n", executable: true }], botIds: [main.id], status: "published" }).ref;

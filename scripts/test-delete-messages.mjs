@@ -20,6 +20,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import ts from "typescript";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
 process.env.TZ = "America/New_York";
@@ -27,7 +28,8 @@ process.env.BOPS_SELF_HOSTED = "1";
 const UI = "window-token-delete-messages";
 process.env.BOPS_UI_TOKEN = UI;
 globalThis.bopsOrgoKey = "sk_orgo_test_delete_messages";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-delete-messages-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
@@ -43,7 +45,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -74,19 +76,19 @@ process.emitWarning = (warning, ...rest) => (rest[0]?.code === "MODULE_TYPELESS_
 const rejections = [];
 process.on("unhandledRejection", (e) => rejections.push(String(e?.stack ?? e)));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const P = await import(`${root}/lib/privacy.ts`);
-await import(`${root}/lib/server/privacy.ts`);
-const Del = await import(`${root}/lib/server/deleted.ts`);
-const Rm = await import(`${root}/lib/server/remove.ts`);
-const Up = await import(`${root}/lib/server/uploads.ts`);
-const Fr = await import(`${root}/lib/server/frames.ts`);
-const Pages = await import(`${root}/lib/server/pages.ts`);
-const Route = await import(`${root}/app/api/privacy/route.ts`);
-const MessagesRoute = await import(`${root}/app/api/chats/[chatId]/messages/route.ts`);
-const { callAllowed } = await import(`${root}/components/app/view-only.ts`);
-const { orgoKey } = await import(`${root}/lib/server/orgo-auth.ts`);
-const { botChatId, pairChatId } = await import(`${root}/lib/types.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const P = await import(`${rootUrl}/lib/privacy.ts`);
+await import(`${rootUrl}/lib/server/privacy.ts`);
+const Del = await import(`${rootUrl}/lib/server/deleted.ts`);
+const Rm = await import(`${rootUrl}/lib/server/remove.ts`);
+const Up = await import(`${rootUrl}/lib/server/uploads.ts`);
+const Fr = await import(`${rootUrl}/lib/server/frames.ts`);
+const Pages = await import(`${rootUrl}/lib/server/pages.ts`);
+const Route = await import(`${rootUrl}/app/api/privacy/route.ts`);
+const MessagesRoute = await import(`${rootUrl}/app/api/chats/[chatId]/messages/route.ts`);
+const { callAllowed } = await import(`${rootUrl}/components/app/view-only.ts`);
+const { orgoKey } = await import(`${rootUrl}/lib/server/orgo-auth.ts`);
+const { botChatId, pairChatId } = await import(`${rootUrl}/lib/types.ts`);
 clearInterval(globalThis.__bopsRoutines);
 
 /* ---------------- Helpers ---------------- */
@@ -488,7 +490,7 @@ await check("Delete now leaves out what was between us: a thread kept between us
 await check("nothing the window says about deleting has a dash or says Orbit", () => {
   const words = [];
   for (const f of ["components/app/message-deletes.tsx", "components/app/your-data.tsx", "lib/privacy.ts", "app/api/privacy/route.ts", "app/api/chats/[chatId]/messages/route.ts", "lib/server/deleted.ts", "lib/server/remove.ts"]) {
-    const src = ts.createSourceFile(f, readFileSync(`${root}/${f}`, "utf8"), ts.ScriptTarget.Latest, true, f.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const src = ts.createSourceFile(f, readFileSync(`${rootPath}/${f}`, "utf8"), ts.ScriptTarget.Latest, true, f.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
     const walk = (n) => {
       if (ts.isJsxAttribute(n) && n.name.getText() === "className") return;
       // Where modules are (an import, import()), not words.
@@ -499,7 +501,7 @@ await check("nothing the window says about deleting has a dash or says Orbit", (
     walk(src);
   }
   // The chat view's own words about deleting.
-  const chat = readFileSync(`${root}/components/app/chat-view.tsx`, "utf8");
+  const chat = readFileSync(`${rootPath}/components/app/chat-view.tsx`, "utf8");
   for (const said of ["Select messages", "Delete all messages", "in this chat?", "You can restore them from Recently deleted for", "Knowledge keeps what it learned from them."]) {
     assert.ok(chat.includes(said), said);
     words.push(["components/app/chat-view.tsx", said]);

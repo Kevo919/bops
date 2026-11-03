@@ -25,11 +25,13 @@ import { join } from "node:path";
 
 import { WebSocketServer } from "ws";
 import { endGroup, killGroup, removeTemp } from "./fixtures/cleanup.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -42,8 +44,8 @@ registerHooks({
     }
   },
 });
-const { cleanInput, startRelay, LINGER_MS, POINTER_BINDING, pointerOf } = await import(`${root}/lib/browser-relay.ts`);
-const { BROWSER_METHODS } = await import(`${root}/cloud/protocol.ts`);
+const { cleanInput, startRelay, LINGER_MS, POINTER_BINDING, pointerOf } = await import(`${rootUrl}/lib/browser-relay.ts`);
+const { BROWSER_METHODS } = await import(`${rootUrl}/cloud/protocol.ts`);
 
 let passed = 0;
 const test = async (name, f) => {

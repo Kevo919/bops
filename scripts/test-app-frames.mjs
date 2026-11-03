@@ -17,11 +17,13 @@ import { createRequire, registerHooks } from "node:module";
 import { createServer as createTcp } from "node:net";
 import { networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const require = createRequire(import.meta.url);
-const F = require(`${root}/desktop/app-frames.cjs`);
+const F = require(`${rootPath}/desktop/app-frames.cjs`);
 let passed = 0;
 const test = async (name, fn) => {
   await fn();
@@ -124,14 +126,14 @@ await test("an app's page may load its own page again, never another address, no
 });
 
 await test("main.cjs installs it before any window and leaves the apps' webviews to it", () => {
-  const main = readFileSync(`${root}/desktop/main.cjs`, "utf8");
+  const main = readFileSync(`${rootPath}/desktop/main.cjs`, "utf8");
   const ready = main.indexOf("app.whenReady().then(");
   const install = main.indexOf("appFrames = installAppFrames({ app, session, server: URL, preload: path.join(__dirname, \"app-frame-preload.cjs\")");
   assert.ok(install > ready && install < main.indexOf("void createWindow();", ready), "installed when ready, before the window");
   assert.match(main, /if \(contents\.getType\(\) !== "webview"\) return;\n\s*\/\/ [^\n]*\n\s*if \(appFrames\?\.isApps\(contents\.session\)\) return;\n\s*fenceTabSession\(contents\.session\);/, "a tab's rules never go on the apps' session");
-  const preload = readFileSync(`${root}/desktop/app-frame-preload.cjs`, "utf8");
+  const preload = readFileSync(`${rootPath}/desktop/app-frame-preload.cjs`, "utf8");
   assert.match(preload, /contextBridge\.exposeInMainWorld\("bopsHost", \{\n\s*post: \(message\) => ipcRenderer\.sendToHost\("bops-app", message\),\n\s*listen: \(fn\) => void ipcRenderer\.on\("bops-app", \(_event, message\) => fn\(message\)\),\n\}\);/);
-  const tsx = readFileSync(`${root}/components/app/made-apps.tsx`, "utf8");
+  const tsx = readFileSync(`${rootPath}/components/app/made-apps.tsx`, "utf8");
   assert.match(tsx, /createElement\("webview", \{ ref: setView, src: `\$\{location\.origin\}\$\{path\}`, partition: "bops-apps",/, "the window puts apps on that partition");
   assert.equal(F.PARTITION, "bops-apps");
 });
@@ -145,7 +147,7 @@ if (process.env.SKIP_ELECTRON) {
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -158,9 +160,9 @@ registerHooks({
     }
   },
 });
-const P = await import(`${root}/lib/made-app-page.ts`);
-const runtimes = { react: readFileSync(`${root}/public/made-apps/react-19.2.8.js`, "utf8"), tailwind: readFileSync(`${root}/public/made-apps/tailwind-browser-4.3.3.js`, "utf8") };
-const CSP = readFileSync(`${root}/app/api/made-apps/[appId]/view/route.ts`, "utf8").match(/"(sandbox allow-scripts;[^"]+)"/)[1];
+const P = await import(`${rootUrl}/lib/made-app-page.ts`);
+const runtimes = { react: readFileSync(`${rootPath}/public/made-apps/react-19.2.8.js`, "utf8"), tailwind: readFileSync(`${rootPath}/public/made-apps/tailwind-browser-4.3.3.js`, "utf8") };
+const CSP = readFileSync(`${rootPath}/app/api/made-apps/[appId]/view/route.ts`, "utf8").match(/"(sandbox allow-scripts;[^"]+)"/)[1];
 
 // Someone else's server: every request it gets is data that got out.
 const hits = [];
@@ -243,7 +245,7 @@ delete env.ELECTRON_RUN_AS_NODE;
 let seen;
 try {
   await new Promise((resolve, reject) => {
-    const child = spawn(require("electron"), [`${root}/scripts/test-app-frames.electron.cjs`], { env, stdio: ["ignore", "ignore", process.env.DEBUG ? "inherit" : "ignore"] });
+    const child = spawn(require("electron"), [`${rootPath}/scripts/test-app-frames.electron.cjs`], { env, stdio: ["ignore", "ignore", process.env.DEBUG ? "inherit" : "ignore"] });
     const t = setTimeout(() => (child.kill("SIGKILL"), reject(new Error("Electron took too long"))), 90_000);
     child.on("exit", () => (clearTimeout(t), resolve()));
     child.on("error", reject);

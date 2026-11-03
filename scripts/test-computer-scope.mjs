@@ -15,10 +15,12 @@ import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-computer-scope-"));
 process.chdir(scratch);
 process.env.HOME = scratch;
@@ -26,7 +28,7 @@ process.env.HOME = scratch;
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -52,8 +54,8 @@ async function check(name, fn) {
   }
 }
 
-const C = await import(`${root}/cloud/computer-scope.ts`);
-const T = await import(`${root}/lib/types.ts`);
+const C = await import(`${rootUrl}/cloud/computer-scope.ts`);
+const T = await import(`${rootUrl}/lib/types.ts`);
 const D1 = "c1c1c1c1-0000-4000-8000-000000000001";
 const D2 = "c2c2c2c2-0000-4000-8000-000000000002";
 const D3 = "c3c3c3c3-0000-4000-8000-000000000003";
@@ -604,8 +606,8 @@ const quiet = { info: console.info, warn: console.warn };
 console.info = () => {};
 console.warn = (...a) => void warned.push(a.join(" "));
 
-const S = await import(`${root}/lib/server/store.ts`);
-const P = await import(`${root}/lib/server/persist-cloud.ts`);
+const S = await import(`${rootUrl}/lib/server/store.ts`);
+const P = await import(`${rootUrl}/lib/server/persist-cloud.ts`);
 const RUNNER = P.deviceIdFor(USER, D1);
 
 const seed = () => {

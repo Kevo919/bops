@@ -14,14 +14,15 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -51,13 +52,13 @@ globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} }
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
 
-const { CODER_MIN_SIZE, mascotMarkup, mascotSvg, MOVING_MOODS } = await import(`${root}/lib/mascot.ts`);
-const { codersOf, codingThread, isPraise, moodOf, moodSignals, NO_SIGNALS, SHY_MS } = await import(`${root}/lib/bot-mood.ts`);
-const { BotMoods, BotMoodsFrom, CallTalking, Mascot, talkingStore } = await import(`${root}/components/app/mascot.tsx`);
-const { stateArrived } = await import(`${root}/components/app/state-arrival.ts`);
-const { ChatAvatar } = await import(`${root}/components/app/ui.tsx`);
-const { ChatView } = await import(`${root}/components/app/chat-view.tsx`);
-const { botTalking, BOT_TALKING } = await import(`${root}/components/app/call-bar.tsx`);
+const { CODER_MIN_SIZE, mascotMarkup, mascotSvg, MOVING_MOODS } = await import(`${rootUrl}/lib/mascot.ts`);
+const { codersOf, codingThread, isPraise, moodOf, moodSignals, NO_SIGNALS, SHY_MS } = await import(`${rootUrl}/lib/bot-mood.ts`);
+const { BotMoods, BotMoodsFrom, CallTalking, Mascot, talkingStore } = await import(`${rootUrl}/components/app/mascot.tsx`);
+const { stateArrived } = await import(`${rootUrl}/components/app/state-arrival.ts`);
+const { ChatAvatar } = await import(`${rootUrl}/components/app/ui.tsx`);
+const { ChatView } = await import(`${rootUrl}/components/app/chat-view.tsx`);
+const { botTalking, BOT_TALKING } = await import(`${rootUrl}/components/app/call-bar.tsx`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -277,7 +278,7 @@ await test("the sidebar's rows and the chat's header (ChatAvatar) move, each bot
 });
 
 await test("the motions: every moving class has one, transform and opacity only, 0.7 to 2 s loops, and none with reduced motion", () => {
-  const css = readFileSync(`${root}/app/globals.css`, "utf8");
+  const css = readFileSync(`${rootPath}/app/globals.css`, "utf8");
   const markup = MOVING_MOODS.map((m) => mascotMarkup("max", "#FF9F43", { mood: m })).join("");
   // The bubble and the laptop only hold what moves in them.
   const classes = [...new Set([...markup.matchAll(/class="([^"]+)"/g)].flatMap((m) => m[1].split(" ")))].filter((c) => c !== "mascot-thought" && c !== "mascot-laptop");
@@ -349,8 +350,8 @@ await test("the call bar says the bot is talking while its voice comes through, 
 });
 
 await test("the loading scene sings, looks about and blinks, the window's splash and the app's first load alike, on the awake face's own shapes", () => {
-  const splash = readFileSync(`${root}/desktop/splash.html`, "utf8");
-  const css = readFileSync(`${root}/app/globals.css`, "utf8");
+  const splash = readFileSync(`${rootPath}/desktop/splash.html`, "utf8");
+  const css = readFileSync(`${rootPath}/app/globals.css`, "utf8");
   const awake = mascotMarkup("boppy", "#0A0A0A", { mood: "awake" });
   // The splash draws exactly the awake picture, so the same selectors find its eyes and mouth in both.
   assert.ok(splash.includes(`<svg class="boppy" viewBox="0 0 40 40">${awake}</svg>`), "the splash's Boppy is the awake picture");

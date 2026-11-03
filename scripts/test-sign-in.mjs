@@ -13,7 +13,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 // Orgo is the fake below, on its own origin; the state goes to a throwaway file store.
 for (const k of ["ORGO_API_KEY", "BOPS_DATABASE_URL", "BOPS_SELF_HOSTED"]) delete process.env[k];
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.test";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const ts = createRequire(import.meta.url)("typescript");
 // Modules that would start something when called or loaded (the Keychain, Bops Cloud, the relay, the
 // bots' sessions and what they load) are stand-ins: each of their exports does nothing.
@@ -21,10 +22,10 @@ const STAND_INS = new Set(["keychain", "cloud-tunnel", "relay", "sessions", "mac
 // The server modules import "@/lib/…" and "./store" (no extension), the way Next resolves them. Node only
 // strips types and can't run parameter properties (SignInError has one), so the project's TypeScript
 // compiles each file instead.
-const project = pathToFileURL(root).href + "/";
+const project = pathToFileURL(rootPath).href + "/";
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -74,8 +75,8 @@ globalThis.fetch = async (input, init) => {
   return out;
 };
 
-const L = await import(`${root}/lib/server/orgo-sign-in.ts`);
-const route = await import(`${root}/app/api/auth/start/route.ts`);
+const L = await import(`${rootUrl}/lib/server/orgo-sign-in.ts`);
+const route = await import(`${rootUrl}/app/api/auth/start/route.ts`);
 /** POST /api/auth/start the way the app does: a JSON body naming the way in, or none at all. */
 const start = async (body) => {
   const init = body === undefined ? { method: "POST" } : { method: "POST", headers: { "Content-Type": "application/json" }, body: typeof body === "string" ? body : JSON.stringify(body) };

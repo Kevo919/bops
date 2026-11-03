@@ -23,10 +23,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { unfaked } from "./fake-exports.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 for (const k of Object.keys(process.env)) if (/^(BOPS|ORGO)_/.test(k)) delete process.env[k];
 process.env.BOPS_ORGO_ORIGIN = "https://orgo.example";
-const root = new URL("..", import.meta.url).href.replace(/\/$/, "");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
 const START = process.argv.includes("--start");
 
 const FAKES = {
@@ -40,7 +42,7 @@ const VALUES = { runner: { IDENTITY_EVERY_MS: 300000, WHO_AM_I_EVERY_MS: 60000 }
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
-    if (specifier.startsWith("@/")) specifier = `${root}/${specifier.slice(2)}`;
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
     } catch (e) {
@@ -146,12 +148,12 @@ function keyHome() {
 
 process.env.BOPS_RUNNER = "1";
 process.env.BOPS_RUNNER_COMPUTER = C1;
-const V = await import(`${root}/lib/server/vm-identity.ts`);
+const V = await import(`${rootUrl}/lib/server/vm-identity.ts`);
 const VT = V.vmIdentityForTests;
-const K = await import(`${root}/lib/server/runner-key.ts`);
+const K = await import(`${rootUrl}/lib/server/runner-key.ts`);
 const home = keyHome();
 K.runnerKeyForTests.files([home.secrets, home.env]);
-const A = await import(`${root}/lib/server/orgo-auth.ts`);
+const A = await import(`${rootUrl}/lib/server/orgo-auth.ts`);
 const left = [];
 /** Orgo's profile as the runner's key check asks it (by key: an answer, or none). */
 const profiles = new Map();
@@ -182,7 +184,7 @@ const fileKey = (k) => writeFileSync(home.secrets, `export ORGO_API_KEY=${k}\n`,
 /* ---------------- Started on its own (node … --start): runner-start.ts ---------------- */
 
 if (START) {
-  const S = await import(`${root}/lib/server/runner-start.ts`);
+  const S = await import(`${rootUrl}/lib/server/runner-start.ts`);
   Object.assign(process.env, { BOPS_UI_TOKEN: "a".repeat(64), HOSTNAME: "127.0.0.1", BOPS_DEVICE_SEED: C1 });
   globalThis.__fake.runner = { checkIdentity: async () => "same", runnerComputer: () => C1, startRunsOn: () => globalThis.__fake.started.push("runs-on"), watchIdentity: async () => {} };
   globalThis.__fake["orgo-sign-in"] = { authStatus: async () => ((ready = true), {}) };
@@ -474,7 +476,7 @@ await check("a token turned down anywhere has the runner take its next credentia
 
 await check("the VMM answering for another computer is a copy: its token is never taken up, and the runner leaves", async () => {
   resetAll();
-  const R = await import(`${root}/lib/server/runner.ts`);
+  const R = await import(`${rootUrl}/lib/server/runner.ts`);
   let copies = 0;
   R.runnerForTests.identity({ leave: () => void copies++, copyFiles: [] });
   fileKey("sk_file_key");
@@ -657,7 +659,7 @@ await check("orgoKey() replaces a token that's due or turned down without making
 
 await check("Orgo's calls on a turned-down token are made once more on the next credential; no token is ever logged", async () => {
   resetAll();
-  const O = await import(`${root}/lib/server/orgo.ts`);
+  const O = await import(`${rootUrl}/lib/server/orgo.ts`);
   vmm.token = tokenAnswer({ token: "orgo_vm_stale.sig" });
   const sent = [];
   const fetchWas = globalThis.fetch;
@@ -682,7 +684,7 @@ await check("Orgo's calls on a turned-down token are made once more on the next 
 
 await check("its VMM asked every minute: another computer is a copy (it leaves), another VM of its own gets a new token", async () => {
   resetAll();
-  const R = await import(`${root}/lib/server/runner.ts`);
+  const R = await import(`${rootUrl}/lib/server/runner.ts`);
   let copies = 0;
   R.runnerForTests.identity({ leave: () => void copies++, copyFiles: [] });
   vmm.token = tokenAnswer({ token: "orgo_vm_vma.sig", vm: "vm-a" });
@@ -708,7 +710,7 @@ await check("its VMM asked every minute: another computer is a copy (it leaves),
 });
 
 await check("started on its own, a runner with no credential waits and starts on a key; a refused one stops", () => {
-  const run = spawnSync(process.execPath, ["--conditions=react-server", import.meta.url, "--start"], { encoding: "utf8" });
+  const run = spawnSync(process.execPath, ["--conditions=react-server", fileURLToPath(import.meta.url), "--start"], { encoding: "utf8" });
   assert.equal(run.status, 0, `${run.stdout}${run.stderr}`.split("\n").filter((l) => /FAIL|passed|^\s{2}/.test(l)).join("\n"));
 });
 
