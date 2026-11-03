@@ -1,0 +1,71 @@
+name: Fork CI
+
+on:
+  pull_request:
+    branches: [windows-port]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# PR code receives no write permissions or repository secrets.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    # Same fork-only guard as sync-upstream.yml.
+    if: github.repository != 'OrgoAI/bops'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate route types
+        # next-env.d.ts is not committed; match the existing CI prerequisite.
+        run: npx next typegen
+      - name: Typecheck
+        run: npx tsc --noEmit -p .
+      - name: Lint
+        run: npm run lint
+      - name: Bot AI tests
+        run: node scripts/test-bot-ai.mjs
+      - name: CLI agent tests
+        run: node --conditions=react-server scripts/test-cli-agents.mjs
+      - name: Config tests
+        run: node scripts/test-config.mjs
+
+  android:
+    if: github.repository != 'OrgoAI/bops'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle*
+            android/gradle/wrapper/gradle-wrapper.properties
+      - name: Install Android SDK packages
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"'
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Build and lint Android
+        run: |
+          cd android
+          ./gradlew assembleDebug lintDebug
