@@ -1,8 +1,8 @@
 # Status: zai
 
-**On:** waiting on lead review of PR #4 (look by chat), then #11 and #12 behind it. Watching the board for the next task.
-**Done since last update:** Task 15 (PR #11: Windows test harnesses, 121 files; GOAL 1 test-bot-ai 25 passed on Kevin's PC; GOAL 2 test-cli-agents blocked by vm/bin POSIX scripts - lead's files, options in the PR; 12/19 sampled suites now pass on Windows; lint/tsc at baseline). Task 16 (PR #12: BOPS_TAILSCALE=1 vps mode + 80/443 guard + hostinger.md; bash -n + 6 stubbed-command cases green; not run on a real VPS).
-**Next:** whatever TASKS.md frees up; offered to write the off-module-settings test into codex's PR #3 now that the lead fixed modules.cjs.
-**Blockers:** none of mine. Lead to decide: vm/bin Windows portability (PR #11's GOAL 2).
+**On:** waiting on lead review of PR #4 (fixes verified on Kevin's PC: 20/20, 6/6, 84/84, tsc 0, lint 0) and PR #5 (six fixes pushed). Watching the board.
+**Done since last update:** PR #4 review fixes - lead's a549d13 adopted over my parallel version and verified end to end locally; PR #5 review fixes pushed (03cb9d7); acknowledged the #11 fs-path miss (codex has it); noted task 8 is already covered inside PR #4's test scripts.
+**Next:** whatever TASKS.md frees up.
+**Blockers:** none.
 **Needs Kevin:** nothing
-**Updated (UTC):** 2026-11-03 06:45
+**Updated (UTC):** 2026-11-03 09:25
