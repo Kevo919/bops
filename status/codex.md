@@ -1,20 +1,19 @@
 # Codex status
 
-Updated 2026-11-03T15:44:33.4217512Z. Heartbeat bops-hourly-build-check active; run owner codex-heartbeat-20261103-1540. MVP first; lead alone merges.
+Updated 2026-11-03T16:14Z. Hourly automation bops-hourly-build-check active; owner codex-heartbeat-20261103-1540; stop by ~16:25 UTC. Lead alone merges.
 
-## Now
-- PR15 merged by lead (windows-port b2d3551). No push toinstallerbranch needed; willfast-forwardlocalcheckout. Priorliveupgrade/shortcuts/hashretention passed; newapplaunchremainsblockedbyautomaticapprovalreview/notretried. LeadsaidKevinlauncheshimself. Installer nits deferredperlead.
-- PR30 localauth/card: normalmergedb2d3551 into9f87d42, notpushedyet. 13subscriptionDOM+8ModelsCardDOMtests PASS; no merge/orderingregression. Exactheadfreshtype/lint runningunderbuildlockcodex-auth-checks-1540. Prior07291ecbothCIgreen,12auth+14fakechat+13DOM+proxy+type/lintPASS. ActualEdge syntheticdesktop/mobilechecksPASS; reallogin/modelcallsunverified.
-- LocalchatstillUNWIRED/hardproductiongateFALSE beforeanyCLIwork. ExactCodexconfig/Windowsbackend/attestation andrelayprivacyblockers reported. Leaddeadline~18UTC thenauth-only/cardshipandchat47. Do notenableprototypeorclaimno-write/networkguarantees. Recommendedauth-onlyreviewpendingleaddecision.
-- PR17 fusealignment resumed inbops-windows-fuses nowinstallermerged. Onlycode/lightchecks untilauthheavyjobfinishes. NoinstalledBopslaunch/inspectproberetry; previousautomaticreviewblocksremainbinding.
+## Ready for review
+- PR30 AUTH-ONLY MVP ready at 9f87d42. Both CI green; exact-head clean verification worktree typecheck exit 0, lint 0 errors/14 warnings, subscription DOM 13 and Models DOM 8 passed. Earlier auth 12, gated fake chat 14 and proxy tests passed. Actual local CLI status helper reports connected metadata for both providers; no fresh login or provider-token validation. PR22 folded and closed. Chat remains hard-disabled/unwired; task47 parked.
+- PR17 head 0c4b0bc includes installer base b2d3551, both CI green; 7 light fuse checks passed. PR body now distinguishes earlier artifact evidence from current head. Fresh combined NSIS build and binary fuse-byte inspection are waiting on lead build lock (09:46 local timestamp); never steal it. No installed app/inspector retry after prior automatic approval blocks.
 
-## Other coordination
-- PR24 CRLFsigninfixmerged; realcloudloginretryunverified.
-- PR22cloudcardfoldedintoPR30; leadchoosesmerge/closeorder.
-- Zai ownsPR19/27reviewfixesandMCP23. Lead1515reviewconfirmsourPR19bugsplussharedpresence/reminderissues; doNOTpushourlocal a7edec2overzaiwork. Local8tests+mutationproofremainhandoffonly.
-- Repos/optionalworkdeferred; PR11/20merged. Full128matrixandrealdeviceauthuntested.
+## In progress / next
+- Installer nits on codex/windows-installer-followups in C:/Users/MBV3n/bops-installer-followups: unpacked production-build command, versioned artifact name, preserve deleted shortcuts during upgrade. Code-only worker and independent review active; no heavy build yet.
+- Lead owns Repos19/38, Connections48, Handy41, cron26, soul28. Zai owns PR19/27 fixes and MCP PR32; do not overwrite.
+- After PR30 review and PR17/nits, recipe verification35-37 in Docker is assigned to Codex. Docker not started; needs exclusive heavy slot.
 
-## Needs Kevin / continuation
-No newKevin actionrequested. Sharedheavylockauthchecksowned; noDocker/emulator/modelrequeststarted. Endthisrunbyabout16:25UTC, releaseonlyownedlocks/logend. CheckleadmessagesafterpushandcurrentCI. PreserveleadModels/configllmswork.
+## Needs Kevin
+- No Bops decision needed. Separate tooling outage: memory observer reports "Claude Code could not authenticate the observer"; Claude Code /login or claude auth login is needed to restore automatic memory capture. Work state and board are maintained explicitly.
 
-2026-11-03T15:50:52.9453409Z PR30auth-onlymarkedready9f87d42 BOTHCIgreen;PR22closedsuperseded. RealproductionCLIstatushelperconfirmedbothconnectedmetadata. Awaitleadreview. PR17nextafterleadbuildlock.
+## Handoff
+- Lead lock still present at16:11 UTC; earlier main .next/BUILD_ID absent. Lead notified at16:01 and16:05. Do not infer build success from process disappearance.
+- No Docker, emulator, paid model call, installer launch or foreign-process termination this run. Only release owned hourly lock at exit; shared build lock belongs to lead.
