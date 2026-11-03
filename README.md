@@ -178,7 +178,10 @@ This fork adds three things to Bops:
 
 - **Windows.** Bops runs on a Windows PC: `npm run setup:win`, then `npm run app` (or `npm run app:build:win` for `dist-desktop\win-unpacked\Bops.exe`). Saved logins and tokens are encrypted, with the key in Windows Credential Manager. Bots can work on the PC too: by default only in a Chrome of their own (Codex's Windows sandbox runs their commands as a separate, restricted Windows user); with **Settings → Full access** on, as you, with a shell and your files.
 - **Your phone.** The Android app in [`android/`](android/README.md) is Bops on your phone. Pair it in **Settings → Your phone**; away from home it reaches your PC over Tailscale.
-- **A server.** Bops on a Hostinger VPS, always on: see [docs/hostinger.md](docs/hostinger.md).
+- **A server.** Bops on a Hostinger VPS, always on: see [docs/hostinger.md](docs/hostinger.md), or run `scripts/vps-setup.sh` there.
+- **Modules.** Every part is swappable or can be switched off, like DeepSeek Harness's plugins: the AI provider and each model, computers, memory, apps, email, phone and more. Change them in **Settings → Modules** or in `config/bops.yaml` (see `config/bops.example.yaml`); add your own in `config/modules.d/`.
+- **In the background.** On Windows Bops stays in the tray when its window closes, and can start with Windows. The phone app tells you when a bot needs you.
+- **Staying current.** `npm run sync:upstream` merges OrgoAI's latest; a weekly GitHub action opens a pull request for it in your fork.
 
 ## Run it yourself
 
