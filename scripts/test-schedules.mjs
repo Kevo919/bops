@@ -436,6 +436,9 @@ let clock = Z("2026-10-13T20:30:00Z"); // Tuesday 4:30 PM in New York
 Date.now = () => clock;
 let seq = 0;
 const state = {
+  // The clock below jumps days at a time, which the routines' inactivity brake would read as the owner
+  // being away; these tests are about the schedule math, so the brake is off here (test-routines-away.mjs has it).
+  routineAwayDays: 0,
   owner: { name: "Sam", timeZone: NY },
   bots: [
     { id: "bot_main", name: "Boppy", isMain: true, mail: { inboxId: "inb_1", podId: "pod" }, email: "boppy@bops.test" },
