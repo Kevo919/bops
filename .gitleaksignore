@@ -3,3 +3,7 @@
 52451f6cd78a942408602b8c1ca67eb85ba74eea:scripts/test-vm-identity.mjs:generic-api-key:505
 52451f6cd78a942408602b8c1ca67eb85ba74eea:scripts/test-vm-identity.mjs:generic-api-key:510
 52a1f2bfe92531162a1b20007509c22786a12b1e:cloud/test/core-members.test.ts:generic-api-key:211
+# fork test fixture, fake value
+bb1b2444a99afea5563b9703314238b7868f0af4:scripts/test-chat-providers.mjs:generic-api-key:26
+# fork test fixture, fake value
+ac68d39cf9284a1e96c6b698c4299ca3df98c95e:scripts/test-cli-agents.mjs:generic-api-key:435
