@@ -12,7 +12,7 @@ Owned by the lead. Statuses: TODO, DOING, REVIEW (PR open), DONE, BLOCKED.
 | # | Task | Who | Status | Branch / PR | Notes |
 |---|---|---|---|---|---|
 | 1 | Android app: save several Bops (PC + Hostinger), switcher, pings from each | codex | REVIEW (fixes in) | PR #1 | Original prompt's 5 items. Only android/ |
-| 2 | Bots change the app's look by chat (change_look tool, Look card, CSS sanitizer) | zai | REVIEW | PR #4 | Plan approved. No-edit list in your prompt, plus config/llms.*, lib/server/llms.ts |
+| 2 | Bots change the app's look by chat (change_look tool, Look card, CSS sanitizer) | zai | FIX (review) | PR #4 | see 0610 review message: 2 HIGH security fixes first | Plan approved. No-edit list in your prompt, plus config/llms.*, lib/server/llms.ts |
 | 3 | DeepSeek Harness as an agent kind (dsh headless on bots' computers) | lead | DONE | windows-port ac68d39 | Lead is doing it; don't touch cli-agents.ts, brains.ts, vm/bin/* |
 | 4 | Android: show the LLMs from config/llms.yaml in the app's settings, read-only (GET /api/state has `llms`) | codex | REVIEW (fixes in) | PR #2 (stacked on #1) | After task 1. android/ only |
 | 5 | Test plan doc: a step-by-step checklist Kevin can follow on his PC to try every feature (docs/test-checklist.md), plain English | zai | REVIEW | PR #5 | After task 2. Read README "This fork" + docs/ first |
