@@ -24,6 +24,9 @@ type Row = {
   useFor?: string[];
   runBy?: string;
   chatDefault?: boolean;
+  /** Another account of its provider (NAME__LABEL in .env.local); `accountMissing`: this server hasn't got it. */
+  account?: string;
+  accountMissing?: boolean;
 };
 type Provider = {
   id: string;
@@ -31,6 +34,8 @@ type Provider = {
   label: string;
   keyName: string | null;
   keySet: boolean;
+  /** Its other accounts' labels (NAME__LABEL set in .env.local), never a key. */
+  accounts?: string[];
   chatOnly?: boolean;
 };
 type RunBy = {
@@ -331,6 +336,63 @@ function Jobs({
   );
 }
 
+const ACCOUNT_NOTE =
+  "Chats use this account. Bots' tasks on their computers use the default account.";
+
+/**
+ * Which of the provider's accounts a model's chats use: the default (its key name) or another (NAME__LABEL in
+ * .env.local). Only when the provider has more than one, or the model names one this server hasn't got.
+ */
+function AccountSelect({
+  provider,
+  value,
+  missing,
+  disabled,
+  onChange,
+}: {
+  provider?: Provider;
+  value: string;
+  missing?: boolean;
+  disabled?: boolean;
+  onChange: (label: string) => void;
+}) {
+  const labels = provider?.accounts ?? [];
+  if (!provider?.keyName || (!labels.length && !value)) return null;
+  return (
+    <label
+      className="flex items-center gap-1.5 text-[12px]"
+      title={ACCOUNT_NOTE}
+    >
+      <span className="text-pencil">Account</span>
+      <select
+        aria-label="Account"
+        className={field}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">Default ({provider.keyName})</option>
+        {labels.map((a) => (
+          <option key={a} value={a}>
+            {a.toLowerCase()} ({provider.keyName}__{a})
+          </option>
+        ))}
+        {value && !labels.includes(value) && (
+          <option value={value}>
+            {value.toLowerCase()} (account not found)
+          </option>
+        )}
+      </select>
+      {missing && (
+        <span data-account-missing className="text-[#9A5B00]">
+          Account not found: add {provider.keyName}__{value} to .env.local, then
+          restart Bops.
+        </span>
+      )}
+    </label>
+  );
+}
+
 /** The agents that may run this provider's models for bots' tasks; the rest shown dimmed, with why. */
 function RunBySelect({
   info,
@@ -416,6 +478,11 @@ function ModelRow({
         <span className="break-all font-mono text-[11px] text-pencil">
           {l.model}
         </span>
+        {l.account && (
+          <span data-account-tag className="text-[12px] text-pencil">
+            {l.account.toLowerCase()} account
+          </span>
+        )}
         <span className="flex-1" />
         <KeyDot provider={p} />
       </div>
@@ -508,6 +575,19 @@ function ModelRow({
             </div>
           )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px]">
+            <AccountSelect
+              provider={p}
+              value={l.account ?? ""}
+              missing={l.accountMissing}
+              disabled={busy}
+              onChange={(a) =>
+                void update(
+                  { account: a || null },
+                  () =>
+                    `${l.name} now uses ${a ? `the ${a.toLowerCase()} account` : "the default account"}.`,
+                )
+              }
+            />
             {!chatOnly && (
               <label className="flex items-center gap-1.5">
                 <span
@@ -621,6 +701,7 @@ type NewModel = {
   useFor: string[];
   runBy?: string;
   chatDefault?: boolean;
+  account?: string;
 };
 
 /**
@@ -645,6 +726,7 @@ function AddModel({
   const [jobs, setJobs] = useState<string[]>([]);
   const [runBy, setRunBy] = useState("opencode");
   const [chatDefault, setChatDefault] = useState(false);
+  const [account, setAccount] = useState("");
   const [list, setList] = useState<OrModel[] | null>(null);
   const [offline, setOffline] = useState(false);
   const [search, setSearch] = useState("");
@@ -773,6 +855,7 @@ function AddModel({
             setMode("list");
             if (!named) setName("");
             setRunBy("opencode");
+            setAccount("");
           }}
         >
           <option value="">Pick a provider</option>
@@ -784,6 +867,7 @@ function AddModel({
         </select>
         {p && <KeyDot provider={p} />}
       </label>
+      <AccountSelect provider={p} value={account} onChange={setAccount} />
       {provider && (
         <div className="flex flex-col gap-1 text-[12px]">
           <span className="font-medium">2. Model</span>
@@ -1106,6 +1190,7 @@ function AddModel({
               useFor: chatOnly ? [] : jobs,
               ...(runBy !== "opencode" && !chatOnly ? { runBy } : {}),
               ...(chatDefault ? { chatDefault: true } : {}),
+              ...(account ? { account } : {}),
             })
           }
         >

@@ -16,6 +16,7 @@ import { tregOn } from "@/lib/server/treg";
 import "@/lib/server/llms";
 import { llms, ROUTE_KEYS } from "@/lib/agents";
 import { cloudProxy } from "@/lib/server/cloud";
+import { accountFlags } from "@/lib/server/provider-accounts";
 import { startActivityBeat } from "@/lib/server/free-hours";
 import { startComputerChecks } from "@/lib/server/sessions";
 import { startRunsOn } from "@/lib/server/runner";
@@ -99,6 +100,8 @@ function forApp(all: AppState): AppState {
 function chatKeys(): Record<string, boolean> {
   const out: Record<string, boolean> = {};
   for (const [provider, name] of Object.entries(ROUTE_KEYS)) out[provider] = !!process.env[name]?.trim();
+  // Each provider's other accounts (lib/accounts.ts: NAME__LABEL in .env.local): "openrouter__WORK", never a key.
+  Object.assign(out, accountFlags());
   if (cloudProxy("openai")) out.openai = true;
   return out;
 }

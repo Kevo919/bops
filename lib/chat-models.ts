@@ -1,4 +1,5 @@
 import { isPreset, llms, ROUTE_KEYS, ROUTE_NAMES, type AgentRoute } from "./agents";
+import { accountFlag } from "./accounts";
 
 /**
  * The models a chat can answer on (Chat.model), picked in the chat's message box: "provider/model", from
@@ -6,7 +7,9 @@ import { isPreset, llms, ROUTE_KEYS, ROUTE_NAMES, type AgentRoute } from "./agen
  * file. Unset is Auto: OpenAI, as before (chat.ts CHAT_MODEL and the router). The server calls each provider on
  * its key in .env.local (lib/server/chat-providers.ts); the window and the server both read this list.
  */
-export type ChatModel = { id: string; name: string; provider: AgentRoute; preset?: true };
+export type ChatModel = { id: string; name: string; provider: AgentRoute; preset?: true; account?: string };
+/** Whether a model's key is set here (`keys`: AppState.chatKeys), its own account's when it names one (lib/accounts.ts). */
+export const chatKeySet = (m: Pick<ChatModel, "provider" | "account">, keys: Partial<Record<string, boolean>>) => !!keys[accountFlag(m.provider, m.account)];
 
 export const BUILTIN_CHAT_MODELS: ChatModel[] = [
   { id: "openai/gpt-6.1-sol", name: "GPT 6.1 Sol", provider: "openai" },
@@ -24,7 +27,7 @@ export const BUILTIN_CHAT_MODELS: ChatModel[] = [
 
 /** Your LLMs first (by their names in the file), then the built in ones they don't already have. */
 export function chatModels(): ChatModel[] {
-  const out: ChatModel[] = llms().map((l) => ({ id: `${l.provider}/${l.model}`, name: l.name, provider: l.provider, ...(isPreset(l.provider, l.model) ? { preset: true as const } : {}) }));
+  const out: ChatModel[] = llms().map((l) => ({ id: `${l.provider}/${l.model}`, name: l.name, provider: l.provider, ...(isPreset(l.provider, l.model) ? { preset: true as const } : {}), ...(l.account ? { account: l.account } : {}) }));
   for (const m of BUILTIN_CHAT_MODELS) if (!out.some((x) => x.id === m.id)) out.push(m);
   return out;
 }
@@ -36,7 +39,7 @@ export function chatModels(): ChatModel[] {
  */
 export function chatDefault(keys: Partial<Record<string, boolean>>): ChatModel | undefined {
   const l = llms().find((x) => x.chatDefault);
-  return l && keys[l.provider] ? { id: `${l.provider}/${l.model}`, name: l.name, provider: l.provider } : undefined;
+  return l && chatKeySet(l, keys) ? { id: `${l.provider}/${l.model}`, name: l.name, provider: l.provider, ...(l.account ? { account: l.account } : {}) } : undefined;
 }
 
 /** A model a chat may be set to: one of chatModels(). */

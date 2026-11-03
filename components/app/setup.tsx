@@ -876,6 +876,7 @@ export function KeysCard() {
           ))}
           <a className="text-[12px] underline" href="https://github.com/Kevo919/bops/blob/windows-port/docs/keys.md" target="_blank" rel="noopener noreferrer">How to get keys and set spending limits</a>
           <p className="text-[12px] text-pencil">A successful authentication check does not guarantee credits or access to every model. After changing .env.local, restart Bops and refresh this list.</p>
+          <p data-accounts-help className="text-[12px] text-pencil">More than one account for a provider (a work and a personal key): to add another account, put a line like <span className="font-mono">OPENROUTER_API_KEY__WORK=...</span> in .env.local (the provider&apos;s key name, two underscores, then a label of A to Z, 0 to 9 and _), and restart Bops. Each account gets its own row and Check here, and you pick it for a model in Models. Bots&apos; tasks on their computers still use the default account.</p>
         </div>
       }
     >

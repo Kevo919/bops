@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { AppState, Chat } from "@/lib/types";
-import { chatKeyName, chatModelLabel, chatModels, chatModelShown, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
+import { chatKeyName, chatKeySet, chatModelLabel, chatModels, chatModelShown, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
+import { accountKeyName, accountWord } from "@/lib/accounts";
 import type { AgentRoute } from "@/lib/agents";
 import { post } from "./ui";
 // The default for new chats (Settings, Models), named in the box's hint.
@@ -66,7 +67,7 @@ export function ChatModelOptions({ keys, value, auto }: { keys: Partial<Record<s
           {list.map((m) => (
             <option key={m.id} value={m.id} {...(m.preset ? { "data-preset": "" } : {})}>
               {chatModelLabel(m)}
-              {keys[provider] ? "" : " (no key)"}
+              {chatKeySet(m, keys) ? "" : " (no key)"}
             </option>
           ))}
         </optgroup>
@@ -79,7 +80,9 @@ export function ChatModelOptions({ keys, value, auto }: { keys: Partial<Record<s
 /** The line under the box when the chat's model has no key on this server: which key to add, and where. Null when it has one, or it's Auto. */
 export function chatModelHint(state: Pick<AppState, "chatKeys" | "shared">, c: Pick<Chat, "model">): string | null {
   const p = providerOf(c.model);
-  if (!p || state.shared || state.chatKeys?.[p]) return null;
+  const account = chatModels().find((m) => m.id === c.model)?.account;
+  if (!p || state.shared || chatKeySet({ provider: p, account }, state.chatKeys ?? {})) return null;
+  if (account) return `${providerName(p)} (${accountWord(account)}) has no key on this server yet: add ${accountKeyName(chatKeyName(p), account)} to .env.local, then restart Bops.`;
   if (p === "ollama") return `Ollama isn't set up on this server: add OLLAMA_BASE_URL (its address, like http://127.0.0.1:11434/v1) to .env.local, then restart Bops.`;
   return `${providerName(p)} has no key on this server yet: add ${chatKeyName(p)} to .env.local, then restart Bops.`;
 }

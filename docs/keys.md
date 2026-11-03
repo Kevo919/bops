@@ -96,6 +96,17 @@ To use other Ollama models, add them to `config/llms.yaml` with `provider: ollam
 
 Restart Bops, check the configured keys in **Settings → This Mac → Keys**, then select the corresponding provider/model in Bops. Keep spending alerts enabled where available, but use an enforced cap when you need requests to stop. Rate limits control request speed; they are not spending budgets.
 
+## More than one account for a provider
+
+You can keep as many keys as you like for the same provider (a work and a personal OpenAI key, two OpenRouter keys, several z.ai accounts). They stay in `.env.local` only:
+
+- The provider's **default account** keeps its usual name, for example `OPENROUTER_API_KEY=...`.
+- Each **other account** is that name, two underscores, then a label of capital letters, numbers and `_` (at most 24), for example `OPENROUTER_API_KEY__WORK=...` or `OPENAI_API_KEY__PERSONAL=...`.
+
+Restart Bops after changing `.env.local`. Each account then has its own row and **Check** button in **Keys** (shown as "OpenRouter (work)"), and in **Models** each model of that provider gets an **Account** box: pick which account its chats (and chat routines) use. Bops never shows a key's value, only whether it's set. In `config/llms.yaml` this is `account: work` on that model. If a model names an account that isn't in `.env.local` (removed, or a typo), the card says **account not found** and its chats say which line to add.
+
+For now, bots' tasks on their computers (OpenCode, DeepSeek Harness) still use the provider's default account.
+
 ## Adding models
 
 Once a key is set, add the provider's models in **Settings → This Mac → Models** (right under Keys). No file editing or restart is needed.
