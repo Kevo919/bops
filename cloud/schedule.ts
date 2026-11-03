@@ -438,7 +438,9 @@ function cronField(text: string, f: (typeof CRON_FIELDS)[number]): { values: num
 export function parseCron(expr: unknown): { spec: CronSpec } | { error: string } {
   const text = typeof expr === "string" ? expr.trim().replace(/\s+/g, " ") : "";
   if (!text) return { error: "It needs a cron expression, like 0 9 * * 1-5 (weekdays at 9 AM)." };
-  const parts = (CRON_ALIASES[text.toLowerCase()] ?? text).split(" ");
+  // Own keys only: "__proto__" or "constructor" would read Object's own members off the plain object.
+  const alias = text.toLowerCase();
+  const parts = (Object.hasOwn(CRON_ALIASES, alias) ? CRON_ALIASES[alias] : text).split(" ");
   if (parts.length !== 5) return { error: "A cron expression has 5 parts: minute, hour, day of the month, month, day of the week." };
   const fields: number[][] = [];
   for (let i = 0; i < 5; i++) {
@@ -460,8 +462,9 @@ function cronGap(s: CronSpec): number {
   const times = s.hours.flatMap((h) => s.minutes.map((m) => h * 60 + m)).sort((a, b) => a - b);
   let gap = Infinity;
   for (let i = 1; i < times.length; i++) gap = Math.min(gap, times[i] - times[i - 1]);
+  // Both given (either day runs): the 15th and a Monday can be two days running, so count across midnight.
   const twoDays =
-    (s.anyDom && s.anyDow) || (!s.anyDow && adjacent(s.dows, (last, first) => last === 6 && first === 0)) || (!s.anyDom && adjacent(s.doms, (last, first) => last >= 28 && first === 1));
+    s.anyDom === s.anyDow || (!s.anyDow && adjacent(s.dows, (last, first) => last === 6 && first === 0)) || (!s.anyDom && adjacent(s.doms, (last, first) => last >= 28 && first === 1));
   if (twoDays && times.length) gap = Math.min(gap, times[0] + 24 * 60 - times[times.length - 1]);
   return gap;
 }
@@ -518,6 +521,9 @@ function describeCron(s: CronSpec): string {
   else if (hourStep === 1) time = `Every hour${past(s.minutes)}`;
   else if (hourStep !== undefined) time = `Every ${hourStep} hours${past(s.minutes)}`;
   else if (span() && s.minutes.length === 1) time = `Every hour${past(s.minutes)}${span()}`;
+  else if (s.minutes.length === 1 && s.hours.length > 2 && s.hours.every((h, i) => i === 0 || h - s.hours[i - 1] === s.hours[1] - s.hours[0]))
+    // Evenly spaced hours not from midnight ("1-23/2"): every so many hours, from the first.
+    time = `Every ${s.hours[1] - s.hours[0]} hours from ${clock(s.hours[0] * 60 + s.minutes[0])}`;
   else {
     const times = s.hours.flatMap((h) => s.minutes.map((m) => clock(h * 60 + m)));
     time = `at ${times.length > 8 ? `${times.length} times a day` : listText(times)}`;

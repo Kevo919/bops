@@ -150,6 +150,11 @@ await check("parseCron: what's wrong, in plain words", () => {
   assert.match(error("0 9 * * ?"), /"\?" isn't a day of the week/);
   assert.match(error("0 9 * * 1--5"), /isn't a day of the week/);
   assert.match(error("@never"), /5 parts/);
+  // Object's own members aren't shortcuts.
+  assert.match(error("__proto__"), /5 parts/);
+  assert.match(error("constructor"), /5 parts/);
+  assert.match(error("toString"), /5 parts/);
+  assert.match(error("__proto__ 9 * * *"), /isn't a minute/);
   assert.match(error("0 9 L * *"), /"L" isn't a day of the month/);
   const n = S.normalizeSchedule({ kind: "cron", expr: 42 });
   assert.ok("error" in n);
@@ -170,6 +175,7 @@ await check("the least gap: 15 minutes, across the day and across midnight when 
   assert.match(error("5,55 0,23 * * 0,6"), /10 minutes apart/, "Saturday into Sunday, the other way round");
   assert.match(error("5,55 0,23 1,31 * *"), /10 minutes apart/, "the 31st into the 1st");
   assert.match(error("5,55 0,23 * jan *"), /10 minutes apart/, "every day of a month");
+  assert.match(error("5,55 0,23 15 * 1"), /10 minutes apart/, "the 15th and a Monday can be two days running");
   for (const ok of ["*/15 * * * *", "*/20 * * * *", "0,15,30,45 * * * *", "0-59/15 * * * *", "0 * * * *", "0 */1 * * *", "5,55 0,23 * * 1", "5,55 0,23 * * 1,3,5", "5,55 0,23 15 * *", "59 23 * * *", "0 0 * * *", "45 23,0 * * *", "0 9,17 * * *"]) {
     const n = S.normalizeSchedule(cron(ok));
     assert.ok(!("error" in n), `${ok} reads: ${n.error}`);
@@ -222,6 +228,8 @@ await check("describeSchedule: plain words, no dashes", () => {
     ["@weekly", "Sundays at 12 AM"],
     ["@daily", "Every day at 12 AM"],
     ["0 0,2,4,6,8,10,12,14,16,18,20,22 * * *", "Every 2 hours"],
+    ["0 1-23/2 * * *", "Every 2 hours from 1 AM"],
+    ["30 8-20/4 * * 1-5", "Every 4 hours from 8:30 AM, weekdays"],
     ["0,30 9,10,11,12,13 * * 1-5", "Every 30 minutes, 9 AM to 1:30 PM, weekdays"],
   ];
   for (const [expr, want] of cases) {

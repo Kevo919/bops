@@ -61,7 +61,7 @@ export const zoneOf = (r: Pick<Routine, "timeZone">) => (r.timeZone && validTime
 /** A schedule in a few plain words, in `tz` (else the user's zone): "Weekdays at 9 AM", "Every 2 hours, 8 AM to 10 PM". */
 export const describeSchedule = (schedule: Schedule, tz?: string) => describe(schedule, tz || routineZone());
 
-/** The gap between an "every" or meeting routine's runs, in ms; undefined for the rest. */
+/** The gap between an "every" or meeting routine's runs, in ms; undefined for the rest (a cron one too: its runs are wall clock times, so the timed kinds' late rule applies). */
 const beatOf = (s: Schedule) => (s.kind === "every" ? s.minutes * 60_000 : s.kind === "before_event" ? EVENT_CHECK_MINUTES * 60_000 : undefined);
 
 /** A quiet run's answer when nothing needs the user. */
