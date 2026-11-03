@@ -1966,6 +1966,28 @@ function WorkspaceGeneral({ state }: { state: AppState }) {
           {error}
         </span>
       )}
+      {/* The routines' inactivity brake: how long without you around before routines that speak up wait (lib/server/presence.ts). */}
+      {!state.shared && (
+        <>
+          <span className="mt-2 text-[13px] font-semibold">While you&apos;re away</span>
+          <div className="flex items-center gap-3 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+            <span className="min-w-0 flex-1 text-[13px] leading-4">After this many days without you looking in, routines that would speak up wait quietly (their runs are marked away) until you&apos;re back. Check-in routines that have nothing to say run anyway, and Run now always runs.</span>
+            <select
+              aria-label="Days before routines wait"
+              value={String(state.routineAwayDays ?? 7)}
+              onChange={(e) => void post("/api/workspaces", { routineAwayDays: Number(e.target.value) }, "PATCH")}
+              className="shrink-0 cursor-pointer rounded-full bg-white px-3 py-1 text-[12.5px] font-medium shadow-[0_0_0_1px_#E6E6E3] outline-none"
+            >
+              {[3, 7, 14, 30].map((d) => (
+                <option key={d} value={d}>
+                  {d} days
+                </option>
+              ))}
+              <option value={0}>Never wait</option>
+            </select>
+          </div>
+        </>
+      )}
       <span className="text-[12px] leading-4 text-[#9A9A98]">{state.shared ? `Shared with you by ${state.shared.owner || "its owner"}.` : "Make another workspace, or delete this one, from the workspace menu in the sidebar."}</span>
     </div>
   );

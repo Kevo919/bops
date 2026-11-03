@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { post } from "./ui";
 import { BUILTIN_CHAT_MODELS } from "@/lib/chat-models";
 
 /*
@@ -125,11 +126,7 @@ export function ModelsCard() {
       setError(null);
       setNote(null);
       try {
-        const res = await fetch("/api/models", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(op),
-        });
+        const res = await post("/api/models", op);
         const body = (await res.json().catch(() => null)) as
           (Info & { moved?: Moved[]; error?: string }) | null;
         if (!res.ok || !body?.llms) {

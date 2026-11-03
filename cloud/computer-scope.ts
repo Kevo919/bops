@@ -402,13 +402,22 @@ const itsRun = (s: Blob, n: Blob, ctx: Ctx) => {
 const RULES: Record<string, (stored: unknown, next: unknown, ctx: Ctx) => Kept> = {
   // Its own device's threads, of its bots in their chats, or of a routine's run of its own still going;
   // another's stay as they were. One it has stays its own where it is, its bot moved off the computer or not (threadsOf).
-  sessions: (stored, next, ctx) =>
-    keepList("sessions", stored, next, ctx, {
+  sessions: (stored, next, ctx) => {
+    const had = new Set(listOf(stored).map((x) => x.id as string));
+    const kept = keepList("sessions", stored, next, ctx, {
       add: (x) => x.by === ctx.device && (ofItsBots(x, ctx) || ofItsRun(x, ctx)),
       remove: (s) => s.by === ctx.device,
       item: (s, n) =>
-        s.by === ctx.device && n.by === ctx.device && ((ofItsBots(s, ctx) && ofItsBots(n, ctx)) || (n.botId === s.botId && n.chatId === s.chatId)) ? { value: n, denied: [] } : { value: s, denied: [`sessions.${s.id}`] },
-    }),
+        s.by === ctx.device && n.by === ctx.device && ((ofItsBots(s, ctx) && ofItsBots(n, ctx)) || (n.botId === s.botId && n.chatId === s.chatId))
+          ? // What the owner allowed for a thread (Session.allowedAsks, permission.ts) is the owner's
+            // word, not a computer's: a runner's copy never rewrites it, whatever else of the thread it carries.
+            { value: { ...n, allowedAsks: s.allowedAsks }, denied: [] }
+          : { value: s, denied: [`sessions.${s.id}`] },
+    });
+    // A thread a computer adds comes with no grants of its own: allowedAsks is only ever the owner's word.
+    const value = (kept.value as Blob[]).map((x) => (had.has(x.id as string) || x.allowedAsks === undefined ? x : { ...x, allowedAsks: undefined }));
+    return { value, denied: kept.denied };
+  },
   // A run of its bots' routines: the clock, a skip that passed going, a pause. Of another bot's, only the
   // clock and record of the run that's its own (itsRun).
   routines: (stored, next, ctx) =>
