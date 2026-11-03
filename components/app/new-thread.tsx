@@ -79,6 +79,7 @@ export function AgentPick({ state, bot: b, value, keys, onPick, onSetUp }: { sta
                   {x.id === ai.default && <DefaultPill />}
                 </span>
                 <span className="truncate text-[11.5px] leading-[15px] text-[#6B6B6B]">{st.ready ? modelShort(x.kind, x.model) || "Auto" : st.line}</span>
+                {(x.pays === "plan" || x.model?.startsWith("zai-coding/")) && <span className="text-[11.5px] leading-[15px] text-[#6B6B6B]">· {paysLabel(x, state, workBot(b, state.bots).computerId)}</span>}
               </span>
             </button>
             {!st.ready && onSetUp && (
@@ -264,6 +265,7 @@ export function AgentChipPick({ state, bot: b, value, keys, defaultOpen = false,
       >
         <AgentMark kind={now.kind} size={15} />
         <span className={`max-w-[170px] truncate ${off(now) ? "text-[#B54708]" : ""}`}>{label}</span>
+        {(now.pays === "plan" || now.model?.startsWith("zai-coding/")) && <span className="max-w-[180px] truncate text-[11px]">· {paysLabel(now, state, workBot(b, state.bots).computerId)}</span>}
         <span aria-hidden className="text-[9px] text-[#9A9A98]">
           ▾
         </span>
