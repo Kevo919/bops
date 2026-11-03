@@ -24,6 +24,8 @@
 #    openrouter   OpenRouter (hundreds of models; model looks like "deepseek/deepseek-chat")
 #                                                 OPENROUTER_API_KEY
 #    deepinfra    DeepInfra                       DEEPINFRA_API_KEY
+#    ollama       Ollama, free, on your own server (chats only; model looks like "qwen2.5:3b")
+#                                                 no key: set OLLAMA_BASE_URL in .env.local
 #
 #  WHERE THEY RUN: on your bots' cloud computers, through OpenCode. They need
 #  Settings → Modules → Agent harnesses turned on. A chat can run on them too:
@@ -60,3 +62,9 @@ llms:
   # - name: GPT 6.1 Sol
   #   provider: openai
   #   model: gpt-6.1-sol
+  #
+  # Free, on your own server: Ollama. Chats only (pick it by a chat's Send button), not bots' agents.
+  # Pull the model there first (ollama pull qwen2.5:3b), and set OLLAMA_BASE_URL in .env.local.
+  # - name: Qwen 2.5 3B (local)
+  #   provider: ollama
+  #   model: qwen2.5:3b

@@ -1,6 +1,6 @@
 # Set up your provider keys
 
-This guide covers the eight keys shown in **Settings → This Mac → Keys** when you run your own Bops server. A key is a password that lets Bops use your provider account. Only configure the providers you use. Provider API usage and cloud computers can cost money; a chat-app subscription does not automatically include API credits.
+This guide covers the eight keys, plus the free Ollama setting, shown in **Settings → This Mac → Keys** when you run your own Bops server. A key is a password that lets Bops use your provider account. Only configure the providers you use. Provider API usage and cloud computers can cost money; a chat-app subscription does not automatically include API credits.
 
 ## Put keys on the machine running Bops
 
@@ -78,6 +78,19 @@ The official key and top-up pages loaded DeepSeek's sign-in screen in a browser.
 3. Set a **credit limit on this key**. Requests are rejected when it is exhausted, until you increase it or its configured daily/weekly/monthly reset occurs. An unlimited key can consume your entire account balance, including automatic top-ups. See [OpenRouter's key-limit instructions](https://openrouter.ai/docs/api_reference/authentication).
 
 Choose models with prices you are comfortable paying and review account top-up settings as well as the key limit.
+
+## 9. Ollama (free, local) — `OLLAMA_BASE_URL`
+
+Ollama runs open models on your own server, so chats on it cost nothing and need no account or key. Use it when you want a free model for everyday chat; small models are slower and less capable than the paid ones above.
+
+1. Install Ollama on the server that runs Bops and pull a model, for example `ollama pull qwen2.5:3b`.
+2. Put Ollama's address in `OLLAMA_BASE_URL=`, ending in `/v1` (Ollama's OpenAI-compatible API). The usual address is `http://127.0.0.1:11434/v1`; use whatever port your install listens on.
+3. Restart Bops. The chat model menu by the Send button now shows **Ollama (free, local)**. Without `OLLAMA_BASE_URL` it doesn't show at all.
+4. Optional: `OLLAMA_API_KEY=` only if your Ollama sits behind a proxy that wants a key; Bops sends it as `Bearer`. Plain Ollama needs none.
+
+To use other Ollama models, add them to `config/llms.yaml` with `provider: ollama` and the model name exactly as `ollama list` shows it (for example `qwen2.5:3b`). Ollama is for chats only: bots' agents run on cloud computers that can't reach your server's Ollama. An Ollama chat can't search the web or see images. If a small model can't use tools, Bops asks it again without them, so it can still answer but can't look things up for you.
+
+**Check** for this row asks Ollama for its model list at `OLLAMA_BASE_URL/models`. **works** with zero models means Ollama is running but you still need to pull one.
 
 ## After setup
 

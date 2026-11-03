@@ -7,7 +7,7 @@ import { chatKeyName, providerOf } from "@/lib/chat-models";
 /**
  * A chat on another provider than OpenAI (Chat.model "anthropic/…", "zai/…", "zai-coding-cn/…", "deepseek/…"): the part of
  * OpenAI's Responses API that chat.ts uses, answered by that provider. Anthropic speaks its Messages API; z.ai,
- * DeepSeek, OpenRouter and DeepInfra speak OpenAI's Chat Completions. What comes back is shaped like a Responses
+ * DeepSeek, OpenRouter, DeepInfra and Ollama speak OpenAI's Chat Completions. What comes back is shaped like a Responses
  * result as chat.ts reads it: an id, the output (the reply as a message with output_text, and function calls
  * with call_id, name and arguments), output_text and usage.
  *
@@ -19,6 +19,10 @@ import { chatKeyName, providerOf } from "@/lib/chat-models";
  * OpenAI's own tools aren't there: web_search is left out, and the model is told so in its instructions.
  * reasoning, service_tier and include are OpenAI's and are left out too. Keys come from this server's
  * environment (.env.local), never the state, and are never logged or said back.
+ *
+ * Ollama ("ollama/qwen2.5:3b") is free and runs on this server: no key (OLLAMA_API_KEY is sent as Bearer if set,
+ * for one behind a proxy), at OLLAMA_BASE_URL (default http://127.0.0.1:11434/v1). A small model that can't take
+ * tools says so with a 400; the call is made again once without them, and that model is sent none from then on.
  */
 
 type Params = ResponseCreateParamsNonStreaming;
@@ -37,11 +41,20 @@ const CHAT_URLS: Partial<Record<AgentRoute, string>> = {
   deepseek: "https://api.deepseek.com/v1/chat/completions",
   openrouter: "https://openrouter.ai/api/v1/chat/completions",
   deepinfra: "https://api.deepinfra.com/v1/openai/chat/completions",
+  // Ollama's is this server's own setting: ollamaBase().
 };
+
+export const OLLAMA_DEFAULT_BASE = "http://127.0.0.1:11434/v1";
+/** Where this server's Ollama answers (OLLAMA_BASE_URL, without a trailing slash). */
+export const ollamaBase = () => (process.env.OLLAMA_BASE_URL?.trim() || OLLAMA_DEFAULT_BASE).replace(/\/+$/, "");
+const chatUrl = (provider: AgentRoute) => (provider === "ollama" ? `${ollamaBase()}/chat/completions` : CHAT_URLS[provider]);
+/** Ollama models that said they can't take tools: sent none from then on (until Bops restarts). */
+const noTools = new Set<string>();
+const toolsRefused = (e: unknown) => e instanceof ChatProviderError && e.status === 400 && /tool/i.test(e.said ?? "");
 /** Who said no, in the chat's words. */
-const LABELS: Record<AgentRoute, string> = { anthropic: "Claude", openai: "OpenAI", zai: "z.ai", "zai-coding": "z.ai", "zai-coding-cn": "z.ai (China)", deepseek: "DeepSeek", openrouter: "OpenRouter", deepinfra: "DeepInfra" };
+const LABELS: Record<AgentRoute, string> = { anthropic: "Claude", openai: "OpenAI", zai: "z.ai", "zai-coding": "z.ai", "zai-coding-cn": "z.ai (China)", deepseek: "DeepSeek", openrouter: "OpenRouter", deepinfra: "DeepInfra", ollama: "Ollama" };
 /** Whose account it is. */
-const ACCOUNTS: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", zai: "z.ai", "zai-coding": "z.ai", "zai-coding-cn": "open.bigmodel.cn", deepseek: "DeepSeek", openrouter: "OpenRouter", deepinfra: "DeepInfra" };
+const ACCOUNTS: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", zai: "z.ai", "zai-coding": "z.ai", "zai-coding-cn": "open.bigmodel.cn", deepseek: "DeepSeek", openrouter: "OpenRouter", deepinfra: "DeepInfra", ollama: "Ollama" };
 /** Where to add credit. */
 const BILLING: Record<AgentRoute, string> = {
   anthropic: "console.anthropic.com, Billing",
@@ -52,9 +65,10 @@ const BILLING: Record<AgentRoute, string> = {
   deepseek: "platform.deepseek.com, Top up",
   openrouter: "openrouter.ai, Credits",
   deepinfra: "deepinfra.com, Billing",
+  ollama: "nowhere: Ollama is free",
 };
 /** Providers whose chat models can't see images: an image is left out, with a note in its place. */
-const NO_IMAGES = new Set<AgentRoute>(["deepseek"]);
+const NO_IMAGES = new Set<AgentRoute>(["deepseek", "ollama"]);
 
 const ANTHROPIC_VERSION = "2023-06-01";
 const ANTHROPIC_MAX_TOKENS = 8192;
@@ -70,11 +84,14 @@ export const NO_WEB_SEARCH =
 export class ChatProviderError extends Error {
   readonly provider: AgentRoute;
   readonly status?: number;
-  constructor(message: string, provider: AgentRoute, status?: number) {
+  /** The provider's own words, short and without the key (for Bops to read, e.g. a model that can't take tools). */
+  readonly said?: string;
+  constructor(message: string, provider: AgentRoute, status?: number, said?: string) {
     super(message);
     this.name = "ChatProviderError";
     this.provider = provider;
     this.status = status;
+    this.said = said;
   }
 }
 
@@ -249,17 +266,33 @@ function chatMessages(provider: AgentRoute, system: string, turns: Turn[]) {
   return out;
 }
 
+type ChatJson = {
+  choices?: { message?: { content?: string | null; tool_calls?: { id?: string; function?: { name?: string; arguments?: string } }[] } }[];
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
+};
+
 async function callChat(provider: AgentRoute, model: string, system: string, turns: Turn[], functions: ReturnType<typeof functionsOf>["functions"], key: string, signal: AbortSignal) {
-  const body = {
+  const ollama = provider === "ollama";
+  const body = (withTools: boolean) => ({
     model,
     messages: chatMessages(provider, system, turns),
-    ...(functions.length ? { tools: functions.map((f) => ({ type: "function", function: f })) } : {}),
-  };
+    ...(withTools && functions.length ? { tools: functions.map((f) => ({ type: "function", function: f })) } : {}),
+  });
   const extra: Record<string, string> = provider === "openrouter" ? { "X-Title": "Bops" } : {};
-  const json = (await send(provider, CHAT_URLS[provider]!, { authorization: `Bearer ${key}`, ...extra }, body, key, model, signal)) as {
-    choices?: { message?: { content?: string | null; tool_calls?: { id?: string; function?: { name?: string; arguments?: string } }[] } }[];
-    usage?: { prompt_tokens?: number; completion_tokens?: number };
-  };
+  // Ollama needs no key: one is sent only when there is one (OLLAMA_API_KEY).
+  const headers = { ...(key ? { authorization: `Bearer ${key}` } : {}), ...extra };
+  const go = (withTools: boolean) => send(provider, chatUrl(provider)!, headers, body(withTools), key, model, signal) as Promise<ChatJson>;
+  let json: ChatJson;
+  if (ollama && noTools.has(model)) json = await go(false);
+  else
+    try {
+      json = await go(true);
+    } catch (e) {
+      // A small local model that can't take tools: once more without them, and none for it from then on.
+      if (!ollama || !functions.length || !toolsRefused(e)) throw e;
+      noTools.add(model);
+      json = await go(false);
+    }
   const m = json.choices?.[0]?.message ?? {};
   const calls = (m.tool_calls ?? []).map((c, i) => ({ id: c.id || `call_${i}_${Math.random().toString(36).slice(2, 10)}`, name: String(c.function?.name ?? ""), arguments: c.function?.arguments || "{}" }));
   return { text: typeof m.content === "string" ? m.content : "", calls, input: json.usage?.prompt_tokens ?? 0, output: json.usage?.completion_tokens ?? 0 };
@@ -276,7 +309,9 @@ async function send(provider: AgentRoute, url: string, headers: Record<string, s
     throw new ChatProviderError(
       timedOut
         ? `${LABELS[provider]} took too long to answer (over ${Math.round(TIMEOUT_MS / 1000)} seconds). Try again, or pick another model.`
-        : `Couldn't reach ${LABELS[provider]}: check this server's internet connection, then try again.`,
+        : provider === "ollama"
+          ? `Couldn't reach Ollama at ${ollamaBase()}: check that Ollama is running there, and OLLAMA_BASE_URL in .env.local, then try again.`
+          : `Couldn't reach ${LABELS[provider]}: check this server's internet connection, then try again.`,
       provider,
     );
   }
@@ -298,7 +333,7 @@ function said(raw: string, key: string): string {
     text = (typeof e === "string" ? e : e?.message) ?? j.message ?? j.msg ?? raw;
     if (typeof e === "object" && e?.code !== undefined) text = `${text} (code ${e.code})`;
   } catch {}
-  return text.split(key).join("…").replace(/\s+/g, " ").trim().slice(0, 200);
+  return (key ? text.split(key).join("…") : text).replace(/\s+/g, " ").trim().slice(0, 200);
 }
 
 /** A no, in plain English: which provider, and the fix. */
@@ -307,7 +342,13 @@ export function refusal(provider: AgentRoute, status: number, raw: string, key: 
   const keyName = chatKeyName(provider);
   const words = said(raw, key);
   const balance = status === 402 || /insufficient[ _]balance|credit balance|no (resource package|balance)|out of credit|insufficient[ _]quota|quota exceeded|exceeded your current quota|billing|1113|top ?up|payment required/i.test(words);
-  const err = (m: string) => new ChatProviderError(m, provider, status);
+  const err = (m: string) => new ChatProviderError(m, provider, status, words);
+  if (provider === "ollama") {
+    if (status === 401 || status === 403) return err(`Ollama turned this down: it wants a key. Set OLLAMA_API_KEY in .env.local to the one its proxy expects, then restart Bops.`);
+    if (status === 404 || /not found|try pulling/i.test(words)) return err(`Ollama doesn't have the model "${model}". Pull it on the server (ollama pull ${model}), or pick another model.`);
+    if (status >= 500) return err(`Ollama had a problem running "${model}" (HTTP ${status})${words ? `: ${words}` : ""}. The server may be short of memory for it: try a smaller model.`);
+    return err(`Ollama turned this down (HTTP ${status})${words ? `: ${words}` : ""}.`);
+  }
   if (status === 401 || (status === 403 && /key|auth|token|credential/i.test(words) && !balance))
     return err(`${who} turned this down: your ${ACCOUNTS[provider]} key isn't valid. Check ${keyName} in .env.local, then restart Bops.`);
   if (balance)
@@ -336,11 +377,12 @@ const newId = (prefix: string) => `${prefix}_${Date.now().toString(36)}${(counte
 export async function createOnProvider(params: Params, opts: { timeoutMs?: number } = {}): Promise<Response> {
   const model = String(params.model ?? "");
   const provider = providerOf(model);
-  if (!provider || provider === "openai" || !CHAT_URLS[provider]) throw new Error(`${model} isn't a model Bops can chat on.`);
+  if (!provider || provider === "openai" || !chatUrl(provider)) throw new Error(`${model} isn't a model Bops can chat on.`);
+  // Everything after the first "/": "ollama/qwen2.5:3b" is qwen2.5:3b, colon and all.
   const name = model.slice(provider.length + 1);
-  const keyName = chatKeyName(provider);
-  const key = process.env[keyName]?.trim();
-  if (!key) throw new ChatProviderError(`No ${ACCOUNTS[provider]} key is set on this server: add ${keyName} to .env.local, then restart Bops. Or pick another model.`, provider);
+  const keyName = provider === "ollama" ? "OLLAMA_API_KEY" : chatKeyName(provider);
+  const key = process.env[keyName]?.trim() ?? "";
+  if (!key && provider !== "ollama") throw new ChatProviderError(`No ${ACCOUNTS[provider]} key is set on this server: add ${keyName} to .env.local, then restart Bops. Or pick another model.`, provider);
 
   const before = params.previous_response_id ? earlier(params.previous_response_id) : [];
   if (!before)

@@ -1,0 +1,41 @@
+id: excalidraw
+name: Excalidraw
+repo: excalidraw/excalidraw
+url: https://github.com/excalidraw/excalidraw
+license: MIT
+license_note: ""
+what: A hand-drawn style virtual whiteboard for sketching diagrams in the browser.
+good_for: whiteboard diagrams
+stack: [node, react, vite, yarn]
+requirements:
+  node: ">=18.0.0"
+  other:
+    - "yarn 1.x on PATH: the excalidraw-app start script calls yarn itself (packageManager: yarn@1.22.22)"
+keys_optional: []
+keys_required: []
+clone: git clone --depth 1 https://github.com/excalidraw/excalidraw.git excalidraw
+install:
+  - command -v yarn || npm install -g yarn@1.22.22
+  - npx -y yarn@1.22.22 install --frozen-lockfile
+run: npx -y yarn@1.22.22 start --host 127.0.0.1
+background: true
+kind: web
+port: 3001
+health:
+  http: http://127.0.0.1:3001/
+  expect: 200
+fits_bot_computer: true
+fits_reason: A Vite dev server with no backend or keys; install takes about a minute (930 MB node_modules).
+verified:
+  date: "2026-11-03"
+  by: claude-agent (Linux sandbox, Node 22.23.4)
+  commit: dd2f8fc
+  steps:
+    clone: pass
+    install: "pass: yarn install --frozen-lockfile done in 52 s"
+    run: "pass: Vite 5.0.12 ready (port 3001 from .env.development VITE_APP_PORT)"
+    health: "pass: GET http://127.0.0.1:3001/ returned 200 with <title>Excalidraw Whiteboard"
+  notes: >-
+    The sandbox already had yarn on PATH, so the 'npm install -g yarn' fallback in the first install line
+    was not exercised. Collaboration and sharing use the public excalidraw.com backends configured in
+    .env.development.
