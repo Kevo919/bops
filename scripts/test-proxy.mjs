@@ -32,11 +32,17 @@ const passes = (res) => res.headers.get("x-middleware-next") === "1";
 
 // No token (a hosted server, or a dev server outside the app): same-origin calls go through as before.
 delete process.env.BOPS_UI_TOKEN;
+assert.equal(call("GET", "/api/local-subscriptions").status, 403, "local CLI status requires an authenticated desktop even in development");
 assert.ok(passes(call("POST", "/api/apps/approvals")), "no token: as before");
 assert.equal(call("POST", "/api/apps/approvals", { host: "192.168.1.5:3210", origin: null }).status, 403, "another host still can't");
 assert.equal(call("POST", "/api/apps/approvals", { origin: "https://evil.example" }).status, 403, "another origin still can't");
 
 process.env.BOPS_UI_TOKEN = TOKEN;
+for (const method of ["GET", "POST"]) {
+  assert.ok(passes(call(method, "/api/local-subscriptions", { cookie: `bops_window=${TOKEN}` })), "the desktop can manage its local CLI");
+  assert.equal(call(method, "/api/local-subscriptions", { cookie: `bops_window=${TOKEN}; bops_remote=phone` }).status, 403, "phone credentials never grant local CLI access");
+  assert.equal(call(method, "/api/local-subscriptions", { cookie: `bops_window=${TOKEN}`, origin: "https://evil.example" }).status, 403, "foreign origin cannot manage CLI auth");
+}
 // What a bot's Chrome on this Mac could send after a redirect onto the app's own page: same origin, no cookie.
 for (const [method, path] of [["POST", "/api/apps/approvals"], ["POST", "/api/chats/c1/messages"], ["POST", "/api/sessions/s1/where"], ["POST", "/api/apps"], ["PATCH", "/api/mac"], ["DELETE", "/api/bots"], ["POST", "/api/restart"]]) {
   const res = call(method, path);

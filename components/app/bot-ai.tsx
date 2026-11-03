@@ -134,6 +134,7 @@ export function AgentTile({ agent: x, bot: b, state, isDefault, on, keys, onClic
           {isDefault && <DefaultPill />}
         </span>
         <span className={`truncate text-[11.5px] leading-[15px] ${!st.ready && !soon && st.button ? "text-[#B54708]" : "text-[#6B6B6B]"}`}>{st.line}</span>
+        {(x.pays === "plan" || x.model?.startsWith("zai-coding/")) && <span className="text-[11.5px] leading-[15px] text-[#6B6B6B]">· {paysLabel(x, state, workBot(b, state.bots).computerId)}</span>}
       </span>
     </button>
   );

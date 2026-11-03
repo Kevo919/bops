@@ -73,6 +73,10 @@
   "main": "desktop/main.cjs",
   "productName": "Bops",
   "build": {
+    "electronFuses": {
+      "enableNodeCliInspectArguments": false,
+      "resetAdHocDarwinSignature": true
+    },
     "appId": "ai.orgo.bops",
     "productName": "Bops",
     "publish": [
