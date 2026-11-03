@@ -48,4 +48,8 @@ Uninstalling the desktop app is not an account deletion or a deletion of cloud-h
 
 ## Validation status
 
+Local subscription sign-in is available only in the self-hosted desktop window, not the phone or hosted browser UI. Claude Code must be installed with its official native installer. Complete its automatically opened browser flow; Bops cannot accept the authorization code from a manually opened Claude sign-in URL.
+
+CLI subprocesses deliberately do not inherit proxy or custom certificate overrides such as `HTTPS_PROXY` and `NODE_EXTRA_CA_CERTS`. Environments requiring those overrides are not supported by this login integration. Local ChatGPT chat remains parked as task 47 behind a hard production gate; the retained prototype is not a supported feature and cannot be enabled through environment variables. File and network isolation must be verified before that gate changes.
+
 These instructions describe the configured installer behavior. Build and install/uninstall validation for this change is tracked in its pull request; this page does not certify an installer run or guarantee behavior on an untested PC.
