@@ -1,0 +1,15 @@
+From: zai → lead
+
+UTC 2026-11-03 21:30. Kevin's new ask, translated and split so nothing collides with what's yours. His words: "customize the UI including widgets, buttons, tabs; linked applications like DeepSeek Harness; a repos page that opens all repos the user has added; add DeepSeek and God's Eye to start. I have both dsh in the CLI (cloned from GitHub) and the desktop version of dsh."
+
+How it maps:
+1. **Repos page**: that IS task 19 (yours, feature/repos-section, in progress) + task 20 (codex; God's Eye View is already a named starter there). Nothing new to open - Kevin's ask confirms the priority of both. If it helps, task 20's list could add DeepSeek Harness itself (deepseek-ai/DeepSeek-Harness on GitHub, MIT) as a starter, since Kevin explicitly named it.
+2. **Linked applications (pinned apps in the UI)**: NEW. Design note (mine, for your sign-off):
+   - A "Pinned" row in the sidebar (above or as part of the rail's existing sections) holding the owner's linked apps: each a card with name + icon, click to open.
+   - Sources of a linked app, v1: (a) an app running on a bot's computer screen (dsh desktop = exactly this: the desktop version on a bot's screen, live and take-over-able, screens already stream); (b) a local web app on the owner's machine opened in a Bops tab (God's Eye View at localhost:4173 = exactly this, once run via the Repos section); (c) an external https address (dsh's cloud UI if he means that).
+   - State: AppState.pinnedApps: { id, title, kind: "screen" | "web", botId?, display?, url? }[] - small, additive, syncs like any setting; editor = drag-free "Pin to sidebar" buttons on a computer screen's corner and on any open web tab, plus an X on the card to unpin. Owner-only.
+   - dsh specifically: the CLI clone he has = my 2005 dsh-terminal proposal (a bot's screen running interactive dsh); the desktop version = pinned-app kind (a). Both come together if you assign 2005 to me with the three file spots, and pinnedApps is a separate small task on top.
+3. **UI customization (widgets, buttons, tabs)**: NEW, and big if taken literally. Proposal for v1 that matches the ask without a framework rewrite: let the owner choose WHICH cards/sections show (Settings -> Window: toggle Widgets on/off per kind - pinned apps row, the bot's screens rail, the schedule/routines card, the CRM card, etc.) and reorder the sidebar's sections (up/down buttons, order kept in state). Full free-form widget canvas (drag anywhere, custom sizes) I'd call a v2 with its own task - say the word and I'll spec it, but I'd not block Kevin's visible wins on it.
+4. **"Add DeepSeek & God's Eye to start"**: once 19/20 land, both are one-click; with pinned apps, both then sit one click from the sidebar. I can add the two starter entries + pins as the acceptance test of 2+3.
+
+Ask: (a) bless pinnedApps + window customization as tasks (I'll take both if next-free; est. 3-5h the pair, tests included), (b) confirm whether dsh joins task 20's starter list, (c) 2005 assignment as before. No code started on any of it.
