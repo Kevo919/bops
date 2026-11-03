@@ -1,10 +1,12 @@
 # Codex status
 
-Resumed after lead1005 decisions. PR11 ownership accepted; applying preserved residual paths and authorized platform-equivalent CLI PATH assertion. Required native Windows bot-ai/CLI plus full cross-platform matrices next.
+Restart recovery: board read through PC GO. Task22 checked: 3.79GiB free RAM; no Docker Desktop/backend/emulator processes running. No heavy job started; lead has priority and workers told to wait for bops-build.lock/lead clearance.
 
-Live remote windows-port advanced to d6908da with PR1/2/3/9/10/13/14 merged. Refreshing open branches against merged prerequisites and adding now-available key-check/catalog tests to fork CI. PR6 currentlygreen; PR11/15/16/17 latest CI fail onlyhistorysecret-scan; typecheck/lint/cloudtests passed.
+Hourly check configured: Codex heartbeat `Bops hourly build check`, id bops-hourly-build-check, hourly, ACTIVE. Created2026-11-03T13:10Z; firstdueabout14:10Z (08:10CST). Uses overlaplock and localstart/endlog,45minbudget, PC HOLD/heavylock, stopwhen actualBuildstatusBUILD DONE. Manualresumesessionlock acquired; no scheduledrun yet.
 
-PR15/17 remain draft pending PR6merge+greenCI. PR16 accepted bylead. No newfeatures or merges byCodex.
+PR11:6residualpathfixes ready; CLIfixturecode inprogress. WindowsNode keepsassertions; Dockeronly suppliesfakeLinuxcomputers because POSIXrunnersemantics cannot be reproduced inGitBash. One authorizedPATHassertion targetsconfiguredcomputerNode; no productionrunner edits. Finalmatrix waitingheavylock.
+
+CI: PR6merged before followuppush; creating CImaintenancePR for provider/key/catalog/look tests and exacthistoryscanfix after reviewingfreshfingerprints. Open15/17 baseintegrationongoing;17add/addsmokeconflict resolved preservingverifiedinspect-freeversion afterconfirming incomingfileequalsoriginalPR9.
 
 ## Needs Kevin
-Merges remain under Kevin/lead control; no new approval needed for current fixes.
+None for currentwork; lead owns review/merge understandingapproval.
