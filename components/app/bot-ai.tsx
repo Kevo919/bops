@@ -304,7 +304,7 @@ function AgentEditor({
           })}
         </div>
       </div>
-      {x.kind === "codex" && x.pays === "plan" && <span className={quiet}>For the self-hosted owner. Sign in with ChatGPT on the bot's screen using the device code. Your plan allowance applies; this does not use Bops Cloud credit.</span>}
+      {x.kind === "codex" && x.pays === "plan" && <span className={quiet}>For the self-hosted owner. Sign in with ChatGPT on the bot&apos;s screen using the device code. Your plan allowance applies; this does not use Bops Cloud credit.</span>}
       {soons.length > 0 && <span className={quiet}>Soon: {soons.join(" ")}</span>}
       {(x.kind === "claude" || x.kind === "codex") && (accounts.length > 1 || x.pays === "plan") && (
         <div className="flex flex-col items-end gap-1">
