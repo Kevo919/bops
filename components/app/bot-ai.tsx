@@ -11,6 +11,9 @@ import {
   aiOf,
   defaultModel,
   isCli,
+  JOB_HELP,
+  JOB_NAMES,
+  JOBS,
   MAX_AGENTS,
   modelsFor,
   OPENCODE_OTHER,
@@ -180,7 +183,7 @@ function ModelRow({ agent: x, disabled, onPick }: { agent: BotAgent; disabled?: 
             value={typing}
             onChange={(e) => setTyping(e.target.value)}
             aria-label="Other model"
-            placeholder="provider/model, like deepinfra/qwen3"
+            placeholder="provider/model, like deepinfra/qwen3 or zai-coding/glm-5.3"
             className="min-w-0 flex-1 rounded-[10px] bg-white px-3 py-1.5 text-[12.5px] leading-4 shadow-[0_0_0_1px_#E6E6E3] outline-none"
           />
           <button type="submit" disabled={!OPENCODE_OTHER.test(typing.trim())} className={btnLight}>
@@ -188,6 +191,40 @@ function ModelRow({ agent: x, disabled, onPick }: { agent: BotAgent; disabled?: 
           </button>
         </form>
       )}
+    </div>
+  );
+}
+
+/**
+ * The jobs an agent takes: a new thread nobody picked an agent for goes to the agent set for its kind of work
+ * (lib/agents.ts jobOf), e.g. Z.ai's GLM for coding and planning. A job is one agent's: picking it here moves it.
+ */
+function JobsRow({ agent: x, others, disabled, onPick }: { agent: BotAgent; others: BotAgent[]; disabled?: boolean; onPick: (jobs: string[]) => void }) {
+  const mine = new Set(x.jobs ?? []);
+  return (
+    <div className={`${glassRow} flex-wrap gap-y-1.5`}>
+      <span className="min-w-[72px] flex-1 text-[13px] leading-4" title="New threads about this kind of work go to this agent, unless you pick one.">
+        Use for
+      </span>
+      <div role="group" aria-label="Use for" className="flex flex-wrap justify-end gap-1">
+        {JOBS.map((j) => {
+          const on = mine.has(j);
+          const elsewhere = !on && others.some((y) => y.jobs?.includes(j));
+          return (
+            <button
+              key={j}
+              type="button"
+              aria-pressed={on}
+              disabled={disabled}
+              title={`${JOB_HELP[j]}${elsewhere ? ". Another agent has it now: picking it moves it here." : ""}`}
+              onClick={() => onPick(on ? [...mine].filter((k) => k !== j) : [...mine, j])}
+              className={`${pill} ${on ? "bg-ink text-white" : "bg-black/[0.05] text-[#6B6B6B] hover:text-ink"} ${elsewhere ? "opacity-60" : ""} disabled:opacity-50`}
+            >
+              {JOB_NAMES[j]}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -238,6 +275,9 @@ function AgentEditor({
   return (
     <div className="flex flex-col gap-2 rounded-[16px] bg-[#FAFAF9] p-3 shadow-[0_0_0_1px_#EFEFEC]">
       <ModelRow key={`${x.id}:${x.pays}`} agent={x} disabled={ro || busy} onPick={(model) => void go({ op: "update", agentId: x.id, model })} />
+      {BRAINS_ON && aiOf(b, state).agents.length > 1 && (
+        <JobsRow agent={x} others={aiOf(b, state).agents.filter((y) => y.id !== x.id)} disabled={ro || busy} onPick={(jobs) => void go({ op: "update", agentId: x.id, jobs })} />
+      )}
       <div className={`${glassRow} flex-wrap gap-y-1.5`}>
         <span className="min-w-[72px] flex-1 text-[13px] leading-4">Pays with</span>
         <div role="group" aria-label="Pays with" className="flex shrink-0 gap-0.5 rounded-full bg-black/[0.05] p-[3px]">

@@ -11,7 +11,7 @@ import { BRAINS_ON, planName, signInOn, threadRunner, workBot, workspaceOf, type
  * its folder on the bot's computer (vm/bin/bops-brain), each bot's agents with their own settings there.
  */
 
-export type AgentRoute = "anthropic" | "openai" | "deepinfra";
+export type AgentRoute = "anthropic" | "openai" | "deepinfra" | "zai" | "zai-coding";
 
 /** What each kind of agent is. `soon`: shown, dimmed, with why it isn't in Bops yet. */
 export const AGENTS: Record<AgentKind, { name: string; maker: string; pays: AgentPays[]; soon?: string }> = {
@@ -45,13 +45,63 @@ export const MODELS: { id: string; kind: AgentKind; label: string; short: string
   { id: "anthropic/claude-sonnet-5-5", kind: "opencode", label: "Claude Sonnet 5.5", short: "Sonnet 5.5" },
   { id: "anthropic/claude-opus-5-5", kind: "opencode", label: "Claude Opus 5.5", short: "Opus 5.5" },
   { id: "openai/gpt-6.1-sol", kind: "opencode", label: "GPT 6.1 Sol", short: "GPT 6.1 Sol" },
+  { id: "zai-coding/glm-5.3", kind: "opencode", label: "GLM 5.3 (Z.ai Coding Plan)", short: "GLM 5.3", note: "Your Z.ai Coding Plan" },
+  { id: "zai/glm-5.2", kind: "opencode", label: "GLM 5.2 (Z.ai)", short: "GLM 5.2", note: "Z.ai, pay as you go" },
 ];
+
+/* ---------------- Jobs ---------------- */
+
+/**
+ * Kinds of work an agent can be set to take (BotAgent.jobs): "use Z.ai for coding and planning, Claude Code for
+ * writing". A new thread nobody picked an agent for goes to the bot's agent for its job, else the Default. The job is
+ * read from the task's words here, at once and the same way every time (jobOf), so the owner can see and predict it.
+ */
+export const JOBS = ["coding", "planning", "thinking", "research", "writing", "browsing"] as const;
+export type Job = (typeof JOBS)[number];
+export const JOB_NAMES: Record<Job, string> = { coding: "Coding", planning: "Planning", thinking: "Thinking", research: "Research", writing: "Writing", browsing: "Web tasks" };
+export const JOB_HELP: Record<Job, string> = {
+  coding: "Code, apps, websites, scripts, bugs",
+  planning: "Plans, schedules, roadmaps, step-by-step",
+  thinking: "Analysis, comparing options, hard questions",
+  research: "Finding things out across sources",
+  writing: "Emails, posts, documents, rewriting",
+  browsing: "Forms, sign-ups, orders, clicking through sites",
+};
+const JOB_WORDS: Record<Job, RegExp> = {
+  coding: /\b(code|coding|program|script|bug|debug|fix the (build|error|app|site)|function|repo(sitory)?|github|git|pull request|deploy|refactor|compile|api|endpoint|database|sql|python|javascript|typescript|react|next\.?js|node|html|css|kotlin|android app|website|web app|app|frontend|backend|unit tests?)\b/gi,
+  planning: /\b(plan|planning|roadmap|schedule|itinerary|timeline|milestones?|strategy|outline|steps? to|break (it|this) down|organi[sz]e|prioriti[sz]e|agenda)\b/gi,
+  thinking: /\b(analy[sz]e|analysis|compare|comparison|decide|decision|evaluate|reason|think (it )?through|pros and cons|trade-?offs?|figure out|why|should i|weigh|assess)\b/gi,
+  research: /\b(research|find out|look up|look into|sources?|investigate|learn about|what is|who is|news|report on|survey|market)\b/gi,
+  writing: /\b(write|draft|email|letter|essay|post|blog|article|rewrite|proofread|summari[sz]e|caption|copy|script for|reply to)\b/gi,
+  browsing: /\b(fill (out|in)|form|sign (me )?up|register|book|reserve|order|buy|purchase|log ?in|click|download|upload|checkout|cancel my|unsubscribe)\b/gi,
+};
+
+/** The job a task's words are most about, or undefined when none stands out. Ties go to the earlier job in JOBS. */
+export function jobOf(words: string | undefined): Job | undefined {
+  if (!words?.trim()) return undefined;
+  let best: Job | undefined;
+  let most = 0;
+  for (const j of JOBS) {
+    const n = words.match(JOB_WORDS[j])?.length ?? 0;
+    if (n > most) {
+      best = j;
+      most = n;
+    }
+  }
+  return best;
+}
+export const cleanJobs = (jobs: unknown): Job[] | undefined => {
+  if (!Array.isArray(jobs)) return undefined;
+  const out = JOBS.filter((j) => jobs.includes(j));
+  return out.length ? out : undefined;
+};
 /** Any other model OpenCode can run on a key of these providers ("Other model" in its editor). */
-export const OPENCODE_OTHER = /^(anthropic|openai|deepinfra)\/[A-Za-z0-9._:/-]{1,120}$/;
+export const OPENCODE_OTHER = /^(anthropic|openai|deepinfra|zai|zai-coding)\/[A-Za-z0-9._:/-]{1,120}$/;
 
 /** The Vault key each provider's agents run on (lib/server/keys.ts KEY_PROVIDERS). */
-export const ROUTE_KEYS: Record<AgentRoute, string> = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", deepinfra: "DEEPINFRA_API_KEY" };
-export const ROUTE_NAMES: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", deepinfra: "DeepInfra" };
+// Z.ai: one key for both. "zai-coding" is its GLM Coding Plan (the plan's own address and allowance), "zai" pay as you go.
+export const ROUTE_KEYS: Record<AgentRoute, string> = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", deepinfra: "DEEPINFRA_API_KEY", zai: "ZAI_API_KEY", "zai-coding": "ZAI_API_KEY" };
+export const ROUTE_NAMES: Record<AgentRoute, string> = { anthropic: "Anthropic", openai: "OpenAI", deepinfra: "DeepInfra", zai: "Z.ai", "zai-coding": "Z.ai Coding Plan" };
 
 /** Bops agent: every bot has it, always first, and it is every thread's fallback. */
 export const BOPS_AGENT: BotAgent = { id: "bops", kind: "bops", pays: "credit" };
@@ -124,12 +174,13 @@ export function cleanAi(ai: unknown, brains: Brain[] = [], wsId?: string): BotAi
     seen.add(x.id);
     seen.add(key);
     const model = typeof x.model === "string" && modelOk(kind, x.model) && !(kind === "bops" && x.model === "auto") ? x.model : undefined;
-    out.push({ id: x.id, kind, pays, ...(account ? { account } : {}), ...(model ? { model } : {}) });
+    const jobs = cleanJobs(x.jobs);
+    out.push({ id: x.id, kind, pays, ...(account ? { account } : {}), ...(model ? { model } : {}), ...(jobs ? { jobs } : {}) });
   }
   const bops = out.find((x) => x.kind === "bops") ?? BOPS_AGENT;
   const agents = [bops, ...out.filter((x) => x.kind !== "bops")].slice(0, MAX_AGENTS);
   const def = typeof raw.default === "string" && agents.some((x) => x.id === raw.default) ? raw.default : "bops";
-  if (agents.length === 1 && !bops.model && def === "bops") return undefined;
+  if (agents.length === 1 && !bops.model && !bops.jobs && def === "bops") return undefined;
   return { agents, default: def };
 }
 
@@ -370,10 +421,14 @@ export function threadAgent(s: Pick<Session, "agent" | "brainRun" | "onBopsAgent
  * agent on Auto keeps none (its route picks one each task). Undefined for a bot with no profile: nothing new is
  * written on its threads.
  */
-export function pickAgent(b: Bot, state: Pick<AppState, "brains">, picks: (string | undefined | null)[], model?: string): Session["agent"] | undefined {
+export function pickAgent(b: Bot, state: Pick<AppState, "brains">, picks: (string | undefined | null)[], model?: string, goal?: string): Session["agent"] | undefined {
   if (!hasProfile(b, state)) return undefined;
   const ai = aiOf(b, state);
-  const x = picks.map((p) => (p ? ai.agents.find((y) => y.id === p) : undefined)).find(Boolean) ?? ai.agents.find((y) => y.id === ai.default) ?? BOPS_AGENT;
+  const picked = picks.map((p) => (p ? ai.agents.find((y) => y.id === p) : undefined)).find(Boolean);
+  // Nobody picked one: the agent set to take this kind of job (the Default first, when it's one of them).
+  const job = picked ? undefined : jobOf(goal);
+  const forJob = job ? (ai.agents.find((y) => y.id === ai.default && y.jobs?.includes(job)) ?? ai.agents.find((y) => y.jobs?.includes(job))) : undefined;
+  const x = picked ?? forJob ?? ai.agents.find((y) => y.id === ai.default) ?? BOPS_AGENT;
   const m = (model && modelOk(x.kind, model) && !(x.kind === "bops" && model === "auto") ? model : x.model) ?? (isCli(x.kind) ? defaultModel(x.kind) : undefined);
   return { id: x.id, kind: x.kind, ...(m ? { model: m } : {}) };
 }

@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     case "update":
       if (!str(b.agentId)) return Response.json({ error: "which agent?" }, { status: 400 });
       if (b.pays !== undefined && !PAYS.includes(b.pays as AgentPays)) return Response.json({ error: "pays: credit, plan or key" }, { status: 400 });
-      op = { op: "update", agentId: str(b.agentId)!, ...(b.model === null || typeof b.model === "string" ? { model: b.model as string | null } : {}), ...(b.pays ? { pays: b.pays as AgentPays } : {}), ...(str(b.account) ? { account: str(b.account) } : {}), ...(b.newAccount === true ? { newAccount: true } : {}) };
+      op = { op: "update", agentId: str(b.agentId)!, ...(b.model === null || typeof b.model === "string" ? { model: b.model as string | null } : {}), ...(b.pays ? { pays: b.pays as AgentPays } : {}), ...(str(b.account) ? { account: str(b.account) } : {}), ...(b.newAccount === true ? { newAccount: true } : {}), ...(Array.isArray(b.jobs) ? { jobs: (b.jobs as unknown[]).filter((j): j is string => typeof j === "string").slice(0, 10) } : {}) };
       break;
     case "remove":
     case "default":
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "op: add, update, remove or default" }, { status: 400 });
   }
   // Without brains (a release build), only Bops agent's model: nothing else is there to change.
-  if (!BRAINS_ON && !(op.op === "update" && op.agentId === "bops" && op.pays === undefined && op.account === undefined)) return Response.json({ error: "This version of Bops runs Bops agent only." }, { status: 404 });
+  if (!BRAINS_ON && !(op.op === "update" && op.agentId === "bops" && op.pays === undefined && op.account === undefined && op.jobs === undefined)) return Response.json({ error: "This version of Bops runs Bops agent only." }, { status: 404 });
   try {
     const out: { added?: string } = {};
     const ai = setBotAi(botId, op, out);

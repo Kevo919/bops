@@ -451,6 +451,26 @@ await test("a new thread's agent: the owner's pick, then one named, then the Def
 
 const C = await import(fileUrl("lib/server/cli-agents.ts"));
 
+await test("jobs: a thread nobody picked an agent for goes to the agent set for its kind of work; a pick still wins", () => {
+  assert.equal(A.jobOf("Fix the bug in my React app and deploy it"), "coding");
+  assert.equal(A.jobOf("Make a plan and a schedule for the launch"), "planning");
+  assert.equal(A.jobOf("Draft an email to Sam"), "writing");
+  assert.equal(A.jobOf("Fill out the form and book a table"), "browsing");
+  assert.equal(A.jobOf("hello"), undefined);
+  assert.deepEqual(A.cleanJobs(["coding", "nope", "planning", "coding"]), ["coding", "planning"]);
+  assert.equal(A.cleanJobs([]), undefined);
+  const zai = { id: "ag_zaiocode01", kind: "opencode", pays: "key", model: "zai-coding/glm-5.3", jobs: ["coding", "planning"] };
+  const b = { id: "bot_jobs", name: "Jobs", ai: { agents: [{ id: "bops", kind: "bops", pays: "credit" }, zai], default: "bops" } };
+  const st = { brains: [] };
+  assert.deepEqual(A.cleanAi(b.ai).agents[1], zai, "a profile keeps an agent's jobs");
+  assert.deepEqual(A.pickAgent(b, st, [], undefined, "Write a Python script that renames my photos"), { id: zai.id, kind: "opencode", model: "zai-coding/glm-5.3" });
+  assert.deepEqual(A.pickAgent(b, st, [], undefined, "Draft a thank-you letter"), { id: "bops", kind: "bops" }, "no agent has writing: the Default");
+  assert.deepEqual(A.pickAgent(b, st, ["bops"], undefined, "Write a Python script"), { id: "bops", kind: "bops" }, "the owner's pick wins");
+  assert.equal(A.gateRoute(zai), "zai-coding");
+  assert.equal(A.agentKeyName(zai), "ZAI_API_KEY");
+  assert.ok(A.modelOk("opencode", "zai/glm-5.2") && A.modelOk("opencode", "zai-coding/glm-9") && !A.modelOk("opencode", "zaix/glm"));
+});
+
 await test("a run's flags for the computer: its bot, agent, model, thinking, gate route, the bot's other agents, its shell's name", () => {
   const st = S.getState();
   S.update((s) => void (s.bots.find((x) => x.id === "boppy").effort = "high"));
@@ -521,7 +541,8 @@ await test("the AI section: its agents as tiles with the Default marked, agy Soo
   plain(out, "the AI section");
   // A tile's editor: model, how it pays (Soon ones say why), its account, Make default and Remove.
   const ed = render(h(BotAiSection, { state: S.getState(), bot: bot("boppy"), editing: codexAgent, onShowScreen() {} }));
-  assert.match(ed, /Model GPT 6\.1 Sol GPT 6 Astra ▾ Pays with Credit ChatGPT plan Your key Account Codex Max plan|Model GPT 6\.1 Sol GPT 6 Astra ▾ Pays with Credit ChatGPT plan Your key/);
+  // The editor calls Codex's plan "OpenAI plan" (bot-ai.tsx); "Use for" (the jobs it takes) shows on a bot with more than one agent.
+  assert.match(ed, /Model GPT 6\.1 Sol GPT 6 Astra ▾ (Use for Coding Planning Thinking Research Writing Web tasks )?Pays with Credit (ChatGPT|OpenAI) plan Your key/);
   assert.match(renderToStaticMarkup(h(BotAiSection, { state: S.getState(), bot: bot("boppy"), editing: codexAgent })), /title="Soon: A ChatGPT plan for Codex needs a check of OpenAI&#x27;s terms first\."/);
   assert.match(ed, /Your OpenAI key Make default Remove/);
   // What's Soon says why, in words on the page, not only on hover.

@@ -282,7 +282,7 @@ export function startSession({ botId, goal, title, chatId, sentVia = "you", viaB
   // The agent it runs on (lib/agents.ts), given now and fixed from its first turn. None on a bot with no profile:
   // nothing new is written for it. A member's turn never picks one: theirs run on the Default.
   const b0 = bot(botId);
-  const agent = b0 ? pickAgent(b0, getState(), member ? [] : (picks ?? []), member ? undefined : model) : undefined;
+  const agent = b0 ? pickAgent(b0, getState(), member ? [] : (picks ?? []), member ? undefined : model, goal) : undefined;
   const s: Session = {
     id: id("ses"),
     botId,

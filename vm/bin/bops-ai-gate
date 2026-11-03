@@ -10,7 +10,7 @@
 # request and never prints the token or the key. When the process that started it goes (bops-brain execs
 # the CLI, so that is the CLI, or the bot's shell after it), it exits and the token is worth nothing.
 #
-# Usage: bops-ai-gate --route anthropic|openai|deepinfra --port-file <file>
+# Usage: bops-ai-gate --route anthropic|openai|deepinfra|zai|zai-coding --port-file <file>
 import hmac
 import http.client
 import json
@@ -28,7 +28,12 @@ UPSTREAMS = {
     "anthropic": "https://api.anthropic.com",
     "openai": "https://api.openai.com",
     "deepinfra": "https://api.deepinfra.com",
+    # Z.ai's OpenAI shaped API has no /v1: the run asks for /zai/v1/..., the gate sends /api/paas/v4/...
+    "zai": "https://api.z.ai/api/paas/v4",
+    "zai-coding": "https://api.z.ai/api/coding/paas/v4",
 }
+# Routes whose upstream path takes the place of the run's /v1.
+NO_V1 = {"zai", "zai-coding"}
 # Bodies up to this size go on; bigger ones are turned down.
 MOST = 64 * 1024 * 1024
 HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "trailers", "transfer-encoding", "upgrade", "host", "content-length"}
@@ -43,7 +48,7 @@ def arg(name):
 route = arg("--route")
 port_file = arg("--port-file")
 if route not in UPSTREAMS or not port_file:
-    sys.stderr.write("usage: bops-ai-gate --route anthropic|openai|deepinfra --port-file <file>\n")
+    sys.stderr.write("usage: bops-ai-gate --route anthropic|openai|deepinfra|zai|zai-coding --port-file <file>\n")
     sys.exit(2)
 upstream = UPSTREAMS[route]
 # Tests only: a fake provider on this machine instead of the real one.
@@ -117,6 +122,8 @@ class Gate(BaseHTTPRequestHandler):
         if body is not None:
             headers["Content-Length"] = str(len(body))
         rest = path[len(prefix) :]
+        if route in NO_V1:
+            rest = rest[len("/v1") :]
         try:
             if UP.scheme == "https":
                 conn = http.client.HTTPSConnection(UP.hostname, UP.port or 443, timeout=600, context=ssl.create_default_context())

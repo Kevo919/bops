@@ -559,6 +559,8 @@ export type BotAgent = {
   account?: string;
   /** For new threads (lib/agents.ts MODELS). Unset: the kind's default (Bops agent: Auto). */
   model?: string;
+  /** The kinds of work new threads nobody picked an agent for go to this one for (lib/agents.ts JOBS, jobOf). */
+  jobs?: ("coding" | "planning" | "thinking" | "research" | "writing" | "browsing")[];
 };
 /** A bot's AI profile. Unset: Bops agent only, as its Default, exactly as before. */
 export type BotAi = { agents: BotAgent[]; default: string };

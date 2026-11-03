@@ -253,7 +253,9 @@ opencode_config() {
   "provider": {
     "anthropic": { "options": { "baseURL": "{env:BOPS_GATE}/anthropic/v1", "apiKey": "{env:ANTHROPIC_API_KEY}" } },
     "openai": { "options": { "baseURL": "{env:BOPS_GATE}/openai/v1", "apiKey": "{env:OPENAI_API_KEY}" } },
-    "deepinfra": { "options": { "baseURL": "{env:BOPS_GATE}/deepinfra/v1/openai", "apiKey": "{env:DEEPINFRA_API_KEY}" } }
+    "deepinfra": { "options": { "baseURL": "{env:BOPS_GATE}/deepinfra/v1/openai", "apiKey": "{env:DEEPINFRA_API_KEY}" } },
+    "zai": { "npm": "@ai-sdk/openai-compatible", "name": "Z.ai", "options": { "baseURL": "{env:BOPS_GATE}/zai/v1", "apiKey": "{env:ZAI_API_KEY}" } },
+    "zai-coding": { "npm": "@ai-sdk/openai-compatible", "name": "Z.ai Coding Plan", "options": { "baseURL": "{env:BOPS_GATE}/zai-coding/v1", "apiKey": "{env:ZAI_API_KEY}" } }
   }
 }' | put_file "$G/opencode.json" 600
 }
@@ -375,7 +377,7 @@ case "$CMD" in
       [[ "$BOT" =~ ^[A-Za-z0-9_-]+$ && "$AGENT" =~ ^[A-Za-z0-9_-]+$ ]] || bad "which bot and agent?"
       [ -z "$MODEL" ] || [[ "$MODEL" =~ ^[A-Za-z0-9._:/-]{1,120}$ ]] || bad "that model"
       [ -z "$EFFORT" ] || [[ "$EFFORT" =~ ^(low|medium|high)$ ]] || bad "that effort"
-      [ -z "$ROUTE" ] || [[ "$ROUTE" =~ ^(anthropic|openai|deepinfra)$ ]] || bad "that route"
+      [ -z "$ROUTE" ] || [[ "$ROUTE" =~ ^(anthropic|openai|deepinfra|zai|zai-coding)$ ]] || bad "that route"
       [ -z "$ALSO" ] || [[ "$ALSO" =~ ^[a-z]+:[a-z]+(:[A-Za-z0-9_-]*(:[A-Za-z0-9._:/-]*)?)?(,[a-z]+:[a-z]+(:[A-Za-z0-9_-]*(:[A-Za-z0-9._:/-]*)?)?)*$ ]] || bad "those agents"
       [[ "$LABEL" =~ ^[A-Za-z0-9._-]{1,30}$ ]] || bad "that label"
       [ -z "$OCC" ] || [[ "$OCC" =~ ^/[A-Za-z0-9._/\ -]+\.json$ ]] || bad "that OpenCode config"
@@ -457,6 +459,7 @@ case "$CMD" in
           anthropic) export ANTHROPIC_API_KEY="$TOKEN" ANTHROPIC_BASE_URL="$GURL/anthropic" ;;
           openai) export OPENAI_API_KEY="$TOKEN" OPENAI_BASE_URL="$GURL/openai/v1" ;;
           deepinfra) export DEEPINFRA_API_KEY="$TOKEN" ;;
+          zai | zai-coding) export ZAI_API_KEY="$TOKEN" ;;
         esac
         OPENCODE_CONFIG_CONTENT="$(oc_content)" || { echo "Bops couldn't set up OpenCode for this run" >&2; exit 1; }
         export OPENCODE_CONFIG_CONTENT

@@ -1,5 +1,5 @@
 import "server-only";
-import { AGENTS, agentOn, aiOf, cleanAi, hasProfile, isCli, MAX_AGENTS, modelOk, newAgentId, PAYS_SOON, paysOk, threadAgent } from "@/lib/agents";
+import { AGENTS, agentOn, aiOf, cleanAi, cleanJobs, hasProfile, isCli, MAX_AGENTS, modelOk, newAgentId, PAYS_SOON, paysOk, threadAgent } from "@/lib/agents";
 import { BRAINS_ON, workspaceOf, type AgentKind, type AgentPays, type Bot, type BotAi, type BotAgent } from "@/lib/types";
 import { addBrain, BrainError, ensureBrainTools } from "./brains";
 import { alsoSpec } from "./cli-agents";
@@ -17,7 +17,7 @@ import { bot, getState, ownerName, session, update } from "./store";
 
 export type AiOp =
   | { op: "add"; kind: AgentKind; pays: AgentPays; model?: string; newAccount?: boolean }
-  | { op: "update"; agentId: string; model?: string | null; pays?: AgentPays; account?: string; newAccount?: boolean }
+  | { op: "update"; agentId: string; model?: string | null; pays?: AgentPays; account?: string; newAccount?: boolean; jobs?: string[] }
   | { op: "remove"; agentId: string }
   | { op: "default"; agentId: string };
 
@@ -106,6 +106,18 @@ export function setBotAi(botId: string, o: AiOp, out: { added?: string } = {}): 
         modelCheck(x.kind, o.model);
         if (!o.model || (x.kind === "bops" && o.model === "auto")) delete x.model;
         else x.model = o.model;
+      }
+      // The jobs it takes: each job goes to one agent, so giving it this one takes it from the others.
+      if (o.jobs !== undefined) {
+        const jobs = cleanJobs(o.jobs);
+        for (const y of agents)
+          if (y !== x && y.jobs) {
+            const left = y.jobs.filter((j) => !jobs?.includes(j));
+            if (left.length) y.jobs = left;
+            else delete y.jobs;
+          }
+        if (jobs) x.jobs = jobs;
+        else delete x.jobs;
       }
       break;
     }
