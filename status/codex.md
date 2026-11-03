@@ -14,3 +14,7 @@ Freshnative redacted gitleaks8.30.1 --all afterfetchallforkbranches:615commits,z
 
 ## Needs Kevin
 No new action. Previously reported memory-observerauthoutage remains separate from board/workstate tracking.
+
+## Urgent user screenshot 20:18UTC
+PR47 https://github.com/Kevo919/bops/pull/47 head7fc9d08 BOTHCIgreen READY. FixWindowslocaltaskMCPcwd400 via outboundnamespacepathserialization; nativeexecutor/sandbox/resume untouched. LiveAPIcreate/deleteonlyaccepted actualhelperpaths; Windows6checks plusindependentreviewPASS. Main/localconfig unchanged. Leadurgentmerge/rebuild+fulltaskretryrequested; realCodexstartup/UNCshareunverified. Noownedprocesses/locksstartedbythisinteractivefix.
+
