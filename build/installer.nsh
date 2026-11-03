@@ -1,9 +1,18 @@
-# Refresh Bops' existing links even when NSIS keeps shortcuts during an upgrade.
-# Reuse electron-builder's macros so the standard paths, AppUserModelID and
-# explicit --no-desktop-shortcut choice remain respected. The same Bops.lnk is
-# replaced, including the development shortcut pointing at win-unpacked.
+# Stock installSection already creates links when keepShortcuts is false.
+# Only refresh links it preserved on upgrade, including a win-unpacked target.
+# Do not recreate links the user deleted. The stock desktop macro also respects
+# --no-desktop-shortcut, and both macros retain the standard AppUserModelID.
 !macro customInstall
-  StrCpy $keepShortcuts "false"
-  !insertmacro addDesktopLink $keepShortcuts
-  !insertmacro addStartMenuLink $keepShortcuts
+  ${if} $keepShortcuts == "true"
+    ${if} ${FileExists} "$newStartMenuLink"
+      StrCpy $keepShortcuts "false"
+      !insertmacro addStartMenuLink $keepShortcuts
+      StrCpy $keepShortcuts "true"
+    ${endif}
+    ${if} ${FileExists} "$newDesktopLink"
+      StrCpy $keepShortcuts "false"
+      !insertmacro addDesktopLink $keepShortcuts
+      StrCpy $keepShortcuts "true"
+    ${endif}
+  ${endif}
 !macroend
