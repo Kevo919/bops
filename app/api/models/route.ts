@@ -18,6 +18,7 @@ type Change = { list?: Entry[]; removed?: string[]; moved?: { job: string; from:
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const file = () => require(/* turbopackIgnore: true */ `${process.cwd()}/config/llms.cjs`) as {
   PROVIDERS: string[];
+  CHAT_ONLY?: string[];
   RUN_BY: Record<string, { name: string; providers: string[] | null }>;
   NOT_RUN_BY: Record<string, { name: string; why: string }>;
   MAX: number;
@@ -41,6 +42,7 @@ const LABELS: Partial<Record<string, string>> = {
   "zai-coding": "Z.ai GLM, on your Coding Plan",
   zai: "Z.ai GLM, pay as you go",
   deepinfra: "DeepInfra",
+  ollama: "Ollama (free, local; chats only)",
 };
 
 /** What the card shows: the list (each with its id, "provider/model"), the providers, the agents and the jobs. */
@@ -54,7 +56,8 @@ function described() {
     max: f.MAX,
     providers: f.PROVIDERS.map((p) => {
       const keyName = keyOf(p);
-      return { id: p, name: Object.hasOwn(ROUTE_NAMES, p) ? ROUTE_NAMES[p as AgentRoute] : p, label: LABELS[p] ?? (Object.hasOwn(ROUTE_NAMES, p) ? ROUTE_NAMES[p as AgentRoute] : p), keyName: keyName ?? null, keySet: !!(keyName && process.env[keyName]?.trim()) };
+      const name = Object.hasOwn(ROUTE_NAMES, p) ? ROUTE_NAMES[p as AgentRoute] : p;
+      return { id: p, name, label: LABELS[p] ?? name, keyName: keyName ?? null, keySet: !!(keyName && process.env[keyName]?.trim()), ...(f.CHAT_ONLY?.includes(p) ? { chatOnly: true } : {}) };
     }),
     runBy: [
       ...Object.entries(f.RUN_BY).map(([kind, x]) => ({ kind, name: x.name, providers: x.providers })),

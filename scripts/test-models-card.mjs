@@ -144,6 +144,7 @@ try {
       [["anthropic", "ANTHROPIC_API_KEY", true], ["openrouter", "OPENROUTER_API_KEY", false]],
     );
     assert.ok(body.providers.every((p) => typeof p.keySet === "boolean"));
+    assert.deepEqual(body.providers.filter((p) => p.chatOnly).map((p) => p.id), ["ollama"], "Ollama runs chats only");
     assert.deepEqual(body.runBy.map((r) => [r.kind, r.providers === null ? "any" : r.providers.length]), [["opencode", "any"], ["dsh", "any"], ["claude", 0], ["codex", 0]]);
     assert.ok(body.runBy.find((r) => r.kind === "claude").why.includes("AI section"));
     assert.deepEqual(body.jobs.map((j) => j.id), [...A.JOBS]);

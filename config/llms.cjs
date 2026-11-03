@@ -12,6 +12,12 @@ const PROVIDERS = ["anthropic", "openai", "deepinfra", "zai", "zai-coding", "dee
 const JOBS = ["coding", "planning", "thinking", "research", "writing", "browsing"];
 const MODEL = /^[A-Za-z0-9._:/-]{1,120}$/;
 const MAX = 20;
+/**
+ * Providers chats run on but bots' agents can't (lib/agents.ts CHAT_ONLY): Ollama runs on this server, out of
+ * reach of a bot's cloud computer. Their LLMs take no jobs, no run_by and aren't what bots start on.
+ */
+const CHAT_ONLY = ["ollama"];
+const CHAT_ONLY_WHY = "runs chats only (it's on this server, out of reach of your bots' computers), so it takes no bot jobs";
 
 /**
  * The agents that can run an LLM for bots' tasks (run_by), and the providers each runs (null: every one).
@@ -27,7 +33,7 @@ const NOT_RUN_BY = {
   claude: { name: "Claude Code", why: "Claude Code runs on a Claude account you connect in a bot's AI section, so it can't be picked here." },
   codex: { name: "Codex", why: "Codex runs on a ChatGPT account you connect in a bot's AI section, so it can't be picked here." },
 };
-const runByOk = (kind, provider) => Object.hasOwn(RUN_BY, kind) && (!RUN_BY[kind].providers || RUN_BY[kind].providers.includes(provider));
+const runByOk = (kind, provider) => !CHAT_ONLY.includes(provider) && Object.hasOwn(RUN_BY, kind) && (!RUN_BY[kind].providers || RUN_BY[kind].providers.includes(provider));
 const runByOf = (v) => {
   const k = typeof v === "string" ? v.trim().toLowerCase() : "";
   return RUN_BY_WORDS[k] ?? (k === "claude-code" || k === "claude code" ? "claude" : k);
@@ -50,15 +56,21 @@ function clean(raw, problems = []) {
     if (out.length >= MAX) return problems.push(`${where}: at most ${MAX} LLMs`);
     seen.add(id);
     const name = String(x.name ?? "").replace(/[\r\n]/g, " ").trim().slice(0, 60) || model;
-    const useFor = Array.isArray(x.use_for) ? JOBS.filter((j) => x.use_for.includes(j)) : [];
+    const chatOnly = CHAT_ONLY.includes(provider);
+    let useFor = Array.isArray(x.use_for) ? JOBS.filter((j) => x.use_for.includes(j)) : [];
+    if (chatOnly && (useFor.length || x.starter === true)) {
+      problems.push(`${where}: its use_for and starter (${provider} ${CHAT_ONLY_WHY})`);
+      useFor = [];
+    }
     // run_by: an agent that runs this provider, else left out (OpenCode runs it), with why.
     let runBy;
-    if (x.run_by !== undefined && x.run_by !== null && x.run_by !== "") {
+    if (x.run_by !== undefined && x.run_by !== null && x.run_by !== "" && chatOnly) problems.push(`${where}: its run_by (${provider} ${CHAT_ONLY_WHY})`);
+    else if (x.run_by !== undefined && x.run_by !== null && x.run_by !== "") {
       const k = runByOf(x.run_by);
       if (runByOk(k, provider)) runBy = k;
       else problems.push(`${where}: its run_by "${x.run_by}" (OpenCode runs it instead). ${NOT_RUN_BY[k]?.why ?? `run_by is one of ${Object.keys(RUN_BY).join(", ")}.`}`);
     }
-    out.push({ name, provider, model, ...(x.starter === true ? { starter: true } : {}), ...(useFor.length ? { useFor } : {}), ...(runBy ? { runBy } : {}), ...(x.chat_default === true ? { chatDefault: true } : {}) });
+    out.push({ name, provider, model, ...(x.starter === true && !chatOnly ? { starter: true } : {}), ...(useFor.length ? { useFor } : {}), ...(runBy ? { runBy } : {}), ...(x.chat_default === true ? { chatDefault: true } : {}) });
   });
   // One starter and one chat default: the first marked. Each job goes to one LLM: the first that has it.
   let starter = false;
@@ -127,6 +139,13 @@ function change(list, op) {
     x.name = op.name.trim().slice(0, 60);
   }
   if (!x.name) x.name = x.model;
+  const chatOnly = CHAT_ONLY.includes(x.provider);
+  if (chatOnly) {
+    if ((Array.isArray(op.useFor) && op.useFor.length) || op.starter === true || (op.runBy && op.runBy !== "opencode")) return fail(`${x.name} ${CHAT_ONLY_WHY}.`);
+    delete x.useFor;
+    delete x.starter;
+    delete x.runBy;
+  }
   if (op.runBy !== undefined) {
     if (op.runBy === null || op.runBy === "" || op.runBy === "opencode") delete x.runBy;
     else {
@@ -248,4 +267,4 @@ function read(root, log = console.warn, problemsOut) {
   return list;
 }
 
-module.exports = { PROVIDERS, JOBS, RUN_BY, NOT_RUN_BY, MAX, runByOk, clean, read, change, write };
+module.exports = { PROVIDERS, JOBS, CHAT_ONLY, RUN_BY, NOT_RUN_BY, MAX, runByOk, clean, read, change, write };

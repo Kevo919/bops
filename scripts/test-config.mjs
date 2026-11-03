@@ -275,6 +275,18 @@ try {
     assert.deepEqual(list.filter((l) => l.provider === "openrouter").map((l) => [l.model, l.runBy ?? "opencode"]), [["deepseek/deepseek-v4-pro", "opencode"], ["qwen/qwen3-coder-next", "dsh"]]);
   });
 
+  test("LLMs: a chat-only provider (Ollama) takes no jobs, run_by or starter, but can be the chat default", () => {
+    const problems = [];
+    const list = llms.clean({ llms: [{ name: "Local", provider: "ollama", model: "qwen2.5:3b", use_for: ["coding"], run_by: "dsh", starter: true, chat_default: true }, { name: "Cloud", provider: "openai", model: "x", use_for: ["coding"] }] }, problems);
+    assert.deepEqual(list, [{ name: "Local", provider: "ollama", model: "qwen2.5:3b", chatDefault: true }, { name: "Cloud", provider: "openai", model: "x", useFor: ["coding"] }]);
+    assert.equal(problems.length, 2);
+    assert.ok(problems.every((p) => /chats only/.test(p)));
+    assert.match(llms.change(list, { op: "update", id: "ollama/qwen2.5:3b", useFor: ["coding"] }).error, /chats only/);
+    assert.match(llms.change(list, { op: "add", provider: "ollama", model: "llama4", runBy: "dsh" }).error, /chats only/);
+    assert.equal(llms.change(list, { op: "add", provider: "ollama", model: "llama4", useFor: [], chatDefault: true }).list.at(-1).chatDefault, true);
+    assert.equal(llms.runByOk("opencode", "ollama"), false);
+  });
+
   console.log(`PASS: ${passed} config tests (temporary fixtures only)`);
 } finally {
   // scratch was created by this process under the OS temp directory; nothing in the repo is removed.

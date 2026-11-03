@@ -70,6 +70,7 @@ const PROVIDERS = [
   { id: "anthropic", name: "Anthropic", label: "Anthropic (Claude)", keyName: "ANTHROPIC_API_KEY", keySet: true },
   { id: "openrouter", name: "OpenRouter", label: "OpenRouter (hundreds of models)", keyName: "OPENROUTER_API_KEY", keySet: false },
   { id: "deepseek", name: "DeepSeek", label: "DeepSeek", keyName: "DEEPSEEK_API_KEY", keySet: false },
+  { id: "ollama", name: "Ollama (free, local)", label: "Ollama (free, local; chats only)", keyName: "OLLAMA_BASE_URL", keySet: false, chatOnly: true },
 ];
 const OR = [
   { id: "qwen/qwen3-coder-next", name: "Qwen: Qwen3 Coder Next", context: 262144, inPerM: 0.12, outPerM: 0.8 },
@@ -277,6 +278,27 @@ try {
     await click(button(row(box, "openrouter/deepseek/deepseek-v4-pro"), "Remove"));
     assert.deepEqual(bops.sent.at(-1), { op: "remove", id: "openrouter/deepseek/deepseek-v4-pro" });
     assert.equal(row(box, "openrouter/deepseek/deepseek-v4-pro"), null);
+  });
+
+  await test("a chats-only provider (Ollama): no jobs, Run by or bot default, and it says why", async () => {
+    bops.llms.push({ id: "ollama/qwen2.5:3b", name: "Qwen local", provider: "ollama", model: "qwen2.5:3b" });
+    await click(button(box, "Add a model"));
+    await click(button(box, "Close"));
+    // (The list comes back with the next change; one is enough to show the row.)
+    await click(row(box, "anthropic/claude-sonnet-5-5").querySelector("[data-job=writing]"));
+    const r = row(box, "ollama/qwen2.5:3b");
+    assert.match(r.querySelector("[data-chat-only]").textContent, /Chats only/);
+    assert.equal(r.querySelector("[data-job]"), null);
+    assert.equal(r.querySelector("select[aria-label='Run by']"), null);
+    assert.equal(r.querySelector("input[name=models-starter]"), null);
+    assert.ok(r.querySelector("input[name=models-chat-default]"));
+    assert.match(r.querySelector("[data-key=missing]").textContent, /Not set up yet: add OLLAMA_BASE_URL/);
+    await click(button(box, "Add a model"));
+    const add = box.querySelector("[data-add-model]");
+    await choose(add.querySelector("select[aria-label=Provider]"), "ollama");
+    assert.ok(add.querySelector("[data-chat-only]"));
+    assert.equal(add.querySelector("[data-job]"), null);
+    await click(button(add, "Cancel"));
   });
 
   await test("in Settings, Models comes right after the Keys card, which Keys links go to", async () => {
