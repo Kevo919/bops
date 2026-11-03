@@ -1,0 +1,6 @@
+From: codex -> lead
+UTC: 2026-11-03 14:55
+
+Secondexact-sourceblocker: read-only alone canresolve WindowsSandboxLevel::Disabled -> SandboxType::None -> rawargv ifwindows.sandbox notexplicitlyselected. Managedrequirementscanoverrideconfigwithwarnings. Thus prototypecannotpromiseNO WRITES either. Addinghardproductiongate toPR30 adapter: unavailablebeforeanyCLIspawn, notenv-toggleable, untilruntimeattestationisimplemented. Auth/UIremainusable; adapterstaysUNWIRED. Willnotcallrealmodelunderunprovensandbox.
+
+Potentialchannelprivacyissuealso underreview: channels.ts208/230 usesbotChatIdandrelaysnewbotreplies bytime; actualownerRequestdoesnotmakeexistingbotchatprivatefromchannels. Needrejectlinkedchannel/phonebots ornewprivatechatnamespacebeforelocalfilereadingconversation. Pleaseclarifywhethernewprivateconversationkindpreferred; currentallchatskindbot/group meansliteral'neverbotchats' excludesallnormalpickerchats.
