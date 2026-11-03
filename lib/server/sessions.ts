@@ -1,5 +1,6 @@
 import "server-only";
 import { holdAwake } from "./awake";
+import { brainMcp } from "./mcp";
 import { setting } from "./models";
 import { trackServerEvent } from "./analytics";
 import type { BopsEventProps } from "@/cloud/analytics-rules";
@@ -2262,6 +2263,8 @@ function brainTools(sessionId: string, botId: string, display: number, browser: 
     mcpServers: {
       screen: { type: "stdio", command: "/opt/bops/venv/bin/python", args: ["/opt/bops/screen_mcp.py", "stdio", "--session", sessionId, "--bot", botId, ...(approve ? ["--approve"] : [])], env },
       ...(browser ? { browser: { type: "stdio", command: "/usr/bin/node", args: [BROWSER_MCP, "--cdp-endpoint", `http://127.0.0.1:${9200 + display}`, "--init-page", BROWSER_FRONT], env } } : {}),
+      // The bot's own MCP servers (lib/server/mcp.ts): the key-less ones, so nothing secret reaches the computer.
+      ...brainMcp(botId),
       // A task on one of the workspace's apps (work_on_app): Ingot's tools, for the app's repo on this computer.
       ...appMcp(sessionId),
     },
