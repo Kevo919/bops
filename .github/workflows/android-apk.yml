@@ -10,7 +10,7 @@ name: Android APK
 
 on:
   push:
-    branches: [windows-port, feature/android-apk] # TEMP: proves the publish step on this PR branch (to android-latest-test); removed before merge
+    branches: [windows-port]
     paths:
       - "android/**"
       - ".github/workflows/android-apk.yml"
