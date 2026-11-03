@@ -73,7 +73,8 @@
   "productName": "Bops",
   "build": {
     "electronFuses": {
-      "enableNodeCliInspectArguments": false
+      "enableNodeCliInspectArguments": false,
+      "resetAdHocDarwinSignature": true
     },
     "appId": "ai.orgo.bops",
     "productName": "Bops",

@@ -11,6 +11,7 @@ import { join, resolve } from "node:path";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 assert.equal(pkg.build.electronFuses.enableNodeCliInspectArguments, false);
+assert.equal(pkg.build.electronFuses.resetAdHocDarwinSignature, true, "unsigned mac builds need their ad-hoc signature reset after flipping fuses");
 assert.notEqual(pkg.build.electronFuses.runAsNode, false, "bundled server requires RunAsNode");
 const smoke = readFileSync(join(root, "scripts", "smoke-windows.ps1"), "utf8");
 assert.ok(!smoke.includes("--inspect") && !smoke.includes("Runtime.evaluate") && !smoke.includes("webSocketDebuggerUrl"));
