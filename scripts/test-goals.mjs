@@ -61,14 +61,6 @@ async function check(name, fn) {
   }
 }
 
-const S = await import(at("lib/server/store.ts"));
-const G = await import(at("lib/server/goals.ts"));
-const Chat = await import(at("lib/server/chat.ts"));
-const { botChatId } = await import(at("lib/types.ts"));
-clearInterval(globalThis.__bopsRoutines);
-const chatId = botChatId(S.getState().bots[0].id);
-S.update((s) => (s.owner = { name: "Alex", timeZone: "America/New_York" }));
-
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
 const asked = [];
 const answers = [];
@@ -89,6 +81,14 @@ globalThis.fetch = async (input, init) => {
   }
   throw new TypeError(`fetch failed (offline: ${new URL(req.url).host})`);
 };
+const S = await import(at("lib/server/store.ts"));
+const G = await import(at("lib/server/goals.ts"));
+const Chat = await import(at("lib/server/chat.ts"));
+const { botChatId } = await import(at("lib/types.ts"));
+clearInterval(globalThis.__bopsRoutines);
+const chatId = botChatId(S.getState().bots[0].id);
+S.update((s) => (s.owner = { name: "Alex", timeZone: "America/New_York" }));
+
 const toolNames = (body) => body.tools.map((t) => t.name ?? t.type);
 const outputOf = (body, i = 0) => body.input.filter((x) => x.type === "function_call_output")[i]?.output;
 async function turnWith(text, items, final = "Ok.") {
