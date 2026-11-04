@@ -1,5 +1,7 @@
 "use client";
 
+import { useComputerWords } from "./computer-words";
+
 import { screenMap, screenNo } from "@/lib/screens";
 import { askKind, chatAsks } from "@/lib/asks";
 import { alwaysScope, toDo } from "@/lib/permission";
@@ -1443,6 +1445,7 @@ function MemberSendLine({ send, retry }: { send: NonNullable<Message["memberSend
 }
 
 function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onOpenThread, onShowScreen, onShowMac, replyCount, root, onReply, onOpenReplies, onDelete, inReplies, arrival }: RowProps) {
+  const computerWords = useComputerWords();
   // Decided once, as the row mounts: a poll or a new tapback draws it again but never replays it.
   // Yours carries on its pending copy's motion (a negative delay starts it partway, or past the end).
   const [enter] = useState(() =>
@@ -1749,8 +1752,7 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
           <div key={`${s.id}-where`} className="flex gap-1.5 pl-1">
             <button onClick={() => void post(`/api/sessions/${s.id}/where`, { to: "mac" })} className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white">
               <MacIcon size={13} />
-              On your Mac
-            </button>
+              {computerWords("On your Mac")}</button>
             <button onClick={() => void post(`/api/sessions/${s.id}/where`, { to: "cloud" })} className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_#E2E2DF] hover:bg-[#F7F7F6]">
               <CloudIcon />
               In the cloud
@@ -1764,8 +1766,7 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
           <div key={`${s.id}-move`} className="flex gap-1.5 pl-1">
             <button onClick={() => void post(`/api/sessions/${s.id}/where`, { move: true })} className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white">
               <MacIcon size={13} />
-              Move to your Mac?
-            </button>
+              {computerWords("Move to your Mac?")}</button>
             <button onClick={() => void post(`/api/sessions/${s.id}/where`, { move: false })} className="rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_#E2E2DF] hover:bg-[#F7F7F6]">
               Not now
             </button>
@@ -2327,6 +2328,7 @@ function readableOn(hex: string) {
 
 /** A thread, collapsed to one line in the chat. Opens the thread sheet. */
 function SessionChip({ session: s, state, onClick }: { session: Session; state: AppState; onClick: () => void }) {
+  const computerWords = useComputerWords();
   const b = state.bots.find((x) => x.id === s.botId);
   const waiting = needsYou(s);
   // In a shared workspace, what it waits on is the viewer's to answer too (Write on its bot): said so, not "the owner".
@@ -2351,9 +2353,9 @@ function SessionChip({ session: s, state, onClick }: { session: Session; state: 
       <span className={`truncate text-[14px] leading-[18px] ${live(s) || waiting ? "text-ink" : "text-[#6B6B6B]"}`}>{s.title}</span>
       {/* Where it runs: the user's Mac (the owner's, in a shared workspace) or the cloud (deciding: nothing yet). */}
       {s.runsOn === "mac" ? (
-        <span title={`On ${state.shared ? "the owner's" : "your"} Mac`} className="flex shrink-0 items-center gap-1 rounded-full bg-[#F2F2F0] px-1.5 py-px text-[11px] leading-[14px] text-[#3A3A38]">
+        <span title={computerWords`On ${state.shared ? "the owner's" : "your"} Mac`} className="flex shrink-0 items-center gap-1 rounded-full bg-[#F2F2F0] px-1.5 py-px text-[11px] leading-[14px] text-[#3A3A38]">
           <MacIcon size={11} />
-          {ownerMac(state)}
+          {computerWords(ownerMac(state))}
         </span>
       ) : s.askWhere && live(s) ? (
         <span className="shrink-0 text-[12px] leading-4 text-[#6B6B6B]">· where?</span>
@@ -2420,6 +2422,7 @@ export function ThreadSheet({
   /** Show one of a bot's screens up close: where its brain's sign-in opened, or the thread's own, for it (NeedsYouCard). */
   onShowScreen?: (botId: string, display: number, sessionId?: string) => void;
 }) {
+  const computerWords = useComputerWords();
   // "Working for 1m 23s" counts up while it's open.
   useNow(live(s) ? 1000 : 60_000);
   // Opening it plays its entrance; coming back to it (the chat column is drawn again after a
@@ -2514,7 +2517,7 @@ export function ThreadSheet({
             </div>
             {agentPays && <span className="text-[12px] leading-4 text-[#6B6B6B]">{agentPays}</span>}
             <button onClick={onShowComputer} className="flex items-center gap-1.5 text-left text-[12px] leading-4 text-[#6B6B6B] hover:text-ink">
-              {b.name} · {s.runsOn === "mac" ? `on ${state.shared ? "the owner's" : "your"} Mac · ` : ""}
+              {b.name} · {s.runsOn === "mac" ? computerWords`on ${state.shared ? "the owner's" : "your"} Mac · ` : ""}
               {terminal !== undefined ? "in the terminal" : s.askWhere && live(s) ? `waiting for ${ownerYou(state)}` : live(s) ? "working" : s.status === "done" ? "finished" : "stopped"} · {toolCount} steps
               {/* Its screen, by the number the panel and the bots use. */}
               {s.runsOn !== "mac" && (live(s) && s.display !== undefined ? ` · screen ${screenNo(s.display)}` : !live(s) && s.lastDisplay !== undefined ? ` · left off on screen ${screenNo(s.lastDisplay)}` : "")}
@@ -2525,11 +2528,11 @@ export function ThreadSheet({
           {!state.shared && s.runsOn !== "mac" && state.mac?.ready && !waitsForOk(s, state) && (s.blocker || s.status === "failed" || (s.offerMac && live(s))) && (
             <button
               onClick={() => void post(`/api/sessions/${s.id}/where`, { move: true })}
-              title="Do this on your Mac instead, on your home internet"
+              title={computerWords("Do this on your Mac instead, on your home internet")}
               className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6]"
             >
               <MacIcon size={13} />
-              {s.offerMac && live(s) && !s.blocker ? "Move to your Mac" : "Try on your Mac"}
+              {s.offerMac && live(s) && !s.blocker ? computerWords("Move to your Mac") : computerWords("Try on your Mac")}
             </button>
           )}
           {canTerminal && !state.shared && (
@@ -2750,8 +2753,7 @@ export function ThreadSheet({
         ) : !writesThread(state, s) ? (
           // With Write on its bot, but it runs on the owner's Mac: a member's words never reach work there (Bops Cloud refuses them).
           <div data-read-only className="mx-3 mb-3 rounded-[14px] bg-[#F7F7F5] px-3.5 py-2.5 text-center text-[13px] leading-[18px] text-[#6B6B6B]">
-            This runs on the owner&apos;s Mac. Only the owner can tell it more.
-          </div>
+            {computerWords("This runs on the owner's Mac. Only the owner can tell it more.")}</div>
         ) : (
         <form
           onSubmit={(e) => {
@@ -2973,6 +2975,7 @@ function CloudIcon() {
  * which the owner's Bops does as the owner's own pick. What didn't go says why.
  */
 function WhereButtons({ state, session: s, botName }: { state: AppState; session: Session; botName: string }) {
+  const computerWords = useComputerWords();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pick = async (to: "mac" | "cloud") => {
@@ -2990,7 +2993,7 @@ function WhereButtons({ state, session: s, botName }: { state: AppState; session
         {!state.shared && (
           <button disabled={busy} onClick={() => void pick("mac")} className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white disabled:opacity-50">
             <MacIcon size={12} />
-            {ownerMac(state)}
+            {computerWords(ownerMac(state))}
           </button>
         )}
         <button disabled={busy} onClick={() => void pick("cloud")} className={`rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 disabled:opacity-50 ${state.shared ? "bg-ink text-white" : "bg-white shadow-[0_0_0_1px_#E2E2DF] hover:bg-[#F7F7F6]"}`}>
@@ -3033,6 +3036,7 @@ function NeedsYouCard({
   onSomethingElse: () => void;
   onOpen?: () => void;
 }) {
+  const computerWords = useComputerWords();
   const [working, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const b = state.bots.find((x) => x.id === s.botId);
@@ -3149,8 +3153,7 @@ function NeedsYouCard({
             )}
             {toMac && (
               <button disabled={busy} onClick={() => void post(`/api/sessions/${s.id}/where`, { move: true })} className={plain}>
-                Try on your Mac
-              </button>
+                {computerWords("Try on your Mac")}</button>
             )}
             <button disabled={busy} onClick={dismiss} className={plain}>
               Dismiss
@@ -3172,8 +3175,7 @@ function NeedsYouCard({
             </button>
             {toMac && (
               <button disabled={busy} onClick={() => void post(`/api/sessions/${s.id}/where`, { move: true })} className={plain}>
-                Try on your Mac
-              </button>
+                {computerWords("Try on your Mac")}</button>
             )}
             <button disabled={busy} onClick={dismiss} className={plain}>
               Dismiss

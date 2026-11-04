@@ -21,6 +21,8 @@ for (const key of Object.keys(process.env)) if (/^(BOPS_|OPENAI_|ANTHROPIC_|ZAI_
 process.env.NEXT_PUBLIC_BOPS_BRAINS = "1";
 const temp = mkdtempSync(join(tmpdir(), "bops-models-card-"));
 
+let stateVersion = 1;
+globalThis.__modelsTouchState = () => { stateVersion++; };
 const hooks = registerHooks({
   resolve(specifier, context, next) {
     if (specifier.startsWith("@/")) specifier = pathToFileURL(join(root, specifier.slice(2))).href;
@@ -39,6 +41,8 @@ const hooks = registerHooks({
     }
   },
   load(url, context, next) {
+    if (url.endsWith("/lib/server/store.ts"))
+      return { format: "module", shortCircuit: true, source: "export const touchState = () => globalThis.__modelsTouchState();" };
     // As Next gives it: require, for config/llms.cjs.
     if (url.endsWith("/lib/server/llms.ts"))
       return { format: "module-typescript", shortCircuit: true, source: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);\n' + readFileSync(fileURLToPath(url), "utf8") };
@@ -110,7 +114,9 @@ try {
     new Request(`http://${host}${path}`, { method, headers: { "Content-Type": "application/json", ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   const win = { cookie: `bops_window=${TOKEN}` };
   const post = async (body) => {
+    const beforeVersion = stateVersion;
     const res = await route.POST(req("POST", { body, headers: win }));
+    assert.equal(stateVersion, beforeVersion + (res.ok ? 1 : 0), "only successful saves invalidate state polling");
     return { status: res.status, body: await res.json() };
   };
 
@@ -251,7 +257,7 @@ try {
   });
 
   await test("the default only goes on chats as they're made: existing, pair and app chats never fall through to it", async () => {
-    const src = (f) => readFileSync(join(root, f), "utf8");
+    const src = (f) => readFileSync(join(root, f), "utf8").replace(/\r\n/g, "\n");
     // A chat with no model answers on Auto (chatModelOf reads only the chat's own pick).
     const chatTs = src("lib/server/chat.ts");
     assert.match(chatTs, /const chatModelOf = \(chatId: string \| undefined\) => \{\n {2}const m = chatId \? chat\(chatId\)\?\.model : undefined;\n {2}return m && providerOf\(m\) \? m : undefined;\n\};/);
@@ -348,6 +354,7 @@ try {
 
   console.log(`PASS: ${passed} Models card checks (temporary config, fake network)`);
 } finally {
+  delete globalThis.__modelsTouchState;
   process.chdir(originalCwd);
   for (const key of Object.keys(process.env)) if (!(key in originalEnv)) delete process.env[key];
   Object.assign(process.env, originalEnv);

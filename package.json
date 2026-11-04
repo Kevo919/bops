@@ -17,6 +17,7 @@
     "app:release": "scripts/release.sh",
     "setup:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-windows.ps1",
     "app:build:win": "next build && node -e \"require('fs').writeFileSync('desktop/repo.json', JSON.stringify({ path: process.cwd(), built: true }))\" && electron-builder --win nsis --x64 --publish never",
+    "app:build:win:dir": "next build && node -e \"require('fs').writeFileSync('desktop/repo.json', JSON.stringify({ path: process.cwd(), built: true }))\" && electron-builder --win --x64 --dir --publish never",
     "app:dev:win": "node -e \"require('fs').writeFileSync('desktop/repo.json', JSON.stringify({ path: process.cwd() }))\" && electron-builder --win --dir",
     "modules:example": "node scripts/modules-example.cjs",
     "sync:upstream": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-upstream.ps1",
@@ -37,6 +38,8 @@
     "agentmail": "^0.5.35",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
+    "docx": "^9.15.2",
+    "exceljs": "^4.4.0",
     "linkedom": "^0.18.13",
     "lucide-react": "^1.50.0",
     "next": "16.3.8",
@@ -44,6 +47,7 @@
     "pg": "^8.23.1",
     "posthog-js": "1.231.0",
     "posthog-node": "5.10.0",
+    "pptxgenjs": "^4.0.1",
     "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -194,7 +198,7 @@
       "createStartMenuShortcut": true,
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": false,
-      "artifactName": "Bops-Setup.exe"
+      "artifactName": "Bops-Setup-${version}-${arch}.exe"
     }
   }
 }

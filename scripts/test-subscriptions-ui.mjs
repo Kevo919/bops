@@ -133,6 +133,7 @@ console.log("subscriptions ui: 5 passed");
 }
 
 const local = (kind, state = "signed-out", extra = {}) => ({ kind, state, available: state !== "missing", connected: state === "connected", checkedAt: 1700000000000, ...extra });
+win.bopsMac = {}; // Desktop bridge presence; no real desktop calls.
 let snapshots = [local("codex"), local("claude", "missing", { error: "Install Claude Code, then check again." })];
 calls.length = 0;
 answer = (path, body) => {
@@ -194,6 +195,33 @@ assert.match(localMount.box.textContent, /only to the self-hosted owner/);
 await localMount.done();
 console.log("ok API access failure is visible rather than a silent empty card");
 console.log("local subscriptions ui: 4 passed");
+for (const hosted of [false, true]) {
+  calls.length = 0;
+  if (hosted) win.bopsMac = {}; else delete win.bopsMac;
+  answer = (path) => path === "/api/config" ? json({ selfHosted: !hosted }) : json({});
+  localMount = await mount({ state: noHost }, AiSubscriptionsCard);
+  assert.equal(button(localMount.box, "This PC"), undefined);
+  assert.ok(!calls.some((c) => c.path.startsWith("/api/local-subscriptions")));
+  await localMount.done();
+}
+console.log("ok phone/browser and hosted cards never request desktop subscription status");
+win.bopsMac = {};
+calls.length = 0;
+answer = (path) => json({ subscriptions: path.includes("?kind=codex") ? [local("codex", "connected")] : [local("codex", "connecting"), local("claude", "signed-out", { loginUrl: "https://claude.com/cai/oauth/authorize?fixture=only" })] });
+localMount = await mount({}, LocalSubscriptions);
+await act(async () => { await new Promise((r) => setTimeout(r, 2100)); });
+assert.ok(calls.some((c) => c.path === "/api/local-subscriptions?kind=codex"));
+assert.ok(!calls.some((c) => c.path.includes("?kind=claude")));
+assert.equal(localMount.box.querySelector("a"), null);
+assert.match(localMount.box.textContent, /cannot accept a pasted authorization code/);
+await localMount.done();
+console.log("ok polling requests only the connecting provider and Claude has no manual code URL");
+answer = () => json({ subscriptions: [local("codex"), local("claude", "connecting", { loginUrl: "https://claude.ai/oauth/authorize?fixture=only" })] });
+localMount = await mount({}, LocalSubscriptions);
+assert.equal(localMount.box.querySelector("a"), null, "even an older allowed Claude URL is not offered during sign-in");
+assert.ok(button(localMount.box, "Cancel Claude sign-in"));
+await localMount.done();
+console.log("ok connecting Claude never offers its printed paste-code URL");
 if (!BRAINS_OFF) {
   const { execFileSync } = await import("node:child_process");
   const output = execFileSync(process.execPath, [fileURLToPath(import.meta.url), "--brains-off"], { encoding: "utf8", env: process.env });

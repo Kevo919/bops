@@ -3,11 +3,11 @@ import { computerBriefing, teamBriefing } from "./briefing";
 import { belowOf } from "@/lib/chain";
 import { appsOpen } from "@/lib/apps-access";
 import { aboutBops, SPEAKING } from "./style";
-import { howIWork } from "@/cloud/style";
+import { soulBlock } from "@/lib/bot-docs";
 import { appsNote, placesNote } from "./skills";
 import { dataNote } from "./treg";
 import { openaiClient } from "./openai-client";
-import { botChatId, CALL_VOICES, isCallVoice, live, MAX_PERSONA_CHARS, settingsOf, type Bot } from "@/lib/types";
+import { botChatId, CALL_VOICES, isCallVoice, live, settingsOf, type Bot } from "@/lib/types";
 import { handleMessage } from "./chat";
 import { callEnded, callStarted } from "./attention";
 import { noteOutOfCredit, outOfCreditWords } from "./cloud";
@@ -87,7 +87,7 @@ export async function voicePrompt(b: Bot, how: "live" | "turns" = "live") {
   return [
     `You are ${b.name}, ${b.isMain ? `${owner}'s chief of staff` : `${owner}'s ${b.role} bot`} in Bops, on a phone call with ${owner}. ${ownerLine()}`,
     // What the user wrote on its profile (How I work), short: their preferences, never Bops' rules.
-    howIWork(owner, b.persona?.slice(0, MAX_PERSONA_CHARS), true),
+    soulBlock(owner, b, true),
     "Talk like a capable teammate on a call: short, warm, natural. One or two sentences at a time. No lists.",
     SPEAKING,
     // With Apps for an account they're open to (lib/apps-access.ts).

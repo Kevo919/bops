@@ -40,6 +40,7 @@ const ANY: Record<NonNullable<AppApproval["kind"]>, string> = {
   api: "whatever it sends",
   data: "whatever it looks up",
   brain: "whatever it runs",
+  mcp: "whatever it sends the server",
 };
 
 /** What Always allow covers, as the card says it: "Always allow Max to send an email, whoever it's to and whatever it says." */

@@ -1,8 +1,9 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { waitsForOk, workspaceOf, type AppState, type Bot, type Session } from "@/lib/types";
+import { MAX_BOT_DOC_CHARS, waitsForOk, workspaceOf, type AppState, type Bot, type Session } from "@/lib/types";
 import { entryOf, teamIn } from "@/lib/chain";
+import { MEMORY_FILE, renderMemoryDoc, renderSoul, SOUL_FILE } from "@/lib/bot-docs";
 import { MemorySheet } from "./memory-sheet";
 import { ago, memberAnswers, post, quietNothing, StatusIcon } from "./ui";
 import { you } from "@/lib/shared";
@@ -38,6 +39,9 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
   const [asking, setAsking] = useState(false);
   const [answer, setAnswer] = useState<(Answer & { question: string }) | null>(null);
   const [manage, setManage] = useState(false);
+  // Edit: the bot's SOUL.md and MEMORY.md (the owner's own: not with someone else's workspace open).
+  const [view, setView] = useState<"memory" | "edit">("memory");
+  const editing = view === "edit" && !state.shared;
   const [allLearned, setAllLearned] = useState(false);
   const [allWork, setAllWork] = useState(false);
   const reload = useCallback(() => setTick((t) => t + 1), []);
@@ -90,6 +94,19 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
   return (
     <OwnMemoryOf.Provider value={data?.own ? b.id : undefined}>
     <div className="mx-auto flex w-full max-w-[640px] flex-col gap-7 pb-6">
+      {!state.shared && (
+        <div role="tablist" aria-label="Memory views" className="flex gap-0.5 self-start rounded-full bg-[#F2F2F0] p-0.5 text-[12.5px] leading-4">
+          {(["memory", "edit"] as const).map((v) => (
+            <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`rounded-full px-3 py-1 ${view === v ? "bg-white font-medium text-ink shadow-[0_0_0_1px_#0000000F]" : "text-[#6B6B6B] hover:text-ink"}`}>
+              {v === "memory" ? "Memory" : "Edit"}
+            </button>
+          ))}
+        </div>
+      )}
+      {editing ? (
+        <BotDocs state={state} bot={b} pinned={(data?.card ?? []).map((l) => l.text)} />
+      ) : (
+      <>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -239,9 +256,106 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
           {!data.own && !state.shared && entryOf(teamIn(state, workspaceOf(b)), b.id).kept && <KeptApart bot={b} onDone={reload} />}
         </>
       )}
+      </>
+      )}
 
     </div>
     </OwnMemoryOf.Provider>
+  );
+}
+
+/* ---------------- Edit: SOUL.md and MEMORY.md ---------------- */
+
+type DocView = { text: string | null; generated: string };
+type Docs = { soul: DocView; memory: DocView; max: number; dir: string | null; error?: string };
+
+/**
+ * The bot's two documents, each in a text area: SOUL.md (who it is, its tone, its rules) and MEMORY.md (long-lived
+ * facts). Until the owner writes one, the generated text shows (from How I work, and what's pinned in memory), and
+ * that's what the bot reads too; Save keeps what they wrote in the state (the files under .data mirror it), Reset
+ * goes back to the generated one. Owner only: the server refuses anyone else (app/api/bots/docs).
+ */
+function BotDocs({ state, bot: b, pinned }: { state: AppState; bot: Bot; pinned: string[] }) {
+  const owner = state.owner?.name.trim() || "you";
+  const [docs, setDocs] = useState<Docs | null>(null);
+  useEffect(() => {
+    let gone = false;
+    void fetch(`/api/bots/docs?${new URLSearchParams({ bot: b.id })}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j: Docs) => !gone && setDocs(j))
+      .catch(() => {});
+    return () => {
+      gone = true;
+    };
+  }, [b.id]);
+  // Until the server answers (or when it can't), the generated ones from what the page has: the same text.
+  const soul: DocView = docs?.soul ?? { text: b.soul ?? null, generated: renderSoul(b, owner) };
+  const memory: DocView = docs?.memory ?? { text: b.memoryDoc ?? null, generated: renderMemoryDoc(b, owner, pinned) };
+  return (
+    <div data-bot-docs className="flex flex-col gap-7">
+      <div className="rounded-[18px] bg-[#F7F7F6] px-5 py-4 text-[13px] leading-5 text-[#6B6B6B]">
+        {b.name} reads both at the start of every chat turn, task and call. <b className="font-medium text-ink">{SOUL_FILE}</b> is who it is: its tone and its rules; saved, it takes the place of How I work on its profile. <b className="font-medium text-ink">{MEMORY_FILE}</b> is what you want it to keep in mind for good, next to what it learns on its own. What you say in a chat still wins, and Bops&apos; own rules (approvals) still apply.
+        {docs?.dir ? <span className="block pt-1 text-[12px] text-[#9A9A98]">Copies are kept at {docs.dir}; edits there do nothing, edit here.</span> : null}
+      </div>
+      {docs?.error && <div role="alert" className="text-[13px] text-[#B42318]">{docs.error}</div>}
+      <DocEditor bot={b} field="soul" file={SOUL_FILE} doc={soul} max={docs?.max ?? MAX_BOT_DOC_CHARS} onSaved={setDocs} />
+      <DocEditor bot={b} field="memoryDoc" file={MEMORY_FILE} doc={memory} max={docs?.max ?? MAX_BOT_DOC_CHARS} onSaved={setDocs} />
+    </div>
+  );
+}
+
+function DocEditor({ bot: b, field, file, doc, max, onSaved }: { bot: Bot; field: "soul" | "memoryDoc"; file: string; doc: DocView; max: number; onSaved: (d: Docs) => void }) {
+  const shown = doc.text ?? doc.generated;
+  const [text, setText] = useState(shown);
+  // Another bot, or a fresh copy from the server: start from what it shows (never over an edit in progress).
+  const [was, setWas] = useState({ bot: b.id, shown });
+  if (was.bot !== b.id || (was.shown !== shown && text === was.shown)) {
+    setWas({ bot: b.id, shown });
+    setText(shown);
+  }
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const changed = text !== shown;
+  const left = max - text.length;
+  const send = async (value: string | null) => {
+    setBusy(true);
+    setError(null);
+    const r = (await (await post("/api/bots/docs", { botId: b.id, [field]: value }, "PATCH")).json().catch(() => ({ error: "Couldn't save. Try again." }))) as Docs;
+    setBusy(false);
+    if (r.error) return setError(r.error);
+    onSaved(r);
+    const next = (field === "soul" ? r.soul : r.memory);
+    setWas({ bot: b.id, shown: next.text ?? next.generated });
+    setText(next.text ?? next.generated);
+  };
+  return (
+    <section data-doc={file} className="flex flex-col gap-2.5">
+      <div className="flex h-6 items-center justify-between">
+        <h3 className="text-[15px] font-semibold tracking-[-0.01em]">{file}</h3>
+        <span className="text-[12px] leading-4 text-[#9A9A98]">{doc.text === null ? "Generated" : "Yours"}</span>
+      </div>
+      <textarea
+        aria-label={file}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        maxLength={max}
+        spellCheck={false}
+        rows={12}
+        className="min-h-[200px] w-full resize-y rounded-[14px] bg-[#F7F7F6] px-4 py-3 font-mono text-[12.5px] leading-[19px] outline-none focus:bg-white focus:shadow-[inset_0_0_0_1.5px_#0A0A0A]"
+      />
+      <div className="flex items-center gap-2">
+        <button disabled={busy || !changed} onClick={() => void send(text)} className="h-7 rounded-full bg-[#0A0A0A] px-3 text-[12.5px] font-medium text-white disabled:opacity-40">
+          Save
+        </button>
+        {(doc.text !== null || changed) && (
+          <button disabled={busy} onClick={() => void send(null)} className="h-7 rounded-full bg-[#F2F2F0] px-3 text-[12.5px] font-medium text-ink hover:bg-[#EAEAE7] disabled:opacity-50">
+            Reset to generated
+          </button>
+        )}
+        {error && <span role="alert" className="text-[12px] text-[#B42318]">{error}</span>}
+        <span className="ml-auto shrink-0 text-[12px] tabular-nums leading-4 text-[#9A9A98]">{left === 1 ? "1 character left" : `${left.toLocaleString("en-US")} characters left`}</span>
+      </div>
+    </section>
   );
 }
 

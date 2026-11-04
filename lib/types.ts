@@ -110,6 +110,21 @@ export type Bot = {
    */
   persona?: string;
   /**
+   * Its SOUL.md (lib/bot-docs.ts): who it is, its tone and its rules, as the owner wrote them in its Memory tab's
+   * Edit, up to MAX_BOT_DOC_CHARS. Set, it stands in for `persona` in its chat, tasks and calls (the generated one
+   * it starts from holds `persona`); unset, the bot reads `persona` as before. The text here is the source of
+   * truth: the SOUL.md file under .data is a mirror written from it, never read back. Only the owner's own Bops
+   * window writes it (app/api/bots/docs): never a member, the phone, a computer (cloud/computer-scope.ts BOT_RUN)
+   * or a bot's tool. Members and teammates' computers never read it (cloud/ws-slice.ts BOT, computer-scope TEAMMATE).
+   */
+  soul?: string;
+  /**
+   * Its MEMORY.md (lib/bot-docs.ts): long-lived facts the owner keeps for it, up to MAX_BOT_DOC_CHARS, given with
+   * its long-term memory at the start of every chat turn, task and call (lib/server/memory.ts memoryBlock). The
+   * generated one it starts from holds the pinned lines of its memory (About you). Kept, written and read as `soul` is.
+   */
+  memoryDoc?: string;
+  /**
    * Keys (lib/server/keys.ts): the names of the user's API keys in their Orgo vault this bot may call
    * with call_api ("STRIPE_SECRET_KEY"). Only the names: the keys themselves never leave Orgo.
    */
@@ -160,6 +175,12 @@ export type BotSettings = {
    * "Send an email" rule says ask meanwhile, which is what a Bops from before does with it.
    */
   mailNever?: true;
+  /**
+   * Which of the config's MCP servers are this bot's own, by name (lib/server/mcp.ts; config/bops.yaml
+   * `mcp: servers:`). Unset: none. A server that names keys runs for the chat only, never on a brain's
+   * computer (its keys stay here).
+   */
+  mcpServers?: string[];
 };
 
 /** Bot `b`'s settings page settings (Workspace.botSettings), none set: {}. */
@@ -204,6 +225,8 @@ export const isCallVoice = (v: unknown): v is CallVoice => typeof v === "string"
 export type LineVoice = { for: CallVoice; id: string; name: string; exact?: true };
 
 export const MAX_PERSONA_CHARS = 1500;
+/** How long a bot's SOUL.md or MEMORY.md may be (Bot.soul, Bot.memoryDoc), in characters. */
+export const MAX_BOT_DOC_CHARS = 20_000;
 
 /** A workspace: one team with its own main bot, bots, chats and work. The user switches between them. */
 export type Workspace = {
@@ -1403,6 +1426,28 @@ export type RoutineRun = {
   by?: string;
 };
 
+/**
+ * A goal the owner set with a bot (chat.ts set_goal): what they're after, and the routines and skills
+ * the bot built for it, kept together so the goal can be seen whole. `status` done/dropped retires the
+ * goal and leaves what it made running (the owner set those up on purpose); only the record changes.
+ */
+export type Goal = {
+  id: string;
+  botId: BotId;
+  title: string;
+  why?: string;
+  createdAt: number;
+  status: "active" | "done" | "dropped";
+  doneAt?: number;
+  /** The routines set up for it (Routine.id), each already scheduled. */
+  routineIds?: string[];
+  /** The skills written for its recurring jobs (SkillRef.id), if any. */
+  skillIds?: string[];
+};
+
+/** An idea the owner parked (chat.ts save_idea, or the Ideas tab): a sentence and when, nothing more. */
+export type Idea = { id: string; text: string; at: number; from: "chat" | "panel" };
+
 /** A routine or one-off scheduled ask. When it fires it becomes a reminder, a turn in the bot's chat, or a thread. */
 export type Routine = {
   id: string;
@@ -1654,6 +1699,10 @@ export type AppState = {
   messages: Message[];
   sessions: Session[];
   routines: Routine[];
+  /** The owner's goals (Goal, chat.ts set_goal): what they're after and what the bot built for it. */
+  goals?: Goal[];
+  /** The owner's parked ideas (Idea): a sentence each, nothing running, until one is made a goal. */
+  ideas?: Idea[];
   /**
    * How each bot did the kinds of jobs it was shown, from before skills (Procedure). Each is moved into
    * its workspace's skills (lib/server/workspace-skills.ts adoptProcedures) and the list is emptied; what was
@@ -2297,7 +2346,7 @@ export type AppApproval = {
   action: string;
   resources: string[];
   preview: string;
-  kind?: "app" | "email" | "api" | "data" | "brain";
+  kind?: "app" | "email" | "api" | "data" | "brain" | "mcp";
   /** A call to an API with one of the user's keys: the key, its service, the method and the whole path. */
   api?: { key: string; label: string; method: string; path: string };
   at: number;

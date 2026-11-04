@@ -4,6 +4,7 @@ import { requestInbox } from "@/lib/server/mail";
 import { isCallVoice, MAX_PERSONA_CHARS, type AppAccess, type Effort } from "@/lib/types";
 import { withMailRule, type MailRule } from "@/lib/permission";
 import { editBotSettings } from "@/lib/server/bot-settings";
+import { setBotMcp } from "@/lib/server/mcp";
 import { bot, update } from "@/lib/server/store";
 import { notReady } from "@/lib/server/ready";
 import { routineChanged } from "@/lib/server/routine-sync";
@@ -69,6 +70,8 @@ export async function PATCH(request: Request) {
     othersMail?: MailRule;
     /** The site it works on (lib/types.ts BotSite: { app, site }, `site` the app's own when left out), or null for none. */
     site?: unknown;
+    /** Which of the config's MCP servers are this bot's own (BotSettings.mcpServers, lib/server/mcp.ts), by name. */
+    mcp?: string[];
   };
   const b = body.botId ? bot(body.botId) : undefined;
   if (!b) return Response.json({ error: "no such bot" }, { status: 404 });
@@ -114,7 +117,7 @@ export async function PATCH(request: Request) {
     if (body.othersMail) b.permissions = withMailRule(b.permissions, body.othersMail);
   });
   // The settings page's own, kept on the bot's workspace (lib/types.ts BotSettings): Bot.voice stays what voiceFor keeps.
-  if (body.callVoice !== undefined || typeof body.answersCalls === "boolean" || body.sequence || body.othersMail)
+  if (body.callVoice !== undefined || typeof body.answersCalls === "boolean" || body.sequence || body.othersMail || Array.isArray(body.mcp))
     update((s) =>
       editBotSettings(s, b, (x) => {
         if (body.callVoice === null) delete x.callVoice;
@@ -128,6 +131,7 @@ export async function PATCH(request: Request) {
         }
         if (body.othersMail === "never") x.mailNever = true;
         else if (body.othersMail) delete x.mailNever;
+        if (Array.isArray(body.mcp)) setBotMcp(s, b, body.mcp);
       }),
     );
   // Calls to its number speak in the voice picked (lib/server/phone.ts syncLineVoices): AgentPhone's closest, set on its agent.
