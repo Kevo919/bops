@@ -21,6 +21,17 @@ const isPreset = (provider, model) => provider === "openrouter" && PRESET.test(S
 const modelOk = (provider, model) => MODEL.test(model) || isPreset(provider, model);
 const MAX = 20;
 /**
+ * Another account of the provider (lib/accounts.ts): `account: work` uses the key BASE__WORK in .env.local
+ * (OPENROUTER_API_KEY__WORK) for this LLM's chats; none: the default key. A-Z, 0-9 and _, at most 24, any case.
+ */
+const ACCOUNT = /^[A-Z0-9_]{1,24}$/;
+const accountOf = (v) => {
+  const s = typeof v === "string" ? v.trim().toUpperCase() : "";
+  return ACCOUNT.test(s) ? s : undefined;
+};
+/** Ollama has no key, so no accounts. */
+const NO_ACCOUNTS = ["ollama"];
+/**
  * Providers chats run on but bots' agents can't (lib/agents.ts CHAT_ONLY): Ollama runs on this server, out of
  * reach of a bot's cloud computer. Their LLMs take no jobs, no run_by and aren't what bots start on.
  */
@@ -82,7 +93,17 @@ function clean(raw, problems = []) {
       if (runByOk(k, provider)) runBy = k;
       else problems.push(`${where}: its run_by "${x.run_by}" (OpenCode runs it instead). ${NOT_RUN_BY[k]?.why ?? `run_by is one of ${Object.keys(RUN_BY).join(", ")}.`}`);
     }
-    out.push({ name, provider, model, ...(x.starter === true && !chatOnly ? { starter: true } : {}), ...(useFor.length ? { useFor } : {}), ...(runBy ? { runBy } : {}), ...(x.chat_default === true ? { chatDefault: true } : {}) });
+    // account: kept when it's a label (one this server hasn't got is said in Settings, Models), else left out, with why.
+    let account;
+    if (x.account !== undefined && x.account !== null && x.account !== "") {
+      account = accountOf(x.account);
+      if (!account) problems.push(`${where}: its account "${x.account}" (letters, numbers and _ only, at most 24; the default account is used)`);
+      else if (NO_ACCOUNTS.includes(provider)) {
+        problems.push(`${where}: its account (${provider} has no key, so no accounts)`);
+        account = undefined;
+      }
+    }
+    out.push({ name, provider, model, ...(account ? { account } : {}), ...(x.starter === true && !chatOnly ? { starter: true } : {}), ...(useFor.length ? { useFor } : {}), ...(runBy ? { runBy } : {}), ...(x.chat_default === true ? { chatDefault: true } : {}) });
   });
   // One starter and one chat default: the first marked. Each job goes to one LLM: the first that has it.
   let starter = false;
@@ -160,6 +181,15 @@ function change(list, op) {
     x.name = op.name.trim().slice(0, 60);
   }
   if (!x.name) x.name = x.model;
+  if (op.account !== undefined) {
+    if (op.account === null || op.account === "") delete x.account;
+    else {
+      const a = accountOf(op.account);
+      if (!a) return fail("An account is a label of letters, numbers and _ only, at most 24 (like WORK).");
+      if (NO_ACCOUNTS.includes(x.provider)) return fail(`${x.provider} has no key, so no accounts.`);
+      x.account = a;
+    }
+  } else if (x.account && NO_ACCOUNTS.includes(x.provider)) delete x.account;
   const chatOnly = chatOnlyOf(x.provider, x.model);
   if (chatOnly) {
     if ((Array.isArray(op.useFor) && op.useFor.length) || op.starter === true || (op.runBy && op.runBy !== "opencode")) return fail(isPreset(x.provider, x.model) ? `${x.name} ${PRESET_WHY}.` : `${x.name} ${CHAT_ONLY_WHY}.`);
@@ -204,6 +234,7 @@ const FIELDS = [
   ["name", (l) => l.name],
   ["provider", (l) => l.provider],
   ["model", (l) => l.model],
+  ["account", (l) => l.account],
   ["starter", (l) => (l.starter ? true : undefined)],
   ["use_for", (l) => (l.useFor?.length ? l.useFor : undefined)],
   ["run_by", (l) => l.runBy],
@@ -288,4 +319,4 @@ function read(root, log = console.warn, problemsOut) {
   return list;
 }
 
-module.exports = { PROVIDERS, JOBS, CHAT_ONLY, RUN_BY, NOT_RUN_BY, MAX, MODEL, PRESET, isPreset, chatOnlyOf, runByOk, clean, read, change, write };
+module.exports = { ACCOUNT, PROVIDERS, JOBS, CHAT_ONLY, RUN_BY, NOT_RUN_BY, MAX, MODEL, PRESET, isPreset, chatOnlyOf, runByOk, clean, read, change, write };

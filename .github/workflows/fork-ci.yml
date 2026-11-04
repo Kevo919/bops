@@ -81,6 +81,8 @@ jobs:
         run: node --conditions=react-server scripts/test-openrouter-presets.mjs
       - name: Routine model tests
         run: node --conditions=react-server scripts/test-routine-model.mjs
+      - name: Provider accounts tests
+        run: node --conditions=react-server scripts/test-provider-accounts.mjs
       - name: Look permission and sanitizer tests
         run: node --conditions=react-server scripts/test-look.mjs
       - name: Repo recipe tests

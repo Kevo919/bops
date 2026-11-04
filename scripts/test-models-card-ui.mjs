@@ -68,7 +68,7 @@ const RUN_BY = [
 ];
 const PROVIDERS = [
   { id: "anthropic", name: "Anthropic", label: "Anthropic (Claude)", keyName: "ANTHROPIC_API_KEY", keySet: true },
-  { id: "openrouter", name: "OpenRouter", label: "OpenRouter (hundreds of models)", keyName: "OPENROUTER_API_KEY", keySet: false },
+  { id: "openrouter", name: "OpenRouter", label: "OpenRouter (hundreds of models)", keyName: "OPENROUTER_API_KEY", keySet: false, accounts: ["WORK"] },
   { id: "deepseek", name: "DeepSeek", label: "DeepSeek", keyName: "DEEPSEEK_API_KEY", keySet: false },
   { id: "ollama", name: "Ollama (free, local)", label: "Ollama (free, local; chats only)", keyName: "OLLAMA_BASE_URL", keySet: false, chatOnly: true },
 ];
@@ -116,7 +116,7 @@ globalThis.fetch = async (url, opts = {}) => {
     }
   };
   if (op.op === "add") {
-    const l = { id: `${op.provider}/${op.model}`, name: op.name, provider: op.provider, model: op.model, ...(op.useFor?.length ? { useFor: op.useFor } : {}), ...(op.runBy ? { runBy: op.runBy } : {}) };
+    const l = { id: `${op.provider}/${op.model}`, name: op.name, provider: op.provider, model: op.model, ...(op.account ? { account: op.account } : {}), ...(op.useFor?.length ? { useFor: op.useFor } : {}), ...(op.runBy ? { runBy: op.runBy } : {}) };
     take(l, op.useFor ?? []);
     bops.llms.push(l);
   } else if (op.op === "update") {
@@ -126,6 +126,11 @@ globalThis.fetch = async (url, opts = {}) => {
       l.useFor = op.useFor;
     }
     if (op.runBy) l.runBy = op.runBy;
+    if ("account" in op) {
+      if (op.account) l.account = op.account;
+      else delete l.account;
+      delete l.accountMissing;
+    }
     if (op.chatDefault) for (const y of bops.llms) y.chatDefault = y === l;
   } else if (op.op === "remove") bops.llms = bops.llms.filter((x) => x.id !== op.id);
   return json({ ok: true, moved, ...(bops.warning ? { warning: bops.warning } : {}), ...info() });
@@ -387,6 +392,35 @@ try {
     bops.warning = undefined;
     assert.equal(bops.sent.at(-1).model, "someone/new-model:free");
     assert.match(box.querySelector("[data-models-warning]").textContent, /doesn't have "someone\/new-model:free"/);
+  });
+
+  await test("accounts: an Account box only for a provider with more than one, on each model and on Add; one not found is said", async () => {
+    assert.equal(row(box, "anthropic/claude-opus-5-5").querySelector("select[aria-label=Account]"), null, "Anthropic has one account here");
+    const qwen = row(box, "openrouter/qwen/qwen3-coder-next");
+    const sel = qwen.querySelector("select[aria-label=Account]");
+    assert.deepEqual([...sel.querySelectorAll("option")].map((o) => o.textContent), ["Default (OPENROUTER_API_KEY)", "work (OPENROUTER_API_KEY__WORK)"]);
+    assert.match(sel.closest("label").getAttribute("title"), /Bots' tasks on their computers use the default account/);
+    await choose(sel, "WORK");
+    assert.deepEqual(bops.sent.at(-1), { op: "update", id: "openrouter/qwen/qwen3-coder-next", account: "WORK" });
+    assert.match(box.querySelector("[data-models-note]").textContent, /now uses the work account/);
+    assert.match(row(box, "openrouter/qwen/qwen3-coder-next").querySelector("[data-account-tag]").textContent, /work account/);
+    await choose(row(box, "openrouter/qwen/qwen3-coder-next").querySelector("select[aria-label=Account]"), "");
+    assert.deepEqual(bops.sent.at(-1), { op: "update", id: "openrouter/qwen/qwen3-coder-next", account: null });
+    await click(button(box, "Add a model"));
+    const add = box.querySelector("[data-add-model]");
+    assert.equal(add.querySelector("select[aria-label=Account]"), null, "no provider yet");
+    await choose(add.querySelector("select[aria-label=Provider]"), "openrouter");
+    await choose(add.querySelector("select[aria-label=Account]"), "WORK");
+    await click(add.querySelector("[data-or-mode=custom]"));
+    await type(add.querySelector("input[aria-label='Model id']"), "qwen/qwen3-coder-work");
+    await click(button(add, "Save"));
+    assert.deepEqual(bops.sent.at(-1), { op: "add", name: "qwen3-coder-work", provider: "openrouter", model: "qwen/qwen3-coder-work", useFor: [], account: "WORK" });
+    bops.llms.push({ id: "openrouter/x/gone", name: "Gone", provider: "openrouter", model: "x/gone", account: "NOPE", accountMissing: true });
+    await click(row(box, "anthropic/claude-sonnet-5-5").querySelector("[data-job=research]"));
+    const gone = row(box, "openrouter/x/gone");
+    assert.match(gone.querySelector("[data-account-missing]").textContent, /add OPENROUTER_API_KEY__NOPE to \.env\.local/);
+    assert.ok([...gone.querySelectorAll("select[aria-label=Account] option")].some((o) => o.textContent === "nope (account not found)"));
+    assert.ok(!/SECRET|sk-/.test(box.innerHTML), "no key anywhere");
   });
 
   await test("in Settings, Models comes right after the Keys card, which Keys links go to", async () => {

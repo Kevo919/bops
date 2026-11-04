@@ -20,6 +20,9 @@
 #         dsh                 DeepSeek Harness
 #       (Claude Code and Codex run on an account you connect in a bot's AI section.
 #        Ollama runs chats only, so it takes no use_for, run_by or starter.)
+#    4b. Optional: account: work  to use another account (key) of that provider for its
+#       chats: the key OPENROUTER_API_KEY__WORK (the provider's key name, "__", the label)
+#       in .env.local. Leave it out for the default key. Bots' tasks use the default key.
 #    5. Optional: chat_default: true  on one of them ("Default for new chats"): chats
 #       made from then on start on it (when its key is set). Chats you already have keep
 #       their model, and you can still pick Auto (OpenAI) in any chat.

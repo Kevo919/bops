@@ -1,4 +1,5 @@
 import { BRAINS_ON, planName, signInOn, threadRunner, workBot, workspaceOf, type AgentKind, type AgentPays, type AppState, type Bot, type BotAgent, type BotAi, type Brain, type CliKind, type Session } from "@/lib/types";
+import { ACCOUNT_LABEL } from "./accounts";
 
 /**
  * A bot is a whole window, and each of its threads a tab: its AI profile (Bot.ai) lists the agents its threads
@@ -138,7 +139,7 @@ const AGENT_ID = /^ag_[A-Za-z0-9]{10}$/;
  * state (AppState.llms), and both keep it here. They run on OpenCode, on the provider's key from the Vault, and
  * show as DeepSeek Harness's models too.
  */
-export type Llm = { name: string; provider: AgentRoute; model: string; starter?: boolean; useFor?: Job[]; runBy?: RunBy; chatDefault?: boolean };
+export type Llm = { name: string; provider: AgentRoute; model: string; account?: string; starter?: boolean; useFor?: Job[]; runBy?: RunBy; chatDefault?: boolean };
 /**
  * The agents that may run an LLM for bots' tasks (config/llms.yaml run_by; config/llms.cjs RUN_BY says which
  * providers each runs). OpenCode when it says none. Claude Code and Codex run on an account connected to a bot.
@@ -170,6 +171,8 @@ export function setLlms(list: unknown) {
         name: typeof l.name === "string" && l.name.trim() ? l.name.trim().slice(0, 60) : l.model,
         provider: l.provider as AgentRoute,
         model: l.model,
+        // Another account of its provider (lib/accounts.ts): its label only, never a key.
+        ...(typeof l.account === "string" && ACCOUNT_LABEL.test(l.account) && l.provider !== "ollama" ? { account: l.account } : {}),
         ...(l.starter === true && !preset && !out.some((y) => y.starter) ? { starter: true } : {}),
         ...(jobs ? { useFor: jobs } : {}),
         ...(runBy ? { runBy } : {}),
