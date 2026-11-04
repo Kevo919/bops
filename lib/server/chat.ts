@@ -44,6 +44,7 @@ import { offerProposal, PROPOSE_TOOL, sealProposals, type ProposeArgs } from "./
 import { createSkill, findSkill, readSkill, skillRefId, skillsNote, skillText, SkillError, updateSkill, READ_SKILL_TOOL } from "./workspace-skills";
 import { linksFor } from "./channels";
 import { changeLookFromChat } from "./look";
+import { saveIdea, setGoal } from "./goals";
 import { botMcp, callMcp, mcpNote } from "./mcp";
 import { markSeen } from "./presence";
 import { chose, decide, yes, type Answer } from "./decide";
@@ -854,6 +855,8 @@ const LOOKUPS = new Set([
   "deploy_app",
   "local_app",
   "change_look",
+  "set_goal",
+  "save_idea",
   "call_mcp",
   ...DATA_TOOL_NAMES,
   ...CRM_TOOL_NAMES,
@@ -1237,7 +1240,7 @@ type ChatPause = Omit<TurnOptions, "group" | "background" | "resume"> & {
  * it, talk in the chat, or ask a teammate. Those are for the user's own turns. (It can open and update
  * Orbit's issues.)
  */
-const NOT_IN_BACKGROUND = new Set(["react", "schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "remember", "make_page", "make_doc", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "hand_off", "tell_task", "ask_teammate", "create_bot", ...ORBIT_OWNER_ONLY]);
+const NOT_IN_BACKGROUND = new Set(["react", "schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "remember", "make_page", "make_doc", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "hand_off", "tell_task", "ask_teammate", "create_bot", "set_goal", "save_idea", ...ORBIT_OWNER_ONLY]);
 
 /**
  * What a turn someone else started (an email, a text or a call from outside) never has: anything that sets
@@ -1248,7 +1251,7 @@ const NOT_IN_BACKGROUND = new Set(["react", "schedule", "manage_routine", "watch
 /** All a sample (BackgroundJob.sample) has: finding an app's actions and running the ones that only read. */
 const SAMPLE_TOOLS = new Set(["find_app_actions", "use_app"]);
 
-const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "make_doc", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "create_bot"]);
+const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "make_doc", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "set_goal", "save_idea", "create_bot"]);
 
 /**
  * What a member's turn (TurnOptions.member) never has: what sets up or changes what the bots do on their own
@@ -1260,7 +1263,7 @@ const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_w
  * The owner's drafts are left out with the tools themselves; the Connected apps and keys this bot has are there, asking
  * the owner before anything that changes something.
  */
-const NOT_FROM_MEMBER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "create_bot", "change_look", "call_mcp", "remember", "recall", "text_me", ...ORBIT_OWNER_ONLY]);
+const NOT_FROM_MEMBER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "create_bot", "change_look", "call_mcp", "remember", "recall", "text_me", "set_goal", "save_idea", ...ORBIT_OWNER_ONLY]);
 /**
  * Not on a chat turn a computer's runner answers (runner-chat.ts): what writes parts of the state a computer may not
  * (routines, watches, skills, bots: cloud/computer-scope.ts would hold them back, and the bot would say it did what never
@@ -2036,6 +2039,33 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
         where: { type: "string", enum: ["auto", "cloud", "mac"], description: `For a task: where it runs each time. cloud or mac if ${owner} said so; else auto.` },
         time_zone: TIME_ZONE_PARAM,
       }),
+      // A goal (lib/server/goals.ts): the owner says what they're after, the bot agrees the steps with
+      // them, then one call makes the goal and its routines together. The owner's own turns only, like
+      // schedule: never a routine's run, a member's, or a turn someone else started.
+      ...(opts.outside || member || bg
+        ? []
+        : [
+            fn("set_goal", `Set a goal for ${owner}: what they're after, with the steps you agreed together, each becoming a routine on its schedule. Use it when they say "my goal is..." or "I want to get better at..." and you've agreed what to do and when (use schedule alone for one plain job, not a goal). Agree the steps with them first, in your reply, unless they've already said them; then call this once with every step.`, {
+              title: { type: "string", description: "The goal in their words, a few words (\"Run a 5k in the spring\")." },
+              why: { type: ["string", "null"], description: "Why they want it, one line, if they said. Null when they didn't." },
+              steps: {
+                type: "array",
+                description: "The agreed steps, in order. Each becomes a routine that runs on its schedule.",
+                items: {
+                  type: "object",
+                  properties: {
+                    what: { type: "string", description: "What each run does, as a complete instruction to you (the routine's job)." },
+                    title: { type: ["string", "null"], description: "A short label for it (\"Morning stretch\"). Null: made from what." },
+                    schedule: SCHEDULE_PARAMS,
+                  },
+                  required: ["what", "schedule"],
+                },
+              },
+            }),
+            fn("save_idea", `Park an idea of ${owner}'s for later (\"save this idea\", \"that's an idea for later\"): a sentence, nothing more. It shows in their Ideas tab until they make it a goal or drop it. Not for anything to do now (that's a task or a routine) and not for facts about them (that's remember).`, {
+              text: { type: "string", description: "The idea, in their words, one or two sentences." },
+            }),
+          ]),
       fn(
         "manage_routine",
         `Run a routine now, pause, resume, skip one of its runs (skip: at is that run's time, null for its next; unskip brings one back, null for all) or delete it, change where its task runs, or edit it, when ${owner} asks ("run the news check now", "pause it", "skip Friday's digest", "do today's after all", "stop the water reminder", "run the calendar check on my Mac", "make the digest 8 AM and 5 PM", "move it to Mondays and Fridays", "do the prep 30 minutes before instead"). edit takes a whole new schedule, a title, a goal, quiet or a time zone; the fields it doesn't change are null. It answers with how it went.`,
@@ -2662,6 +2692,26 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
         })().catch(failed);
       // Where results go by default follows the user's own last ask. Asked by email, it's the email (the last
       // ask may be an older text or channel message).
+      // A goal (lib/server/goals.ts): the goal and its routines made together, the bot told what was set.
+      if (name === "set_goal") {
+        const steps = Array.isArray(a.steps) ? a.steps : [];
+        if (!steps.length || steps.length > 12) return "Not set: a goal takes 1 to 12 steps.";
+        const clean = steps.map((x) => {
+          const o = (x && typeof x === "object" ? x : {}) as { what?: unknown; title?: unknown; schedule?: unknown };
+          return { what: String(o.what ?? ""), schedule: o.schedule as Schedule, ...(typeof o.title === "string" && o.title.trim() ? { title: o.title } : {}) };
+        }).filter((x) => x.what.trim() && x.schedule);
+        if (clean.length !== steps.length) return "Not set: every step needs what it does and its schedule.";
+        const made = setGoal(botId, String(a.title ?? ""), clean, typeof a.why === "string" ? a.why : undefined);
+        notes.push(`Goal set: ${made.goal.title} (${made.said})`);
+        return `Done. The goal "${made.goal.title}" is set with its routines: ${made.said}. They run on their schedules; ${owner} can stop any of them in Routines, and mark the goal done in the Ideas tab when they reach it.`;
+      }
+      // An idea parked for later: a sentence, nothing more, kept until it becomes a goal or is dropped.
+      if (name === "save_idea") {
+        const text = String(a.text ?? "").trim();
+        if (!text) return "Not saved: say the idea.";
+        saveIdea(text, "chat");
+        return `Parked. It's in ${owner}'s Ideas tab; they can make it a goal from there.`;
+      }
       if (name === "schedule") return scheduleFor(b, a as ScheduleArgs, { ask: opts.emailBack ? undefined : lastAsk, email: !!opts.emailBack, unseen }, notes);
       // A Run now is marked with the message that asked for it, so its result goes back only there (channels.ts, phone.ts).
       if (name === "manage_routine") return manageRoutine(b, below, a as ManageArgs, notes, chatId, opts.answering ?? "chat").catch(failed);
