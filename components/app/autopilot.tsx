@@ -763,6 +763,8 @@ export function AutopilotPage({
             <CloseButton onClick={onClose} className="mt-1.5" />
           </div>
 
+          {!state.shared && <GoalsAndIdeas state={state} mainId={main?.id} onAsk={onAsk} />}
+
           {(team.length > 1 || appFilters) && (
             <div className="flex flex-col gap-2">
               {/* Every bot, with how many each runs: whose each color in the week is, and which bot's to show. */}
@@ -1595,3 +1597,73 @@ export function MonitorRow({
     </PageRow>
   );
 }
+
+export function GoalsAndIdeas({ state, mainId, onAsk, readOnly }: { state: AppState; mainId?: string; onAsk: (botId: string, text?: string) => void; readOnly?: boolean }) {
+  const goals = (state.goals ?? []).filter((g) => g.status === "active");
+  const ideas = state.ideas ?? [];
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const act = (body: Record<string, unknown>) => {
+    setBusy(true);
+    void post("/api/goals", body).finally(() => setBusy(false));
+  };
+  const btn = "rounded-full px-2 py-0.5 text-[12px] font-medium leading-4 text-ink hover:bg-black/[0.05] disabled:opacity-40";
+  return (
+    <div data-goals-card className="flex flex-col gap-2 rounded-[14px] bg-white px-3.5 py-3 shadow-[0_0_0_1px_#E6E6E3]">
+      <span className="text-[13px] font-semibold leading-4">Goals and ideas</span>
+      {goals.slice(0, 4).map((g) => (
+        <div key={g.id} className="flex items-center gap-2" data-goal={g.title}>
+          <span className="min-w-0 flex-1 truncate text-[13px] leading-4" title={g.why ?? g.title}>
+            {g.title}
+            {g.routineIds?.length ? <span className="text-[#9A9A98]"> · {g.routineIds.length} routine{g.routineIds.length === 1 ? "" : "s"}</span> : null}
+          </span>
+          {!readOnly && (
+            <>
+              <button disabled={busy} onClick={() => act({ action: "goal-done", goalId: g.id })} className={btn} title="Reached: the routines keep running">
+                Done
+              </button>
+              <button disabled={busy} onClick={() => act({ action: "goal-drop", goalId: g.id })} className={btn} title="Not pursuing it anymore">
+                Drop
+              </button>
+            </>
+          )}
+        </div>
+      ))}
+      {!goals.length && <span className="text-[12px] leading-4 text-[#9A9A98]">Tell a bot &quot;my goal is...&quot; and it sets up the steps on their schedules.</span>}
+      {ideas.slice(0, 4).map((i) => (
+        <div key={i.id} className="flex items-center gap-2 border-t border-[#ECECEA] pt-1.5" data-idea={i.text}>
+          <span className="min-w-0 flex-1 truncate text-[12.5px] leading-4 text-[#3A3A3A]" title={i.text}>
+            {i.text}
+          </span>
+          {!readOnly && mainId && (
+            <>
+              <button disabled={busy} onClick={() => onAsk(mainId, `Make this idea a goal: ${i.text}`)} className={btn} title="Agree the steps in the chat, then they're set up">
+                Make it a goal
+              </button>
+              <button disabled={busy} onClick={() => act({ action: "idea-take", ideaId: i.id })} className={btn} title="Take it out of the parking lot">
+                Dismiss
+              </button>
+            </>
+          )}
+        </div>
+      ))}
+      {!readOnly && (
+        <form
+          className="flex items-center gap-1.5 border-t border-[#ECECEA] pt-1.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!text.trim()) return;
+            act({ action: "idea-add", text: text.trim() });
+            setText("");
+          }}
+        >
+          <input aria-label="Add an idea" value={text} onChange={(e) => setText(e.target.value)} placeholder="Park an idea for later" className="min-w-0 flex-1 rounded-full bg-[#F7F7F6] px-2.5 py-1 text-[12.5px] leading-4 outline-none" />
+          <button type="submit" disabled={busy || !text.trim()} className={btn}>
+            Park
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
