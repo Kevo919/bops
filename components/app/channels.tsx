@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CHANNELS, PAIR_CODE_MS, PAIR_CODE_TRIES, pairCodeLive, workspaceOf, type AppState, type Bot, type ChannelLink } from "@/lib/types";
 import { Spinner } from "./mascot";
 import { BrandTile, post } from "./ui";
+import { openSignIn } from "./apps";
 
 /*
  * Where to find a bot: the places it lives besides Bops. One row of tiles; a tile that's set up says
@@ -183,7 +184,7 @@ function SlackSetup({ state, bot: b }: { state: AppState; bot: Bot }) {
               <Spinner size={13} /> Finish adding it in your browser…
             </span>
           ) : (
-            <button onClick={() => void post("/api/apps", { app: "slackbot" })} className={primary}>
+            <button onClick={() => void post("/api/apps", { app: "slackbot" }).then((r) => r.json()).then(openSignIn).catch(() => {})} className={primary}>
               Add to Slack
             </button>
           )}

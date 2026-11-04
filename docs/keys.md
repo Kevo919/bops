@@ -92,6 +92,10 @@ To use other Ollama models, add them to `config/llms.yaml` with `provider: ollam
 
 **Check** for this row asks Ollama for its model list at `OLLAMA_BASE_URL/models`. **works** with zero models means Ollama is running but you still need to pull one.
 
+## Composio, Zapier and OpenRouter
+
+**Settings → This Mac → Connections** (below Models) has a row each for Composio (`COMPOSIO_API_KEY`, your connected apps), Zapier (`ZAPIER_MCP_URL`, your Zapier MCP server's address) and OpenRouter (`OPENROUTER_API_KEY`), with where to get each and a **Check** button. They also show in the Keys list. Step by step, including connecting Gmail or Slack and using OpenRouter's free models: [Connect Composio, Zapier and OpenRouter](connections.md).
+
 ## After setup
 
 Restart Bops, check the configured keys in **Settings → This Mac → Keys**, then select the corresponding provider/model in Bops. Keep spending alerts enabled where available, but use an enforced cap when you need requests to stop. Rate limits control request speed; they are not spending budgets.
