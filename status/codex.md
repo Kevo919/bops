@@ -21,3 +21,6 @@ Continue executor diagnosis without conflating provider auth, startup, and task 
 ## Windows task auth diagnosis
 Actual boundedPCtask failed beforetools. Exactregistration403 missing api.agents.environments.connect; credentialmodelsGET200 notscopeproof. Kevinaskedkeyownerpermission. CloudClaudeplan2 retry nowopensofficiallogin; priorbashCRLFresolved. Kevinaskedfinishauth; nativeWindowsClaudealreadyloggedin. Taskcompletion/signinconfirmationstillpending. See newexecutor-scope-and-claude-loginmessage.
 
+
+Claudeplan2 cloud signin nowverified byliveBopsUI: signedin withMaxplan. Windows executor api.agents.environments.connect stillpending; separatecredentials.
+
