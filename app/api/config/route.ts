@@ -5,5 +5,5 @@ export const dynamic = "force-dynamic";
  * self-hosted (BOPS_SELF_HOSTED=1) also shows their setup and status in Settings.
  */
 export async function GET() {
-  return Response.json({ selfHosted: process.env.BOPS_SELF_HOSTED === "1" });
+  return Response.json({ selfHosted: process.env.BOPS_SELF_HOSTED === "1", platform: process.platform });
 }

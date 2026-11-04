@@ -186,10 +186,11 @@ const messagesIn = (bank) => [...hbank(bank).sessions.values()].flatMap((x) => x
 const factsIn = (bank) => hbank(bank).facts.map((f) => f.text);
 
 await check("each bot's memory scope: its own bank while it keeps its memory to itself, the team's otherwise; never the main bot's own", () => {
-  assert.deepEqual(Mem.scopeOf("juno"), { ws: "ws_main", bot: "juno", readsTeam: true });
-  assert.deepEqual(Mem.scopeOf("rex"), { ws: "ws_main", bot: "rex", readsTeam: false });
-  assert.deepEqual(Mem.scopeOf("max"), { ws: "ws_main" });
-  assert.deepEqual(Mem.scopeOf("boppy"), { ws: "ws_main" }, "the main bot always uses the team's memory");
+  // (`for` names the bot reading, for its MEMORY.md: never a bank.)
+  assert.deepEqual(Mem.scopeOf("juno"), { ws: "ws_main", bot: "juno", readsTeam: true, for: "juno" });
+  assert.deepEqual(Mem.scopeOf("rex"), { ws: "ws_main", bot: "rex", readsTeam: false, for: "rex" });
+  assert.deepEqual(Mem.scopeOf("max"), { ws: "ws_main", for: "max" });
+  assert.deepEqual(Mem.scopeOf("boppy"), { ws: "ws_main", for: "boppy" }, "the main bot always uses the team's memory");
   assert.deepEqual(Mem.bindingOf(Mem.scopeOf("juno")), { bank: "bops-bot-juno", peer: "user" });
   assert.deepEqual(Mem.bindingOf("ws_main"), { bank: "bops", peer: "user" });
 });
@@ -256,7 +257,7 @@ await check("its Memory tab shows its own memory, and says so", async () => {
 await check("Keep it apart leaves both banks; Bring it in copies its facts into the team's and deletes its bank", async () => {
   // Kept apart: the chart says so, and nothing moves.
   S.update((s) => (s.workspaces[0].chain.bots.juno = { kept: true }));
-  assert.deepEqual(Mem.scopeOf("juno"), { ws: "ws_main" }, "it uses the team's memory from now on");
+  assert.deepEqual(Mem.scopeOf("juno"), { ws: "ws_main", for: "juno" }, "it uses the team's memory from now on");
   assert.deepEqual(factsIn("bops-bot-juno"), ["Alex sees the dentist every spring."]);
   assert.ok(!(await Mem.memoryBlock(Mem.scopeOf("juno"), "dentist every spring")).includes("every spring"), "nothing reads the bank kept apart");
   // Memory off (signed out): nothing is brought in, and nothing is deleted.

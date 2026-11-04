@@ -110,6 +110,21 @@ export type Bot = {
    */
   persona?: string;
   /**
+   * Its SOUL.md (lib/bot-docs.ts): who it is, its tone and its rules, as the owner wrote them in its Memory tab's
+   * Edit, up to MAX_BOT_DOC_CHARS. Set, it stands in for `persona` in its chat, tasks and calls (the generated one
+   * it starts from holds `persona`); unset, the bot reads `persona` as before. The text here is the source of
+   * truth: the SOUL.md file under .data is a mirror written from it, never read back. Only the owner's own Bops
+   * window writes it (app/api/bots/docs): never a member, the phone, a computer (cloud/computer-scope.ts BOT_RUN)
+   * or a bot's tool. Members and teammates' computers never read it (cloud/ws-slice.ts BOT, computer-scope TEAMMATE).
+   */
+  soul?: string;
+  /**
+   * Its MEMORY.md (lib/bot-docs.ts): long-lived facts the owner keeps for it, up to MAX_BOT_DOC_CHARS, given with
+   * its long-term memory at the start of every chat turn, task and call (lib/server/memory.ts memoryBlock). The
+   * generated one it starts from holds the pinned lines of its memory (About you). Kept, written and read as `soul` is.
+   */
+  memoryDoc?: string;
+  /**
    * Keys (lib/server/keys.ts): the names of the user's API keys in their Orgo vault this bot may call
    * with call_api ("STRIPE_SECRET_KEY"). Only the names: the keys themselves never leave Orgo.
    */
@@ -160,6 +175,12 @@ export type BotSettings = {
    * "Send an email" rule says ask meanwhile, which is what a Bops from before does with it.
    */
   mailNever?: true;
+  /**
+   * Which of the config's MCP servers are this bot's own, by name (lib/server/mcp.ts; config/bops.yaml
+   * `mcp: servers:`). Unset: none. A server that names keys runs for the chat only, never on a brain's
+   * computer (its keys stay here).
+   */
+  mcpServers?: string[];
 };
 
 /** Bot `b`'s settings page settings (Workspace.botSettings), none set: {}. */
@@ -204,6 +225,8 @@ export const isCallVoice = (v: unknown): v is CallVoice => typeof v === "string"
 export type LineVoice = { for: CallVoice; id: string; name: string; exact?: true };
 
 export const MAX_PERSONA_CHARS = 1500;
+/** How long a bot's SOUL.md or MEMORY.md may be (Bot.soul, Bot.memoryDoc), in characters. */
+export const MAX_BOT_DOC_CHARS = 20_000;
 
 /** A workspace: one team with its own main bot, bots, chats and work. The user switches between them. */
 export type Workspace = {
@@ -1137,6 +1160,12 @@ export type MemberSend = { state: "sending" | "waiting" | "failed"; error?: stri
 
 /** A session is a long-running task on one screen of a bot's computer, shown as a thread. */
 export type Session = {
+  /**
+   * Ask actions the owner allowed for this thread alone (permission.ts replyToAsk "session"): the same
+   * ask doesn't pause the run again while this thread runs. New here with each Allow for this thread,
+   * so a fresh thread asks as fresh. Unset: every ask pauses, as before.
+   */
+  allowedAsks?: string[];
   /** Started from a text the user sent a workspace's number: its result is texted back to them from that number. */
   textBack?: { botId: string; to: string };
   /** Started from a message in Slack, Telegram or Discord: its result is posted back there. */
@@ -1397,6 +1426,28 @@ export type RoutineRun = {
   by?: string;
 };
 
+/**
+ * A goal the owner set with a bot (chat.ts set_goal): what they're after, and the routines and skills
+ * the bot built for it, kept together so the goal can be seen whole. `status` done/dropped retires the
+ * goal and leaves what it made running (the owner set those up on purpose); only the record changes.
+ */
+export type Goal = {
+  id: string;
+  botId: BotId;
+  title: string;
+  why?: string;
+  createdAt: number;
+  status: "active" | "done" | "dropped";
+  doneAt?: number;
+  /** The routines set up for it (Routine.id), each already scheduled. */
+  routineIds?: string[];
+  /** The skills written for its recurring jobs (SkillRef.id), if any. */
+  skillIds?: string[];
+};
+
+/** An idea the owner parked (chat.ts save_idea, or the Ideas tab): a sentence and when, nothing more. */
+export type Idea = { id: string; text: string; at: number; from: "chat" | "panel" };
+
 /** A routine or one-off scheduled ask. When it fires it becomes a reminder, a turn in the bot's chat, or a thread. */
 export type Routine = {
   id: string;
@@ -1460,6 +1511,14 @@ export type Routine = {
   source?: RoutineSource;
   /** Tags it sorts what it reads with (the defaults and Workspace.tags), as its bot is told. */
   tags?: string[];
+  /**
+   * The model its runs are on, as a chat's (Chat.model): "provider/model", one of lib/chat-models.ts chatModels() (Your
+   * LLMs, OpenRouter presets too, and the built in ones). A chat run's turn is on it (chat.ts BackgroundJob.model); a
+   * task starts on an agent that runs it when it's one of Your LLMs bots' agents run (routines.ts taskAgentFor), else
+   * as before. Unset: as before (the bot's chat's model, or Auto). Only the owner sets it (app/api/routines, and the
+   * schedule tool on their own turns).
+   */
+  model?: string;
 };
 
 /**
@@ -1640,6 +1699,10 @@ export type AppState = {
   messages: Message[];
   sessions: Session[];
   routines: Routine[];
+  /** The owner's goals (Goal, chat.ts set_goal): what they're after and what the bot built for it. */
+  goals?: Goal[];
+  /** The owner's parked ideas (Idea): a sentence each, nothing running, until one is made a goal. */
+  ideas?: Idea[];
   /**
    * How each bot did the kinds of jobs it was shown, from before skills (Procedure). Each is moved into
    * its workspace's skills (lib/server/workspace-skills.ts adoptProcedures) and the list is emptied; what was
@@ -1796,6 +1859,19 @@ export type AppState = {
    * whose routines are whose.
    */
   runners?: Record<string, RunnerState>;
+  /**
+   * The routines' inactivity brake (Settings → Workspace → General): a routine that would speak up is
+   * skipped, its run recorded "away", once the owner hasn't been around this many days by the shared
+   * clock (AppState.ownerSeenAt, lib/server/presence.ts - the same for every Bops and runner of the
+   * user's). Unset: 7. 0: never skip. Quiet routines and reminders always run.
+   */
+  routineAwayDays?: number;
+  /**
+   * When the owner was last around (lib/server/presence.ts): the window's views and their own messages,
+   * written at most once a minute. Shared, so routines on a computer skip by the owner's own devices.
+   * Unset: never seen yet, and the inactivity brake waits for the first sighting.
+   */
+  ownerSeenAt?: number;
   /**
    * How the window looks (Look): set in Settings, or changed by a bot on the owner's own ask in the chat
    * (change_look). Shared like any setting, so the owner's other Macs take it too. A shared workspace
@@ -2270,7 +2346,7 @@ export type AppApproval = {
   action: string;
   resources: string[];
   preview: string;
-  kind?: "app" | "email" | "api" | "data" | "brain";
+  kind?: "app" | "email" | "api" | "data" | "brain" | "mcp";
   /** A call to an API with one of the user's keys: the key, its service, the method and the whole path. */
   api?: { key: string; label: string; method: string; path: string };
   at: number;
@@ -2286,7 +2362,8 @@ export type AppApproval = {
 };
 
 /** How the user answers a request (OpenCode's reply, Codex's ReviewDecision approved / approved_for_session / denied). */
-export type AskReply = "once" | "always" | "reject";
+/** "session": allowed for this one thread (a fresh thread asks again), like Allow once spread over the run (permission.ts). */
+export type AskReply = "once" | "always" | "session" | "reject";
 /** `member`: answered by a member with Write, from their own Bops (the Mac that took it is `by`). */
 export type AskAnswer = { reply: AskReply; message?: string; reason?: "stopped"; by?: string; at: number; member?: MemberWho };
 /** The tool call a run paused at, as the model made it: its name and its arguments (JSON). */

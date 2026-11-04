@@ -56,6 +56,15 @@ jobs:
         run: node --conditions=react-server scripts/test-cli-agents.mjs
       - name: Windows fuse and authenticated shutdown tests
         run: node scripts/test-windows-fuses.mjs
+      - name: Local executor lifecycle tests
+        run: node scripts/test-executor-lifecycle.mjs
+      - name: Agents API Windows path serialization tests
+        run: node scripts/test-agent-api-path.mjs
+      - name: Host computer identity tests
+        run: |
+          node scripts/test-computer-identity.mjs win32
+          node scripts/test-computer-identity.mjs darwin
+          node scripts/test-computer-identity.mjs linux
       - name: Config tests
         run: node scripts/test-config.mjs
       - name: Connections tests (Zapier MCP, Composio and OpenRouter checks)
@@ -72,10 +81,20 @@ jobs:
         run: node --conditions=react-server scripts/test-models-card.mjs
       - name: Models card UI tests
         run: node scripts/test-models-card-ui.mjs
+      - name: OpenRouter presets, custom ids and Auto Router tests
+        run: node --conditions=react-server scripts/test-openrouter-presets.mjs
+      - name: Routine model tests
+        run: node --conditions=react-server scripts/test-routine-model.mjs
+      - name: Provider accounts tests
+        run: node --conditions=react-server scripts/test-provider-accounts.mjs
       - name: Look permission and sanitizer tests
         run: node --conditions=react-server scripts/test-look.mjs
       - name: Repo recipe tests
         run: node scripts/test-repo-recipes.mjs
+      - name: Bot SOUL.md and MEMORY.md tests
+        run: node --conditions=react-server scripts/test-bot-docs.mjs
+      - name: Bot SOUL.md and MEMORY.md UI tests
+        run: node scripts/test-bot-docs-ui.mjs
       - name: Voice typing card UI tests
         run: node scripts/test-handy-card-ui.mjs
 

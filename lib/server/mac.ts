@@ -1,3 +1,4 @@
+import { computerWords } from "@/lib/computer-words";
 import "server-only";
 import { existsSync } from "node:fs";
 import type { MacState } from "@/lib/types";
@@ -24,14 +25,14 @@ import { getState, stateReady, update } from "./store";
 export const DEFAULT_MAC_RULES =
   process.platform === "win32"
     ? ["File Explorer", "Outlook", "Excel", "Word", "PowerPoint", "OneNote", "my desktop", "my Downloads", "my laptop", "my PC", "my computer"]
-    : ["Messages", "iMessage", "Notes", "Apple Mail", "Photos", "Finder", "Keynote", "Pages", "Numbers", "Xcode", "Reminders", "my desktop", "my Downloads", "my laptop", "my Mac"];
+    : ["Messages", "iMessage", "Notes", "Apple Mail", "Photos", "Finder", "Keynote", "Pages", "Numbers", "Xcode", "Reminders", "my desktop", "my Downloads", "my laptop", computerWords("my Mac", process.platform)];
 
 export const emptyMac = (): MacState => ({ ready: false, rules: [...DEFAULT_MAC_RULES] });
 
 /** This server runs on the user's Mac (not a hosted one), where bots can work. */
 const onTheMac = () => (process.platform === "darwin" || process.platform === "win32") && !onPostgres() && process.env.BOPS_THIS_COMPUTER !== "0";
 /** What to call this computer in what the app says: the Mac, or (Windows) this PC. */
-const here = process.platform === "win32" ? "this PC" : "this Mac";
+const here = process.platform === "win32" ? "this PC" : computerWords("this Mac", process.platform);
 
 /**
  * Is the user's Mac ready for bots, and if not, the one thing it waits on: the Codex CLI that runs the
@@ -48,7 +49,7 @@ export async function checkMac() {
   let next: MacState["next"];
   if (!onTheMac()) {
     next = "elsewhere";
-    reason = "Bots work on your Mac in the Bops app on your Mac.";
+    reason = computerWords("Bots work on your Mac in the Bops app on your Mac.", process.platform);
   } else if (!findCodex()) {
     if (!installStatus()) installCodex(() => void checkMac().catch(() => {}));
     const failed = installStatus()?.state === "failed" ? installStatus()?.error : undefined;

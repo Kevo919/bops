@@ -3,6 +3,12 @@ import type OpenAI from "openai";
 import type { Response, ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
 import type { AgentRoute } from "@/lib/agents";
 import { chatKeyName, providerOf } from "@/lib/chat-models";
+import { llms } from "@/lib/agents";
+import { accountKeyName, accountWord } from "@/lib/accounts";
+import { accountKey } from "./provider-accounts";
+
+/** The provider's name, with the account when it isn't the default: "OpenRouter (work)". */
+const whoOf = (provider: AgentRoute, acct?: string) => `${LABELS[provider]}${acct ? ` (${accountWord(acct)})` : ""}`;
 
 /**
  * A chat on another provider than OpenAI (Chat.model "anthropic/…", "zai/…", "zai-coding-cn/…", "deepseek/…"): the part of
@@ -231,7 +237,7 @@ function parsed(args: string): Record<string, unknown> {
   }
 }
 
-async function callAnthropic(model: string, system: string, turns: Turn[], functions: ReturnType<typeof functionsOf>["functions"], key: string, signal: AbortSignal) {
+async function callAnthropic(model: string, system: string, turns: Turn[], functions: ReturnType<typeof functionsOf>["functions"], key: string, signal: AbortSignal, acct?: string) {
   const body = {
     model,
     max_tokens: ANTHROPIC_MAX_TOKENS,
@@ -239,7 +245,7 @@ async function callAnthropic(model: string, system: string, turns: Turn[], funct
     messages: anthropicMessages(turns),
     ...(functions.length ? { tools: functions.map((f) => ({ name: f.name, description: f.description, input_schema: f.parameters })) } : {}),
   };
-  const json = (await send("anthropic", CHAT_URLS.anthropic!, { "x-api-key": key, "anthropic-version": ANTHROPIC_VERSION }, body, key, model, signal)) as {
+  const json = (await send("anthropic", CHAT_URLS.anthropic!, { "x-api-key": key, "anthropic-version": ANTHROPIC_VERSION }, body, key, model, signal, acct)) as {
     content?: { type?: string; text?: string; id?: string; name?: string; input?: unknown }[];
     usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
   };
@@ -280,7 +286,7 @@ type ChatJson = {
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 };
 
-async function callChat(provider: AgentRoute, model: string, system: string, turns: Turn[], functions: ReturnType<typeof functionsOf>["functions"], key: string, signal: AbortSignal) {
+async function callChat(provider: AgentRoute, model: string, system: string, turns: Turn[], functions: ReturnType<typeof functionsOf>["functions"], key: string, signal: AbortSignal, acct?: string) {
   const ollama = provider === "ollama";
   const body = (withTools: boolean) => ({
     model,
@@ -290,7 +296,7 @@ async function callChat(provider: AgentRoute, model: string, system: string, tur
   const extra: Record<string, string> = provider === "openrouter" ? { ...OPENROUTER_HEADERS } : {};
   // Ollama needs no key: one is sent only when there is one (OLLAMA_API_KEY).
   const headers = { ...(key ? { authorization: `Bearer ${key}` } : {}), ...extra };
-  const go = (withTools: boolean) => send(provider, chatUrl(provider)!, headers, body(withTools), key, model, signal) as Promise<ChatJson>;
+  const go = (withTools: boolean) => send(provider, chatUrl(provider)!, headers, body(withTools), key, model, signal, acct) as Promise<ChatJson>;
   let json: ChatJson;
   const toolless = `${provider}/${model}`;
   if ((ollama || provider === "openrouter") && noTools.has(toolless)) json = await go(false);
@@ -317,7 +323,7 @@ async function callChat(provider: AgentRoute, model: string, system: string, tur
 
 /* ---------------- Sending, and what a no means ---------------- */
 
-async function send(provider: AgentRoute, url: string, headers: Record<string, string>, body: unknown, key: string, model: string, signal: AbortSignal): Promise<unknown> {
+async function send(provider: AgentRoute, url: string, headers: Record<string, string>, body: unknown, key: string, model: string, signal: AbortSignal, acct?: string): Promise<unknown> {
   let res: globalThis.Response;
   try {
     res = await fetch(url, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body), signal });
@@ -325,19 +331,19 @@ async function send(provider: AgentRoute, url: string, headers: Record<string, s
     const timedOut = (e as Error)?.name === "TimeoutError" || (e as Error)?.name === "AbortError";
     throw new ChatProviderError(
       timedOut
-        ? `${LABELS[provider]} took too long to answer (over ${Math.round(TIMEOUT_MS / 1000)} seconds). Try again, or pick another model.`
+        ? `${whoOf(provider, acct)} took too long to answer (over ${Math.round(TIMEOUT_MS / 1000)} seconds). Try again, or pick another model.`
         : provider === "ollama"
           ? `Couldn't reach Ollama at ${ollamaBase()}: check that Ollama is running there, and OLLAMA_BASE_URL in .env.local, then try again.`
-          : `Couldn't reach ${LABELS[provider]}: check this server's internet connection, then try again.`,
+          : `Couldn't reach ${whoOf(provider, acct)}: check this server's internet connection, then try again.`,
       provider,
     );
   }
   const raw = await res.text().catch(() => "");
-  if (!res.ok) throw refusal(provider, res.status, raw, key, model);
+  if (!res.ok) throw refusal(provider, res.status, raw, key, model, acct);
   try {
     return JSON.parse(raw);
   } catch {
-    throw new ChatProviderError(`${LABELS[provider]} answered with something Bops can't read. Try again in a minute, or pick another model.`, provider, res.status);
+    throw new ChatProviderError(`${whoOf(provider, acct)} answered with something Bops can't read. Try again in a minute, or pick another model.`, provider, res.status);
   }
 }
 
@@ -354,9 +360,10 @@ function said(raw: string, key: string): string {
 }
 
 /** A no, in plain English: which provider, and the fix. */
-export function refusal(provider: AgentRoute, status: number, raw: string, key: string, model: string): ChatProviderError {
-  const who = LABELS[provider];
-  const keyName = chatKeyName(provider);
+export function refusal(provider: AgentRoute, status: number, raw: string, key: string, model: string, acct?: string): ChatProviderError {
+  // Another account's: named, with its own key name ("OpenRouter (work)", OPENROUTER_API_KEY__WORK).
+  const who = whoOf(provider, acct);
+  const keyName = accountKeyName(chatKeyName(provider), acct);
   const words = said(raw, key);
   const balance = status === 402 || /insufficient[ _]balance|credit balance|no (resource package|balance)|out of credit|insufficient[ _]quota|quota exceeded|exceeded your current quota|billing|1113|top ?up|payment required/i.test(words);
   const err = (m: string) => new ChatProviderError(m, provider, status, words);
@@ -367,7 +374,7 @@ export function refusal(provider: AgentRoute, status: number, raw: string, key: 
     return err(`Ollama turned this down (HTTP ${status})${words ? `: ${words}` : ""}.`);
   }
   if (status === 401 || (status === 403 && /key|auth|token|credential/i.test(words) && !balance))
-    return err(`${who} turned this down: your ${ACCOUNTS[provider]} key isn't valid. Check ${keyName} in .env.local, then restart Bops.`);
+    return err(`${who} turned this down: your ${ACCOUNTS[provider]} key${acct ? ` (${accountWord(acct)})` : ""} isn't valid. Check ${keyName} in .env.local, then restart Bops.`);
   if (balance)
     return err(
       provider === "zai" || provider === "zai-coding" || provider === "zai-coding-cn"
@@ -401,18 +408,25 @@ export async function createOnProvider(params: Params, opts: { timeoutMs?: numbe
   if (!provider || provider === "openai" || !chatUrl(provider)) throw new Error(`${model} isn't a model Bops can chat on.`);
   // Everything after the first "/": "ollama/qwen2.5:3b" is qwen2.5:3b, colon and all.
   const name = model.slice(provider.length + 1);
-  const keyName = provider === "ollama" ? "OLLAMA_API_KEY" : chatKeyName(provider);
-  const key = process.env[keyName]?.trim() ?? "";
-  if (!key && provider !== "ollama") throw new ChatProviderError(`No ${ACCOUNTS[provider]} key is set on this server: add ${keyName} to .env.local, then restart Bops. Or pick another model.`, provider);
+  // The account its LLM names (config/llms.yaml account: BASE__LABEL in .env.local), else the default key.
+  const acct = provider === "ollama" ? undefined : llms().find((l) => `${l.provider}/${l.model}` === model)?.account;
+  const { keyName, key } = provider === "ollama" ? accountKey("OLLAMA_API_KEY") : accountKey(chatKeyName(provider), acct);
+  if (!key && provider !== "ollama")
+    throw new ChatProviderError(
+      acct
+        ? `The ${whoOf(provider, acct)} account isn't set on this server: add ${keyName} to .env.local, then restart Bops. Or pick another account for this model in Settings, Models.`
+        : `No ${ACCOUNTS[provider]} key is set on this server: add ${keyName} to .env.local, then restart Bops. Or pick another model.`,
+      provider,
+    );
 
   const before = params.previous_response_id ? earlier(params.previous_response_id) : [];
   if (!before)
-    throw new ChatProviderError(`${LABELS[provider]} lost track of this reply: Bops restarted, or it was more than an hour ago. Send your message again.`, provider, 410);
+    throw new ChatProviderError(`${whoOf(provider, acct)} lost track of this reply: Bops restarted, or it was more than an hour ago. Send your message again.`, provider, 410);
   const turns = [...before, ...turnsOf(params.input)];
   const { functions, webSearch } = functionsOf(params.tools);
   const system = [params.instructions ?? "", webSearch ? NO_WEB_SEARCH : ""].filter(Boolean).join("\n");
   const signal = AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS);
-  const got = provider === "anthropic" ? await callAnthropic(name, system, turns, functions, key, signal) : await callChat(provider, name, system, turns, functions, key, signal);
+  const got = provider === "anthropic" ? await callAnthropic(name, system, turns, functions, key, signal, acct) : await callChat(provider, name, system, turns, functions, key, signal, acct);
 
   const id = newId("resp");
   keep(id, [...turns, { role: "assistant", text: got.text, calls: got.calls }]);

@@ -11,6 +11,7 @@ import { appHeaders } from "./app-version";
 import { cloudOn, cloudProxy, cloudSessionNow } from "./cloud";
 import { chose, decide, yes, type Question } from "./decide";
 import { addMessage, bot, getState, ownerName, sameState, stateArrivals, stateEpoch, update, userDir } from "./store";
+import { memoryDocBlock } from "@/lib/bot-docs";
 import { recordTokens, usageTags } from "./usage";
 
 /**
@@ -53,7 +54,13 @@ const ownBank = (ws: string): Binding =>
  * bank in it, for a bot that keeps its memory to itself (`bot`), which still reads the team's too (`readsTeam`).
  * Every function here that takes a workspace takes a scope as well.
  */
-export type MemoryScope = { ws: string; bot?: string; readsTeam?: boolean };
+export type MemoryScope = {
+  ws: string;
+  bot?: string;
+  readsTeam?: boolean;
+  /** The bot reading (scopeOf): its MEMORY.md (Bot.memoryDoc) goes with what memory knows (memoryBlock). Never a bank. */
+  for?: string;
+};
 type Where = string | MemoryScope;
 const scopeIn = (w: Where): MemoryScope => (typeof w === "string" ? { ws: w } : w);
 const wsIn = (w: Where) => (typeof w === "string" ? w : w.ws);
@@ -62,7 +69,7 @@ const wsIn = (w: Where) => (typeof w === "string" ? w : w.ws);
 export function scopeOf(botId: string): MemoryScope {
   const ws = wsOf(botId);
   const st = getState();
-  return ownMemory(st, botId) ? { ws, bot: botId, readsTeam: readsTeam(st, botId) } : { ws };
+  return ownMemory(st, botId) ? { ws, bot: botId, readsTeam: readsTeam(st, botId), for: botId } : { ws, for: botId };
 }
 
 /** The scope's bank: the workspace's, or a bot's own in it, "<team bank>-bot-<id>" with the team's peer (under the user's prefix in Bops Cloud: bankFor). */
@@ -265,12 +272,33 @@ async function card(b: Binding) {
 
 /**
  * What a bot should know about the user for this message or task: their card, plus what Honcho has
- * learned that's relevant to `about` (unless `search` is false: just the card, which is quick).
- * Empty when memory is off or too slow.
+ * learned that's relevant to `about` (unless `search` is false: just the card, which is quick), and, for a
+ * bot (MemoryScope.for), its MEMORY.md when the owner wrote one. Empty when memory is off or too slow and
+ * there's no MEMORY.md.
  */
-export async function memoryBlock(where: Where, about: string, ms = 2500, { search = true }: { search?: boolean } = {}): Promise<string> {
-  if (!on()) return "";
+export async function memoryBlock(where: Where, about: string, ms = 2500, opts: { search?: boolean } = {}): Promise<string> {
   const sc = scopeIn(where);
+  // Its MEMORY.md (lib/bot-docs.ts), from the state: there with memory off too, and never held up by Honcho.
+  const reading = sc.for ? bot(sc.for) : undefined;
+  const doc = reading ? memoryDocBlock(ownerName(), reading) : "";
+  const known = await knownBlock(sc, about, ms, opts);
+  return [known, doc].filter(Boolean).join("\n");
+}
+
+/** The pinned lines of a bot's memory (its scope's card, About you), for its MEMORY.md; none with memory off, or too slow. */
+export async function pinnedLines(botId: string, ms = 8000): Promise<string[]> {
+  if (!on()) return [];
+  try {
+    const lines = await within(card(bindingOf(scopeOf(botId))), ms);
+    return lines ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** What Honcho knows (memoryBlock without the MEMORY.md): empty when memory is off or too slow. */
+async function knownBlock(sc: MemoryScope, about: string, ms: number, { search = true }: { search?: boolean }): Promise<string> {
+  if (!on()) return "";
   const owner = ownerName();
   // A bot that keeps its memory to itself reads its own bank, and the team's too while it still knows what the team
   // knows: both at once, within the same time.

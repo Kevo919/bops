@@ -1,5 +1,7 @@
 "use client";
 
+import { useComputerWords } from "./computer-words";
+
 import { useEffect, useRef, useState } from "react";
 import { live, type AppState, type Bot, type Session, type Watch } from "@/lib/types";
 import { MacIcon, MacSettings } from "./mac-tab";
@@ -71,6 +73,7 @@ export function MacComputer(props: MacComputerProps) {
 }
 
 function MacComputerView({ state, mode, onFocus, onBack, onOpenThread, showThread, hidden = false }: MacComputerProps) {
+  const computerWords = useComputerWords();
   const inApp = useMacApp();
   const screens = useMacScreens();
   // A tile you picked, and when: it stays until a new task starts on the Mac (then the view follows that).
@@ -252,7 +255,7 @@ function MacComputerView({ state, mode, onFocus, onBack, onOpenThread, showThrea
           </svg>
           <span className="text-[13px] font-medium leading-4">Back</span>
         </button>
-        <span className="text-[15px] font-semibold leading-5">Your Mac</span>
+        <span className="text-[15px] font-semibold leading-5">{computerWords("Your Mac")}</span>
         <span className="flex-1" />
         <div className="flex gap-1">
           {items.map((i) => {
@@ -451,7 +454,7 @@ function MacComputerView({ state, mode, onFocus, onBack, onOpenThread, showThrea
             {yours
               ? `You have control of ${current?.bot?.name ?? "the bot"}'s Chrome · click and type on it, then hand it back`
               : grid.length
-              ? `${grid.length} bots are working on your Mac · pick one to watch it up close`
+              ? computerWords`${grid.length} bots are working on your Mac · pick one to watch it up close`
               : current?.watch?.alert
                   ? `New in ${current.label}: ${current.watch.alert.text}`
                   : current?.watch && !(current.session && live(current.session))
@@ -463,7 +466,7 @@ function MacComputerView({ state, mode, onFocus, onBack, onOpenThread, showThrea
                   : current?.kind === "browser" && current.session?.waitingOnYou
                     ? `${current.bot?.name ?? "A bot"} is waiting on you · take control of its Chrome to sign in for it`
                   : working.length
-                    ? `${working.length} working on your Mac`
+                    ? computerWords`${working.length} working on your Mac`
                     : `Nothing running · ${current?.label ?? "your screen"}${current?.kind === "display" ? ` (${current.sub})` : ""}`}
           </span>
           {current?.kind === "browser" && current.bot && !yours && !grid.length && !(current.session && live(current.session)) && (
@@ -487,7 +490,7 @@ function MacComputerView({ state, mode, onFocus, onBack, onOpenThread, showThrea
           {current?.session && live(current.session) && !grid.length && (
             <button
               onClick={() => void post("/api/sessions", { sessionId: current.session!.id }, "DELETE")}
-              title="Stop this task on your Mac"
+              title={computerWords("Stop this task on your Mac")}
               className="shrink-0 rounded-full bg-ink px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-white"
             >
               Stop
@@ -530,6 +533,7 @@ function Live({ item, fps = 30, maxWidth = 4096, fit = "contain", className = ""
 }
 
 function BrowserPicture({ botId, macScreen, small, fit, className, onSize }: { botId: string; macScreen: number; small: boolean; fit: "contain" | "cover"; className: string; onSize?: (w: number, h: number) => void }) {
+  const computerWords = useComputerWords();
   const [tick, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), small ? 2000 : 1000);
@@ -539,7 +543,7 @@ function BrowserPicture({ botId, macScreen, small, fit, className, onSize }: { b
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={`/api/screen?bot=${encodeURIComponent(botId)}&mac=${macScreen}&scale=${small ? 0.4 : 0.75}&t=${tick}`}
-      alt="Chrome on your Mac"
+      alt={computerWords("Chrome on your Mac")}
       onLoad={(e) => onSize?.(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
       className={`${className} bg-white ${fit === "cover" ? "object-cover object-top" : "object-contain"}`}
     />
@@ -566,10 +570,11 @@ function WhoPill({ item: i }: { item: Item }) {
 }
 
 function Blocked({ why }: { why: "app" | "loading" | "permission" | "nothing" }) {
+  const computerWords = useComputerWords();
   if (why === "loading") return <div className="h-full w-full animate-pulse" />;
   const [title, body] =
     why === "app"
-      ? ["Open the Bops app to watch your Mac", "A browser tab can't see your screen. In the Bops app, your displays and the windows bots use show here live."]
+      ? [computerWords("Open the Bops app to watch your Mac"), "A browser tab can't see your screen. In the Bops app, your displays and the windows bots use show here live."]
       : why === "permission"
         ? ["Let Bops see your screen", "macOS asks once: turn on Bops under Screen Recording, then quit and reopen Bops."]
         : ["Nothing to show yet", "Bops can't find a display to show."];
@@ -590,11 +595,12 @@ function Blocked({ why }: { why: "app" | "loading" | "permission" | "nothing" })
 }
 
 function SettingsButton({ onClick, label }: { onClick: () => void; label?: boolean }) {
+  const computerWords = useComputerWords();
   return (
     <button
       onClick={onClick}
-      title="Your Mac settings: the words that mean your Mac"
-      aria-label="Your Mac settings"
+      title={computerWords("Your Mac settings: the words that mean your Mac")}
+      aria-label={computerWords("Your Mac settings")}
       className={`flex shrink-0 items-center justify-center gap-1.5 rounded-full text-[12.5px] font-medium text-[#3A3A38] hover:bg-[#F2F2F0] ${label ? "px-3 py-1.5 shadow-[0_0_0_1px_#E2E2DF]" : "size-8"}`}
     >
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
@@ -602,7 +608,7 @@ function SettingsButton({ onClick, label }: { onClick: () => void; label?: boole
         <circle cx="10" cy="4.5" r="1.5" />
         <circle cx="6" cy="11.5" r="1.5" />
       </svg>
-      {label && "Your Mac settings"}
+      {label && computerWords("Your Mac settings")}
     </button>
   );
 }
@@ -612,10 +618,11 @@ function SettingsButton({ onClick, label }: { onClick: () => void; label?: boole
  * goes back to the screen. Never a sheet over the tab.
  */
 function MacSettingsSheet({ state, onClose }: { state: AppState; onClose: () => void }) {
+  const computerWords = useComputerWords();
   return (
     <div
       role="region"
-      aria-label="Your Mac settings"
+      aria-label={computerWords("Your Mac settings")}
       data-mac-settings
       onKeyDown={(e) => {
         if (e.key !== "Escape") return;
@@ -629,8 +636,7 @@ function MacSettingsSheet({ state, onClose }: { state: AppState; onClose: () => 
           <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden>
             <path d="M6 1.5L1.5 6 6 10.5" fill="none" stroke="#8A8A88" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Back to your Mac
-        </button>
+          {computerWords("Back to your Mac")}</button>
       </div>
       <div className="mx-auto flex min-h-0 w-full max-w-[620px] flex-1 flex-col">
         <MacSettings state={state} />
@@ -652,6 +658,7 @@ function watchPicks(app: string, title: string) {
  * a heads-up, done. Jev reads the window's text when it changes; the main bot tells you in its chat.
  */
 function MacWatchSheet({ target, onClose }: { target: { app?: string; title?: string; windowId?: number; watch?: Watch } | null; onClose: () => void }) {
+  const computerWords = useComputerWords();
   const [windows, setWindows] = useState<{ app: string; title: string; windowId: number }[] | null>(null);
   const [picked, setPicked] = useState(target?.app && target.windowId !== undefined ? target : null);
   const [lookFor, setLookFor] = useState(target?.watch?.lookFor ?? "");
@@ -692,7 +699,7 @@ function MacWatchSheet({ target, onClose }: { target: { app?: string; title?: st
     <div className="pointer-events-none absolute inset-x-4 bottom-4 z-50 flex justify-center">
       <div
         role="region"
-        aria-label={picked ? `Watch ${picked.title}` : "Watch a window on your Mac"}
+        aria-label={picked ? `Watch ${picked.title}` : computerWords("Watch a window on your Mac")}
         data-mac-watch
         onKeyDown={(e) => {
           if (e.key !== "Escape") return;
@@ -703,7 +710,7 @@ function MacWatchSheet({ target, onClose }: { target: { app?: string; title?: st
       >
         <div className="flex items-center gap-2">
           <WatchEye size={13} />
-          <span className="flex-1 text-[15px] font-semibold leading-5">{picked ? `Watch ${picked.title}` : "Watch a window on your Mac"}</span>
+          <span className="flex-1 text-[15px] font-semibold leading-5">{picked ? `Watch ${picked.title}` : computerWords("Watch a window on your Mac")}</span>
           <button onClick={onClose} className="shrink-0 rounded-full px-2.5 py-1 text-[12.5px] font-medium text-[#6B6B6B] hover:bg-[#F2F2F0] hover:text-ink">
             Cancel
           </button>

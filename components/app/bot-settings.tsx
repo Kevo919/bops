@@ -396,6 +396,48 @@ function TeamBody({ state, bot: b, older, onOpenChart }: { state: AppState; bot:
 
 /* ---------------- AI, and how it works ---------------- */
 
+/** The bot's own MCP servers (lib/server/mcp.ts, the config's `mcp: servers:`): a chip per server, from /api/mcp. */
+function McpRow({ state, bot: b, busy }: { state: AppState; bot: Bot; busy: boolean }) {
+  const { send } = useBotSave(b.id);
+  const mine = settingsOf(state, b).mcpServers ?? [];
+  // The config's servers (names and key names only; never a value) come from the window's own route.
+  const [servers, setServers] = useState<Record<string, { command: string | null; env: string[]; chatOnly: boolean }> | null>(null);
+  useEffect(() => {
+    void fetch("/api/mcp")
+      .then(async (r) => (r.ok ? ((await r.json()) as { servers?: Record<string, { command: string | null; env: string[]; chatOnly: boolean }> }).servers : null))
+      .then((s) => setServers(s ?? {}))
+      .catch(() => setServers({}));
+  }, []);
+  const names = Object.keys(servers ?? {});
+  if (servers === null) return null;
+  if (!names.length) return null; // Nothing in the config: the row stays away, as if there were no such thing.
+  return (
+    <div data-mcp-row className="flex flex-col gap-1.5">
+      <div className="flex items-baseline gap-2">
+        <span className="text-[13px] font-semibold leading-4">MCP servers</span>
+        <span className="text-[12px] leading-4 text-[#6B6B6B]">Tools of its own, from config/bops.yaml. {mine.length ? "Ones with keys run for the chat only." : "None picked."}</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {names.map((name) => {
+          const on = mine.includes(name);
+          return (
+            <button
+              key={name}
+              disabled={busy}
+              onClick={() => void send({ mcp: on ? mine.filter((n) => n !== name) : [...mine, name] })}
+              title={servers![name].command ? `Runs ${servers![name].command}` : "A remote server (not wired up yet)"}
+              className={`rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 disabled:opacity-50 ${on ? "bg-ink text-white" : "shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6]"}`}
+            >
+              {name}
+              {servers![name].chatOnly ? " · chat only" : ""}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function AiBody({ state, bot: b, links }: { state: AppState; bot: Bot; links: SettingsLinks }) {
   const { busy, error, send } = useBotSave(b.id);
   return (
@@ -427,6 +469,7 @@ function AiBody({ state, bot: b, links }: { state: AppState; bot: Bot; links: Se
           onPick={(v) => void send({ dataOff: v === "off" })}
         />
       )}
+      <McpRow state={state} bot={b} busy={busy} />
       {error && (
         <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
           {error}

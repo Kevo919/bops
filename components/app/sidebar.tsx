@@ -1,5 +1,7 @@
 "use client";
 
+import { useComputerWords } from "./computer-words";
+
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { dropCitations } from "@/lib/plain-words";
 import { MAIN_WORKSPACE, waitingAsks, WORKSPACE_APPS_SINCE, workspaceOf, type AppState, type Chat, type Session, type Watch } from "@/lib/types";
@@ -543,6 +545,7 @@ export function YouMenuView({
   onSetup: () => void;
   onTeam?: () => void;
 }) {
+  const computerWords = useComputerWords();
   const [open, setOpen] = useState(false);
   // Restart Bops, asked in place in the menu: the row turns into its question.
   const [restart, setRestart] = useState(false);
@@ -604,8 +607,8 @@ export function YouMenuView({
             shut();
             onSetup();
           }}
-          title="Something on this Mac needs you"
-          aria-label="Something on this Mac needs you"
+          title={computerWords("Something on this Mac needs you")}
+          aria-label={computerWords("Something on this Mac needs you")}
           className="motion-dot-in absolute -bottom-0.5 -left-0.5 rounded-full shadow-[0_0_0_2px_#F9F9F8]"
         >
           <NeedsYouDot />
@@ -651,7 +654,7 @@ export function YouMenuView({
               <rect x="1.8" y="2.8" width="12.4" height="8.4" rx="1.4" fill="none" stroke="#0A0A0A" strokeWidth="1.4" />
               <path d="M5.8 13.6h4.4" fill="none" stroke="#0A0A0A" strokeWidth="1.4" strokeLinecap="round" />
             </svg>
-            <span className="flex-1">Permissions on this Mac</span>
+            <span className="flex-1">{computerWords("Permissions on this Mac")}</span>
             {needsYou && <NeedsYouDot />}
           </button>
           {canRestart &&

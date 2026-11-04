@@ -242,6 +242,23 @@ await check("a computer may make each change its runner's work makes, all at onc
   assert.deepEqual(C.writeDenials({}, { bots: [] }, scope), ["state"], "never a state of its own making");
 });
 
+await check("a thread a runner adds or changes never carries grants of its own (Session.allowedAsks is the owner's word)", () => {
+  const base = baseState();
+  base.sessions.push({ id: "s-granted", botId: "main", chatId: "bot:main", by: ME, status: "running", allowedAsks: ["Create a row"] });
+  const mine = structuredClone(base);
+  mine.sessions.push({ id: "s-new-grant", botId: "main", chatId: "bot:main", by: ME, status: "running", allowedAsks: ["Pay everything"] });
+  mine.sessions.find((x) => x.id === "s-granted").allowedAsks = ["Pay everything"];
+  mine.sessions.find((x) => x.id === "s-granted").status = "done";
+  const kept = C.keepAllowed(base, mine, scope).blob;
+  const added = kept.sessions.find((x) => x.id === "s-new-grant");
+  assert.ok(added, "the new thread itself is taken");
+  assert.equal(added.allowedAsks, undefined, "but not a grant it brought");
+  const changed = kept.sessions.find((x) => x.id === "s-granted");
+  assert.equal(changed.status, "done", "the runner's own change to its thread is taken");
+  assert.deepEqual(changed.allowedAsks, ["Create a row"], "the owner's grant stays as it was");
+  assert.deepEqual(C.writeDenials(base, kept, scope), [], "what was kept is never refused");
+});
+
 await check("whatever a runner's state becomes, what keepAllowed keeps is never refused, and keeps each allowed change in it (3000 mixes)", () => {
   const r = rng(11);
   for (let i = 0; i < 3000; i++) {

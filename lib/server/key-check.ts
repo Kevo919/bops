@@ -1,6 +1,8 @@
 import "server-only";
 import { ROUTE_KEYS, ROUTE_NAMES, type AgentRoute } from "@/lib/agents";
 import { checkZapier, zapierSet } from "./zapier";
+import { ACCOUNT_LABEL, accountWord } from "@/lib/accounts";
+import { accountLabels } from "./provider-accounts";
 
 export type KeyCheckResult = {
   key: string;
@@ -33,9 +35,23 @@ const probes: Probe[] = [
 ];
 const ollamaModels = () => `${(process.env.OLLAMA_BASE_URL?.trim() ?? "").replace(/\/+$/, "")}/models`;
 
-export function keyCheckList(): KeyCheckResult[] {
-  return probes.map(({ key, label, kind }) => ({ key, label, status: (kind === "zapier" ? zapierSet() : !!process.env[key]?.trim()) ? "set" : "not set" }));
+/**
+ * A provider's other accounts (lib/accounts.ts: NAME__LABEL in .env.local) are checked as its default is, at the
+ * same fixed address: each a probe of its own, "OpenRouter (work)". Only a provider's key has accounts (not
+ * Ollama's address, the executor's or Orgo's), and only names this server has set.
+ */
+const ACCOUNT_KINDS: ReadonlySet<Probe["kind"]> = new Set(["openai", "anthropic", "models", "openrouter"]);
+const withAccounts = (p: Probe) => (ACCOUNT_KINDS.has(p.kind) && p.label !== "OpenAI executor" ? accountLabels(p.key).map((a) => ({ ...p, key: `${p.key}__${a}`, label: `${p.label} (${accountWord(a)})` })) : []);
+function probeOf(key: string): Probe | undefined {
+  const own = probes.find((entry) => entry.key === key);
+  if (own) return own;
+  const at = key.lastIndexOf("__");
+  if (at < 0 || !ACCOUNT_LABEL.test(key.slice(at + 2))) return undefined;
+  return probes.flatMap(withAccounts).find((entry) => entry.key === key);
 }
+
+export function keyCheckList(): KeyCheckResult[] {
+  return probes.flatMap((p) => [p, ...withAccounts(p)]).map(({ key, label, kind }) => ({ key, label, status: (kind === "zapier" ? zapierSet() : !!process.env[key]?.trim()) ? "set" : "not set" }));}
 
 /** Read only a bounded diagnostic payload; never return any upstream text or credentials. */
 async function payload(response: Response): Promise<Record<string, unknown> | null> {
@@ -60,7 +76,7 @@ async function payload(response: Response): Promise<Record<string, unknown> | nu
 
 /** Exactly one outbound request, only after the owner explicitly presses Check. No file writes. */
 export async function checkKey(key: string): Promise<KeyCheckResult | null> {
-  const probe = probes.find((entry) => entry.key === key);
+  const probe = probeOf(key);
   if (!probe) return null;
   const { label, kind } = probe;
   const result = (status: KeyCheckResult["status"], message: string): KeyCheckResult => ({ key, label, status, message });
