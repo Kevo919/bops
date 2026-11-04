@@ -1,3 +1,4 @@
+import { touchState } from "@/lib/server/store";
 import "@/lib/server/llms";
 import { fromThisMac } from "@/lib/server/owner-email";
 import { fromBopsWindow } from "@/lib/server/ui-token";
@@ -100,6 +101,7 @@ export async function POST(request: Request) {
   }
   // In at once: new threads, bots and chats use it from now on.
   setLlms(f.read(root, () => {}));
+  touchState(); // The catalog is part of /api/state: invalidate version-only poll responses.
   return Response.json({ ok: true, moved: done.moved ?? [], ...warningFor(op as { op?: string; provider?: unknown; model?: unknown; id?: unknown }, done.list), ...described() }, { headers });
 }
 

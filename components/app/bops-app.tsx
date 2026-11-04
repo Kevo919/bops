@@ -1,5 +1,7 @@
 "use client";
 
+import { useComputerWords } from "./computer-words";
+
 import { APPS_NAME, appsOwnShown, appsShown } from "@/lib/apps-access";
 import { screenMap } from "@/lib/screens";
 import { chatAsks } from "@/lib/asks";
@@ -1807,6 +1809,7 @@ function OwnerSettings({ owner }: { owner: AppState["owner"] }) {
  * reached (Tailscale), the email domain, the phone service, and each computer's id.
  */
 function SelfHosting({ state }: { state: AppState }) {
+  const computerWords = useComputerWords();
   const joined = state.bots.filter((b) => b.tailnet);
   const tailnet = state.host === "orgo" && joined.length > 0;
   return (
@@ -1821,7 +1824,7 @@ function SelfHosting({ state }: { state: AppState }) {
         <div className="flex gap-2.5">
           <div className={`flex flex-1 flex-col gap-1.5 rounded-[14px] p-3.5 ${option(!tailnet)}`}>
             <span className="flex items-center justify-between">
-              <span className="text-[14px] font-semibold">{state.host === "mac" ? "Direct on this Mac" : "Through Orgo"}</span>
+              <span className="text-[14px] font-semibold">{state.host === "mac" ? computerWords("Direct on this Mac") : "Through Orgo"}</span>
               {radio(!tailnet)}
             </span>
             <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">
@@ -1850,7 +1853,7 @@ function SelfHosting({ state }: { state: AppState }) {
         {state.bots.map((b) => (
           <div key={b.id} className="flex items-center border-b border-[#F0F0EE] py-2 last:border-0">
             <span className="w-[200px] text-[13px] font-medium">{b.name}</span>
-            <span className="font-mono text-[12px] text-[#3A3A38]">{!state.shared && state.host === "mac" ? "this Mac" : b.computerId ? `${b.computerId}${b.tailnet ? ` · ${b.tailnet.ip}` : ""}` : sharesComputer(b) ? `shares ${workBot(b, state.bots).name}'s` : "none yet"}</span>
+            <span className="font-mono text-[12px] text-[#3A3A38]">{!state.shared && state.host === "mac" ? computerWords("this Mac") : b.computerId ? `${b.computerId}${b.tailnet ? ` · ${b.tailnet.ip}` : ""}` : sharesComputer(b) ? `shares ${workBot(b, state.bots).name}'s` : "none yet"}</span>
           </div>
         ))}
       </div>
@@ -1860,6 +1863,7 @@ function SelfHosting({ state }: { state: AppState }) {
 
 /** Where your bots work: their own cloud computers (the default), or this Mac. One switch for every workspace. */
 function WhereBotsWork({ state }: { state: AppState }) {
+  const computerWords = useComputerWords();
   const setHost = (host: Host) => void post("/api/host", { host });
   return (
     <div className="flex flex-col gap-2 px-[22px] pt-4">
@@ -1868,11 +1872,11 @@ function WhereBotsWork({ state }: { state: AppState }) {
         {(["orgo", "mac"] as const).map((h) => (
           <button key={h} onClick={() => setHost(h)} className={`flex flex-1 flex-col gap-1.5 rounded-[14px] p-3.5 text-left ${option(state.host === h)}`}>
             <span className="flex items-center justify-between">
-              <span className="text-[14px] font-semibold">{h === "orgo" ? "Their own cloud computers" : "This Mac"}</span>
+              <span className="text-[14px] font-semibold">{h === "orgo" ? "Their own cloud computers" : computerWords("This Mac")}</span>
               {radio(state.host === h)}
             </span>
             <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">
-              {h === "orgo" ? "Recommended. Your bots work on a computer in the cloud, with 4 screens, and keep working when your Mac is closed. A bot can have one of its own." : "Bots work in background browsers on this Mac, from your own internet connection."}
+              {h === "orgo" ? computerWords("Recommended. Your bots work on a computer in the cloud, with 4 screens, and keep working when your Mac is closed. A bot can have one of its own.") : computerWords("Bots work in background browsers on this Mac, from your own internet connection.")}
             </span>
           </button>
         ))}
@@ -2091,6 +2095,7 @@ export function Settings({
   onMakeBot?: () => void;
   onOpenWatch?: (w: Watch) => void;
 }) {
+  const computerWords = useComputerWords();
   const selfHosted = useSelfHosted();
   // The workspace's domains (bought through Orgo): only where apps are shown (an @orgo.ai account, its own workspace).
   const domains = appsOwnShown(state);
@@ -2136,7 +2141,7 @@ export function Settings({
     ...(BRAINS_ON ? [item("ai", "AI plans")] : []),
     ...(!selfHosted ? [item("privacy", "Privacy")] : []),
     item("look", "Look"),
-    item("mac", "This Mac"),
+    item("mac", computerWords("This Mac")),
   ];
   const workspace: NavItem[] = [
     item("general", "General"),
@@ -2251,7 +2256,7 @@ export function Settings({
   else if (pane === "mac")
     body = (
       <>
-        <PaneHead title="This Mac" sub="Permissions here, where your bots work, and their computers." />
+        <PaneHead title={computerWords("This Mac")} sub="Permissions here, where your bots work, and their computers." />
         <ThisMacSettings state={state} />
         <WhereBotsWork state={state} />
         {/* Bots in browsers on this Mac have no computer to run routines on; a self-hosted Bops has no Bops Cloud for a runner to share the state through. */}

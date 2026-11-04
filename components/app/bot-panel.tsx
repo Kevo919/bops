@@ -1,5 +1,7 @@
 "use client";
 
+import { useComputerWords } from "./computer-words";
+
 import { useEffect, useRef, useState } from "react";
 import { agentLabel, defaultAgent, isCli, paysLabel } from "@/lib/agents";
 import { appsStayLine, botChatId, brainRuns, live, MAIN_WORKSPACE, MAX_PERSONA_CHARS, settingsOf, sharesComputer, workBot, workspaceOf, type AgentKind, type AppState, type Bot, type BotSettings, type Session } from "@/lib/types";
@@ -233,6 +235,7 @@ function Details({
   /** Its full settings page, at a section: the AI, Team and Sequences rows. */
   onExpand?: (at?: SettingsSection) => void;
 }) {
+  const computerWords = useComputerWords();
   const plan = usePhonePlan();
   const { line, main, reach, numberRoom, emailRoom, emailOnAsk } = contactOf(state, b, plan);
   const glass = GLASS;
@@ -307,11 +310,11 @@ function Details({
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="text-[13px] font-semibold leading-4">Works on</span>
           <span className="text-[12px] leading-4 text-[#6B6B6B]">
-            {(b.runsOn ?? "auto") === "auto" ? `Its cloud computer, or ${yourMac(state)} when a task needs it` : b.runsOn === "mac" ? `${Your(state)} Mac, always` : "Its cloud computer, always"}
+            {(b.runsOn ?? "auto") === "auto" ? `Its cloud computer, or ${yourMac(state)} when a task needs it` : b.runsOn === "mac" ? computerWords`${Your(state)} Mac, always` : "Its cloud computer, always"}
           </span>
         </div>
         <div className="flex shrink-0 gap-0.5 rounded-full bg-black/[0.05] p-[3px]">
-          {([["auto", "Auto"], ["cloud", "Cloud"], ["mac", `${Your(state)} Mac`]] as const).map(([v, label]) => (
+          {([["auto", "Auto"], ["cloud", "Cloud"], ["mac", computerWords`${Your(state)} Mac`]] as const).map(([v, label]) => (
             <button
               key={v}
               onClick={() => void post("/api/bots", { botId: b.id, runsOn: v }, "PATCH")}

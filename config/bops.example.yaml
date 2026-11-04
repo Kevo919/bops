@@ -82,3 +82,16 @@
 # privacy:
 #   enabled: true
 #   telemetry: true               # Share usage data
+
+# Your own MCP servers (Model Context Protocol), for bots to use as tools. Each is a command that
+# speaks MCP over stdio. A bot gets them when you pick them on its settings page (its AI section's
+# MCP servers row); a server that names keys runs for the chat only - its keys stay on this machine,
+# never on a bot's computer.
+# mcp:
+#   servers:
+#     github:
+#       command: npx
+#       args: ["-y", "@modelcontextprotocol/server-github"]
+#       env: [GITHUB_TOKEN]       # KEY NAMES: each is read from .env.local, and only these reach the server
+#     notes:
+#       command: /usr/local/bin/mcp-notes       # a key-less one: a bot's computer may run it too

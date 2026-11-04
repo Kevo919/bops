@@ -1,5 +1,7 @@
 "use client";
 
+import { useComputerWords } from "./computer-words";
+
 import { useEffect, useRef, useState } from "react";
 import { BLOCKER_LABEL, computerAsleep, computerCheckMs, computerInUse, DISPLAYS, isScreenWatch, live, streamsLive, workBot, workspaceOf, type AppState, type Bot, type Session } from "@/lib/types";
 import { freeComputerOpen, ownIsBops, setupShort } from "@/lib/orgo-plans";
@@ -1227,6 +1229,7 @@ function HomeScreen({ state, bot: b }: { state: AppState; bot: Bot }) {
 }
 
 function NoComputer({ state, bot: b, host }: { state: AppState; bot: Bot; /** The bot whose computer it works on (itself, unless it shares the main bot's). */ host: Bot }) {
+  const computerWords = useComputerWords();
   const plan = usePlan(state);
   // Whether the user's Orgo plan has room to make it: the main bot's, or a copy of it for a bot of its own.
   // One made already whose setup didn't finish takes no more room: Set up finishes it (POST /api/computer).
@@ -1276,7 +1279,7 @@ function NoComputer({ state, bot: b, host }: { state: AppState; bot: Bot; /** Th
           className="max-w-[320px]"
           text={
             noRoom.short === "none"
-              ? `${noRoom.text} Until then, your bots can work on this Mac (Settings, Where your bots work).`
+              ? computerWords`${noRoom.text} Until then, your bots can work on this Mac (Settings, Where your bots work).`
               : host.isMain
                 ? noRoom.text
                 : `${b.name} will work on the main bot's computer instead. ${noRoom.text}`
@@ -1369,6 +1372,7 @@ function SharedScreen({ state, bot: b }: { state: AppState; bot: Bot }) {
 
 /** The computer itself, for the bot's Details: where it came from and how it's running. */
 export function ComputerSummary({ state, bot: b, className = "", onOpen }: { state: AppState; bot: Bot; className?: string; onOpen?: () => void }) {
+  const computerWords = useComputerWords();
   // This Mac's browsers are the viewer's own app's: a shared workspace's bot never works there (state.host is the viewer's).
   const mac = !state.shared && state.host === "mac";
   const c = mac ? b : workBot(b, state.bots);
@@ -1386,7 +1390,7 @@ export function ComputerSummary({ state, bot: b, className = "", onOpen }: { sta
         <span className="text-[13px] font-semibold leading-4">Computer</span>
         <span className="truncate text-[12px] leading-4 text-[#6B6B6B]">
           {mac
-            ? "Browsers on this Mac"
+            ? computerWords("Browsers on this Mac")
             : state.shared && b.runsOn === "mac"
               ? `Works on ${yourMac(state)}`
               : b.isMain
