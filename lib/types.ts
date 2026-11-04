@@ -1403,6 +1403,28 @@ export type RoutineRun = {
   by?: string;
 };
 
+/**
+ * A goal the owner set with a bot (chat.ts set_goal): what they're after, and the routines and skills
+ * the bot built for it, kept together so the goal can be seen whole. `status` done/dropped retires the
+ * goal and leaves what it made running (the owner set those up on purpose); only the record changes.
+ */
+export type Goal = {
+  id: string;
+  botId: BotId;
+  title: string;
+  why?: string;
+  createdAt: number;
+  status: "active" | "done" | "dropped";
+  doneAt?: number;
+  /** The routines set up for it (Routine.id), each already scheduled. */
+  routineIds?: string[];
+  /** The skills written for its recurring jobs (SkillRef.id), if any. */
+  skillIds?: string[];
+};
+
+/** An idea the owner parked (chat.ts save_idea, or the Ideas tab): a sentence and when, nothing more. */
+export type Idea = { id: string; text: string; at: number; from: "chat" | "panel" };
+
 /** A routine or one-off scheduled ask. When it fires it becomes a reminder, a turn in the bot's chat, or a thread. */
 export type Routine = {
   id: string;
@@ -1646,6 +1668,10 @@ export type AppState = {
   messages: Message[];
   sessions: Session[];
   routines: Routine[];
+  /** The owner's goals (Goal, chat.ts set_goal): what they're after and what the bot built for it. */
+  goals?: Goal[];
+  /** The owner's parked ideas (Idea): a sentence each, nothing running, until one is made a goal. */
+  ideas?: Idea[];
   /**
    * How each bot did the kinds of jobs it was shown, from before skills (Procedure). Each is moved into
    * its workspace's skills (lib/server/workspace-skills.ts adoptProcedures) and the list is emptied; what was
