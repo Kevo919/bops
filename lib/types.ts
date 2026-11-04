@@ -160,6 +160,12 @@ export type BotSettings = {
    * "Send an email" rule says ask meanwhile, which is what a Bops from before does with it.
    */
   mailNever?: true;
+  /**
+   * Which of the config's MCP servers are this bot's own, by name (lib/server/mcp.ts; config/bops.yaml
+   * `mcp: servers:`). Unset: none. A server that names keys runs for the chat only, never on a brain's
+   * computer (its keys stay here).
+   */
+  mcpServers?: string[];
 };
 
 /** Bot `b`'s settings page settings (Workspace.botSettings), none set: {}. */
@@ -2289,7 +2295,7 @@ export type AppApproval = {
   action: string;
   resources: string[];
   preview: string;
-  kind?: "app" | "email" | "api" | "data" | "brain";
+  kind?: "app" | "email" | "api" | "data" | "brain" | "mcp";
   /** A call to an API with one of the user's keys: the key, its service, the method and the whole path. */
   api?: { key: string; label: string; method: string; path: string };
   at: number;
