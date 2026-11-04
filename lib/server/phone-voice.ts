@@ -1,7 +1,7 @@
 import "server-only";
 import { speedFor, tierParam, withSpeed } from "./routing";
 import type { CallerVerdict } from "@/cloud/protocol";
-import { botChatId, live, MAX_PERSONA_CHARS, settingsOf, type Bot, type BotSettings } from "@/lib/types";
+import { botChatId, live, settingsOf, type Bot, type BotSettings } from "@/lib/types";
 import { callEnded, callStarted } from "./attention";
 import { delegate, voicePrompt } from "./call";
 import { OWNER_WHO, saveToMemory, scopeOf } from "./memory";
@@ -9,7 +9,7 @@ import { openaiClient } from "./openai-client";
 import { callLog, fromOwner, isOwner, linkClaimed, routeFor, type ApEvent } from "./phone";
 import { addMessage, bot, getState, ownerLine, ownerName, patchSession, stateEpoch } from "./store";
 import { SPEAKING } from "./style";
-import { howIWork } from "@/cloud/style";
+import { soulBlock } from "@/lib/bot-docs";
 import { recordCallMinutes, recordTokens, usageTags } from "./usage";
 
 /**
@@ -94,7 +94,7 @@ function quickPrompt(b: Bot) {
   return [
     `You are ${b.name}, ${b.isMain ? `${owner}'s chief of staff` : `${owner}'s ${b.role} bot`} in Bops, on a phone call with ${owner}. ${ownerLine()}`,
     // How I work, short (the full prompt has it too): the owner's preferences, never Bops' rules.
-    howIWork(owner, b.persona?.slice(0, MAX_PERSONA_CHARS), true),
+    soulBlock(owner, b, true),
     "Talk like a capable teammate on a call: short, warm, natural.",
     SPEAKING,
     `Whenever ${owner} asks for something to be done, looked up, checked, scheduled, or handed to another bot, call delegate with what they asked, in their words, and say in a few words that you're on it.`,
