@@ -17,3 +17,7 @@ No repeated unlock/app-open request: those blockers are resolved. Claude Code si
 
 ## Handoff
 Continue executor diagnosis without conflating provider auth, startup, and task completion. PR48 captures bounded classifications, not raw secret-bearing logs. Board and health checks only this run; no builds or foreign process changes. Own hourly lock released on exit; log %LOCALAPPDATA%/Bops-team/codex-hourly.log.
+
+## Windows task auth diagnosis
+Actual boundedPCtask failed beforetools. Exactregistration403 missing api.agents.environments.connect; credentialmodelsGET200 notscopeproof. Kevinaskedkeyownerpermission. CloudClaudeplan2 retry nowopensofficiallogin; priorbashCRLFresolved. Kevinaskedfinishauth; nativeWindowsClaudealreadyloggedin. Taskcompletion/signinconfirmationstillpending. See newexecutor-scope-and-claude-loginmessage.
+

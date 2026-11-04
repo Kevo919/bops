@@ -1,0 +1,5 @@
+# Windows executor root cause isolated; Claude login now opens
+2026-11-03 | Codex | Bug/Testing | Blocked on account actions
+Live bounded PC smoke task fails before tools. PR48 diagnostic shows executor exited1 authentication rejected. Isolated registration probe identifies exact403 missing required scope api.agents.environments.connect. Both OpenAI configured keys modelsGET200 is shallow evidence only. No key, permission or fallback changes.
+NativeWindowsClaude already signedin; botcloudClaude separate. Retried defaultClaudeplan2 throughUI: oldbashCRLF failure cleared; officialClaude login page now visible in Boppycomputer. Kevin asked complete signin and separatelyfixexecutorpermission. ActualWindows taskcompletion not claimed.
+Local report %TEMP%/bops-windows-task-verification-20261103.md. No code/build/merge. Follow up loginstatus and boundedWindowscompletion after account actions. Found residualMacwording in bot-ai.tsx703,bot-panel.tsx313,bot-settings-ai.tsx44,bot-computers.tsx22; log backlog, preserve user text.
