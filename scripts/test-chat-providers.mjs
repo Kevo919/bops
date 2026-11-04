@@ -127,6 +127,30 @@ await check("the window's picker: Ollama only where it's set up (OLLAMA_BASE_URL
   assert.equal(chatModelHint(on, { model: "ollama/qwen2.5:3b" }), null);
 });
 
+await check("the pickers with an OpenRouter preset: \"Preset: <name>\" in the chat's and in a routine's (Auto, as before, first)", async () => {
+  const { ChatModelPick } = await import(`${rootUrl}/components/app/chat-model.tsx`);
+  const { RoutineModelPick } = await import(`${rootUrl}/components/app/autopilot.tsx`);
+  const { setLlms } = await import(`${rootUrl}/lib/agents.ts`);
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { createElement: h } = await import("react");
+  setLlms([{ name: "Email writer", provider: "openrouter", model: "@preset/email-writer" }, { name: "Auto Router", provider: "openrouter", model: "openrouter/auto" }]);
+  const state = { chatKeys: { openrouter: true, anthropic: false }, bots: [], sessions: [] };
+  const chatHtml = renderToStaticMarkup(h(ChatModelPick, { state, chat: { id: chatId, model: "openrouter/@preset/email-writer" } }));
+  assert.match(chatHtml, /<optgroup label="OpenRouter"><option value="openrouter\/@preset\/email-writer" data-preset="" selected="">Preset: Email writer<\/option><option value="openrouter\/openrouter\/auto">Auto Router<\/option><\/optgroup>/);
+  assert.match(chatHtml, /title="Replies in this chat run on Preset: Email writer"/);
+  const r = { id: "rtn_1", botId: "b", title: "Digest", goal: "g", schedule: { kind: "daily", time: "09:00" }, enabled: true, run: "chat" };
+  const html = renderToStaticMarkup(h(RoutineModelPick, { routine: r, state, value: "openrouter/@preset/email-writer", onChange() {} }));
+  assert.match(html, /aria-label="Model for this routine"/);
+  assert.match(html, /<option value="" ?>Auto \(as before\)<\/option>/);
+  assert.match(html, /<option value="openrouter\/@preset\/email-writer" data-preset="" selected="">Preset: Email writer<\/option>/);
+  assert.match(html, /<option value="anthropic\/claude-opus-5-5">Claude Opus 5\.5 \(no key\)<\/option>/, "the built in ones too");
+  assert.match(html, /chat turn is on this model/);
+  assert.match(renderToStaticMarkup(h(RoutineModelPick, { routine: { ...r, run: "task" }, state, value: "", onChange() {} })), /OpenCode or DeepSeek Harness/);
+  assert.match(renderToStaticMarkup(h(RoutineModelPick, { routine: r, state, value: "openrouter/gone/x", onChange() {} })), /<option value="openrouter\/gone\/x" selected="">openrouter\/gone\/x<\/option>/, "one gone from the list still shows");
+  assert.equal(renderToStaticMarkup(h(RoutineModelPick, { routine: { ...r, reminder: "Drink water." }, state, value: "", onChange() {} })), "", "not for a reminder");
+  assert.equal(renderToStaticMarkup(h(RoutineModelPick, { routine: { ...r, fromOutside: "an email" }, state, value: "", onChange() {} })), "", "not for one someone else set up");
+});
+
   process.exit(failures ? 1 : 0);
 }
 

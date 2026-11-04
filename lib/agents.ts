@@ -147,6 +147,13 @@ export const RUN_BY_KINDS = ["opencode", "dsh"] as const;
 export type RunBy = (typeof RUN_BY_KINDS)[number];
 const g = globalThis as unknown as { __bopsLlms?: Llm[] };
 export const llms = (): Llm[] => g.__bopsLlms ?? [];
+/** A plain model id ("deepseek/deepseek-chat", "qwen2.5:3b"), as config/llms.cjs MODEL. */
+export const MODEL_ID = /^[A-Za-z0-9._:/-]{1,120}$/;
+/** An OpenRouter preset, written as its model ("@preset/email-writer"), as config/llms.cjs PRESET. */
+export const PRESET_ID = /^@preset\/[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/;
+export const isPreset = (provider: string, model: string) => provider === "openrouter" && PRESET_ID.test(model);
+/** An LLM only chats run on (and chat routines): Ollama's (on this server) and OpenRouter presets (bots' agents take a plain model id). */
+export const chatOnlyLlm = (l: Pick<Llm, "provider" | "model">) => CHAT_ONLY.has(l.provider) || isPreset(l.provider, l.model);
 const LLM_PROVIDERS = new Set<string>(Object.keys(ROUTE_KEYS));
 /** Keep the list (from the file, or from the state the window got): only what Bops can run. */
 export function setLlms(list: unknown) {
@@ -155,14 +162,15 @@ export function setLlms(list: unknown) {
     for (const x of list.slice(0, 20)) {
       if (!x || typeof x !== "object") continue;
       const l = x as Partial<Llm>;
-      if (typeof l.provider !== "string" || !LLM_PROVIDERS.has(l.provider) || typeof l.model !== "string" || !/^[A-Za-z0-9._:/-]{1,120}$/.test(l.model)) continue;
-      const jobs = cleanJobs(l.useFor);
-      const runBy = (RUN_BY_KINDS as readonly string[]).includes(l.runBy as string) && l.runBy !== "opencode" ? l.runBy : undefined;
+      if (typeof l.provider !== "string" || !LLM_PROVIDERS.has(l.provider) || typeof l.model !== "string" || !(MODEL_ID.test(l.model) || isPreset(l.provider, l.model))) continue;
+      const preset = isPreset(l.provider, l.model);
+      const jobs = preset ? undefined : cleanJobs(l.useFor);
+      const runBy = !preset && (RUN_BY_KINDS as readonly string[]).includes(l.runBy as string) && l.runBy !== "opencode" ? l.runBy : undefined;
       out.push({
         name: typeof l.name === "string" && l.name.trim() ? l.name.trim().slice(0, 60) : l.model,
         provider: l.provider as AgentRoute,
         model: l.model,
-        ...(l.starter === true && !out.some((y) => y.starter) ? { starter: true } : {}),
+        ...(l.starter === true && !preset && !out.some((y) => y.starter) ? { starter: true } : {}),
         ...(jobs ? { useFor: jobs } : {}),
         ...(runBy ? { runBy } : {}),
         ...(l.chatDefault === true && !out.some((y) => y.chatDefault) ? { chatDefault: true } : {}),
@@ -173,7 +181,7 @@ export function setLlms(list: unknown) {
 const llmModel = (l: Llm) => `${l.provider}/${l.model}`;
 /** The LLMs as models of OpenCode and DeepSeek Harness (and the Claude ones of Claude Code too), the starter first. */
 const llmModels = (kind: AgentKind): (typeof MODELS)[number][] => {
-  const list = llms().filter((l) => !CHAT_ONLY.has(l.provider)).sort((a, b) => Number(!!b.starter) - Number(!!a.starter));
+  const list = llms().filter((l) => !chatOnlyLlm(l)).sort((a, b) => Number(!!b.starter) - Number(!!a.starter));
   if (anyModel(kind)) return list.map((l) => ({ id: llmModel(l), kind, label: l.name, short: l.name }));
   if (kind === "claude") return list.filter((l) => l.provider === "anthropic").map((l) => ({ id: l.model, kind, label: l.name, short: l.name }));
   return [];
@@ -193,7 +201,7 @@ export const llmAgent = (l: Llm): BotAgent => {
  */
 export function starterAi(): BotAi | undefined {
   if (!BRAINS_ON) return undefined;
-  const list = llms().filter((l) => !CHAT_ONLY.has(l.provider) && (l.starter || l.useFor?.length)).slice(0, MAX_AGENTS - 1);
+  const list = llms().filter((l) => !chatOnlyLlm(l) && (l.starter || l.useFor?.length)).slice(0, MAX_AGENTS - 1);
   if (!list.length) return undefined;
   const starter = list.find((l) => l.starter);
   return { agents: [BOPS_AGENT, ...list.map(llmAgent)], default: starter ? llmAgent(starter).id : "bops" };

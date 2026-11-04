@@ -29,6 +29,8 @@ import { CloseButton, currentWorkspace, needsYou, post, ReadOnlyLine, teamOf } f
 import { FooterButton } from "./sidebar-footer";
 import { deleteQuestion, RoutineWeek, useClock, weekPlan, WeekLegend, WeekLetters } from "./routine-week";
 import { ReportsSheet } from "./routine-reports";
+import { ChatModelOptions } from "./chat-model";
+import { chatModelLabel, chatModels } from "@/lib/chat-models";
 
 /*
  * Routines: what the workspace's bots do on their own, and how. Schedules (routines: a reminder, a turn
@@ -1042,10 +1044,11 @@ function ScheduleEdit({
   tz?: string;
   busy: boolean;
   error: string | null;
-  onSave: (edit: { title?: string; goal?: string; quiet?: boolean } & WhenEdit) => void;
+  onSave: (edit: { title?: string; goal?: string; quiet?: boolean; model?: string | null } & WhenEdit) => void;
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState(r.title);
+  const [model, setModel] = useState(r.model ?? "");
   const [goal, setGoal] = useState(r.goal);
   const when = useWhen(r, tz);
   const [quiet, setQuiet] = useState(!!r.quiet);
@@ -1055,6 +1058,8 @@ function ScheduleEdit({
     ...(goal.trim() && goal.trim() !== r.goal ? { goal: goal.trim() } : {}),
     ...when.edit,
     ...(quiet !== !!r.quiet ? { quiet } : {}),
+    // A null takes its own model off: it runs as before.
+    ...(model !== (r.model ?? "") ? { model: model || null } : {}),
   };
   const changed = Object.keys(edit).length > 0;
   const field = "w-full rounded-xl bg-[#F7F7F6] px-3 py-2 text-[13px] leading-[18px] outline-none focus:bg-white focus:shadow-[0_0_0_1.5px_#0A0A0A]";
@@ -1092,6 +1097,7 @@ function ScheduleEdit({
           <input type="checkbox" checked={quiet} onChange={(e) => setQuiet(e.target.checked)} className="size-3.5 accent-[#0A0A0A]" />
           Quiet: post only when there&rsquo;s something for you
         </label>
+        <RoutineModelPick routine={r} state={state} value={model} disabled={busy} onChange={setModel} />
       </div>
       <div className="-ml-2.5 flex items-center gap-0.5">
         <button type="submit" disabled={!changed || busy} className="rounded-full bg-ink px-3 py-1 text-[12px] font-medium leading-4 text-white disabled:opacity-40">
@@ -1105,6 +1111,42 @@ function ScheduleEdit({
     </form>
   );
 }
+
+/**
+ * The model a routine's runs are on (Routine.model), with the chat's options (Auto, Your LLMs with presets, the built
+ * in ones). Not for a reminder (it runs nothing) or a routine someone else set up (it runs as they set it up).
+ */
+export function RoutineModelPick({ routine: r, state, value, disabled, onChange }: { routine: Routine; state: AppState; value: string; disabled?: boolean; onChange: (model: string) => void }) {
+  if (r.reminder || r.fromOutside) return null;
+  return (
+    <label className="flex items-center gap-2 text-[12.5px] leading-4 text-[#3A3A38]" title={modelHelp(r)}>
+      Model
+      <select
+        aria-label="Model for this routine"
+        data-routine-model
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="max-w-[220px] truncate rounded-lg bg-[#F7F7F6] px-2 py-1 text-[12.5px] leading-4 outline-none focus:bg-white focus:shadow-[0_0_0_1.5px_#0A0A0A]"
+      >
+        <ChatModelOptions keys={state.chatKeys ?? {}} value={value} auto="Auto (as before)" />
+      </select>
+    </label>
+  );
+}
+
+/** What a routine's model applies to, by how it runs. */
+const modelHelp = (r: Routine) =>
+  r.run === "chat"
+    ? "Each run's chat turn is on this model. Auto: the bot's chat model, as before."
+    : "A task starts on this model when it's one of Your LLMs the bot's OpenCode or DeepSeek Harness can run (not a preset or an Ollama model, which run chats only). Otherwise, and on Auto, it runs as before.";
+
+/** A routine's own model as its row says it: " · on Claude Opus 5.5". */
+export const modelWords = (r: Pick<Routine, "model">) => {
+  if (!r.model) return "";
+  const m = chatModels().find((x) => x.id === r.model);
+  return ` · on ${m ? chatModelLabel(m) : r.model}`;
+};
 
 /** Just when a schedule runs, changed in place on its When: Save, Cancel, Esc cancels, Cmd+Enter saves. */
 function WhenChange({ routine: r, state, tz, busy, onSave, onCancel }: { routine: Routine; state: AppState; tz?: string; busy: boolean; onSave: (edit: WhenEdit) => void; onCancel: () => void }) {
@@ -1270,7 +1312,7 @@ export function ScheduleRow({
       id={r.id}
       lead={chip ? undefined : <BotMark bot={bot} />}
       title={undash(r.title)}
-      line={`${describeSchedule(r.schedule, zone)} · ${nextWords(r, state, tz)}${r.quiet ? " · quiet" : ""}`}
+      line={`${describeSchedule(r.schedule, zone)} · ${nextWords(r, state, tz)}${r.quiet ? " · quiet" : ""}${modelWords(r)}`}
       dim={!r.enabled}
       end={
         <>

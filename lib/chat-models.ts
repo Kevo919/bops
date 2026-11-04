@@ -1,4 +1,4 @@
-import { llms, ROUTE_KEYS, ROUTE_NAMES, type AgentRoute } from "./agents";
+import { isPreset, llms, ROUTE_KEYS, ROUTE_NAMES, type AgentRoute } from "./agents";
 
 /**
  * The models a chat can answer on (Chat.model), picked in the chat's message box: "provider/model", from
@@ -6,7 +6,7 @@ import { llms, ROUTE_KEYS, ROUTE_NAMES, type AgentRoute } from "./agents";
  * file. Unset is Auto: OpenAI, as before (chat.ts CHAT_MODEL and the router). The server calls each provider on
  * its key in .env.local (lib/server/chat-providers.ts); the window and the server both read this list.
  */
-export type ChatModel = { id: string; name: string; provider: AgentRoute };
+export type ChatModel = { id: string; name: string; provider: AgentRoute; preset?: true };
 
 export const BUILTIN_CHAT_MODELS: ChatModel[] = [
   { id: "openai/gpt-6.1-sol", name: "GPT 6.1 Sol", provider: "openai" },
@@ -24,7 +24,7 @@ export const BUILTIN_CHAT_MODELS: ChatModel[] = [
 
 /** Your LLMs first (by their names in the file), then the built in ones they don't already have. */
 export function chatModels(): ChatModel[] {
-  const out: ChatModel[] = llms().map((l) => ({ id: `${l.provider}/${l.model}`, name: l.name, provider: l.provider }));
+  const out: ChatModel[] = llms().map((l) => ({ id: `${l.provider}/${l.model}`, name: l.name, provider: l.provider, ...(isPreset(l.provider, l.model) ? { preset: true as const } : {}) }));
   for (const m of BUILTIN_CHAT_MODELS) if (!out.some((x) => x.id === m.id)) out.push(m);
   return out;
 }
@@ -53,6 +53,12 @@ export function providerOf(model: string | undefined): AgentRoute | undefined {
  * so it doesn't show for people without Ollama. Every other provider shows, with "(no key)" when it has none.
  */
 export const chatModelShown = (m: ChatModel, keys: Partial<Record<string, boolean>>) => m.provider !== "ollama" || !!keys.ollama;
+
+/**
+ * How a model reads in a picker (the chat's, a routine's): its name, and for an OpenRouter preset "Preset: <name>",
+ * so a preset isn't taken for a model of that name.
+ */
+export const chatModelLabel = (m: Pick<ChatModel, "name" | "preset">) => (m.preset ? `Preset: ${m.name}` : m.name);
 
 /** The key each provider's chat runs on, and its name for people ("Anthropic"). */
 export const chatKeyName = (p: AgentRoute) => ROUTE_KEYS[p];

@@ -16,7 +16,7 @@ import { ORBIT_OWNER_ONLY, ORBIT_TOOL_NAMES, ORBIT_TOOLS, orbitNote, orbitNowLin
 import type { ResponseInputItem } from "openai/resources/responses/responses";
 import { openaiClient } from "./openai-client";
 import { respond } from "./chat-providers";
-import { providerOf } from "@/lib/chat-models";
+import { chatModelLabel, chatModels, providerOf } from "@/lib/chat-models";
 import { contactLine, createBot, namesTheUser } from "./bots";
 import { creditsOut, noteOutOfCredit, outOfCreditWords } from "./cloud";
 import { noOwnComputer } from "./plan";
@@ -35,7 +35,7 @@ import { savePage } from "./pages";
 import { saveDoc } from "./docs";
 import { onRunner } from "./persist";
 import { currentTurn, noteActing, stillTurn } from "./turn-context";
-import { createRoutine, deleteRoutine, describeSchedule, editRoutine, isNothing, NO_CREDIT_FOR_ROUTINES, routinesNote, runRoutine, setRoutineEnabled, setRoutineWhere, skipRoutine, unskipRoutine, zoneOf } from "./routines";
+import { createRoutine, deleteRoutine, describeSchedule, editRoutine, isNothing, NO_CREDIT_FOR_ROUTINES, routineModelName, routinesNote, runRoutine, setRoutineEnabled, setRoutineWhere, skipRoutine, unskipRoutine, zoneOf } from "./routines";
 import { undash } from "./procedures";
 import { draftDeed, draftsIn, draftsJob, draftTools, offerDraft, ReadLog, sameTarget, writesReplies, type DraftArgs, type KeptReads } from "./reply-drafts";
 import { readyWords } from "@/lib/reply-drafts";
@@ -1158,6 +1158,8 @@ type BackgroundJob = {
   goal: string;
   quiet: boolean;
   procedureId?: string;
+  /** The model the routine runs on (Routine.model, checked as it starts: routines.ts chatRun); unset: the chat's, as before. */
+  model?: string;
   /**
    * A look at a Connected App for Bops itself (routine-suggestions.ts learnTags), not a run of the routine:
    * only find_app_actions and use_app's read actions (SAMPLE_TOOLS), no task, and nothing posted in the chat.
@@ -1354,6 +1356,7 @@ type ScheduleArgs = {
   deliver_to?: DeliverTo;
   skill?: string | null;
   time_zone?: string | null;
+  model?: string | null;
 };
 
 /** A routine's own zone, when it has one: " (Europe/London time)". */
@@ -1363,7 +1366,7 @@ const zoneWords = (r: Routine) => (r.timeZone ? ` (${r.timeZone} time)` : "");
 function scheduledNote(r: Routine) {
   const how = r.reminder ? " · a reminder" : r.where && r.where !== "auto" ? ` · ${r.where === "mac" ? "on your Mac" : "in the cloud"}` : "";
   const goes = deliveryWords(r.deliverTo).replace(/^, /, " · ");
-  return `Scheduled "${r.title}" · ${describeSchedule(r.schedule, zoneOf(r))}${zoneWords(r)}${how}${r.quiet ? " · quiet" : ""}${goes}${r.fromOutside ? ` · set up by ${r.fromOutside}` : ""}`;
+  return `Scheduled "${r.title}" · ${describeSchedule(r.schedule, zoneOf(r))}${zoneWords(r)}${how}${r.quiet ? " · quiet" : ""}${goes}${r.model ? ` · on ${routineModelName(r)}` : ""}${r.fromOutside ? ` · set up by ${r.fromOutside}` : ""}`;
 }
 
 /**
@@ -1390,6 +1393,8 @@ function scheduleFor(b: Bot, a: ScheduleArgs, ctx: { ask?: Message; email: boole
     deliverTo: d.deliverTo,
     procedure: a.skill?.trim() || undefined,
     timeZone: a.time_zone?.trim() || undefined,
+    // Only a model Bops has (createRoutine checks it against chatModels(), and says which there are).
+    model: reminder ? undefined : a.model?.trim() || undefined,
   });
   const r = made.routine;
   if (!r) return `Not set: ${made.error ?? "Bops couldn't set it up."}`;
@@ -1984,8 +1989,9 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
     // Someone's waiting on this reply: the user's own message, in the app, by text or in a channel (not
     // an email, which nobody expects back in seconds, or a turn someone else started). It runs fast.
     const waiting = !!opts.answering && !opts.outside && !opts.emailBack;
-    // The model the chat was set to (chatModelOf), or Auto: CHAT_MODEL, which the router may raise.
-    const pinned = chatModelOf(chatId);
+    // A routine's own model (BackgroundJob.model), else the model the chat was set to (chatModelOf), or Auto: CHAT_MODEL,
+    // which the router may raise.
+    const pinned = (bg?.model && providerOf(bg.model) ? bg.model : undefined) ?? chatModelOf(chatId);
     const base: Config = { model: pinned ?? CHAT_MODEL, effort: CHAT_REASONING.effort };
     // How much thinking the message needs (routing.ts routeChat: Jev, alongside what's below). Only the user's own.
     const routing = waiting ? routeChat(base, lastWords(chatId), botId, { pinned: !!pinned }).catch(() => ({ config: base })) : Promise.resolve({ config: base });
@@ -2038,6 +2044,10 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
         skill: { type: ["string", "null"], description: "The name of one of your skills each run follows, or null." },
         where: { type: "string", enum: ["auto", "cloud", "mac"], description: `For a task: where it runs each time. cloud or mac if ${owner} said so; else auto.` },
         time_zone: TIME_ZONE_PARAM,
+        model: {
+          type: ["string", "null"],
+          description: `Only when ${owner} names a model for it: the id of one Bops has, exactly: ${chatModels().map((m) => `${m.id} (${chatModelLabel(m)})`).join(", ")}. Null otherwise (it runs as before).`,
+        },
       }),
       // A goal (lib/server/goals.ts): the owner says what they're after, the bot agrees the steps with
       // them, then one call makes the goal and its routines together. The owner's own turns only, like

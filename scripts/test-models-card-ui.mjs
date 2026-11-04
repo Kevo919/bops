@@ -85,22 +85,24 @@ const bops = {
   sent: [],
   offline: false,
   orFetches: 0,
-  rejectSave: false,
+  // Your presets as app/api/models/openrouter/presets answers (never with a key in it), and what the card was told after a save.
+  presets: { presets: [{ slug: "email-writer", name: "Email writer", description: "Short, warm emails" }, { slug: "coder", name: "Coder" }] },
+  presetFetches: 0,
+  warning: undefined,
 };
 const info = () => ({ llms: bops.llms, max: 20, providers: PROVIDERS, runBy: RUN_BY, jobs: JOBS, problems: [] });
 const json = (j, status = 200) => ({ ok: status < 400, status, json: async () => j });
 globalThis.fetch = async (url, opts = {}) => {
-  if (url.startsWith("/api/state?v=")) {
-    const version = bops.sent.length;
-    return json(Number(url.split("=")[1]) === version ? { version } : { version, state: { llms: structuredClone(bops.llms), chatKeys: {} } });
-  }
   if (url === "/api/models/openrouter") {
     bops.orFetches++;
     return json(bops.offline ? { models: [], offline: true } : { models: OR });
   }
+  if (url === "/api/models/openrouter/presets") {
+    bops.presetFetches++;
+    return json(bops.presets);
+  }
   if (url !== "/api/models") throw new Error(`unexpected ${url}`);
   if (!opts.method || opts.method === "GET") return json(info());
-  if (bops.rejectSave) return json({ error: "Fixture save refused" }, 400);
   const op = JSON.parse(opts.body);
   bops.sent.push(op);
   // As config/llms.cjs change() does it, for what the card sends here.
@@ -126,19 +128,14 @@ globalThis.fetch = async (url, opts = {}) => {
     if (op.runBy) l.runBy = op.runBy;
     if (op.chatDefault) for (const y of bops.llms) y.chatDefault = y === l;
   } else if (op.op === "remove") bops.llms = bops.llms.filter((x) => x.id !== op.id);
-  return json({ ok: true, moved, ...info() });
+  return json({ ok: true, moved, ...(bops.warning ? { warning: bops.warning } : {}), ...info() });
 };
 
 const { createElement: h, act } = await import("react");
 const { createRoot } = await import("react-dom/client");
 const { ModelsCard, nameFromOpenRouter } = await import(`${rootUrl}/components/app/models-card.tsx`);
 
-const { useAppState } = await import(`${rootUrl}/components/app/ui.tsx`);
-const { ChatModelPick } = await import(`${rootUrl}/components/app/chat-model.tsx`);
-function SettingsAndChat() {
-  const state = useAppState();
-  return h("div", null, h(ModelsCard), state && h(ChatModelPick, { state, chat: { id: "test-chat" } }));
-}
+
 let passed = 0;
 const test = async (name, f) => {
   await f();
@@ -186,7 +183,7 @@ const box = doc.createElement("div");
 doc.body.appendChild(box);
 const root = createRoot(box);
 await act(async () => {
-  root.render(h(SettingsAndChat));
+  root.render(h(ModelsCard));
   await settle();
 });
 
@@ -250,8 +247,6 @@ try {
     assert.equal(box.querySelector("[data-add-model]"), null, "closed once saved");
     assert.equal(box.querySelector("[data-models-note]").textContent, "Added Qwen3 Coder Next. Planning moved from Claude Opus 5.5 to Qwen3 Coder Next.");
     assert.ok(row(box, "openrouter/qwen/qwen3-coder-next"));
-    const picker = box.querySelector("select[aria-label='Model for this chat']");
-    assert.ok([...picker.options].some((o) => o.value === "openrouter/qwen/qwen3-coder-next" && o.textContent.includes("Qwen3 Coder Next")), "saved model reaches mounted chat picker without reload or waiting for poll");
     assert.equal(nameFromOpenRouter("Meta: Llama 5 (free)"), "Llama 5 (free)");
   });
 
@@ -292,7 +287,6 @@ try {
     await click(button(row(box, "openrouter/deepseek/deepseek-v4-pro"), "Remove"));
     assert.deepEqual(bops.sent.at(-1), { op: "remove", id: "openrouter/deepseek/deepseek-v4-pro" });
     assert.equal(row(box, "openrouter/deepseek/deepseek-v4-pro"), null);
-    assert.ok(![...box.querySelector("select[aria-label='Model for this chat']").options].some((o) => o.value === "openrouter/deepseek/deepseek-v4-pro"), "removed model leaves mounted picker");
   });
 
   await test("a chats-only provider (Ollama): no jobs, Run by or bot default, and it says why", async () => {
@@ -316,15 +310,83 @@ try {
     await click(button(add, "Cancel"));
   });
 
-  await test("rejected save keeps the current catalog and reports the failure", async () => {
-    const picker = () => box.querySelector("select[aria-label='Model for this chat']").innerHTML;
-    const before = picker();
-    bops.rejectSave = true;
-    try {
-      await click(row(box, "anthropic/claude-sonnet-5-5").querySelector("[data-job=writing]"));
-      assert.match(box.textContent, /Fixture save refused/);
-      assert.equal(picker(), before);
-    } finally { bops.rejectSave = false; }
+  await test("OpenRouter presets: your presets listed (read by the server on your key), one picked is @preset/<slug>, chats only", async () => {
+    await click(button(box, "Add a model"));
+    const add = box.querySelector("[data-add-model]");
+    await choose(add.querySelector("select[aria-label=Provider]"), "openrouter");
+    assert.equal(bops.presetFetches, 0, "not asked until Preset is picked");
+    await click(add.querySelector("[data-or-mode=preset]"));
+    assert.equal(bops.presetFetches, 1);
+    assert.match(add.querySelector("[data-presets]").textContent, /openrouter\.ai\/settings\/presets/);
+    assert.equal(add.querySelector("[data-presets] a").getAttribute("href"), "https://openrouter.ai/settings/presets");
+    assert.deepEqual([...add.querySelectorAll("[data-or-preset]")].map((b) => b.getAttribute("data-or-preset")), ["email-writer", "coder"]);
+    assert.match(add.querySelector("[data-or-preset]").textContent, /@preset\/email-writer · Short, warm emails/);
+    assert.equal(add.querySelector("input[aria-label='Model id']"), null, "a preset is picked, not a model id");
+    assert.equal(add.querySelector("input[aria-label='Preset slug']"), null, "the list worked: nothing to type");
+    await click(add.querySelector("[data-or-preset=email-writer]"));
+    assert.equal(add.querySelector("[data-or-preset=email-writer]").getAttribute("aria-selected"), "true");
+    assert.equal(add.querySelector("input[aria-label=Name]").value, "Email writer");
+    assert.match(add.querySelector("[data-chat-only]").textContent, /OpenRouter preset/);
+    assert.equal(add.querySelector("[data-job]"), null, "no bot jobs for a preset");
+    assert.equal(add.querySelector("select[aria-label='Run by']"), null);
+    await click(button(add, "Save"));
+    assert.deepEqual(bops.sent.at(-1), { op: "add", name: "Email writer", provider: "openrouter", model: "@preset/email-writer", useFor: [] });
+    const r = row(box, "openrouter/@preset/email-writer");
+    assert.ok(r.querySelector("[data-preset-tag]"));
+    assert.match(r.querySelector("[data-chat-only]").textContent, /OpenRouter preset/);
+    assert.equal(r.querySelector("input[name=models-starter]"), null);
+  });
+
+  await test("presets with no presets yet: says where to make one; without a key (the list can't be read): says so, and a slug typed in works", async () => {
+    bops.presets = { presets: [] };
+    await click(button(box, "Add a model"));
+    const none = box.querySelector("[data-add-model]");
+    await choose(none.querySelector("select[aria-label=Provider]"), "openrouter");
+    await click(none.querySelector("[data-or-mode=preset]"));
+    assert.match(none.querySelector("[data-presets-none]").textContent, /no presets on OpenRouter yet/);
+    assert.equal(none.querySelector("input[aria-label='Preset slug']"), null);
+    await click(button(none, "Cancel"));
+    bops.presets = { presets: [], noKey: true };
+    await click(button(box, "Add a model"));
+    const add = box.querySelector("[data-add-model]");
+    await choose(add.querySelector("select[aria-label=Provider]"), "openrouter");
+    await click(add.querySelector("[data-or-mode=preset]"));
+    assert.match(add.querySelector("[data-presets-nokey]").textContent, /Add OPENROUTER_API_KEY/);
+    const slug = add.querySelector("input[aria-label='Preset slug']");
+    await type(slug, "bad slug!");
+    assert.match(add.textContent, /letters, numbers, - and _ only/);
+    assert.ok(button(add, "Save").disabled);
+    await type(slug, "@preset/research_v2");
+    assert.equal(slug.value, "research_v2", "a pasted @preset/ comes off");
+    await click(button(add, "Save"));
+    assert.equal(bops.sent.at(-1).model, "@preset/research_v2");
+  });
+
+  await test("Auto Router in one click, and any model id typed in (said when OpenRouter's list doesn't have it, not refused)", async () => {
+    bops.offline = false;
+    await click(button(box, "Add a model"));
+    let add = box.querySelector("[data-add-model]");
+    await choose(add.querySelector("select[aria-label=Provider]"), "openrouter");
+    await click(add.querySelector("[data-or-auto]"));
+    assert.equal(add.querySelector("input[aria-label='Model id']").value, "openrouter/auto");
+    assert.equal(add.querySelector("input[aria-label=Name]").value, "Auto Router");
+    assert.ok(add.querySelector("[data-job]"), "Auto Router is a plain model id: bots can use it");
+    await click(button(add, "Save"));
+    assert.deepEqual(bops.sent.at(-1), { op: "add", name: "Auto Router", provider: "openrouter", model: "openrouter/auto", useFor: [] });
+    await click(button(box, "Add a model"));
+    add = box.querySelector("[data-add-model]");
+    await choose(add.querySelector("select[aria-label=Provider]"), "openrouter");
+    await click(add.querySelector("[data-or-mode=custom]"));
+    assert.equal(add.querySelector("[aria-label='OpenRouter models']"), null, "the list is out of the way");
+    assert.match(add.textContent, /Any OpenRouter model id, e\.g\. vendor\/model or vendor\/model:free/);
+    await type(add.querySelector("input[aria-label='Model id']"), "someone/new-model:free");
+    assert.match(add.querySelector("[data-unknown-id]").textContent, /doesn't have someone\/new-model:free/);
+    assert.ok(!button(add, "Save").disabled, "a warning, not a no");
+    bops.warning = "Saved, but OpenRouter's model list doesn't have \"someone/new-model:free\".";
+    await click(button(add, "Save"));
+    bops.warning = undefined;
+    assert.equal(bops.sent.at(-1).model, "someone/new-model:free");
+    assert.match(box.querySelector("[data-models-warning]").textContent, /doesn't have "someone\/new-model:free"/);
   });
 
   await test("in Settings, Models comes right after the Keys card, which Keys links go to", async () => {

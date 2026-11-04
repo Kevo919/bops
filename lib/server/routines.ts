@@ -1,7 +1,7 @@
 import "server-only";
 import { readlinkSync } from "node:fs";
 import { trackServerEvent } from "./analytics";
-import { botChatId, lastWorkOf, levelIn, live, pausedForOk, workspaceOf, type Bot, type Delivery, type Message, type ReplyDraft, type Routine, type SkillProposal, type RoutineRun, type RoutineSource, type Schedule, type Session } from "@/lib/types";
+import { botChatId, lastWorkOf, levelIn, live, pausedForOk, workspaceOf, type Bot, type BotAgent, type Delivery, type Message, type ReplyDraft, type Routine, type SkillProposal, type RoutineRun, type RoutineSource, type Schedule, type Session } from "@/lib/types";
 import { appNameFor, CHECK_TEMPLATE, tagsOf } from "@/lib/routine-catalog";
 import { draftsText } from "@/lib/reply-drafts";
 import { describeSchedule as describe, EVENT_CHECK_MINUTES, eventWindow, inHours, nextRun, sameWallTime, normalizeSchedule, resolveOnce, validTimeZone, whenText } from "@/cloud/schedule";
@@ -16,6 +16,8 @@ import { startSession } from "./sessions";
 import { addMessage, bot, getState, id, LEFT_BEHIND, ownerName, ownSession, patchSession, RESTARTED, session, startLanded, stateDevice, stateEpoch, stateReady, stateTooNew, update } from "./store";
 import { findSkill, skillRefId } from "./workspace-skills";
 import { awayOver, markSeen } from "./presence";
+import { chatModelOk, chatModels, chatModelLabel } from "@/lib/chat-models";
+import { anyModel, chatOnlyLlm, llms, readyAgents } from "@/lib/agents";
 
 /**
  * Routines and scheduled asks. Each one belongs to a bot. When one comes due it's a reminder (a message
@@ -199,6 +201,24 @@ type RoutineOpts = {
   tags?: string[];
   /** The IANA zone its times are in; unset: the user's. */
   timeZone?: string;
+  /** The model its runs are on (Routine.model): one of lib/chat-models.ts chatModels(); unset: as before. */
+  model?: string;
+};
+
+/**
+ * Why a routine can't be set to `model`, else undefined: it must be a model a chat can be set to (Your LLMs, presets
+ * too, and the built in ones: lib/chat-models.ts chatModels), named by its id ("openrouter/qwen/qwen3-coder-next").
+ */
+export function modelProblem(model: unknown): string | undefined {
+  if (chatModelOk(model)) return undefined;
+  const ids = chatModels().map((m) => m.id);
+  return `"${String(model).slice(0, 130)}" isn't a model Bops has. Pick one of Your LLMs (Settings, Models) or a built in one: ${ids.slice(0, 30).join(", ")}${ids.length > 30 ? ", …" : ""}.`;
+}
+
+/** The routine's model as a person reads it ("Preset: Email writer", "Claude Opus 5.5"), or its id when it's gone from the list. */
+export const routineModelName = (r: Pick<Routine, "model">) => {
+  const m = r.model ? chatModels().find((x) => x.id === r.model) : undefined;
+  return m ? chatModelLabel(m) : r.model;
 };
 
 /**
@@ -219,6 +239,13 @@ export function createRoutine(botId: string, title: string, goal: string, schedu
   if (outside && (schedule?.kind === "every" || schedule?.kind === "before_event" || (schedule && "times" in schedule && (schedule.times?.length ?? 0) > 1)))
     return { error: `Only ${owner} can set up a routine that repeats through the day.` };
   if (outside && opts.deliverTo) return { error: `Only ${owner} can have a routine's results sent by text, email, Slack, Telegram or Discord. Its results stay in this chat.` };
+  // The model its runs are on is the owner's to pick (their keys pay for it): never on someone else's say.
+  if (outside && opts.model) return { error: `Only ${owner} can pick the model a routine runs on.` };
+  const model = opts.model?.trim() || undefined;
+  if (model) {
+    const bad = modelProblem(model);
+    if (bad) return { error: bad };
+  }
   const zone = checkZone(opts.timeZone);
   if (zone.error) return { error: zone.error };
   const tz = zone.timeZone ?? routineZone();
@@ -261,6 +288,8 @@ export function createRoutine(botId: string, title: string, goal: string, schedu
     ...(outside ? { fromOutside: outside.slice(0, 200) } : {}),
     ...(!outside && opts.source ? { source: { app: opts.source.app, template: opts.source.template, ...(opts.source.account ? { account: opts.source.account } : {}) } } : {}),
     ...(!outside && opts.tags?.length ? { tags: [...new Set(opts.tags.map((t) => t.trim()).filter(Boolean))].slice(0, 12) } : {}),
+    // A reminder runs nothing, so it has no model.
+    ...(model && !reminder ? { model } : {}),
   };
   update((st) => st.routines.push(r));
   trackServerEvent("bops_routine_created", {});
@@ -276,7 +305,7 @@ export function createRoutine(botId: string, title: string, goal: string, schedu
  */
 export function editRoutine(
   routineId: string,
-  patch: Partial<Pick<Routine, "title" | "goal" | "schedule" | "quiet" | "deliverTo" | "run" | "procedure" | "where" | "timeZone">>,
+  patch: Partial<Pick<Routine, "title" | "goal" | "schedule" | "quiet" | "deliverTo" | "run" | "procedure" | "where" | "timeZone" | "model">>,
 ): { routine?: Routine; error?: string; moved?: boolean } {
   const r = routine(routineId);
   if (!r) return { error: "No such routine." };
@@ -284,6 +313,13 @@ export function editRoutine(
   if (r.fromOutside && patch.run === "chat") return { error: `It was set up by ${r.fromOutside}, so it runs as a task in the cloud. Make a new routine to run it as a chat.` };
   // And in the cloud: its thread is marked as theirs, which never runs on the user's Mac (sessions.ts StartOptions.outside).
   if (r.fromOutside && patch.where === "mac") return { error: outsideStaysInCloud(r) };
+  // The model is the owner's to pick (their keys pay for it), never one for someone else's routine; undefined clears it.
+  if ("model" in patch && patch.model) {
+    if (r.fromOutside) return { error: `It was set up by ${r.fromOutside}, so it runs as it was set up. Make a new routine to pick its model.` };
+    if (r.reminder) return { error: "A reminder runs nothing, so it has no model." };
+    const bad = modelProblem(patch.model);
+    if (bad) return { error: bad };
+  }
   // And at most once a day: a stranger's routine never repeats through the day (createRoutine).
   if (r.fromOutside && (patch.schedule?.kind === "every" || patch.schedule?.kind === "before_event" || (patch.schedule && "times" in patch.schedule && (patch.schedule.times?.length ?? 0) > 1)))
     return { error: `Only ${ownerName()} can set up a routine that repeats through the day.` };
@@ -338,6 +374,10 @@ export function editRoutine(
     if ("where" in patch) r.where = patch.where;
     if ("deliverTo" in patch) r.deliverTo = patch.deliverTo ?? undefined;
     if ("procedure" in patch) r.procedure = procedure;
+    if ("model" in patch) {
+      if (patch.model) r.model = patch.model;
+      else delete r.model;
+    }
   });
   routineChanged(r.botId);
   liveRoutine(workspaceOf(bot(r.botId)), r.id, "changed");
@@ -632,7 +672,9 @@ async function chatRun(r: Routine, b: Bot, at: number, opts: RunOpts): Promise<R
   try {
     if (onRunner() && !(await runLanded(r.id, at))) return notLanded(at);
     const { backgroundTurn } = await import("./chat");
-    const out = await backgroundTurn(b.id, { routineId: r.id, title: r.title, goal: goalFor(r, at), quiet: !!r.quiet, ...(r.procedure ? { procedureId: r.procedure } : {}) });
+    // On its own model when it has one Bops still has (Routine.model); else as before (the bot's chat's, or Auto).
+    const model = r.model && chatModelOk(r.model) ? r.model : undefined;
+    const out = await backgroundTurn(b.id, { routineId: r.id, title: r.title, goal: goalFor(r, at), quiet: !!r.quiet, ...(r.procedure ? { procedureId: r.procedure } : {}), ...(model ? { model } : {}) });
     if (out.paused) return routine(r.id)?.last ?? { at, status: "running" };
     return await endChatRun(r, b, at, opts, out, before);
   } catch (e) {
@@ -776,6 +818,7 @@ function taskRun(r: Routine, b: Bot, at: number, opts: RunOpts): RoutineRun {
       routineId: r.id,
       ...(r.procedure ? { procedure: r.procedure } : {}),
       ...(r.fromOutside ? { outside: r.fromOutside } : {}),
+      ...taskAgentFor(r, b),
     });
     // Set up by text, before results could go elsewhere: the result is texted back when the thread ends.
     if (r.textTo && !r.deliverTo) patchSession(s.id, { textBack: r.textTo });
@@ -786,6 +829,27 @@ function taskRun(r: Routine, b: Bot, at: number, opts: RunOpts): RoutineRun {
   } catch (e) {
     return record(r.id, { at, status: "failed", error: (e as Error).message });
   }
+}
+
+/**
+ * The agent a routine's task starts on for its model (Routine.model), as New thread with picks one (sessions.ts
+ * StartOptions agents and model): only for one of Your LLMs that bots' agents run (not a preset or Ollama's, which
+ * run chats only), on one of the bot's ready agents that takes any model (OpenCode, DeepSeek Harness). The one on
+ * that very model first, else one of the kind that runs that LLM (its run_by: OpenCode unless it says DeepSeek
+ * Harness), told the model. None of them (a chat-only model, a built in one, a bot with no such agent ready): {},
+ * and the task starts as it did before (its job's agent, or the bot's Default). Someone else's routine never.
+ */
+export function taskAgentFor(r: Pick<Routine, "model" | "fromOutside">, b: Bot, agents?: BotAgent[]): { agents?: string[]; model?: string } {
+  if (!r.model || r.fromOutside) return {};
+  const l = llms().find((x) => `${x.provider}/${x.model}` === r.model);
+  if (!l || chatOnlyLlm(l)) return {};
+  // `agents`: the bot's ready ones (a test gives them).
+  const ready = (agents ?? readyAgents(b, getState())).filter((x) => anyModel(x.kind));
+  const exact = ready.find((x) => x.model === r.model);
+  if (exact) return { agents: [exact.id] };
+  const kind = l.runBy === "dsh" ? "dsh" : "opencode";
+  const other = ready.find((x) => x.kind === kind);
+  return other ? { agents: [other.id], model: r.model } : {};
 }
 
 /**
@@ -1229,6 +1293,7 @@ export function routinesNote(botIds: string[]) {
       r.quiet ? "quiet (posts only when something needs the user)" : "",
       deliverText(r),
       r.procedure ? `follows skill "${findSkill(r.botId, r.procedure)?.name ?? r.procedure}"` : "",
+      r.model ? `runs on ${routineModelName(r)} (${owner} picked it in Bops)` : "",
       r.fromOutside ? `set up by ${r.fromOutside}, not ${owner}` : "",
       r.source ? (r.source.template === CHECK_TEMPLATE ? `checks ${checkWord(r.source)}, as ${owner} picked when connecting it` : `a starter for ${appWord(r.source.app)}`) : "",
       r.tags?.length ? `sorts with tags ${r.tags.join(", ")}` : "",

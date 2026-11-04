@@ -1511,6 +1511,14 @@ export type Routine = {
   source?: RoutineSource;
   /** Tags it sorts what it reads with (the defaults and Workspace.tags), as its bot is told. */
   tags?: string[];
+  /**
+   * The model its runs are on, as a chat's (Chat.model): "provider/model", one of lib/chat-models.ts chatModels() (Your
+   * LLMs, OpenRouter presets too, and the built in ones). A chat run's turn is on it (chat.ts BackgroundJob.model); a
+   * task starts on an agent that runs it when it's one of Your LLMs bots' agents run (routines.ts taskAgentFor), else
+   * as before. Unset: as before (the bot's chat's model, or Auto). Only the owner sets it (app/api/routines, and the
+   * schedule tool on their own turns).
+   */
+  model?: string;
 };
 
 /**

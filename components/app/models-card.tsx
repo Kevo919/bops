@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { post } from "./ui";
 import { BUILTIN_CHAT_MODELS } from "@/lib/chat-models";
+import { isPreset, MODEL_ID, PRESET_ID } from "@/lib/agents";
 
 /*
  * Settings, Models: Your LLMs (config/llms.yaml) as a list, in plain words. Each model has what it's for (its jobs:
@@ -10,7 +11,9 @@ import { BUILTIN_CHAT_MODELS } from "@/lib/chat-models";
  * it, and whether its provider's key is set (only whether: never a key). Add a model picks a provider, then a model
  * (OpenRouter's from its list, searchable), then its jobs. Each job belongs to one model, so picking one another
  * model has moves it, and the card says so. Every change saves at once (app/api/models) and applies without a
- * restart; the file keeps its comments.
+ * restart; the file keeps its comments. For OpenRouter, Add a model also takes one of your presets (the server reads
+ * them on your key: app/api/models/openrouter/presets; a slug typed in only when that list can't be read), any
+ * model id typed in, or the Auto Router in one click.
  */
 
 type Row = {
@@ -55,7 +58,13 @@ type OrModel = {
   outPerM?: number;
 };
 
-const MODEL = /^[A-Za-z0-9._:/-]{1,120}$/;
+/** A model id Bops can write for this provider: a plain one, or for OpenRouter a preset ("@preset/<slug>"). */
+const modelOk = (provider: string, model: string) =>
+  MODEL_ID.test(model) || isPreset(provider, model);
+/** OpenRouter's Auto Router: it picks a model for each message (openrouter.ai/docs, Auto Router). */
+export const AUTO_ROUTER = "openrouter/auto";
+const PRESETS_PAGE = "https://openrouter.ai/settings/presets";
+type OrPreset = { slug: string; name: string; description?: string };
 const pill =
   "shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 disabled:opacity-50";
 const dark = `${pill} bg-ink text-white`;
@@ -88,6 +97,8 @@ export const nameFromOpenRouter = (name: string) =>
 const nameFromId = (id: string) => id.split("/").pop() || id;
 const CHAT_ONLY_NOTE =
   "Chats only: it runs on this server, out of reach of your bots' computers, so it takes no bot jobs.";
+const PRESET_NOTE =
+  "An OpenRouter preset: chats and chat routines run on it. Bots' tasks need a plain model id, so it takes no bot jobs.";
 const price = (m: OrModel) =>
   m.inPerM === undefined
     ? ""
@@ -103,6 +114,7 @@ const moveWords = (moved: Moved[], jobs: JobInfo[], to: string) =>
 
 export function ModelsCard() {
   const [info, setInfo] = useState<Info | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -125,16 +137,18 @@ export function ModelsCard() {
       setBusy(true);
       setError(null);
       setNote(null);
+      setWarning(null);
       try {
         const res = await post("/api/models", op);
         const body = (await res.json().catch(() => null)) as
-          (Info & { moved?: Moved[]; error?: string }) | null;
+          (Info & { moved?: Moved[]; error?: string; warning?: string }) | null;
         if (!res.ok || !body?.llms) {
           setError(body?.error ?? "Couldn't save that change.");
           return false;
         }
         setInfo(body);
         setNote(said(body.moved ?? [], body));
+        if (body.warning) setWarning(body.warning);
         return true;
       } catch {
         setError("Couldn't reach Bops to save that change.");
@@ -192,6 +206,11 @@ export function ModelsCard() {
         {note && (
           <p data-models-note className="text-[12px] text-[#3A3A38]">
             {note}
+          </p>
+        )}
+        {warning && (
+          <p data-models-warning className="text-[12px] text-[#9A5B00]">
+            {warning}
           </p>
         )}
         {adding && (
@@ -369,6 +388,8 @@ function ModelRow({
   const [provider, setProvider] = useState(l.provider);
   const [model, setModel] = useState(l.model);
   const p = info.providers.find((x) => x.id === l.provider);
+  // Chats only: its provider is (Ollama), or it's an OpenRouter preset.
+  const chatOnly = !!p?.chatOnly || isPreset(l.provider, l.model);
   const update = (
     patch: Record<string, unknown>,
     said: (moved: Moved[]) => string,
@@ -381,6 +402,14 @@ function ModelRow({
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-[12.5px] font-medium leading-4">{l.name}</span>
         <span className="text-[12px] text-pencil">{p?.name ?? l.provider}</span>
+        {isPreset(l.provider, l.model) && (
+          <span
+            data-preset-tag
+            className="rounded-full bg-black/[0.05] px-1.5 text-[11px] text-[#3A3A38]"
+          >
+            Preset
+          </span>
+        )}
         <span className="break-all font-mono text-[11px] text-pencil">
           {l.model}
         </span>
@@ -427,7 +456,7 @@ function ModelRow({
           <div className="flex gap-1.5">
             <button
               className={dark}
-              disabled={busy || !name.trim() || !MODEL.test(model)}
+              disabled={busy || !name.trim() || !modelOk(provider, model)}
               onClick={async () => {
                 if (
                   await update(
@@ -455,9 +484,9 @@ function ModelRow({
         </div>
       ) : (
         <>
-          {p?.chatOnly ? (
+          {chatOnly ? (
             <span data-chat-only className="text-[12px] text-pencil">
-              {CHAT_ONLY_NOTE}
+              {isPreset(l.provider, l.model) ? PRESET_NOTE : CHAT_ONLY_NOTE}
             </span>
           ) : (
             <div className="flex flex-wrap items-center gap-2 text-[12px]">
@@ -476,7 +505,7 @@ function ModelRow({
             </div>
           )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px]">
-            {!p?.chatOnly && (
+            {!chatOnly && (
               <label className="flex items-center gap-1.5">
                 <span
                   className="text-pencil"
@@ -517,7 +546,7 @@ function ModelRow({
               />
               Default for new chats
             </label>
-            {!p?.chatOnly && (
+            {!chatOnly && (
               <label
                 className="flex items-center gap-1.5"
                 title="New bots start on this one for tasks no other model is set to take"
@@ -591,7 +620,10 @@ type NewModel = {
   chatDefault?: boolean;
 };
 
-/** Add a model: a provider, then its model (OpenRouter's list, searchable), its name, its jobs; then Save. */
+/**
+ * Add a model: a provider, then its model, its name, its jobs; then Save. For OpenRouter the model is one of four:
+ * from its list (searchable), one of your presets, any model id typed in, or the Auto Router.
+ */
 function AddModel({
   info,
   busy,
@@ -613,6 +645,15 @@ function AddModel({
   const [list, setList] = useState<OrModel[] | null>(null);
   const [offline, setOffline] = useState(false);
   const [search, setSearch] = useState("");
+  // OpenRouter: from its list, a preset of yours, or any id typed in.
+  const [mode, setMode] = useState<"list" | "preset" | "custom">("list");
+  const [presets, setPresets] = useState<{
+    presets: OrPreset[];
+    noKey?: boolean;
+    refused?: boolean;
+    offline?: boolean;
+  } | null>(null);
+  const [slug, setSlug] = useState("");
   useEffect(() => {
     if (provider !== "openrouter" || list) return;
     let live = true;
@@ -628,6 +669,26 @@ function AddModel({
       live = false;
     };
   }, [provider, list]);
+  useEffect(() => {
+    if (provider !== "openrouter" || mode !== "preset" || presets) return;
+    let live = true;
+    fetch("/api/models/openrouter/presets", { cache: "no-store" })
+      .then((x) => (x.ok ? x.json() : { presets: [], offline: true }))
+      .then(
+        (b: {
+          presets?: OrPreset[];
+          noKey?: boolean;
+          refused?: boolean;
+          offline?: boolean;
+        }) => {
+          if (live) setPresets({ ...b, presets: b.presets ?? [] });
+        },
+      )
+      .catch(() => live && setPresets({ presets: [], offline: true }));
+    return () => {
+      live = false;
+    };
+  }, [provider, mode, presets]);
   const found = useMemo(() => {
     if (!list) return [];
     const words = search.toLowerCase().split(/\s+/).filter(Boolean);
@@ -648,7 +709,16 @@ function AddModel({
     setModel(id);
     if (!named) setName(label ?? nameFromId(id));
   };
-  const moving = (p?.chatOnly ? [] : jobs)
+  const pickPreset = (s: string, label?: string) => {
+    setSlug(s);
+    setModel(s ? `@preset/${s}` : "");
+    if (!named) setName(label ?? s);
+  };
+  const or = provider === "openrouter";
+  const preset = isPreset(provider, model);
+  // Chats only: Ollama, or a preset (bots' agents take a plain model id).
+  const chatOnly = !!p?.chatOnly || preset;
+  const moving = (chatOnly ? [] : jobs)
     .map((j) => ({
       job: j,
       owner: info.llms.find((y) => y.useFor?.includes(j)),
@@ -657,7 +727,31 @@ function AddModel({
   const dup = info.llms.some(
     (l) => l.provider === provider && l.model === model,
   );
-  const ready = !!provider && MODEL.test(model) && !!name.trim() && !dup;
+  // A typed id OpenRouter's list (when there is one) doesn't have: said, not refused (the server says so again).
+  const unknown =
+    or &&
+    !preset &&
+    !!model &&
+    MODEL_ID.test(model) &&
+    !!list?.length &&
+    !list.some((m) => m.id === model);
+  const ready = !!provider && modelOk(provider, model) && !!name.trim() && !dup;
+  const tab = (m: typeof mode, label: string) => (
+    <button
+      type="button"
+      data-or-mode={m}
+      aria-pressed={mode === m}
+      onClick={() => {
+        setMode(m);
+        setModel("");
+        setSlug("");
+        if (!named) setName("");
+      }}
+      className={`${chip} ${mode === m ? "bg-ink text-white" : "bg-black/[0.05] text-[#3A3A38] hover:text-ink"}`}
+    >
+      {label}
+    </button>
+  );
   return (
     <div
       data-add-model
@@ -672,6 +766,8 @@ function AddModel({
           onChange={(e) => {
             setProvider(e.target.value);
             setModel("");
+            setSlug("");
+            setMode("list");
             if (!named) setName("");
             setRunBy("opencode");
           }}
@@ -688,7 +784,32 @@ function AddModel({
       {provider && (
         <div className="flex flex-col gap-1 text-[12px]">
           <span className="font-medium">2. Model</span>
-          {provider === "openrouter" && (
+          {or && (
+            <div
+              className="flex flex-wrap items-center gap-1"
+              role="group"
+              aria-label="Kind of OpenRouter model"
+            >
+              {tab("list", "From OpenRouter's list")}
+              {tab("preset", "One of your presets")}
+              {tab("custom", "Any model id")}
+              <button
+                type="button"
+                data-or-auto
+                aria-pressed={model === AUTO_ROUTER}
+                title="OpenRouter picks a model for each message, by what it asks"
+                onClick={() => {
+                  setMode("custom");
+                  setSlug("");
+                  pickModel(AUTO_ROUTER, "Auto Router");
+                }}
+                className={`${chip} ${model === AUTO_ROUTER ? "bg-ink text-white" : "bg-black/[0.05] text-[#3A3A38] hover:text-ink"}`}
+              >
+                Auto Router
+              </button>
+            </div>
+          )}
+          {or && mode === "list" && (
             <>
               {!list && (
                 <span className="text-pencil">
@@ -742,7 +863,7 @@ function AddModel({
                     ))}
                     {!found.length && (
                       <span className="px-2 py-1 text-pencil">
-                        None match. Type the id below if you know it.
+                        None match. Pick &ldquo;Any model id&rdquo; to type it.
                       </span>
                     )}
                   </div>
@@ -750,20 +871,145 @@ function AddModel({
               )}
             </>
           )}
-          <span className="text-pencil">Model id</span>
-          <input
-            type="text"
-            aria-label="Model id"
-            list={suggestions.length ? "models-card-suggestions" : undefined}
-            className={`${field} font-mono`}
-            placeholder={
-              provider === "openrouter"
-                ? "maker/model, like qwen/qwen3-coder-next"
-                : "model id"
-            }
-            value={model}
-            onChange={(e) => pickModel(e.target.value.trim())}
-          />
+          {or && mode === "preset" && (
+            <div data-presets className="flex flex-col gap-1">
+              <span className="text-pencil">
+                A preset is a model with your own instructions and settings,
+                made on OpenRouter at{" "}
+                <a
+                  href={PRESETS_PAGE}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  openrouter.ai/settings/presets
+                </a>
+                . Chats and chat routines can run on it.
+              </span>
+              {!presets && (
+                <span className="text-pencil">Getting your presets…</span>
+              )}
+              {presets?.noKey && (
+                <span data-presets-nokey className="text-pencil">
+                  Add OPENROUTER_API_KEY in Keys to see your presets here, or
+                  type a preset&apos;s slug below.
+                </span>
+              )}
+              {presets?.refused && (
+                <span data-presets-refused className="text-pencil">
+                  OpenRouter turned down your key for the list of presets. Type
+                  a preset&apos;s slug below.
+                </span>
+              )}
+              {presets?.offline && (
+                <span data-presets-offline className="text-pencil">
+                  Couldn&apos;t reach OpenRouter for your presets. Type a
+                  preset&apos;s slug below.
+                </span>
+              )}
+              {presets &&
+                !presets.noKey &&
+                !presets.refused &&
+                !presets.offline &&
+                !presets.presets.length && (
+                  <span data-presets-none className="text-pencil">
+                    You have no presets on OpenRouter yet. Make one at
+                    openrouter.ai/settings/presets, then pick it here.
+                  </span>
+                )}
+              {!!presets?.presets.length && (
+                <div
+                  role="listbox"
+                  aria-label="Your OpenRouter presets"
+                  className="flex max-h-[180px] flex-col overflow-y-auto rounded border border-[#E6E6E3] bg-white"
+                >
+                  {presets.presets.map((x) => (
+                    <button
+                      key={x.slug}
+                      type="button"
+                      role="option"
+                      aria-selected={slug === x.slug}
+                      data-or-preset={x.slug}
+                      onClick={() => pickPreset(x.slug, x.name)}
+                      className={`flex flex-col px-2 py-1 text-left ${slug === x.slug ? "bg-ink text-white" : "hover:bg-[#F2F2F0]"}`}
+                    >
+                      <span className="text-[12px] font-medium">{x.name}</span>
+                      <span
+                        className={`font-mono text-[11px] ${slug === x.slug ? "text-white/80" : "text-pencil"}`}
+                      >
+                        @preset/{x.slug}
+                        {x.description ? ` · ${x.description}` : ""}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Typed in only when the list can't be read (no key, the key turned down, OpenRouter down). */}
+              {(presets?.noKey || presets?.refused || presets?.offline) && (
+                <>
+                  <label className="flex flex-col gap-0.5">
+                    <span className="text-pencil">Preset slug</span>
+                    <input
+                      type="text"
+                      aria-label="Preset slug"
+                      className={`${field} font-mono`}
+                      placeholder="like email-writer"
+                      value={slug}
+                      onChange={(e) =>
+                        pickPreset(
+                          e.target.value.trim().replace(/^@preset\//, ""),
+                        )
+                      }
+                    />
+                  </label>
+                  {slug && !PRESET_ID.test(`@preset/${slug}`) && (
+                    <span className="text-[#B00020]">
+                      A preset&apos;s slug is letters, numbers, - and _ only.
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+          {/* Typed in: under the list too (as before), and on its own for "Any model id". */}
+          {(!or || mode !== "preset") && (
+            <>
+              <span className="text-pencil">
+                {or
+                  ? "Any OpenRouter model id, e.g. vendor/model or vendor/model:free"
+                  : "Model id"}
+              </span>
+              <input
+                type="text"
+                aria-label="Model id"
+                list={
+                  suggestions.length ? "models-card-suggestions" : undefined
+                }
+                className={`${field} font-mono`}
+                placeholder={
+                  or
+                    ? "vendor/model, like qwen/qwen3-coder-next or meta-llama/llama-5:free"
+                    : "model id"
+                }
+                value={model}
+                onChange={(e) => pickModel(e.target.value.trim())}
+              />
+              {or && (
+                <span className="text-pencil">
+                  Find ids at{" "}
+                  <a
+                    href="https://openrouter.ai/models"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    openrouter.ai/models
+                  </a>
+                  .
+                </span>
+              )}
+            </>
+          )}
           {suggestions.length > 0 && (
             <datalist id="models-card-suggestions">
               {suggestions.map((s) => (
@@ -771,9 +1017,15 @@ function AddModel({
               ))}
             </datalist>
           )}
-          {model && !MODEL.test(model) && (
+          {model && !preset && !modelOk(provider, model) && (
             <span className="text-[#B00020]">
               A model id is letters, numbers and . _ : / - only, with no spaces.
+            </span>
+          )}
+          {unknown && (
+            <span data-unknown-id className="text-[#9A5B00]">
+              OpenRouter&apos;s list doesn&apos;t have {model}. You can still
+              save it: check the id if chats on it fail.
             </span>
           )}
           {dup && (
@@ -799,9 +1051,9 @@ function AddModel({
       {provider && (
         <div className="flex flex-col gap-1 text-[12px]">
           <span className="font-medium">3. What it&apos;s for</span>
-          {p?.chatOnly ? (
+          {chatOnly ? (
             <span data-chat-only className="text-pencil">
-              {CHAT_ONLY_NOTE}
+              {preset ? PRESET_NOTE : CHAT_ONLY_NOTE}
             </span>
           ) : (
             <>
@@ -848,8 +1100,8 @@ function AddModel({
               name: name.trim(),
               provider,
               model,
-              useFor: p?.chatOnly ? [] : jobs,
-              ...(runBy !== "opencode" && !p?.chatOnly ? { runBy } : {}),
+              useFor: chatOnly ? [] : jobs,
+              ...(runBy !== "opencode" && !chatOnly ? { runBy } : {}),
               ...(chatDefault ? { chatDefault: true } : {}),
             })
           }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { AppState, Chat } from "@/lib/types";
-import { chatKeyName, chatModels, chatModelShown, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
+import { chatKeyName, chatModelLabel, chatModels, chatModelShown, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
 import type { AgentRoute } from "@/lib/agents";
 import { post } from "./ui";
 // The default for new chats (Settings, Models), named in the box's hint.
@@ -18,19 +18,13 @@ export function ChatModelPick({ state, chat: c, onError }: { state: AppState; ch
   if (state.shared) return null;
   const keys = state.chatKeys ?? {};
   const value = c.model ?? "";
-  // Ollama's models only where it's set up; the chat's own pick stays shown either way.
-  const models = chatModels().filter((m) => m.id === value || chatModelShown(m, keys));
-  const groups = new Map<AgentRoute, ChatModel[]>();
-  for (const m of models) groups.set(m.provider, [...(groups.get(m.provider) ?? []), m]);
-  // One no longer in the list (taken out of config/llms.yaml): still shown, so the box says what the chat is on.
-  const gone = value && !models.some((m) => m.id === value) ? value : null;
-  const current = models.find((m) => m.id === value);
+  const current = chatModels().find((m) => m.id === value);
   // What new chats start on (Settings, Models), for the box's hint; this chat's own pick, or Auto, is what it runs on.
   const fallback = chatDefault(keys);
   return (
     <select
       aria-label="Model for this chat"
-      title={`${current ? `Replies in this chat run on ${current.name}` : "Replies in this chat run on Auto (OpenAI)"}${fallback ? `. Default for new chats: ${fallback.name}` : ""}`}
+      title={`${current ? `Replies in this chat run on ${chatModelLabel(current)}` : "Replies in this chat run on Auto (OpenAI)"}${fallback ? `. Default for new chats: ${fallback.name}` : ""}`}
       value={value}
       disabled={saving}
       onChange={async (e) => {
@@ -48,19 +42,37 @@ export function ChatModelPick({ state, chat: c, onError }: { state: AppState; ch
       }}
       className="h-[30px] max-w-[150px] shrink-0 cursor-pointer truncate rounded-full bg-transparent px-2 text-[12.5px] leading-4 text-[#3A3A38] outline-none hover:bg-[#F2F2F0]"
     >
-      <option value="">Auto (OpenAI)</option>
+      <ChatModelOptions keys={keys} value={value} auto="Auto (OpenAI)" />
+    </select>
+  );
+}
+
+/**
+ * The options of a model picker (the chat's, a routine's): Auto first (`auto`, its words), then Your LLMs (presets
+ * as "Preset: <name>") and the built in ones, by provider, "(no key)" on one whose key isn't set here. Ollama's only
+ * where it's set up. `value`, the pick now, is always there: one taken out of config/llms.yaml since shows by its id.
+ * Read at each render from lib/agents.ts llms(), which the window keeps in step with the state (ui.tsx).
+ */
+export function ChatModelOptions({ keys, value, auto }: { keys: Partial<Record<string, boolean>>; value: string; auto: string }) {
+  const models = chatModels().filter((m) => m.id === value || chatModelShown(m, keys));
+  const groups = new Map<AgentRoute, ChatModel[]>();
+  for (const m of models) groups.set(m.provider, [...(groups.get(m.provider) ?? []), m]);
+  const gone = value && !models.some((m) => m.id === value) ? value : null;
+  return (
+    <>
+      <option value="">{auto}</option>
       {[...groups].map(([provider, list]) => (
         <optgroup key={provider} label={providerName(provider)}>
           {list.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
+            <option key={m.id} value={m.id} {...(m.preset ? { "data-preset": "" } : {})}>
+              {chatModelLabel(m)}
               {keys[provider] ? "" : " (no key)"}
             </option>
           ))}
         </optgroup>
       ))}
       {gone && <option value={gone}>{gone}</option>}
-    </select>
+    </>
   );
 }
 
