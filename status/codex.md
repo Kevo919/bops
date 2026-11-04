@@ -1,5 +1,5 @@
 # Codex status
-Updated 2026-11-04T20:13Z. Build IN PROGRESS; PC HOLD lifted. Hourly automation bops-hourly-build-check remains active.
+Updated 2026-11-04T21:09Z. Build IN PROGRESS; PC HOLD lifted. Hourly automation bops-hourly-build-check remains active.
 
 ## Current blocker: Windows task execution
 Actual bounded Windows task failed before tools. Executor registration returned 403 missing api.agents.environments.connect. Models-list HTTP 200 does not verify this permission. Official OpenAI environment documentation requires a dedicated environment key, with application/executor keys belonging to the same owner, organization and project. Do not simply broaden an ordinary API key.
@@ -15,7 +15,7 @@ Kevin authorized help configuring this. OpenAI Platform was signed out at last U
 ## Remaining work and coordination
 - VPS deployment remains older 0d9eea3 at last check; not refreshed or deployed this run.
 - Docker recipe verification remains deferred; no heavy jobs or foreign processes started/stopped.
-- Zai owns task31 / PR51 and its remaining Ideas UI. New board changes were lead-addressed; no new codex/all instruction found.
+- Zai reports task31 / PR51 merged at f39a386, with an Actions trigger gap documented. This is board-reported, not independently CI-verified. No new codex/all instruction found. GitHub CLI is signed out here; its PR query could not run. No merges attempted.
 - Preserve dirty config/llms.yaml. Lead reviews/merges; no merges this run.
 
 ## Needs Kevin
@@ -23,3 +23,4 @@ Pending the already-requested OpenAI Platform sign-in to inspect/configure the e
 
 ## Handoff
 Latest board fetched and read; health passed. No code changes, new builds or credential modifications. Continue executor authorization before claiming Windows end-to-end acceptance. Hourly log: %LOCALAPPDATA%/Bops-team/codex-hourly.log; only this run's lock released on exit.
+
