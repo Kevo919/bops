@@ -40,6 +40,7 @@ import { appsNote, placesNote } from "./skills";
 import { copySkillsToComputer, countUse, findSkill, skillsFor, skillsIndexNote, skillsNote, skillText } from "./workspace-skills";
 import { appMcp, appsComputerGone, askDeploy, changeCardAfterTask, deployAfterTask, previewAfterTask, readyAppForTask } from "./hosted-apps";
 import { DATA_TOOL_NAMES, DATA_TOOLS, dataNote, dataOn, runDataTool } from "./treg";
+import { REPO_TOOL_NAMES, repoTaskTools, repoTool } from "./repos";
 import { crmNote } from "./crm";
 import { memberWho, memoryBlock, OWNER_WHO, saveToMemory, scopeOf } from "./memory";
 import { soulBlock } from "@/lib/bot-docs";
@@ -3212,6 +3213,8 @@ async function run(sessionId: string) {
               ...(macUi ? [{ type: "mcp", server_label: "mac", allowed_tools: MAC_UI_TOOLS, transport: macUiMcp(folder!), required: false }] : []),
               // Its apps and business data, answered by this Bops (agentTool): a call that needs the user's OK pauses here.
               ...[...(fnApps ? APP_TOOLS(b) : []), ...(fnData ? DATA_TOOLS(b) : [])].map((t) => ({ type: "function", name: t.name, description: t.description, parameters: t.parameters })),
+              // GitHub repos (lib/server/repos.ts): run_repo only on the owner's own thread (never a stranger's or a member's).
+              ...(outside ? [] : repoTaskTools(ownerName(), { run: !others }).map((t) => ({ type: "function", name: t.name, description: t.description, parameters: t.parameters }))),
             ],
             // Orgo threads can split into helpers (subagents), each on a screen of its own; see screen_mcp.py.
             ...(mac ? {} : { multi_agent: { enabled: true, max_concurrent_subagents: MAX_HELPERS } }),
@@ -3579,6 +3582,11 @@ async function agentTool(sessionId: string, botId: string, name: string, args: R
   if (name === "use_app") {
     if (!opts.approved) step(sessionId, name, `used ${String(args.action ?? "an app")}`);
     return runAppAction(botId, String(args.action ?? ""), (args.arguments as Record<string, unknown>) ?? {}, { sessionId }, (args.account as string | null) ?? null, opts);
+  }
+  if (REPO_TOOL_NAMES.has(name)) {
+    const s = session(sessionId);
+    if (!opts.approved) step(sessionId, name, name === "run_repo" ? `asked to run ${String(args.repo_id ?? args.url ?? "a repo")}` : name === "open_repo" ? `opened ${String(args.repo_id ?? args.url ?? "a repo")}` : "checked the repos");
+    return repoTool(botId, name, args, { owner: !othersThread(s, session), threadId: sessionId, approved: opts.approved });
   }
   if (DATA_TOOL_NAMES.has(name)) {
     if (!opts.approved) step(sessionId, name, name === "business_search" ? `looked up ${String(args.job ?? "business data")}` : name === "find_data" ? `looked for "${String(args.query ?? "").slice(0, 60)}" in business data` : `got ${String(args.endpoint_id ?? "data")}`);

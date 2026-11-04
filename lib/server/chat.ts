@@ -45,6 +45,7 @@ import { offerProposal, PROPOSE_TOOL, sealProposals, type ProposeArgs } from "./
 import { createSkill, findSkill, readSkill, skillRefId, skillsNote, skillText, SkillError, updateSkill, READ_SKILL_TOOL } from "./workspace-skills";
 import { linksFor } from "./channels";
 import { changeLookFromChat } from "./look";
+import { REPO_TOOL_NAMES, repoTool, repoToolSpecs } from "./repos";
 import { saveIdea, setGoal } from "./goals";
 import { botMcp, callMcp, mcpNote } from "./mcp";
 import { markSeen } from "./presence";
@@ -859,6 +860,7 @@ const LOOKUPS = new Set([
   "set_goal",
   "save_idea",
   "call_mcp",
+  ...REPO_TOOL_NAMES,
   ...DATA_TOOL_NAMES,
   ...CRM_TOOL_NAMES,
   ...ORBIT_TOOL_NAMES,
@@ -1254,7 +1256,7 @@ const NOT_IN_BACKGROUND = new Set(["react", "schedule", "manage_routine", "watch
 /** All a sample (BackgroundJob.sample) has: finding an app's actions and running the ones that only read. */
 const SAMPLE_TOOLS = new Set(["find_app_actions", "use_app"]);
 
-const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "make_doc", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "set_goal", "save_idea", "create_bot"]);
+const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "create_bot", "open_repo", "run_repo", "make_doc", "set_goal", "save_idea"]);
 
 /**
  * What a member's turn (TurnOptions.member) never has: what sets up or changes what the bots do on their own
@@ -1273,13 +1275,13 @@ const NOT_FROM_MEMBER = new Set(["schedule", "manage_routine", "watch", "stop_wa
  * landed), what keeps files on the owner's Mac (pages, pictures, apps), and work handed to another bot, which may be on
  * another computer. Those wait for the owner's Mac.
  */
-const NOT_ON_RUNNER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "propose_skill_change", "create_bot", "change_look", "make_page", "make_doc", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "hand_off", "ask_teammate"]);
+const NOT_ON_RUNNER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "propose_skill_change", "create_bot", "change_look", "make_page", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "hand_off", "ask_teammate", "run_repo", "make_doc"]);
 /** Tools that only read: calling them is nothing that can't be done twice (turn-context.ts noteActing). */
-const ONLY_READS = new Set(["find_app_actions", "recall", "check_email", "read_email", "web_fetch", "read_skill", "react"]);
+const ONLY_READS = new Set(["find_app_actions", "recall", "check_email", "read_email", "web_fetch", "read_skill", "react", "list_repos", "open_repo", "repo_status"]);
 const notFromMember = (apps: boolean) => (apps ? NOT_FROM_MEMBER : new Set([...NOT_FROM_MEMBER, "make_app", "change_app", "work_on_app", "deploy_app", "local_app"]));
 
 /** Lookups whose answers come from outside Bops: the web, email, apps and data. A turn that read one can't save a skill. */
-const OUTSIDE_READS = new Set(["web_fetch", "check_email", "read_email", "use_app", "call_api", "call_mcp", ...DATA_TOOL_NAMES, ...CRM_TOOL_NAMES, ...ORBIT_TOOL_NAMES]);
+const OUTSIDE_READS = new Set(["web_fetch", "check_email", "read_email", "use_app", "call_api", "open_repo", "repo_status", ...DATA_TOOL_NAMES, ...CRM_TOOL_NAMES, ...ORBIT_TOOL_NAMES, "call_mcp"]);
 
 /** Work the bot starts or passes on, which may open web addresses in its signed-in browser: checked for them (turn's workRefused). */
 const WORK = new Set(["start_task", "hand_off", "tell_task", "create_bot", "work_on_app"]);
@@ -2374,6 +2376,9 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
               summary: { type: "string", description: "One short line saying what changed, shown under the change in the chat (\"Dark green accents, slightly bigger text\")." },
             }),
           ]),
+      // GitHub repos (lib/server/repos.ts): every bot lists, opens and checks them; run_repo only on the owner's own
+      // turn (never someone else's, a member's, a routine's run or a call), and it asks the owner before a plan's first run.
+      ...repoToolSpecs(owner, { run: !(opts.outside || member || bg || opts.call) }).map((t) => fn(t.name, t.description, t.properties)),
     ];
     // A routine's run looks things up and may start a task; it never sets something up or talks in the chat.
     // Someone else's turn never sets up or changes what the bots do on their own.
@@ -2666,6 +2671,8 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
           })
           .catch(failed);
       if (CRM_TOOL_NAMES.has(name)) return runCrmTool(botId, name, a, { chatId }).catch(failed);
+      // A repo run is the owner's own turn's alone; its first run of a plan asks them (NeedsOk), and their yes runs it (`approved`).
+      if (REPO_TOOL_NAMES.has(name)) return repoTool(botId, name, a as Record<string, unknown>, { owner: !(opts.outside || member || bg || opts.call || onBox), chatId, approved }).catch(failed);
       if (ORBIT_TOOL_NAMES.has(name)) return runOrbitTool(botId, name, a, { chatId, routineId: bg?.routineId, readIn: (key) => read.accountsWith(key) }).catch(failed);
       if (name === "ask_teammate") return askTeammate(b, String(a.bot_id ?? ""), String(a.question ?? ""), chatId, asked, member).catch((e: Error) => `Couldn't reach them: ${e.message}`);
       if (name === "web_fetch") {

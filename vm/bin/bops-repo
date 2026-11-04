@@ -1,0 +1,252 @@
+#!/usr/bin/env bash
+# bops-repo: a GitHub repo run on this computer for Bops' Repos section and the bots' run_repo
+# (lib/server/repos.ts). Bops runs it as root through Orgo's bash; nothing else should.
+#
+# Each repo runs as a Linux user of its own (repo-<id>), never root: no sudo, no groups but its own,
+# HOME a fresh temp folder, its working folder /srv/bops-repos/<id>/src (its user's alone), an
+# environment with only PATH, LANG, HOME/TMPDIR and the plain settings Bops passes (never a key),
+# ulimits, and a time limit on every step. Its network is the public internet, its own ports on this
+# computer and DNS: the ports anything else here listens on (the bots' Chrome DevTools, Bops' own
+# services, other repos), private and link-local addresses and the tailnet are refused to it by
+# iptables. Before anything of the repo runs, a probe AS THAT USER checks it can't read the bots'
+# folders (/root, /root/.bops, the agents' and Chrome profiles' folders, /workspace), can't reach
+# the Docker socket or an X display, and can't connect to the ports it was refused; anything else
+# fails the run closed (BOPS_REPO_FAIL=...).
+#
+#   bops-repo prepare <id> <user> <ports csv|->      user, folders, a fresh HOME, firewall, probe
+#   bops-repo reset <id> <user>                      an empty working folder (src)
+#   bops-repo chunk <id> <n>                         base64 on stdin: part n of a private repo's tarball
+#   bops-repo unpack <id> <user> <sha256>            the tarball checked and unpacked into src, as the user
+#   bops-repo begin <id> <user> <name> <secs> <env b64|-> <command b64>
+#                                                    a step, detached, as the user, in src
+#   bops-repo poll <id> <name>                       BOPS_REPO_POLL running|exit=<n>, then its last lines
+#   bops-repo http <port> <path b64>                 BOPS_REPO_HTTP=<status> from http://127.0.0.1:<port><path>
+#   bops-repo status <id> <user>                     BOPS_REPO_STATUS procs=<n>, then the run's last lines
+#   bops-repo stop <id> <user>                       every process of the user ended
+#
+# Answers are lines starting BOPS_REPO_; a tail is base64 on a BOPS_REPO_TAIL= line. What Bops keeps
+# here is root's alone: /root/.bops/repos/<id>/ (logs, exit codes, the HOME in use).
+set -uo pipefail
+umask 077
+BOPS_REPO_VERSION=1
+BASE=${BOPS_REPO_BASE:-/srv/bops-repos}
+KEEP=${BOPS_REPO_KEEP:-/root/.bops/repos}
+
+fail() {
+  echo "BOPS_REPO_FAIL=$1"
+  [ -n "${2:-}" ] && echo "BOPS_REPO_WHY=$(printf %s "$2" | base64 -w0)"
+  exit 1
+}
+[ "$(id -u)" = 0 ] || fail not-root
+CMD=${1:-}
+ID=${2:-}
+[[ "$ID" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]] || fail bad-id
+DIR="$BASE/$ID"
+SRC="$DIR/src"
+K="$KEEP/$ID"
+mkdir -p "$KEEP" "$K" && chmod 700 "$KEEP" "$K"
+
+user_ok() { [[ "$1" =~ ^repo-[a-z0-9][a-z0-9-]{0,26}$ ]] || fail bad-user; }
+tail_of() { [ -f "$1" ] && echo "BOPS_REPO_TAIL=$(tail -c 4000 "$1" | base64 -w0)"; }
+
+# The environment a step gets: nothing of root's, only these and the plain settings Bops passed.
+envv() {
+  local h; h=$(cat "$K/home" 2>/dev/null) || fail no-home "Prepare it first."
+  local node; node=$(command -v node 2>/dev/null || true)
+  local extra=""
+  [ -n "$node" ] && extra=":$(dirname "$node")"
+  ENVV=("PATH=$h/.npm-global/bin:$h/.local/bin:/usr/local/bin:/usr/bin:/bin$extra" "LANG=C.UTF-8" "HOME=$h" "TMPDIR=$h/tmp"
+    "NPM_CONFIG_PREFIX=$h/.npm-global" "npm_config_update_notifier=false" "PIP_DISABLE_PIP_VERSION_CHECK=1"
+    "GIT_TERMINAL_PROMPT=0" "GIT_CONFIG_NOSYSTEM=1" "GIT_CONFIG_GLOBAL=/dev/null")
+  if [ -n "${1:-}" ] && [ "$1" != - ]; then
+    local line
+    while IFS= read -r line || [ -n "$line" ]; do
+      [ -z "$line" ] && continue
+      [[ "$line" =~ ^[A-Z_][A-Z0-9_]{0,63}=[^[:cntrl:]]*$ ]] || fail bad-env
+      case "${line%%=*}" in PATH|HOME|TMPDIR|LD_PRELOAD|LD_LIBRARY_PATH|BASH_ENV|ENV|*KEY*|*TOKEN*|*SECRET*|*PASSWORD*) fail bad-env "${line%%=*}" ;; esac
+      ENVV+=("$line")
+    done < <(printf %s "$1" | base64 -d)
+  fi
+}
+
+# One command as the repo's user, in src, under its limits (stdin closed).
+as_user() { # <user> <secs> <command>
+  runuser -u "$1" -- env -i "${ENVV[@]}" timeout --kill-after=15 "$2" bash -c '
+    ulimit -c 0; ulimit -u 2048 2>/dev/null; ulimit -n 8192 2>/dev/null; ulimit -f 8388608 2>/dev/null
+    cd "$1" || exit 97
+    exec bash -c "$2"' bash "$SRC" "$3" < /dev/null
+}
+
+# The firewall for the user: the ports others listen on here, private ranges and the tailnet are refused.
+FWFAIL=0
+ipt() { "$@" 2>/dev/null || FWFAIL=1; }
+firewall() { # <user> <ports csv>
+  local u=$1 own=$2 chain t
+  chain="BOPS-$(printf %s "$u" | sha1sum | cut -c1-20)"
+  for t in iptables ip6tables; do
+    "$t" -w -N "$chain" 2>/dev/null || true
+    "$t" -w -F "$chain" || fail firewall "$t couldn't set up its rules."
+    "$t" -w -C OUTPUT -m owner --uid-owner "$u" -j "$chain" 2>/dev/null || "$t" -w -I OUTPUT 1 -m owner --uid-owner "$u" -j "$chain" || fail firewall "$t couldn't add its rule."
+    # Its own ports on this computer, and DNS.
+    local p
+    for p in ${own//,/ }; do ipt "$t" -w -A "$chain" -p tcp -m addrtype --dst-type LOCAL --dport "$p" -j RETURN; done
+    ipt "$t" -w -A "$chain" -p udp --dport 53 -j RETURN
+    ipt "$t" -w -A "$chain" -p tcp -m addrtype --dst-type LOCAL --dport 53 -j RETURN
+  done
+  # Every port anything not its own listens on now, and Bops' own ranges (Chrome DevTools, the home screen, screens).
+  local ports
+  ports=$( { ss -Htlnpe 2>/dev/null | awk -v uid="$(id -u "$u")" '{ if ($0 !~ ("uid:" uid " ")) { n=split($4, a, ":"); print a[n] } }'; ss -Hulnpe 2>/dev/null | awk -v uid="$(id -u "$u")" '{ if ($0 !~ ("uid:" uid " ")) { n=split($4, a, ":"); print a[n] } }'; } | grep -E '^[0-9]+$' | grep -vx 53 | sort -un)
+  for p in $ports; do
+    case ",$own," in *",$p,"*) continue ;; esac
+    ipt iptables -w -A "$chain" -m addrtype --dst-type LOCAL -p tcp --dport "$p" -j REJECT
+    ipt iptables -w -A "$chain" -m addrtype --dst-type LOCAL -p udp --dport "$p" -j REJECT
+    ipt ip6tables -w -A "$chain" -m addrtype --dst-type LOCAL -p tcp --dport "$p" -j REJECT
+    ipt ip6tables -w -A "$chain" -m addrtype --dst-type LOCAL -p udp --dport "$p" -j REJECT
+  done
+  for r in 5900:6099 7600:7699 9200:9399; do
+    ipt iptables -w -A "$chain" -m addrtype --dst-type LOCAL -p tcp --dport "$r" -j REJECT
+    ipt ip6tables -w -A "$chain" -m addrtype --dst-type LOCAL -p tcp --dport "$r" -j REJECT
+  done
+  for n in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 100.64.0.0/10; do ipt iptables -w -A "$chain" -d "$n" -j REJECT; done
+  for n in fc00::/7 fe80::/10; do ipt ip6tables -w -A "$chain" -d "$n" -j REJECT; done
+  [ "$FWFAIL" = 0 ] || fail firewall "A rule couldn't be added (iptables' owner or addrtype match missing?)."
+  echo "$ports" | tr '\n' ',' > "$K/refused-ports"
+}
+
+# The probe, as the user: anything it can reach that it shouldn't fails the run closed.
+probe() { # <user>
+  local u=$1 out
+  out=$(runuser -u "$u" -- env -i PATH=/usr/bin:/bin HOME=/nonexistent python3 -I - "$(cat "$K/refused-ports" 2>/dev/null)" <<'PY' 2>&1
+import os, socket, sys, glob
+bad = []
+for p in ["/root", "/root/.bops", "/root/.bops/agents", "/root/.bops/bots", "/root/profiles", "/root/.env", "/workspace", "/workspace/apps", "/etc/shadow"]:
+    try:
+        if os.path.isdir(p): os.listdir(p)
+        else: open(p, "rb").close()
+        bad.append("reads " + p)
+    except FileNotFoundError: pass
+    except PermissionError: pass
+for s in ["/var/run/docker.sock", "/run/docker.sock"]:
+    try:
+        c = socket.socket(socket.AF_UNIX); c.settimeout(2); c.connect(s); c.close(); bad.append("connects to " + s)
+    except OSError: pass
+def x11(addr):
+    try:
+        c = socket.socket(socket.AF_UNIX); c.settimeout(2); c.connect(addr)
+        c.sendall(b"l\x00\x0b\x00\x00\x00\x00\x00\x00\x00\x00\x00")
+        r = c.recv(1); c.close(); return r == b"\x01"
+    except OSError: return False
+for s in glob.glob("/tmp/.X11-unix/X*"):
+    if x11(s) or x11("\0" + s): bad.append("opens the X display " + s)
+for n in range(0, 10):
+    if x11("\0/tmp/.X11-unix/X%d" % (99 + n)) or x11("\0/tmp/.X11-unix/X%d" % n): bad.append("opens an X display")
+ports = [p for p in sys.argv[1].split(",") if p.isdigit()][:40] + ["9299", "9300", "7600"]
+for p in ports:
+    try:
+        c = socket.create_connection(("127.0.0.1", int(p)), timeout=2); c.close(); bad.append("connects to port " + p)
+    except OSError: pass
+print("BOPS_PROBE=" + ("ok" if not bad else "; ".join(sorted(set(bad)))))
+PY
+)
+  case "$out" in *BOPS_PROBE=ok*) return 0 ;; esac
+  local why; why=$(printf %s "$out" | grep -m1 '^BOPS_PROBE=' | sed 's/^BOPS_PROBE=//')
+  fail unsafe "${why:-the safety check did not run}"
+}
+
+case "$CMD" in
+  prepare)
+    U=${3:-}; user_ok "$U"; PORTS=${4:--}
+    [ "$PORTS" = - ] && PORTS=""
+    [[ -z "$PORTS" || "$PORTS" =~ ^[0-9]{1,5}(,[0-9]{1,5}){0,7}$ ]] || fail bad-ports
+    for t in runuser iptables ip6tables ss python3 git tar timeout curl base64 sha256sum useradd pkill; do
+      command -v "$t" >/dev/null 2>&1 || fail missing-tool "$t"
+    done
+    if ! id "$U" >/dev/null 2>&1; then
+      useradd --system --user-group --home-dir /nonexistent --no-create-home --shell /usr/sbin/nologin "$U" || fail no-user "useradd failed."
+    fi
+    [ "$(id -nG "$U")" = "$U" ] || fail no-user "$U is in other groups: $(id -nG "$U")"
+    [ "$(id -u "$U")" != 0 ] || fail no-user
+    mkdir -p "$BASE" && chown root:root "$BASE" && chmod 711 "$BASE"
+    mkdir -p "$DIR" && chown "$U:$U" "$DIR" && chmod 700 "$DIR"
+    # A fresh HOME for this run: the old one goes.
+    old=$(cat "$K/home" 2>/dev/null || true)
+    [ -n "$old" ] && [[ "$old" == /tmp/bops-repo-* ]] && rm -rf -- "$old"
+    H=$(mktemp -d "/tmp/bops-repo-$ID.XXXXXX") || fail no-home
+    mkdir -p "$H/tmp" && chown -R "$U:$U" "$H" && chmod 700 "$H"
+    echo "$H" > "$K/home"
+    rm -f "$K"/*.exit "$K"/*.log "$K"/tgz.*
+    firewall "$U" "$PORTS"
+    probe "$U"
+    echo "BOPS_REPO_READY=1"
+    ;;
+  reset)
+    U=${3:-}; user_ok "$U"
+    pkill -KILL -u "$U" 2>/dev/null; sleep 1
+    rm -rf -- "$SRC" && mkdir -p "$SRC" && chown "$U:$U" "$SRC" && chmod 700 "$SRC" || fail reset
+    echo "BOPS_REPO_RESET=1"
+    ;;
+  chunk)
+    N=${3:-}; [[ "$N" =~ ^[0-9]{1,5}$ ]] || fail bad-chunk
+    [ "$N" = 0 ] && rm -f "$K"/tgz.*
+    base64 -d > "$K/tgz.part" || fail bad-chunk
+    cat "$K/tgz.part" >> "$K/tgz.all" && rm -f "$K/tgz.part"
+    echo "BOPS_REPO_CHUNK=$N $(stat -c %s "$K/tgz.all")"
+    ;;
+  unpack)
+    U=${3:-}; user_ok "$U"; SUM=${4:-}
+    [[ "$SUM" =~ ^[0-9a-f]{64}$ ]] || fail bad-sum
+    [ "$(sha256sum "$K/tgz.all" | cut -c1-64)" = "$SUM" ] || { rm -f "$K"/tgz.*; fail bad-sum "The archive didn't arrive whole."; }
+    install -o "$U" -g "$U" -m 600 "$K/tgz.all" "$DIR/src.tgz" && rm -f "$K"/tgz.*
+    envv -
+    # Unpacked as the repo's user: whatever the archive holds can't write anywhere that user can't.
+    runuser -u "$U" -- env -i "${ENVV[@]}" timeout 600 tar -xzf "$DIR/src.tgz" --strip-components=1 --no-same-owner --no-same-permissions -C "$SRC" > "$K/unpack.log" 2>&1
+    rc=$?
+    rm -f "$DIR/src.tgz"
+    [ "$rc" = 0 ] || { tail_of "$K/unpack.log"; fail unpack; }
+    echo "BOPS_REPO_UNPACKED=1"
+    ;;
+  begin)
+    U=${3:-}; user_ok "$U"; NAME=${4:-}; SECS=${5:-}; ENVB=${6:--}; CMDB=${7:-}
+    [[ "$NAME" =~ ^[a-z][a-z0-9-]{0,20}$ ]] || fail bad-name
+    [[ "$SECS" =~ ^[0-9]{1,6}$ ]] || fail bad-time
+    C=$(printf %s "$CMDB" | base64 -d) || fail bad-command
+    [ -n "$C" ] || fail bad-command
+    envv "$ENVB"
+    rm -f "$K/$NAME.exit" "$K/$NAME.log"
+    # Detached (this script again, as _run): Bops polls it, so no Orgo call waits on a long install.
+    setsid nohup "$0" _run "$ID" "$U" "$NAME" "$SECS" "$ENVB" "$CMDB" > /dev/null 2>&1 < /dev/null &
+    echo "BOPS_REPO_BEGUN=$NAME"
+    ;;
+  _run)
+    U=${3:-}; user_ok "$U"; NAME=${4:-}; SECS=${5:-}; ENVB=${6:--}; C=$(printf %s "${7:-}" | base64 -d)
+    [[ "$NAME" =~ ^[a-z][a-z0-9-]{0,20}$ ]] || fail bad-name
+    envv "$ENVB"
+    as_user "$U" "$SECS" "$C" > "$K/$NAME.log" 2>&1
+    echo $? > "$K/$NAME.exit"
+    ;;
+  poll)
+    NAME=${3:-}; [[ "$NAME" =~ ^[a-z][a-z0-9-]{0,20}$ ]] || fail bad-name
+    if [ -f "$K/$NAME.exit" ]; then echo "BOPS_REPO_POLL=exit=$(cat "$K/$NAME.exit")"; else echo "BOPS_REPO_POLL=running"; fi
+    tail_of "$K/$NAME.log"
+    ;;
+  http)
+    PORT=$ID; P=$(printf %s "${3:-Lw==}" | base64 -d)
+    [[ "$PORT" =~ ^[0-9]{1,5}$ ]] || fail bad-port
+    [[ "$P" =~ ^/[A-Za-z0-9._~/?=\&%-]*$ ]] || fail bad-path
+    echo "BOPS_REPO_HTTP=$(curl -s -o /dev/null -m 5 --noproxy '*' -w '%{http_code}' "http://127.0.0.1:$PORT$P" 2>/dev/null || echo 000)"
+    ;;
+  status)
+    U=${3:-}; user_ok "$U"
+    n=0; id "$U" >/dev/null 2>&1 && n=$(pgrep -u "$U" 2>/dev/null | wc -l)
+    echo "BOPS_REPO_STATUS procs=$n"
+    tail_of "$K/run.log"
+    ;;
+  stop)
+    U=${3:-}; user_ok "$U"
+    if id "$U" >/dev/null 2>&1; then
+      pkill -TERM -u "$U" 2>/dev/null; sleep 2; pkill -KILL -u "$U" 2>/dev/null
+    fi
+    echo "BOPS_REPO_STOPPED=1"
+    ;;
+  *) fail usage ;;
+esac

@@ -17,6 +17,7 @@ import { BotBrowser, WatchChip } from "./bot-browser";
 import { ChatEdge, gridColumns, storedChatWidth } from "./chat-edge";
 import { LookStyle } from "./look-style";
 import { LookSettings } from "./look-settings";
+import { ReposSection } from "./repos";
 import { BotComputers } from "./bot-computers";
 import { BrainSettings } from "./brains";
 import { CallBar } from "./call-bar";
@@ -1886,7 +1887,7 @@ function WhereBotsWork({ state }: { state: AppState }) {
 }
 
 /** Settings' places: Account (yours, in every workspace), then Workspace (the one open now), then Orgo's team's own. */
-export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains" | "look";
+export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains" | "look" | "repos";
 
 /** A place in Settings' nav: its name, its glyph, and a quiet value on the right. */
 type NavItem = { id: SettingsPane; name: string; icon: React.ReactNode; value?: string | number };
@@ -1913,6 +1914,7 @@ const GLYPHS: Record<SettingsPane, string> = {
   apps: "M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9h4.5v4.5H2.5zM9 9h4.5v4.5H9z",
   domains: "M8 14a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14M8 2C6.2 3.7 5.4 5.7 5.4 8s.8 4.3 2.6 6",
   look: "M8 2.5a5.5 5.5 0 0 0 0 11C9.4 13.5 10.5 12.4 10.5 11c0-1-.8-1.8-1.8-1.8 1 0 1.8-.8 1.8-1.8S10.7 5.6 9.7 5.6C10.7 5.6 11.5 4.8 11.5 3.8 11.5 3.1 10 2.5 8 2.5zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
+  repos: "M3 3.5h4l1.2 1.5H13v7.5H3zM6 8.2l-1.3 1.3L6 10.8M10 8.2l1.3 1.3-1.3 1.3",
 };
 
 /** A pane's title and what it's for, above what it holds. */
@@ -2103,7 +2105,7 @@ export function Settings({
   // An Admin of a shared workspace has its Team too (who's in: lib/server/shared-people.ts); never its chart or email.
   const adminHere = state.shared?.role === "admin";
   // The look is the owner's own window (never a shared workspace's): its pane is theirs alone too.
-  const fits = (p?: SettingsPane) => !!p && (p !== "domains" || domains) && (p !== "apps" || apps) && (p !== "look" || !state.shared) && (!state.shared || ((p !== "team" || adminHere) && p !== "chart" && p !== "email"));
+  const fits = (p?: SettingsPane) => !!p && (p !== "domains" || domains) && (p !== "apps" || apps) && (p !== "look" || !state.shared) && (p !== "repos" || !state.shared) && (!state.shared || ((p !== "team" || adminHere) && p !== "chart" && p !== "email"));
   const [pane, setPane] = useState<SettingsPane>(fits(at) ? at! : "profile");
   const [was, setWas] = useState(`${at}:${atAt}`);
   if (was !== `${at}:${atAt}`) {
@@ -2150,6 +2152,8 @@ export function Settings({
     item("bots", "Bots", { value: team.length || undefined }),
     item("logins", "Logins", { value: logins || undefined }),
     ...(!shared ? [item("email", "Email and phone")] : []),
+    // GitHub repos the bots can run on their computers (lib/server/repos.ts): the owner's own, never a shared workspace's.
+    ...(!shared ? [item("repos", "Repos")] : []),
   ];
   const team_: NavItem[] = [...(apps ? [item("apps", APPS_NAME)] : []), ...(domains ? [item("domains", "Domains")] : [])];
   const navRow = (x: NavItem) => (
@@ -2251,6 +2255,13 @@ export function Settings({
       <>
         <PaneHead title="Look" sub="How this window looks. Ask a bot in the chat to change it too." />
         <LookSettings state={state} />
+      </>
+    );
+  else if (pane === "repos" && !shared)
+    body = (
+      <>
+        <PaneHead title="Repos" sub="Ready to run GitHub repos. Run one on a bot's computer with a click, and every bot can use them." />
+        <ReposSection />
       </>
     );
   else if (pane === "mac")
