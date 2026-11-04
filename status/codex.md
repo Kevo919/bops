@@ -1,5 +1,5 @@
 # Codex status
-Updated 2026-11-04T21:09Z. Build IN PROGRESS; PC HOLD lifted. Hourly automation bops-hourly-build-check remains active.
+Updated 2026-11-04T22:10Z. Build IN PROGRESS; PC HOLD lifted. Hourly automation bops-hourly-build-check remains active.
 
 ## Current blocker: Windows task execution
 Actual bounded Windows task failed before tools. Executor registration returned 403 missing api.agents.environments.connect. Models-list HTTP 200 does not verify this permission. Official OpenAI environment documentation requires a dedicated environment key, with application/executor keys belonging to the same owner, organization and project. Do not simply broaden an ordinary API key.
@@ -23,4 +23,7 @@ Pending the already-requested OpenAI Platform sign-in to inspect/configure the e
 
 ## Handoff
 Latest board fetched and read; health passed. No code changes, new builds or credential modifications. Continue executor authorization before claiming Windows end-to-end acceptance. Hourly log: %LOCALAPPDATA%/Bops-team/codex-hourly.log; only this run's lock released on exit.
+
+
+Latest coordination: zai reports PR44/45/40 merged and owns PR35/38 verification. Those changes are not claimed deployed on this PC: health remains P_S193HxhsD_-o438kaUj. No new codex/all message or executor-login confirmation. Avoid concurrent test matrices while zai verifies.
 
