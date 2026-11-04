@@ -1,4 +1,7 @@
+import { computerWords } from "@/lib/computer-words";
 import "server-only";
+import { monitorExecutor } from "./executor-lifecycle";
+import { agentApiPath } from "./agent-api-path";
 import { execFile, execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -223,9 +226,9 @@ export const browserMcp = (port: number, dir: string) => {
   // Windows has no /usr/bin/env to set them with: the blocked origins go as Playwright's own flag, and
   // its sockets are named pipes there, which have no path-length limit to work around.
   if (onWindows)
-    return { type: "stdio", command: process.execPath, args: [...args, "--blocked-origins", blocked.slice(blocked.indexOf("=") + 1)], cwd: join(dir, "workspace") };
+    return { type: "stdio", command: process.execPath, args: [...args, "--blocked-origins", blocked.slice(blocked.indexOf("=") + 1)], cwd: agentApiPath(join(dir, "workspace")) };
   const env = [`PWTEST_SOCKETS_DIR=${taskSockets(dir)}`, blocked, ...(asNode ? ["ELECTRON_RUN_AS_NODE=1"] : [])];
-  return { type: "stdio", command: "/usr/bin/env", args: [...env, process.execPath, ...args], cwd: join(dir, "workspace") };
+  return { type: "stdio", command: "/usr/bin/env", args: [...env, process.execPath, ...args], cwd: agentApiPath(join(dir, "workspace")) };
 };
 
 /**
@@ -279,7 +282,7 @@ export const macUiMcp = (dir: string) => ({
   type: "stdio",
   command: "/usr/bin/env",
   args: [...(asNode ? ["ELECTRON_RUN_AS_NODE=1"] : []), process.execPath, macUiScript(), "--cua", CUA_DRIVER],
-  cwd: join(dir, "workspace"),
+  cwd: agentApiPath(join(dir, "workspace")),
 });
 
 /** What the executor's environment keeps of the server's: nothing secret, nothing that only makes the server run. */
@@ -344,9 +347,9 @@ export function prepareTaskDir(sessionId: string, dir = taskDir(sessionId), keep
  * writeSkillFiles), fresh each run, so Codex finds them as skills. A folder it can't write costs the task nothing.
  */
 export async function startExecutor(sessionId: string, envId: string, remoteUrl: string, port: number, dir = taskDir(sessionId), fullAccess = false, botId?: string, keep = false): Promise<ChildProcess> {
-  if (!fullAccess && !onWindows && !existsSync(SANDBOX_EXEC)) throw new Error("this Mac has no sandbox for bots (/usr/bin/sandbox-exec)");
+  if (!fullAccess && !onWindows && !existsSync(SANDBOX_EXEC)) throw new Error(computerWords("this Mac has no sandbox for bots (/usr/bin/sandbox-exec)", process.platform));
   const codex = findCodex();
-  if (!codex) throw new Error("the Codex CLI isn't on this Mac yet");
+  if (!codex) throw new Error(computerWords("the Codex CLI isn't on this Mac yet", process.platform));
   prepareTaskDir(sessionId, dir, keep);
   if (botId)
     try {
@@ -362,26 +365,7 @@ export async function startExecutor(sessionId: string, envId: string, remoteUrl:
     fullAccess,
   });
   const child = spawn(run.command, run.args, { cwd: run.cwd, env: run.env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
-  return new Promise((resolve, reject) => {
-    let log = "";
-    const onData = (d: Buffer) => {
-      log += d.toString();
-      if (/error/i.test(log)) {
-        child.kill();
-        reject(new Error(`executor failed: ${log.slice(0, 200)}`));
-      }
-    };
-    child.stdout.on("data", onData);
-    child.stderr.on("data", onData);
-    child.on("error", reject);
-    child.on("exit", (code) => reject(new Error(`executor exited (${code}): ${log.slice(0, 200)}`)));
-    // Mirrors the Orgo path: no error within a few seconds means it connected.
-    setTimeout(() => {
-      child.stdout.off("data", onData);
-      child.stderr.off("data", onData);
-      resolve(child);
-    }, 3000);
-  });
+  return monitorExecutor(child);
 }
 
 /**

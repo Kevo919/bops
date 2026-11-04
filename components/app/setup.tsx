@@ -1,5 +1,7 @@
 "use client";
 
+import { useComputerWords } from "./computer-words";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BRAINS_ON, signInOn, workBot, workspaceOf, type AppState, type Bot, type BotAi } from "@/lib/types";
 import { aiOf, accountOf, paysLabel } from "@/lib/agents";
@@ -12,6 +14,7 @@ import { post, teamOf, useSelfHosted } from "./ui";
 import { UpdateSettings } from "./update-notice";
 import type { KeyCheckResult } from "@/lib/server/key-check";
 import { ModelsCard } from "./models-card";
+import { ConnectionsCard } from "./connections-card";
 import { HandyCard } from "./handy-card";
 
 /*
@@ -35,34 +38,38 @@ import { HandyCard } from "./handy-card";
 
 /** The local official CLIs keep their own logins; cloud accounts remain computer-specific. */
 export function AiSubscriptionsCard({ state, onShowScreen, onOpenVault }: { state: AppState; onShowScreen: (botId: string, display: number) => void; onOpenVault: () => void }) {
+  const computerWords = useComputerWords();
   const selfHosted = useSelfHosted();
+  const desktop = useMacApp();
+  const localAvailable = selfHosted && desktop;
   const [target, setTarget] = useState<"pc" | "cloud">("pc");
+  const localSelected = localAvailable && target === "pc";
   const bots = teamOf(state).filter((b) => state.host !== "mac" && b.runsOn !== "mac");
   const [selected, setSelected] = useState("");
   const b = bots.find((x) => x.id === selected) ?? bots[0];
-  const keys = useVaultKeyNames(b ? workspaceOf(b) : "", target === "cloud" && BRAINS_ON && !!b && !state.shared);
+  const keys = useVaultKeyNames(b ? workspaceOf(b) : "", !localSelected && BRAINS_ON && !!b && !state.shared);
   if (state.shared) return null;
   return (
     <section aria-label="AI subscriptions" className="mx-[22px] mt-4 flex shrink-0 flex-col gap-3 rounded-2xl bg-[#FAFAF9] p-4 shadow-[0_0_0_1px_#E6E6E3]">
       <h2 className="text-[15px] font-semibold">AI subscriptions</h2>
       <div role="group" aria-label="Where to connect subscriptions" className="flex flex-wrap gap-2">
-        <button type="button" aria-pressed={target === "pc"} onClick={() => setTarget("pc")} className={target === "pc" ? dark : light}>This PC</button>
-        <button type="button" aria-pressed={target === "cloud"} onClick={() => setTarget("cloud")} className={target === "cloud" ? dark : light}>Bot cloud computer</button>
+        {localAvailable && <button type="button" aria-pressed={localSelected} onClick={() => setTarget("pc")} className={localSelected ? dark : light}>This PC</button>}
+        <button type="button" aria-pressed={!localSelected} onClick={() => setTarget("cloud")} className={!localSelected ? dark : light}>Bot cloud computer</button>
       </div>
-      {target === "pc" ? <>
+      {localSelected ? <>
         <p className="text-[12px] leading-5 text-[#6B6B6B]">Sign in through the official CLI in your normal browser. Its login stays on this PC across restarts. No bot computer or AI profile is needed to connect. Tasks with your plan run on a bot&apos;s cloud computer; tasks on this PC are coming later.</p>
         <LocalSubscriptions />
         <div className="rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]"><h3 className="font-semibold">z.ai GLM Coding Plan</h3><p className="my-2">Connect with a key from your Coding Plan account in Keys. This is not a browser sign-in; a saved Z.ai key alone does not verify a subscription.</p><button type="button" onClick={onOpenVault} className={light}>Manage Coding Plan key</button></div>
       </> : <>
         <p className="text-[12px] leading-5 text-[#6B6B6B]">Cloud subscriptions power tasks on the selected bot&apos;s computer. Sign-in opens on that computer&apos;s screen. This does not connect the subscription on your PC.</p>
-        {!BRAINS_ON ? <p role="status" className="text-[12px]">Cloud agent harnesses are off in this build. Enable Agent harnesses in Settings → This Mac → Modules, then rebuild Bops. Local subscription sign-in is available on the This PC tab.</p> : <>
+        {!BRAINS_ON ? <p role="status" className="text-[12px]">{computerWords("Cloud agent harnesses are off in this build. Enable Agent harnesses in Settings → This Mac → Modules, then rebuild Bops.")} {localAvailable ? "Local subscription sign-in is available on the This PC tab." : "Local subscription sign-in is available in the self-hosted desktop app."}</p> : <>
           <label className="flex flex-wrap items-center gap-2 text-[12px]">Connect on
             <select aria-label="Subscription bot and computer" value={b?.id ?? ""} disabled={!b} onChange={(e) => setSelected(e.target.value)} className="min-w-0 max-w-full rounded-lg border border-[#E6E6E3] bg-white p-2">
               {!b && <option value="">No cloud bot available</option>}
               {bots.map((bot) => <option key={bot.id} value={bot.id}>{bot.name} · {workBot(bot, state.bots).computerId ? `${workBot(bot, state.bots).name}'s computer` : "computer will be set up when you sign in"}</option>)}
             </select>
           </label>
-          {!b && <p className="text-[12px]">No bot is set to work on a cloud computer. Connect on This PC, or change where your bot works first.</p>}
+          {!b && <p className="text-[12px]">No bot is set to work on a cloud computer. {localAvailable ? "Connect on This PC, or change where your bot works first." : "Change where your bot works first."}</p>}
           {(["claude", "codex", "zai"] as const).map((kind) => <SubscriptionRow key={`${b?.id}:${kind}`} kind={kind} state={state} bot={b} keys={keys} selfHosted={selfHosted} onShowScreen={onShowScreen} onOpenVault={onOpenVault} />)}
         </>}
       </>}
@@ -88,17 +95,18 @@ export function LocalSubscriptions() {
   const [logout, setLogout] = useState<LocalSubscription["kind"] | null>(null);
   const pending = useRef<AbortController | null>(null);
   const active = useRef(true);
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (kind?: LocalSubscription["kind"]) => {
     pending.current?.abort();
     const controller = new AbortController(); pending.current = controller;
     const timer = setTimeout(() => controller.abort(), 20000);
     try {
-      const response = await fetch("/api/local-subscriptions", { cache: "no-store", signal: controller.signal });
+      const response = await fetch(`/api/local-subscriptions${kind ? `?kind=${kind}` : ""}`, { cache: "no-store", signal: controller.signal });
       const j = await response.json();
       if (!response.ok) throw new Error(j.error ?? "Couldn't check local subscriptions.");
       if (!Array.isArray(j.subscriptions)) throw new Error("Bops returned no subscription status. Try Check connection.");
       const next = j.subscriptions.map(localSnapshot);
-      if (active.current && pending.current === controller) { setRows(next); setError(null); }
+      if (kind && (next.length !== 1 || next[0].kind !== kind)) throw new Error("Bops returned a different subscription status.");
+      if (active.current && pending.current === controller) { setRows((old) => kind ? [...(old ?? []).filter((r) => r.kind !== kind), ...next] : next); setError(null); }
     } catch (e) { if (active.current && pending.current === controller) setError(controller.signal.aborted ? "Checking local subscriptions timed out. Try Check connection." : e instanceof Error ? e.message : "Couldn't reach Bops."); }
     finally { clearTimeout(timer); if (pending.current === controller) pending.current = null; }
   }, []);
@@ -108,10 +116,12 @@ export function LocalSubscriptions() {
     queueMicrotask(() => { if (!cancelled) void refresh(); });
     return () => { cancelled = true; active.current = false; pending.current?.abort(); };
   }, [refresh]);
-  const connecting = rows?.some((r) => r.state === "connecting");
+  const connecting = rows?.filter((r) => r.state === "connecting").map((r) => r.kind).sort().join(",");
   useEffect(() => {
     if (!connecting || busy) return;
-    const timer = setInterval(() => { if (!pending.current) void refresh(); }, 2000);
+    const kinds = connecting.split(",") as LocalSubscription["kind"][];
+    let next = 0;
+    const timer = setInterval(() => { if (!pending.current) void refresh(kinds[next++ % kinds.length]); }, 2000);
     return () => clearInterval(timer);
   }, [connecting, busy, refresh]);
   const action = async (kind: LocalSubscription["kind"], operation: "login" | "cancel" | "logout") => {
@@ -137,19 +147,20 @@ export function LocalSubscriptions() {
       const provider = kind === "codex" ? "ChatGPT" : "Claude";
       const rawPlan = typeof s?.plan === "string" ? s.plan.trim() : "";
       const knownPlan = rawPlan ? rawPlan.charAt(0).toUpperCase() + rawPlan.slice(1) : "";
-      const link = s?.state === "connecting" ? loginLink(s.loginUrl) : undefined;
+      const link = kind === "codex" && s?.state === "connecting" ? loginLink(s.loginUrl) : undefined;
       return <div key={kind} className="flex flex-col gap-2 rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]">
         <h3 className="text-[13px] font-semibold">{kind === "codex" ? "ChatGPT Plus/Pro" : "Claude Pro/Max"} · This PC</h3>
         <p>{kind === "codex" ? "Connect the official Codex account on this PC. ChatGPT subscription chat and local subscription tasks are not enabled yet." : "Connect Claude Code's own subscription on this PC. Local subscription tasks are not enabled yet. Claude subscriptions do not power Bops chat."}</p>
         <p role="status">{!s ? "Status not checked yet." : s.state === "missing" ? `${kind === "codex" ? "Codex" : "Claude Code"} CLI was not found on this PC.` : s.state === "connecting" ? "Finish signing in in your normal browser. Bops will check automatically." : s.state === "error" ? "The subscription could not be confirmed." : s.connected ? `Connected: your ${provider}${knownPlan ? ` ${knownPlan}` : ""} subscription` : "Not signed in on this PC."}</p>
         {s?.error && <p role="alert" className="text-[#B00020]">{s.error}</p>}
-        {s?.state === "missing" && <p>Install the official {kind === "codex" ? "Codex" : "Claude Code"} CLI on this PC, then check the connection again.</p>}
+        {s?.state === "missing" && <p>{kind === "codex" ? "Install the official Codex CLI on this PC" : "Install Claude Code using its official native installer (the npm claude.cmd launcher is not used)"}, then check the connection again.</p>}
+        {kind === "claude" && <p>Complete sign-in only in the browser opened automatically by Claude Code. Bops cannot accept a pasted authorization code. If no browser opens, cancel and try the native CLI directly.</p>}
         {s?.connected && <p className="text-[#6B6B6B]">{typeof s.account === "string" && s.account ? s.account : "Account details unavailable"}{!knownPlan ? ". The CLI did not report the plan tier." : ""}</p>}
         {typeof s?.checkedAt === "number" && Number.isFinite(s.checkedAt) && <p className="text-[#6B6B6B]">Last checked: {new Date(s.checkedAt).toLocaleString()}</p>}
         {link && <a href={link} target="_blank" rel="noopener noreferrer" className="underline">Open official sign-in page</a>}
         <div className="flex flex-wrap gap-2">
           {s?.state === "connecting" ? <button type="button" disabled={!!busy} onClick={() => void action(kind, "cancel")} className={light}>Cancel {provider} sign-in</button> : s?.connected ? <button type="button" disabled={!!busy} onClick={() => setLogout(kind)} className={light}>Sign out of {provider} on this PC</button> : <button type="button" disabled={!s?.available || !!busy} onClick={() => void action(kind, "login")} className={dark}>{busy === kind ? "Opening sign-in…" : `Sign in with your ${provider} subscription`}</button>}
-          <button type="button" disabled={!!busy} onClick={() => void refresh()} className={light}>Check {provider} connection</button>
+          <button type="button" disabled={!!busy} onClick={() => void refresh(kind)} className={light}>Check {provider} connection</button>
         </div>
         {logout === kind && <div role="alertdialog" aria-label={`Sign out of ${provider}`} className="rounded-lg bg-[#FFF8EB] p-3"><p>This signs the official {kind === "codex" ? "Codex" : "Claude Code"} CLI out on this PC, including its use outside Bops. Existing tasks may lose access.</p><div className="mt-2 flex gap-2"><button type="button" disabled={!!busy} onClick={() => void action(kind, "logout")} className={dark}>Confirm sign out</button><button type="button" disabled={!!busy} onClick={() => setLogout(null)} className={light}>Keep signed in</button></div></div>}
       </div>;
@@ -304,7 +315,7 @@ function useRelay(every: number) {
   const read = async (res: Response) => {
     const j = (await res.json().catch(() => ({}))) as Partial<RelayInfo> & { error?: string };
     if (res.status === 404) return { available: false, on: false, running: false, routedComputers: [] } satisfies RelayInfo;
-    if (!res.ok && j.available === undefined) throw new Error(j.error || j.reason || "Couldn't reach routing on this Mac.");
+    if (!res.ok && j.available === undefined) throw new Error(j.error || j.reason || "Couldn't reach routing on this computer.");
     return { available: !!j.available, on: !!j.on, reason: j.reason, device: j.device, running: !!j.running, online: j.online, routedComputers: j.routedComputers ?? [] } satisfies RelayInfo;
   };
   const load = useCallback(async () => {
@@ -474,13 +485,14 @@ const COPY: Record<"screen" | "microphone" | "notifications", { title: string; l
 };
 
 function PermissionCard({ id, items }: { id: "screen" | "microphone" | "notifications"; items: Items }) {
+  const computerWords = useComputerWords();
   const { perms, ask, asking, openSettings, sentToSettings } = items;
   const [restarting, setRestarting] = useState(false);
   const s = perms.status?.[id];
   const copy = COPY[id];
   if (!perms.inApp)
-    return <Card icon={ICONS[id]} title={copy.title} line={copy.line} tone="none" status="Needs the Bops app for Mac" />;
-  if (!s) return <Card icon={ICONS[id]} title={copy.title} line={copy.line} tone="none" status="Checking" />;
+    return <Card icon={ICONS[id]} title={copy.title} line={computerWords(copy.line)} tone="none" status={computerWords("Needs the Bops app for Mac")} />;
+  if (!s) return <Card icon={ICONS[id]} title={copy.title} line={computerWords(copy.line)} tone="none" status="Checking" />;
   // Screen Recording turned on while Bops was open: macOS applies it on the next launch.
   const restart = id === "screen" && (perms.restart || (s !== "granted" && sentToSettings.has("screen")));
   const status =
@@ -490,8 +502,8 @@ function PermissionCard({ id, items }: { id: "screen" | "microphone" | "notifica
         : "Allowed"
       : s === "restricted"
         ? id === "notifications"
-          ? "Not available on this Mac"
-          : "Blocked by your Mac's settings or admin"
+          ? computerWords("Not available on this Mac")
+          : computerWords("Blocked by your Mac's settings or admin")
         : s === "denied"
           ? restart
             ? "Turn on Bops in System Settings, then restart Bops"
@@ -501,7 +513,7 @@ function PermissionCard({ id, items }: { id: "screen" | "microphone" | "notifica
             : "Not asked yet";
   const tone: Tone = s === "granted" && !(id === "screen" && perms.restart) ? "ok" : s === "not-determined" || s === "unknown" ? "off" : "todo";
   return (
-    <Card icon={ICONS[id]} title={copy.title} line={copy.line} tone={tone} status={status} below={restarting ? <RestartAsk compact onCancel={() => setRestarting(false)} /> : undefined}>
+    <Card icon={ICONS[id]} title={copy.title} line={computerWords(copy.line)} tone={tone} status={status} below={restarting ? <RestartAsk compact onCancel={() => setRestarting(false)} /> : undefined}>
       {restart && !restarting && (
         <button onClick={() => setRestarting(true)} className={s === "granted" ? dark : light}>
           Restart Bops
@@ -521,10 +533,11 @@ function PermissionCard({ id, items }: { id: "screen" | "microphone" | "notifica
 }
 
 function RelayCard({ items }: { items: Items }) {
+  const computerWords = useComputerWords();
   const { info, busy, error, turn } = items.relay;
-  const line = "Your bots' computers go online through this Mac, so websites see your home internet.";
-  if (!info) return <Card icon={ICONS.relay} title="Route through this Mac" line={line} tone="none" status="Checking" />;
-  if (!info.available) return <Card icon={ICONS.relay} title="Route through this Mac" line={line} tone="none" status={info.reason ? `Not available yet. ${info.reason}` : "Not available yet"} />;
+  const line = computerWords("Your bots' computers go online through this Mac, so websites see your home internet.");
+  if (!info) return <Card icon={ICONS.relay} title={computerWords("Route through this Mac")} line={line} tone="none" status="Checking" />;
+  if (!info.available) return <Card icon={ICONS.relay} title={computerWords("Route through this Mac")} line={line} tone="none" status={info.reason ? `Not available yet. ${info.reason}` : "Not available yet"} />;
   const n = info.routedComputers.length;
   // On by default: the relay may still be starting (or reconnecting) while it's on.
   const connecting = !info.running || info.online === false;
@@ -534,7 +547,7 @@ function RelayCard({ items }: { items: Items }) {
       ? `On${info.device ? ` as ${info.device.name}` : ""}${connecting ? ", connecting" : ""}. ${n ? `${n} computer${n === 1 ? "" : "s"} routed` : "No computers routed yet"}`
       : "Off. Bots' computers use Orgo's connection";
   return (
-    <Card icon={ICONS.relay} title="Route through this Mac" line={line} tone={error ? "todo" : info.on ? (connecting ? "todo" : "ok") : "off"} status={status}>
+    <Card icon={ICONS.relay} title={computerWords("Route through this Mac")} line={line} tone={error ? "todo" : info.on ? (connecting ? "todo" : "ok") : "off"} status={status}>
       <button disabled={busy} onClick={() => void turn(!info.on)} className={info.on ? light : dark}>
         {busy ? <Spinner size={11} color={info.on ? "#0A0A0A" : "#FFFFFF"} /> : info.on ? "Turn off" : "Turn on"}
       </button>
@@ -595,6 +608,7 @@ export const SETUP_NEEDS: Record<SetupItem, string> = {
  * skipped (what the setup screen's Continue did), which puts the badge away for it.
  */
 export function ThisMacSettings({ state }: { state: AppState }) {
+  const computerWords = useComputerWords();
   const items = useSetupItems(state, "settings");
   const [busy, setBusy] = useState(false);
   const skipped = new Set(state.setup?.skipped ?? []);
@@ -607,7 +621,7 @@ export function ThisMacSettings({ state }: { state: AppState }) {
   return (
     <div className="flex flex-col gap-2 px-[22px] pt-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[13px] font-semibold">This Mac</span>
+        <span className="text-[13px] font-semibold">{computerWords("This Mac")}</span>
         <span className="flex items-center gap-1.5">
           {items.perms.inApp && ASKED.some((id) => items.perms.status?.[id] === "not-determined") && (
             <button onClick={() => void allowAll(items)} className={light}>
@@ -629,6 +643,7 @@ export function ThisMacSettings({ state }: { state: AppState }) {
         <KeysCard />
       </div>
       <ModelsCard />
+      <ConnectionsCard state={state} />
       <HandyCard />
       <UpdateSettings />
     </div>
@@ -698,10 +713,11 @@ function FullAccessSetup({ items }: { items: Items }) {
 
 /** Full access for bots on this Mac (MacState.fullAccess): off by default, and only here, with what it means. */
 function FullAccessCard({ items }: { items: Items }) {
+  const computerWords = useComputerWords();
   const on = !!items.state.mac?.fullAccess;
   // Windows has no Full Disk Access or Automation to grant: Full access needs nothing more there.
-  const windows = typeof navigator !== "undefined" && /Windows/.test(navigator.userAgent);
-  const here = windows ? "this PC" : "this Mac";
+  const windows = computerWords("Mac") === "PC";
+  const here = windows ? "this PC" : computerWords("this Mac");
   const set = windows || (items.perms.status?.fullDisk === "granted" && items.perms.status?.automation === "granted");
   if (!items.state.mac?.ready && !on) return null;
   return (
@@ -876,6 +892,7 @@ export function KeysCard() {
           ))}
           <a className="text-[12px] underline" href="https://github.com/Kevo919/bops/blob/windows-port/docs/keys.md" target="_blank" rel="noopener noreferrer">How to get keys and set spending limits</a>
           <p className="text-[12px] text-pencil">A successful authentication check does not guarantee credits or access to every model. After changing .env.local, restart Bops and refresh this list.</p>
+          <p data-accounts-help className="text-[12px] text-pencil">More than one account for a provider (a work and a personal key): to add another account, put a line like <span className="font-mono">OPENROUTER_API_KEY__WORK=...</span> in .env.local (the provider&apos;s key name, two underscores, then a label of A to Z, 0 to 9 and _), and restart Bops. Each account gets its own row and Check here, and you pick it for a model in Models. Bots&apos; tasks on their computers still use the default account.</p>
         </div>
       }
     >

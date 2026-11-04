@@ -89,3 +89,72 @@ export async function openRouterModels(): Promise<{ models: OpenRouterModel[]; o
     clearTimeout(timer);
   }
 }
+
+/**
+ * The ids in the list as last fetched (openRouterModels), or undefined when there's none yet: what Settings, Models
+ * checks a typed id against, without reaching OpenRouter (a warning, never a no: the list can be behind).
+ */
+export function knownOpenRouterIds(): ReadonlySet<string> | undefined {
+  const kept = g.__bopsOpenRouter;
+  return kept?.models.length ? new Set(kept.models.map((m) => m.id)) : undefined;
+}
+
+/* ---------------- Your presets (openrouter.ai/settings/presets) ---------------- */
+
+/** One of the user's OpenRouter presets, as the card needs it: its slug ("@preset/<slug>" is how a request names it), name and description. */
+export type OpenRouterPreset = { slug: string; name: string; description?: string };
+export type PresetsAnswer = { presets: OpenRouterPreset[]; noKey?: true; refused?: true; offline?: true };
+
+const PRESETS_URL = "https://openrouter.ai/api/v1/presets";
+const SLUG = /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/;
+/** OpenRouter gives at most 100 a page; past 3 pages, the rest can be typed. */
+const PAGE = 100;
+const PAGES = 3;
+
+/** OpenRouter's page of presets ({ data: [{ slug, name, description, status }] }), as the card needs it: active ones only. */
+export function trimPresets(body: unknown): OpenRouterPreset[] {
+  const data = (body as { data?: unknown } | null)?.data;
+  if (!Array.isArray(data)) return [];
+  const out: OpenRouterPreset[] = [];
+  for (const x of data) {
+    if (!x || typeof x !== "object") continue;
+    const p = x as { slug?: unknown; name?: unknown; description?: unknown; status?: unknown };
+    if (typeof p.slug !== "string" || !SLUG.test(p.slug)) continue;
+    if (p.status !== undefined && p.status !== null && p.status !== "active") continue;
+    const name = typeof p.name === "string" && p.name.trim() ? p.name.replace(/[\r\n]/g, " ").trim().slice(0, 60) : p.slug;
+    const description = typeof p.description === "string" && p.description.trim() ? p.description.replace(/[\r\n]+/g, " ").trim().slice(0, 160) : undefined;
+    out.push({ slug: p.slug, name, ...(description ? { description } : {}) });
+  }
+  return out;
+}
+
+/**
+ * The user's presets, read by this server on OPENROUTER_API_KEY (GET /api/v1/presets, OpenRouter's "List presets"):
+ * the key never goes to the window, and nothing of it is in the answer. `noKey`: there's no key here; `refused`:
+ * OpenRouter turned the key down; `offline`: it couldn't be reached. Either way, the card takes a slug typed in.
+ */
+export async function openRouterPresets(): Promise<PresetsAnswer> {
+  const key = process.env.OPENROUTER_API_KEY?.trim();
+  if (!key) return { presets: [], noKey: true };
+  const out: OpenRouterPreset[] = [];
+  for (let page = 0; page < PAGES; page++) {
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(`${PRESETS_URL}?limit=${PAGE}&offset=${page * PAGE}`, { signal: abort.signal, headers: { accept: "application/json", authorization: `Bearer ${key}`, "X-Title": "Bops" } });
+      if (res.status === 401 || res.status === 403) return { presets: [], refused: true };
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await readCapped(res, abort);
+      const got = trimPresets(body);
+      for (const p of got) if (!out.some((y) => y.slug === p.slug)) out.push(p);
+      const raw = (body as { data?: unknown[] } | null)?.data;
+      const total = Number((body as { total_count?: unknown } | null)?.total_count);
+      if (!Array.isArray(raw) || raw.length < PAGE || (Number.isFinite(total) && (page + 1) * PAGE >= total)) break;
+    } catch {
+      return { presets: out, offline: true };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return { presets: out };
+}

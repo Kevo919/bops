@@ -140,4 +140,26 @@ await test('owner window only; paired remote and shared state never launch proce
   shared=true; assert.equal((await route.GET(req({'x-bops-window':'local-test-window'}))).status,403); shared=false;
   reply={code:0,text:'Not logged in'}; assert.equal((await route.GET(req({'x-bops-window':'local-test-window'}))).status,200);
 });
+await test('kind-specific refresh probes only that CLI and rejects unknown kinds', async () => {
+  reply={code:0,text:'Logged in using ChatGPT'};
+  const before=calls.length;
+  const response=await route.GET(new Request('http://localhost/api/local-subscriptions?kind=codex',{headers:{'x-bops-window':'local-test-window'}}));
+  assert.equal(response.status,200); assert.equal((await response.json()).subscriptions.length,1);
+  assert.equal(calls.length,before+1); assert.ok(calls.at(-1).args.includes('status'));
+  assert.equal((await route.GET(new Request('http://localhost/api/local-subscriptions?kind=other',{headers:{'x-bops-window':'local-test-window'}}))).status,400);
+  assert.equal(calls.length,before+1);
+});
+await test('proxy and custom certificate overrides never reach the official CLI', async () => {
+  for(const key of ['HTTPS_PROXY','HTTP_PROXY','ALL_PROXY','NODE_EXTRA_CA_CERTS','SSL_CERT_FILE']) process.env[key]='synthetic-override';
+  const runtime=api.localSubscriptionRuntime('codex');
+  for(const key of ['HTTPS_PROXY','HTTP_PROXY','ALL_PROXY','NODE_EXTRA_CA_CERTS','SSL_CERT_FILE']) { assert.equal(runtime.env[key],undefined); delete process.env[key]; }
+});
+await test('Claude printed manual code URLs are never exposed as a usable sign-in link', async () => {
+  reply=null; await api.startLocalLogin('claude');
+  const child=calls.at(-1).child;
+  for(const host of ['claude.com','claude.ai','platform.claude.com']) child.stdout.emit('data',Buffer.from(`https://${host}/cai/oauth/authorize?fixture=only `));
+  const snapshot=await api.getLocalSubscriptionStatus('claude');
+  assert.equal(snapshot.state,'connecting'); assert.equal(snapshot.loginUrl,undefined);
+  reply={code:1,text:'{"loggedIn":false}'}; await api.cancelLocalLogin('claude');
+});
 console.log(`local subscriptions: ${passed} passed`);

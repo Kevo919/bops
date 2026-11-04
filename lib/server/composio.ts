@@ -10,7 +10,7 @@ import { trackServerEvent } from "./analytics";
 import { appHeaders } from "./app-version";
 import { cloudOn, cloudProxy, cloudSession, cloudSessionNow, cloudUrl } from "./cloud";
 import { lowRisk, movesMoney } from "./judgment";
-import { allows, declined, heldAsk, NeedsOk, type AskSpec } from "./permission";
+import { allows, declined, heldAsk, NeedsOk, threadAllows, type AskSpec } from "./permission";
 import { addMessage, bot, getState, installId, ownerName, session as threadOf, update } from "./store";
 import { DATA_TOOL_NAMES, dataOn, foundByBots, runDataTool } from "./treg";
 
@@ -262,7 +262,9 @@ export async function connectApp(app: string, label?: string, replaces?: string,
     s.connecting = (s.connecting ?? []).filter((c) => !(c.app === app && c.status === "failed"));
     s.connecting.push({ id: waitId, app, appName, label: label?.trim() || undefined, status: "waiting", at: Date.now(), replaces, grant });
   });
-  if (req.redirectUrl) execFile("open", [req.redirectUrl]);
+  // On the Mac the sign-in opens in the browser from here; on Windows, Linux or a server the window opens it (opened: false).
+  const opened = !!req.redirectUrl && process.platform === "darwin" && !process.env.BOPS_DATABASE_URL;
+  if (opened) execFile("open", [req.redirectUrl!]);
   void req
     .waitForConnection(15 * 60_000)
     .then(async (ca: { id: string }) => {
@@ -303,7 +305,7 @@ export async function connectApp(app: string, label?: string, replaces?: string,
         if (c) Object.assign(c, { status: "failed", error: /timed out/i.test(e.message) ? "The sign-in wasn't finished." : e.message.slice(0, 200) });
       }),
     );
-  return { redirectUrl: req.redirectUrl };
+  return { redirectUrl: req.redirectUrl, opened };
 }
 
 /**
@@ -759,12 +761,14 @@ export async function runAppAction(
   // things (marking read, a label, an event only they attend): never anything that reaches someone else, deletes, or
   // costs money (strict; if it can't tell, the user is asked). None of that for a member's: those are the owner's to allow.
   const saved = !asker && allows(b, ask, { justDoIt: false });
-  const just = !asker && !saved && !!b.autoApprove && allows(b, ask, { guarded: foundByBots(JSON.stringify(sent)) || surelyMoney(action, app) || (await movesMoney(what, ask.preview)) });
-  const low = !asker && !saved && !b.autoApprove && !destructive && !surelyMoney(action, app) && (await lowRisk(what, ask.preview));
-  if (saved || just || low) {
+  // Allowed for this thread alone (Allow for this thread): its run doesn't pause for the same thing again.
+  const thread = !asker && !saved && threadAllows(b.id, where.sessionId, ask.action);
+  const just = !asker && !saved && !thread && !!b.autoApprove && allows(b, ask, { guarded: foundByBots(JSON.stringify(sent)) || surelyMoney(action, app) || (await movesMoney(what, ask.preview)) });
+  const low = !asker && !saved && !thread && !b.autoApprove && !destructive && !surelyMoney(action, app) && (await lowRisk(what, ask.preview));
+  if (saved || thread || just || low) {
     const out = await run("auto");
     const chatId = where.chatId ?? (where.sessionId ? getState().sessions.find((x) => x.id === where.sessionId)?.chatId : undefined);
-    const why = saved ? "you always allow it" : just ? "Just do it is on" : "low risk";
+    const why = saved ? "you always allow it" : thread ? "you allowed it for this thread" : just ? "Just do it is on" : "low risk";
     if (chatId && !out.startsWith("Failed")) addMessage({ chatId, role: "system", text: `${b.name}: ${info.name} in ${where_} · ${why}, so didn't ask` });
     return out;
   }

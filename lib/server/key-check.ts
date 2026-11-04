@@ -1,5 +1,8 @@
 import "server-only";
 import { ROUTE_KEYS, ROUTE_NAMES, type AgentRoute } from "@/lib/agents";
+import { checkZapier, zapierSet } from "./zapier";
+import { ACCOUNT_LABEL, accountWord } from "@/lib/accounts";
+import { accountLabels } from "./provider-accounts";
 
 export type KeyCheckResult = {
   key: string;
@@ -8,9 +11,9 @@ export type KeyCheckResult = {
   message?: string;
 };
 
-type Probe = { key: string; label: string; url: string; kind: "openai" | "anthropic" | "models" | "openrouter" | "orgo" | "ollama" };
+type Probe = { key: string; label: string; url: string; kind: "openai" | "anthropic" | "models" | "openrouter" | "orgo" | "ollama" | "composio" | "zapier" };
 const provider = (route: AgentRoute, url: string, kind: Probe["kind"]): Probe => ({ key: ROUTE_KEYS[route], label: ROUTE_NAMES[route], url, kind });
-// Scope is intentionally these six providers plus the executor, Orgo and Ollama, not every Vault service.
+// Scope is intentionally these six providers plus the executor, Orgo, Ollama, Composio and Zapier, not every Vault service.
 // Fixed HTTPS destinations: request data and environment overrides cannot redirect a secret. Ollama is the one
 // exception: its address is the owner's own setting, and the only secret sent there is its own (OLLAMA_API_KEY).
 const probes: Probe[] = [
@@ -25,12 +28,30 @@ const probes: Probe[] = [
   // Ollama has no key: its row is its address (OLLAMA_BASE_URL), set only in this server's .env.local by its owner,
   // and the check lists its models there (GET {base}/models). OLLAMA_API_KEY, if set, goes with it as Bearer.
   { key: ROUTE_KEYS.ollama, label: ROUTE_NAMES.ollama, url: "", kind: "ollama" },
+  // Connected apps (lib/server/composio.ts), self-hosted: one page of the project's sign-in setups, the key as x-api-key.
+  { key: "COMPOSIO_API_KEY", label: "Composio (connected apps)", url: "https://backend.composio.dev/api/v3.1/auth_configs?limit=1", kind: "composio" },
+  // Zapier (lib/server/zapier.ts): its address is the secret, so the check is zapier.ts's own (MCP initialize and tools/list).
+  { key: "ZAPIER_MCP_URL", label: "Zapier", url: "", kind: "zapier" },
 ];
 const ollamaModels = () => `${(process.env.OLLAMA_BASE_URL?.trim() ?? "").replace(/\/+$/, "")}/models`;
 
-export function keyCheckList(): KeyCheckResult[] {
-  return probes.map(({ key, label }) => ({ key, label, status: process.env[key]?.trim() ? "set" : "not set" }));
+/**
+ * A provider's other accounts (lib/accounts.ts: NAME__LABEL in .env.local) are checked as its default is, at the
+ * same fixed address: each a probe of its own, "OpenRouter (work)". Only a provider's key has accounts (not
+ * Ollama's address, the executor's or Orgo's), and only names this server has set.
+ */
+const ACCOUNT_KINDS: ReadonlySet<Probe["kind"]> = new Set(["openai", "anthropic", "models", "openrouter"]);
+const withAccounts = (p: Probe) => (ACCOUNT_KINDS.has(p.kind) && p.label !== "OpenAI executor" ? accountLabels(p.key).map((a) => ({ ...p, key: `${p.key}__${a}`, label: `${p.label} (${accountWord(a)})` })) : []);
+function probeOf(key: string): Probe | undefined {
+  const own = probes.find((entry) => entry.key === key);
+  if (own) return own;
+  const at = key.lastIndexOf("__");
+  if (at < 0 || !ACCOUNT_LABEL.test(key.slice(at + 2))) return undefined;
+  return probes.flatMap(withAccounts).find((entry) => entry.key === key);
 }
+
+export function keyCheckList(): KeyCheckResult[] {
+  return probes.flatMap((p) => [p, ...withAccounts(p)]).map(({ key, label, kind }) => ({ key, label, status: (kind === "zapier" ? zapierSet() : !!process.env[key]?.trim()) ? "set" : "not set" }));}
 
 /** Read only a bounded diagnostic payload; never return any upstream text or credentials. */
 async function payload(response: Response): Promise<Record<string, unknown> | null> {
@@ -55,10 +76,14 @@ async function payload(response: Response): Promise<Record<string, unknown> | nu
 
 /** Exactly one outbound request, only after the owner explicitly presses Check. No file writes. */
 export async function checkKey(key: string): Promise<KeyCheckResult | null> {
-  const probe = probes.find((entry) => entry.key === key);
+  const probe = probeOf(key);
   if (!probe) return null;
   const { label, kind } = probe;
   const result = (status: KeyCheckResult["status"], message: string): KeyCheckResult => ({ key, label, status, message });
+  if (kind === "zapier") {
+    const z = await checkZapier();
+    return result(z.status, z.message);
+  }
   const secret = process.env[key]?.trim();
   if (!secret) return result("not set", "This key is not set in the running server's environment.");
   const controller = new AbortController();
@@ -67,6 +92,7 @@ export async function checkKey(key: string): Promise<KeyCheckResult | null> {
     const ollamaKey = process.env.OLLAMA_API_KEY?.trim();
     const headers: Record<string, string> = kind === "anthropic"
       ? { "x-api-key": secret, "anthropic-version": "2023-06-01" }
+      : kind === "composio" ? { "x-api-key": secret }
       : kind === "ollama" ? (ollamaKey ? { Authorization: `Bearer ${ollamaKey}` } : {})
       : { Authorization: `Bearer ${secret}` };
     if (kind === "openai") headers["Content-Type"] = "application/json";
@@ -83,7 +109,7 @@ export async function checkKey(key: string): Promise<KeyCheckResult | null> {
       const n = data.data.length;
       return result("works", n ? `Ollama answered with ${n} model${n === 1 ? "" : "s"}. It's free: no key or credit needed.` : "Ollama answered, but has no models yet: pull one on the server (ollama pull qwen2.5:3b).");
     }
-    if (response.status === 401) return result("invalid", "The provider rejected this key's authentication.");
+    if (response.status === 401 || (kind === "composio" && response.status === 403)) return result("invalid", "The provider rejected this key's authentication.");
     if (response.status === 402 || (kind === "openai" && [error?.code, error?.type].some((code) => code === "insufficient_quota" || code === "billing_hard_limit_reached")))
       return result("no credit", "The provider reports insufficient credit or an exhausted spending allowance.");
     if (response.status === 429) return result("rate limited", "The provider is rate limiting this check. Try again later.");
@@ -96,7 +122,10 @@ export async function checkKey(key: string): Promise<KeyCheckResult | null> {
       const info = data.data;
       if (!info || typeof info !== "object" || Array.isArray(info)) return result("unavailable", "The provider returned an unexpected response.");
       const remaining = (info as Record<string, unknown>).limit_remaining;
-      if (typeof remaining === "number" && remaining <= 0) return result("no credit", "The provider reports that this key's spending allowance is exhausted.");
+      if (typeof remaining === "number" && remaining <= 0) return result("no credit", "The provider reports that this key's spending allowance is exhausted. Free models (ids ending in :free) may still work.");
+    } else if (kind === "composio") {
+      if (!Array.isArray(data.items)) return result("unavailable", "The provider returned an unexpected response.");
+      return result("works", "Composio accepted this key. Connect apps in Settings, Logins; each app's own sign-in was not tested.");
     } else if (kind !== "orgo" && !Array.isArray(data.data)) return result("unavailable", "The provider returned an unexpected response.");
     return result("works", "The authenticated check succeeded. Generation credit and access to individual models were not tested.");
   } catch {
