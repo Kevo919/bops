@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useComputerWords } from "./computer-words";
 import type { AppState, Chat } from "@/lib/types";
 import { categoriesOpen } from "@/lib/memory-categories";
 import type { AutopilotOpen } from "./autopilot";
@@ -73,6 +74,7 @@ export function SidebarRail({
   onOpenMemory: (open: MemoryOpen) => void;
   onApps: () => void;
 }) {
+  const computerWords = useComputerWords();
   // A workspace shared with the user is read only: no bot menu, and nothing new is made in it.
   const menuActions = state.shared ? undefined : actions;
   const [menu, setMenu] = useState<{ botId: string; x: number; y: number } | null>(null);
@@ -146,7 +148,7 @@ export function SidebarRail({
   return (
     <aside data-tip-side="right" aria-label="Sidebar, collapsed" className="flex min-h-0 w-[72px] shrink-0 flex-col px-3 pb-3 pt-3.5">
       <div className="flex flex-col items-center gap-2 pb-3">
-        <button onClick={onExpand} aria-label="Expand the sidebar" data-tip="Expand the sidebar (⌘\)" className="flex size-[34px] shrink-0 items-center justify-center rounded-full hover:bg-black/[0.05]">
+        <button onClick={onExpand} aria-label="Expand the sidebar" data-tip={computerWords("Expand the sidebar (⌘\\)")} className="flex size-[34px] shrink-0 items-center justify-center rounded-full hover:bg-black/[0.05]">
           <SideToggleIcon side="left" open={false} />
         </button>
         {switchable && (

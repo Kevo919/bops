@@ -298,8 +298,13 @@ type Limits = {
   bops_computers_limit?: number;
 };
 
+/** An answer that wasn't one (Orgo unreachable, or 404ing) is kept longer each time it repeats: the crawl
+ *  saw ~25 subscription/limits asks a minute against a 404ing Orgo, because a null plan used not to be
+ *  kept at all. A miss is kept too: a minute at first, doubling each miss in a row up to half an hour —
+ *  a real plan always keeps the plain minute, and fresh:true bypasses, as before. */
 const KEEP_MS = 60_000;
-const g = globalThis as unknown as { bopsOrgoPlan?: { key: string; changes: number; at: number; plan: Promise<OrgoPlan | null> }; bopsMaking?: Promise<unknown>; bopsSizeSwitch?: { phase?: SizePhase } };
+const FAIL_KEEP_MAX_MS = 30 * 60_000;
+const g = globalThis as unknown as { bopsOrgoPlan?: { key: string; changes: number; at: number; keep: number; plan: Promise<OrgoPlan | null> }; bopsMaking?: Promise<unknown>; bopsSizeSwitch?: { phase?: SizePhase } };
 
 /** A switch of the computer's size under way (lib/server/computer-size.ts switchSize), and how far it has got; none: `phase` unset. */
 export const sizeSwitch: { phase?: SizePhase } = (g.bopsSizeSwitch ??= {});
@@ -310,12 +315,13 @@ export async function orgoPlan({ fresh = false } = {}): Promise<OrgoPlan | null>
   if (!key) return null;
   const kept = g.bopsOrgoPlan;
   // Another user's key, or a computer made or deleted since: read again.
-  if (!fresh && kept?.key === key && kept.changes === computerChanges() && Date.now() - kept.at < KEEP_MS) return kept.plan;
-  const read = { key, changes: computerChanges(), at: Date.now(), plan: readPlan(key) };
+  if (!fresh && kept?.key === key && kept.changes === computerChanges() && Date.now() - kept.at < kept.keep) return kept.plan;
+  const read = { key, changes: computerChanges(), at: Date.now(), keep: KEEP_MS, plan: readPlan(key) };
   g.bopsOrgoPlan = read;
-  // Nothing came back: not kept, so the next look asks again.
+  // A miss doubles this read's keep, up to the cap; a plan resets it. (forgetPlan, a new key and changed
+  // computers read again at once, as before.)
   void read.plan.then((p) => {
-    if (!p && g.bopsOrgoPlan === read) g.bopsOrgoPlan = undefined;
+    if (g.bopsOrgoPlan === read && !p) read.keep = Math.min(read.keep * 2, FAIL_KEEP_MAX_MS);
   });
   return read.plan;
 }
