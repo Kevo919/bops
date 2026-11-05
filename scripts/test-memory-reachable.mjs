@@ -1,7 +1,8 @@
 // Tests for what /api/memory says when memory is ON but its service won't answer (the 0855 crawl bug): a
 // 503 with {unreachable: true} the Memory sheet and the bot's Memory tab turn into "can't reach the
 // memory service" — not the fetch's error JSON, whose missing `on` field the sheet read as "Memory isn't
-// on yet" (the wrong reason). With memory off, the same failure is a plain 500 {error} as before.
+// on yet" (the wrong reason). With memory off (no Honcho key), the bot's tab gets {off: true}: its own
+// words for "not set up on this computer", never a failed fetch's message.
 // Honcho is unreachable by construction (fetch to its origin fails); nothing reaches a real service.
 // Usage: node --conditions=react-server scripts/test-memory-reachable.mjs
 import assert from "node:assert/strict";
@@ -94,6 +95,17 @@ await check("memory off: the same failure carries no unreachable flag", async ()
   process.env.HONCHO_API_KEY = "hc-test-memory-reach";
 });
 
+await check("memory off, the bot tab (?bot=): 200 {off: true} with nothing learned, not an error", async () => {
+  delete process.env.HONCHO_API_KEY;
+  const r = await get("?bot=boppy");
+  assert.equal(r.status, 200, `200, got ${r.status}`);
+  const j = await r.json();
+  assert.equal(j.off, true);
+  assert.equal(j.error, undefined);
+  assert.deepEqual([j.card, j.facts], [[], []]);
+  process.env.HONCHO_API_KEY = "hc-test-memory-reach";
+});
+
 await check("the sheet and the tab distinguish the state in what they render (the wording, in the components)", async () => {
   const sheet = readFileSync(new URL(at("components/app/memory-sheet.tsx")), "utf8");
   assert.ok(/unreachable \?/.test(sheet), "the sheet branches on unreachable");
@@ -101,6 +113,7 @@ await check("the sheet and the tab distinguish the state in what they render (th
   assert.ok(/!info\.on \?/.test(sheet), "keeping the isn't-on case for when memory really is off");
   const tab = readFileSync(new URL(at("components/app/bot-memory.tsx")), "utf8");
   assert.ok(/data\.unreachable \?/.test(tab), "the bot tab branches on unreachable");
+  assert.ok(/data\?\.off \?/.test(tab) && /Memory isn&apos;t set up on this computer yet/.test(tab), "and on off, saying so in plain words");
 });
 
 process.chdir(tmpdir());
