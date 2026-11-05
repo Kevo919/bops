@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
-import { describeSchedule, nextRun, parseClock, whenText, type ScheduleLike } from "@/cloud/schedule";
+import { describeSchedule, nextRun, normalizeSchedule, parseClock, whenText, type ScheduleLike } from "@/cloud/schedule";
 import type { Schedule } from "@/lib/types";
 import { undash } from "./side-group";
 import { useNow } from "./ui";
@@ -11,8 +11,8 @@ import { useNow } from "./ui";
  * Edit and its When on the Routines page (autopilot.tsx). On top, the suggested times for it (its starter's
  * presets, or a few that suit any routine), the current one picked. Custom opens the rest: how often, the
  * times of day (up to 6), the days, the gap, only between some hours, the day of the month, how long before
- * each meeting, and once. Then the zone its times are in, and one line that reads it back with its next run.
- * Controlled: the value goes up raw as it's edited (times in the order they were typed); `tidy` it to send.
+ * each meeting, once, and a cron expression (read back in plain words, or what's wrong with it, as it's
+ * typed). Then the zone its times are in, and one line that reads it back with its next run. Controlled: the value goes up raw as it's edited (times in the order they were typed); `tidy` it to send.
  */
 
 export type Hours = { from: string; to: string };
@@ -25,7 +25,8 @@ export type Cadence =
   | { kind: "monthly"; dayOfMonth: number; time: string; times?: string[] }
   | { kind: "once"; at: number }
   | { kind: "every"; minutes: number; hours?: Hours; days?: number[] }
-  | { kind: "before_event"; minutes: number; source: "googlecalendar"; hours?: Hours; days?: number[] };
+  | { kind: "before_event"; minutes: number; source: "googlecalendar"; hours?: Hours; days?: number[] }
+  | { kind: "cron"; expr: string };
 
 export type Preset = { label: string; schedule: Cadence };
 
@@ -97,8 +98,19 @@ export function tidy(c: Cadence): Cadence {
       return { kind: "every", minutes: clamp(c.minutes, MIN_EVERY, MAX_EVERY, MIN_EVERY), ...window(c.hours), ...someDays() };
     case "before_event":
       return { kind: "before_event", minutes: clamp(c.minutes, MIN_BEFORE, MAX_BEFORE, 15), source: "googlecalendar", ...window(c.hours), ...someDays() };
+    case "cron":
+      return { kind: "cron", expr: String(c.expr ?? "").trim().replace(/\s+/g, " ") };
   }
 }
+
+/** What's wrong with a cron expression, in plain words; undefined when it reads. */
+export const cronError = (expr: string): string | undefined => {
+  const n = normalizeSchedule({ kind: "cron", expr });
+  return "error" in n ? n.error : undefined;
+};
+
+/** The cron expression a Custom one starts as: weekdays at 9 AM. */
+const DEFAULT_CRON = "0 9 * * 1-5";
 
 /** Whether two schedules run at the same moments (as tidied). */
 export const sameCadence = (a: Cadence | undefined, b: Cadence | undefined) => !!a && !!b && JSON.stringify(tidy(a)) === JSON.stringify(tidy(b));
@@ -317,6 +329,7 @@ const KINDS: { kind: Kind; text: string }[] = [
   { kind: "monthly", text: "Monthly" },
   { kind: "before_event", text: "Before each meeting" },
   { kind: "once", text: "Once" },
+  { kind: "cron", text: "Custom (a cron expression)" },
 ];
 
 const EVERY_CHOICES: [number, string][] = [
@@ -395,6 +408,7 @@ export function CadencePicker({
     if (kind === "monthly") return onChange({ kind, dayOfMonth: 1, ...t });
     if (kind === "every") return onChange({ kind, minutes: 60, ...win, ...keepDays });
     if (kind === "before_event") return onChange({ kind, minutes: 15, source: "googlecalendar", ...win, ...keepDays });
+    if (kind === "cron") return onChange({ kind, expr: DEFAULT_CRON });
     // Once: the next of its first time, else tomorrow at 9.
     const next = nextRun({ kind: "daily", time: times[0] }, now, tz) ?? now + 86_400_000;
     onChange({ kind: "once", at: next });
@@ -412,15 +426,19 @@ export function CadencePicker({
   const kinds = KINDS.filter((k) => k.kind !== "before_event" || calendar || value.kind === "before_event");
   const zones = [...new Set([tz, ownerZone, hereZone(), ...COMMON_ZONES].filter((z): z is string => !!z))];
 
-  // The line that reads it back.
+  // The line that reads it back. A cron expression that doesn't read shows what's wrong instead.
+  const cronBad = tidied.kind === "cron" ? cronError(tidied.expr) : undefined;
   const words = describeSchedule(asLike(tidied), tz);
-  const next = tidied.kind === "before_event" ? undefined : nextRun(asLike(tidied), now, tz);
-  const preview =
-    tidied.kind === "once" && next === undefined
+  const next = tidied.kind === "before_event" || cronBad ? undefined : nextRun(asLike(tidied), now, tz);
+  const preview = cronBad
+    ? cronBad
+    : tidied.kind === "once" && next === undefined
       ? `${words}. That time has passed.`
       : tidied.kind === "before_event"
         ? `${words}. Checks your calendar every 15 minutes.`
-        : `${words}${next ? `. Next: ${whenText(next, now, tz)}` : ""}`;
+        : tidied.kind === "cron" && next === undefined
+          ? `${words}. That never comes due.`
+          : `${words}${next ? `. Next: ${whenText(next, now, tz)}` : ""}`;
 
   return (
     <div className="flex flex-col gap-2.5 text-[12.5px] leading-4 text-[#3A3A38]">
@@ -583,6 +601,30 @@ export function CadencePicker({
             </>
           )}
 
+          {value.kind === "cron" && (
+            <label className="flex flex-col gap-1">
+              <span className={label}>Cron expression</span>
+              <input
+                type="text"
+                required
+                disabled={disabled}
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
+                aria-label="Cron expression"
+                aria-invalid={!!cronBad}
+                aria-describedby={`${id}-cron-help`}
+                placeholder={DEFAULT_CRON}
+                value={value.expr}
+                onChange={(e) => onChange({ kind: "cron", expr: e.target.value })}
+                className={`${field} w-full font-mono ${cronBad ? "shadow-[0_0_0_1.5px_#C0392B]" : ""}`}
+              />
+              <span id={`${id}-cron-help`} className="text-[11.5px] text-[#9A9A98]">
+                Minute, hour, day of the month, month, day of the week. Steps (*/15), ranges (9-17), lists (1,15) and names (mon, jan) read. At least 15 minutes apart.
+              </span>
+            </label>
+          )}
+
           {value.kind === "once" && (
             <label className="flex flex-col gap-1">
               <span className={label}>On</span>
@@ -618,7 +660,7 @@ export function CadencePicker({
         </div>
       )}
 
-      <span aria-live="polite" className="text-[12px] leading-4 text-[#6B6B6B]">
+      <span aria-live="polite" role={cronBad ? "alert" : undefined} className={`text-[12px] leading-4 ${cronBad ? "text-[#C0392B]" : "text-[#6B6B6B]"}`}>
         {undash(preview)}
         {!custom && zone && ownerZone && zone !== ownerZone ? ` (${zoneName(zone)} time)` : ""}
       </span>

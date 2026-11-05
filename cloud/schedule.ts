@@ -30,10 +30,12 @@ export type ScheduleLike =
   | { kind: "monthly"; dayOfMonth: number; time: string; times?: string[] }
   | { kind: "once"; at: number }
   | { kind: "every"; minutes: number; hours?: { from: string; to: string }; days?: number[] }
-  | { kind: "before_event"; minutes: number; source: "googlecalendar"; hours?: { from: string; to: string }; days?: number[] };
+  | { kind: "before_event"; minutes: number; source: "googlecalendar"; hours?: { from: string; to: string }; days?: number[] }
+  /** A five field cron expression ("0 9 * * 1-5"), read in the zone like the timed kinds (see "Cron expressions" below). */
+  | { kind: "cron"; expr: string };
 
 /** The kinds of schedule there are. */
-export const SCHEDULE_KINDS = ["daily", "weekdays", "weekly", "monthly", "once", "every", "before_event"] as const;
+export const SCHEDULE_KINDS = ["daily", "weekdays", "weekly", "monthly", "once", "every", "before_event", "cron"] as const;
 /** At most this many times of day in one schedule. */
 export const MAX_TIMES = 6;
 /** The longest gap an "every" schedule may have, in minutes (a day). */
@@ -143,11 +145,16 @@ function dateAt(ms: number, tz?: string): Civil {
  * after the jump as it was into the gap (the offset from before the change).
  */
 function instant(date: { y: number; mo: number; d: number }, minutes: number, tz?: string): number {
+  return instants(date, minutes, tz)[0];
+}
+
+/** The same, as every real moment the clock shows that time (two when the clocks fall back), soonest first. */
+function instants(date: { y: number; mo: number; d: number }, minutes: number, tz?: string): number[] {
   const want = Date.UTC(date.y, date.mo - 1, date.d, 0, minutes);
   const before = offset(want - DAY, tz);
   const after = offset(want + DAY, tz);
-  const real = [want - before, want - after].filter((t) => wallMs(t, tz) === want);
-  return real.length ? Math.min(...real) : want - before;
+  const real = [...new Set([want - before, want - after])].filter((t) => wallMs(t, tz) === want).sort((a, b) => a - b);
+  return real.length ? real : [want - before];
 }
 
 /* ---------------- When it runs next ---------------- */
@@ -201,6 +208,10 @@ export function nextRun(s: ScheduleLike, from: number, tz?: string, lastRunAt?: 
   if (!Number.isFinite(from) || !s || typeof s !== "object") return undefined;
   if (s.kind === "once") return Number.isFinite(s.at) && s.at > from ? s.at : undefined;
   if (s.kind === "every" || s.kind === "before_event") return nextEvery(s, from, tz, lastRunAt);
+  if (s.kind === "cron") {
+    const c = parseCron(s.expr);
+    return "error" in c ? undefined : nextCron(c.spec, from, tz);
+  }
   if (!hasTimes(s)) return undefined;
   const times = minutesOf(s);
   if (!times?.length) return undefined;
@@ -273,6 +284,10 @@ export function inHours(s: ScheduleLike, t: number, tz?: string): boolean {
  */
 export function runsADay(s: ScheduleLike): number {
   if (hasTimes(s)) return minutesOf(s)?.length ?? 1;
+  if (s.kind === "cron") {
+    const c = parseCron(s.expr);
+    return "error" in c ? 1 : c.spec.hours.length * c.spec.minutes.length;
+  }
   if (s.kind !== "every" && s.kind !== "before_event") return 1;
   const step = stepOf(s) / MINUTE;
   const a = s.hours ? parseClock(s.hours.from) : undefined;
@@ -349,6 +364,178 @@ export function validTimeZone(tz: unknown): tz is string {
   } catch {
     return false;
   }
+}
+
+
+/* ---------------- Cron expressions ---------------- */
+
+/**
+ * A standard five field cron expression ("0 9 * * 1-5": minute, hour, day of the month, month, day of
+ * the week), its times read as the zone's wall clock like the timed kinds. A field is `*`, a number, a
+ * range ("9-17"), a list ("1,15"), a step ("9-17/2"; "/15" after a star is every 15), or month and day names ("jan", "mon";
+ * Sunday is 0 or 7); "@hourly", "@daily", "@weekly", "@monthly" and "@yearly" read too. As in cron,
+ * when both the day of the month and the day of the week are given, a day that fits either runs. No
+ * seconds, no L, W or #. Two runs are never under MIN_EVERY minutes apart (the gap between any two of
+ * its times of day, and across midnight when it can run two days running).
+ *
+ * Across a clock change: a time that doesn't happen (the clocks spring forward past it) runs as far
+ * after the jump as it was into the gap, once; a time that happens twice (the clocks fall back) runs
+ * the first time, unless the hour field is `*`: then both count, so "every 15 minutes" keeps its beat
+ * through the repeated hour, as cron does.
+ */
+export type CronSpec = { minutes: number[]; hours: number[]; doms: number[]; months: number[]; dows: number[]; anyHour: boolean; anyDom: boolean; anyDow: boolean };
+
+const CRON_ALIASES: Record<string, string> = {
+  "@hourly": "0 * * * *",
+  "@daily": "0 0 * * *",
+  "@midnight": "0 0 * * *",
+  "@weekly": "0 0 * * 0",
+  "@monthly": "0 0 1 * *",
+  "@yearly": "0 0 1 1 *",
+  "@annually": "0 0 1 1 *",
+};
+const MONTH_NAMES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const DOW_NAMES = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const CRON_FIELDS: { name: string; lo: number; hi: number; names?: string[] }[] = [
+  { name: "minute", lo: 0, hi: 59 },
+  { name: "hour", lo: 0, hi: 23 },
+  { name: "day of the month", lo: 1, hi: 31 },
+  { name: "month", lo: 1, hi: 12, names: MONTH_NAMES },
+  { name: "day of the week", lo: 0, hi: 7, names: DOW_NAMES },
+];
+
+/** One field's values, sorted, each once; or what's wrong with it. */
+function cronField(text: string, f: (typeof CRON_FIELDS)[number]): { values: number[] } | { error: string } {
+  const out = new Set<number>();
+  const bad = (part: string) => ({ error: `"${part}" isn't a ${f.name} (${f.lo} to ${f.hi}${f.names ? `, or ${f.names[0]} to ${f.names[f.names.length - 1]}` : ""}).` });
+  const num = (x: string): number | undefined => {
+    if (/^\d+$/.test(x)) return Number(x);
+    const i = f.names ? f.names.indexOf(x.toLowerCase()) : -1;
+    return i < 0 ? undefined : i + f.lo;
+  };
+  for (const part of text.split(",")) {
+    const m = /^(\*|[a-z0-9]+(?:-[a-z0-9]+)?)(?:\/(\d+))?$/i.exec(part);
+    if (!m) return bad(part);
+    const step = m[2] === undefined ? 1 : Number(m[2]);
+    if (step < 1) return { error: `"/${m[2]}" isn't a step. Use "*/15" for every 15.` };
+    let a = f.lo;
+    let b = f.hi;
+    if (m[1] !== "*") {
+      const [x, y] = m[1].split("-");
+      const from = num(x);
+      const to = y === undefined ? (m[2] === undefined ? from : f.hi) : num(y);
+      if (from === undefined || to === undefined || from < f.lo || to > f.hi) return bad(part);
+      if (from > to) return { error: `"${part}" runs backwards. Put the lower ${f.name} first.` };
+      a = from;
+      b = to;
+    }
+    for (let v = a; v <= b; v += step) out.add(f.name === "day of the week" && v === 7 ? 0 : v);
+  }
+  return { values: [...out].sort((x, y) => x - y) };
+}
+
+/** A cron expression read, or what's wrong with it in plain words. */
+export function parseCron(expr: unknown): { spec: CronSpec } | { error: string } {
+  const text = typeof expr === "string" ? expr.trim().replace(/\s+/g, " ") : "";
+  if (!text) return { error: "It needs a cron expression, like 0 9 * * 1-5 (weekdays at 9 AM)." };
+  // Own keys only: "__proto__" or "constructor" would read Object's own members off the plain object.
+  const alias = text.toLowerCase();
+  const parts = (Object.hasOwn(CRON_ALIASES, alias) ? CRON_ALIASES[alias] : text).split(" ");
+  if (parts.length !== 5) return { error: "A cron expression has 5 parts: minute, hour, day of the month, month, day of the week." };
+  const fields: number[][] = [];
+  for (let i = 0; i < 5; i++) {
+    const r = cronField(parts[i], CRON_FIELDS[i]);
+    if ("error" in r) return r;
+    fields.push(r.values);
+  }
+  const spec: CronSpec = { minutes: fields[0], hours: fields[1], doms: fields[2], months: fields[3], dows: fields[4], anyHour: parts[1].startsWith("*"), anyDom: parts[2].startsWith("*"), anyDow: parts[4].startsWith("*") };
+  const gap = cronGap(spec);
+  if (gap < MIN_EVERY) return { error: `That would run ${gap === 1 ? "every minute" : `${gap} minutes apart`}. The shortest gap is ${MIN_EVERY} minutes.` };
+  return { spec };
+}
+
+/** Whether a list of day numbers has two days running (`wrap`: the last and the first count as running too). */
+const adjacent = (list: number[], wrap: (last: number, first: number) => boolean) => list.some((d, i) => i > 0 && d === list[i - 1] + 1) || (list.length > 1 && wrap(list[list.length - 1], list[0]));
+
+/** The least minutes between two runs: across its times of day, and across midnight when it can run on two days running. */
+function cronGap(s: CronSpec): number {
+  const times = s.hours.flatMap((h) => s.minutes.map((m) => h * 60 + m)).sort((a, b) => a - b);
+  let gap = Infinity;
+  for (let i = 1; i < times.length; i++) gap = Math.min(gap, times[i] - times[i - 1]);
+  // Both given (either day runs): the 15th and a Monday can be two days running, so count across midnight.
+  const twoDays =
+    s.anyDom === s.anyDow || (!s.anyDow && adjacent(s.dows, (last, first) => last === 6 && first === 0)) || (!s.anyDom && adjacent(s.doms, (last, first) => last >= 28 && first === 1));
+  if (twoDays && times.length) gap = Math.min(gap, times[0] + 24 * 60 - times[times.length - 1]);
+  return gap;
+}
+
+/** Whether the expression runs on this date: its month, and its day of the month or week (either, when both are given). */
+function cronDay(s: CronSpec, day: Civil): boolean {
+  if (!s.months.includes(day.mo)) return false;
+  const dom = s.doms.includes(day.d);
+  const dow = s.dows.includes(day.dow);
+  return s.anyDom && s.anyDow ? true : s.anyDom ? dow : s.anyDow ? dom : dom || dow;
+}
+
+/** The next moment the expression comes due after `from`; undefined when it never does (the 31st of February). */
+function nextCron(s: CronSpec, from: number, tz?: string): number | undefined {
+  const today = dateAt(from, tz);
+  // Four years and a bit: a February 29th comes round.
+  for (let i = 0; i < 1500; i++) {
+    const day = civil(today.y, today.mo, today.d + i);
+    if (!cronDay(s, day)) continue;
+    let best: number | undefined;
+    for (const h of s.hours)
+      for (const m of s.minutes)
+        for (const t of s.anyHour ? instants(day, h * 60 + m, tz) : [instant(day, h * 60 + m, tz)]) if (t > from && (best === undefined || t < best)) best = t;
+    if (best !== undefined) return best;
+  }
+  return undefined;
+}
+
+/** The step a list climbs by from its first value to the field's top (1 for the whole range); undefined when it isn't one. */
+function stepOf2(list: number[], lo: number, hi: number): number | undefined {
+  if (list.length < 2 || list[0] !== lo) return undefined;
+  const step = list[1] - list[0];
+  return list.every((v, i) => v === lo + i * step) && list[list.length - 1] + step > hi ? step : undefined;
+}
+/** "9 AM and 5 PM", "Jan, Apr and Jul". */
+const listText = (words: string[]) => (words.length === 1 ? words[0] : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`);
+/** Whether a list is a run of consecutive numbers. */
+const consecutive = (list: number[]) => list.every((v, i) => i === 0 || v === list[i - 1] + 1);
+
+/**
+ * A cron expression in plain words: "Weekdays at 9 AM", "Every day at 8 AM and 5 PM", "Every 15 minutes,
+ * weekdays", "Every hour, 9 AM to 5 PM", "Every 2 hours at 30 past", "The 1st and 15th of the month at
+ * 9 AM", "Every day at 9 AM, Jan and Jul".
+ */
+function describeCron(s: CronSpec): string {
+  const minStep = stepOf2(s.minutes, 0, 59);
+  const hourStep = stepOf2(s.hours, 0, 23);
+  const past = (m: number[]) => (m.length === 1 && m[0] === 0 ? "" : ` at ${listText(m.map(String))} past`);
+  const span = () => (hourStep === undefined && consecutive(s.hours) && s.hours.length > 1 ? `, ${clock(s.hours[0] * 60 + s.minutes[0])} to ${clock(s.hours[s.hours.length - 1] * 60 + s.minutes[s.minutes.length - 1])}` : "");
+  let time: string;
+  let leads = true;
+  if (minStep === 1) time = `Every minute${span()}`;
+  else if (minStep !== undefined) time = `Every ${minStep} minutes${hourStep === 1 ? "" : span() || `, ${listText(s.hours.map((h) => clock(h * 60)))}`}`;
+  else if (hourStep === 1) time = `Every hour${past(s.minutes)}`;
+  else if (hourStep !== undefined) time = `Every ${hourStep} hours${past(s.minutes)}`;
+  else if (span() && s.minutes.length === 1) time = `Every hour${past(s.minutes)}${span()}`;
+  else if (s.minutes.length === 1 && s.hours.length > 2 && s.hours.every((h, i) => i === 0 || h - s.hours[i - 1] === s.hours[1] - s.hours[0]))
+    // Evenly spaced hours not from midnight ("1-23/2"): every so many hours, from the first.
+    time = `Every ${s.hours[1] - s.hours[0]} hours from ${clock(s.hours[0] * 60 + s.minutes[0])}`;
+  else {
+    const times = s.hours.flatMap((h) => s.minutes.map((m) => clock(h * 60 + m)));
+    time = `at ${times.length > 8 ? `${times.length} times a day` : listText(times)}`;
+    leads = false;
+  }
+  // The days, as they'd read mid sentence ("weekdays", "Mondays", "the 1st of the month"); every day is "".
+  const dows = s.anyDow ? "" : daysText(s.dows);
+  const doms = s.anyDom ? "" : `the ${listText(s.doms.map(ordinal))} of the month`;
+  const days = s.anyDom && s.anyDow ? "" : dows && doms ? `${doms} and ${dows}` : doms || dows;
+  const months = s.months.length === 12 ? "" : `, ${listText(s.months.map((m) => MONTHS[m - 1]))}`;
+  const lead = days ? days.charAt(0).toUpperCase() + days.slice(1) : "Every day";
+  return leads ? `${time}${days ? `, ${days}` : ""}${months}` : `${lead} ${time}${months}`;
 }
 
 /* ---------------- Checking one ---------------- */
@@ -450,6 +637,11 @@ export function normalizeSchedule(input: unknown): { schedule: ScheduleLike } | 
       const w = tidyWindow(s.hours, s.days);
       return "error" in w ? w : { schedule: { kind: "before_event", minutes: m, source: "googlecalendar", ...w } };
     }
+    case "cron": {
+      const expr = typeof s.expr === "string" ? s.expr.trim().replace(/\s+/g, " ") : "";
+      const c = parseCron(expr);
+      return "error" in c ? c : { schedule: { kind: "cron", expr } };
+    }
   }
   return { error: "That isn't a schedule Bops knows." };
 }
@@ -547,6 +739,10 @@ export function describeSchedule(s: ScheduleLike, tz?: string): string {
     const m = Math.round(Number(s.minutes));
     const lead = m % 60 === 0 && m >= 60 ? (m === 60 ? "1 hour" : `${m / 60} hours`) : `${m} minutes`;
     return [`${lead} before each meeting`, ...windowParts(s)].join(", ");
+  }
+  if (s.kind === "cron") {
+    const c = parseCron(s.expr);
+    return "error" in c ? `Cron "${String(s.expr)}"` : describeCron(c.spec);
   }
   return "On a schedule";
 }

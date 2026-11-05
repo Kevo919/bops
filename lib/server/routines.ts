@@ -64,7 +64,7 @@ export const zoneOf = (r: Pick<Routine, "timeZone">) => (r.timeZone && validTime
 /** A schedule in a few plain words, in `tz` (else the user's zone): "Weekdays at 9 AM", "Every 2 hours, 8 AM to 10 PM". */
 export const describeSchedule = (schedule: Schedule, tz?: string) => describe(schedule, tz || routineZone());
 
-/** The gap between an "every" or meeting routine's runs, in ms; undefined for the rest. */
+/** The gap between an "every" or meeting routine's runs, in ms; undefined for the rest (a cron one too: its runs are wall clock times, so the timed kinds' late rule applies). */
 const beatOf = (s: Schedule) => (s.kind === "every" ? s.minutes * 60_000 : s.kind === "before_event" ? EVENT_CHECK_MINUTES * 60_000 : undefined);
 
 /** A quiet run's answer when nothing needs the user. */
@@ -236,7 +236,7 @@ export function createRoutine(botId: string, title: string, goal: string, schedu
   if (!bot(botId)) return { error: "No such bot." };
   const owner = ownerName();
   const outside = opts.fromOutside?.trim() || undefined;
-  if (outside && (schedule?.kind === "every" || schedule?.kind === "before_event" || (schedule && "times" in schedule && (schedule.times?.length ?? 0) > 1)))
+  if (outside && (schedule?.kind === "every" || schedule?.kind === "before_event" || schedule?.kind === "cron" || (schedule && "times" in schedule && (schedule.times?.length ?? 0) > 1)))
     return { error: `Only ${owner} can set up a routine that repeats through the day.` };
   if (outside && opts.deliverTo) return { error: `Only ${owner} can have a routine's results sent by text, email, Slack, Telegram or Discord. Its results stay in this chat.` };
   // The model its runs are on is the owner's to pick (their keys pay for it): never on someone else's say.
@@ -321,7 +321,7 @@ export function editRoutine(
     if (bad) return { error: bad };
   }
   // And at most once a day: a stranger's routine never repeats through the day (createRoutine).
-  if (r.fromOutside && (patch.schedule?.kind === "every" || patch.schedule?.kind === "before_event" || (patch.schedule && "times" in patch.schedule && (patch.schedule.times?.length ?? 0) > 1)))
+  if (r.fromOutside && (patch.schedule?.kind === "every" || patch.schedule?.kind === "before_event" || patch.schedule?.kind === "cron" || (patch.schedule && "times" in patch.schedule && (patch.schedule.times?.length ?? 0) > 1)))
     return { error: `Only ${ownerName()} can set up a routine that repeats through the day.` };
   const zone = "timeZone" in patch ? checkZone(patch.timeZone) : { timeZone: r.timeZone };
   if (zone.error) return { error: zone.error };
