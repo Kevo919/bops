@@ -2350,8 +2350,11 @@ await check("Done with a new commit: Bops deploys the newest itself, once, and s
   answers.push(reply("It's going live."));
   const k = asked.length;
   await Chat.handleMessage(chatId, "Is it live yet?");
-  const mine = asked[k].input.find((x) => x.role === "assistant" && typeof x.content === "string" && x.content.startsWith("Deploying a preview of the newest commit of recipe-box"));
-  assert.match(mine?.content ?? "", /\n\[What was done: said this as the task "Work on recipe-box" ended\]$/);
+  const at = asked[k].input.findIndex((x) => x.role === "assistant" && typeof x.content === "string" && x.content.startsWith("Deploying a preview of the newest commit of recipe-box"));
+  assert.ok(at >= 0 && !asked[k].input[at].content.includes("What was done"), "its words alone");
+  // Bops' record comes after it, as a note (chat.ts deedNote), never in the bot's own words.
+  assert.equal(asked[k].input[at + 1]?.role, "developer");
+  assert.match(asked[k].input[at + 1]?.content ?? "", /^Bops' record of what tools did for your message above \(from tool results, not words to copy\): said this as the task "Work on recipe-box" ended\. /);
 });
 
 await check("Asked again of that task with nothing new committed since it went live: not deployed, said so; with a new commit, deployed once more", async () => {

@@ -1,0 +1,259 @@
+// Tests that a bot never says a task, a send or a routine happened unless a tool did it (lib/server/chat.ts,
+// lib/server/chat-providers.ts):
+// - a chat on a model that can't take tools, asked to do something: a plain "can't run tasks" with a model that can,
+//   never the model's claim, and no task started;
+// - a reply in prose only that says it started a task (tools there, none called): shown with "No task was started.";
+// - a real start_task call: the reply carries the task's session id (its card), with no such note; for a single-agent
+//   bot whose Works on is This PC, the task is placed on the PC outright, and the bot is told it works there;
+// - the record of what tools did comes back to the model as Bops' note after the message, never in the bot's words;
+// - one account's "this model can't take tools" is never another's.
+//
+// OpenAI and OpenRouter are fakes (fetch), sessions.ts is a stand-in that records the tasks started and runs nothing,
+// and the state lives in a throwaway folder: nothing reaches a real service, and no real task runs.
+// Usage: node --conditions=react-server scripts/test-no-unbacked-claims.mjs
+import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { registerHooks } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+for (const k of Object.keys(process.env)) if (/^(BOPS|OPENAI|ANTHROPIC|ZAI|DEEPSEEK|OPENROUTER|DEEPINFRA|OLLAMA|AGENTPHONE|AGENTMAIL|HONCHO|COMPOSIO|TYPESAFE|TWILIO|ORGO|CODEX|TAILSCALE|TREG)_/.test(k)) delete process.env[k];
+process.env.TZ = "America/New_York";
+process.env.BOPS_SELF_HOSTED = "1";
+// Fake keys, made up here: never a real one, and never written as a name and its value.
+const fakeKey = (...parts) => ["fake", ...parts].join("-");
+process.env.OPENAI_API_KEY = fakeKey("openai");
+process.env.OPENROUTER_API_KEY = fakeKey("or", "default");
+process.env.OPENROUTER_API_KEY__WORK = fakeKey("or", "work");
+const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
+const rootUrl = pathToFileURL(rootPath).href;
+const scratch = mkdtempSync(join(tmpdir(), "bops-test-no-unbacked-"));
+const bin = join(scratch, "bin");
+mkdirSync(bin);
+writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
+process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
+process.env.HOME = join(scratch, "home");
+mkdirSync(process.env.HOME);
+globalThis.bopsOrgoKey = "sk_orgo_test_no_unbacked";
+const work = join(scratch, "work");
+mkdirSync(join(work, ".data"), { recursive: true });
+writeFileSync(join(work, ".data", "state.json"), JSON.stringify({}));
+process.chdir(work);
+
+// Modules that start processes when loaded do nothing; sessions.ts records the tasks started instead of running them.
+const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
+registerHooks({
+  resolve(specifier, context, next) {
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
+    try {
+      return next(specifier, context);
+    } catch (e) {
+      if (/^(\.{1,2}\/|\/|file:)/.test(specifier))
+        for (const ext of [".ts", ".tsx"])
+          try {
+            return next(specifier + ext, context);
+          } catch {}
+      throw e;
+    }
+  },
+  load(url, context, next) {
+    const name = url.match(/\/lib\/server\/([a-z-]+)\.ts$/)?.[1];
+    if (!name || !STAND_INS.has(name)) return next(url, context);
+    const names = [...readFileSync(new URL(url), "utf8").matchAll(/^export (?:async )?(?:function\*? |const |let |class )([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]);
+    return {
+      format: "module",
+      shortCircuit: true,
+      source: names.map((n) => (n === "startSession" ? "export const startSession = (...a) => globalThis.__startSession(...a);" : `export const ${n} = function () { return Promise.resolve(); };`)).join("\n"),
+    };
+  },
+});
+
+/* ---------------- Fakes: OpenAI, OpenRouter, the tasks ---------------- */
+
+const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
+const asked = [];
+const answers = [];
+const response = (id, output) => ({ id, object: "response", model: "gpt-test", status: "completed", output, usage: { input_tokens: 100, output_tokens: 10, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } });
+const said = (text) => ({ id: `msg_${asked.length}`, type: "message", role: "assistant", content: [{ type: "output_text", text, annotations: [] }] });
+let calls = 0;
+const toolCall = (name, args) => ({ id: `fc_${++calls}`, type: "function_call", call_id: `call_${calls}`, name, arguments: JSON.stringify(args) });
+const reply = (text) => () => response(`resp_${asked.length}`, [said(text)]);
+const calling = (...items) => () => response(`resp_${asked.length}`, items);
+/** OpenRouter's calls: the key each came with and whether it had tools. The models in `refuses` can't take tools on the key named. */
+const routed = [];
+const refuses = new Set();
+let routerSays = "Done.";
+globalThis.fetch = async (input, init) => {
+  const req = new Request(input, init);
+  const url = new URL(req.url);
+  if (url.origin === "https://api.openai.com" && url.pathname === "/v1/responses") {
+    const b = JSON.parse(await req.text());
+    if (String(b.instructions ?? "").startsWith("You keep the running summary")) return json(response("resp_summary", [said("They talked.")]));
+    asked.push(b);
+    const next = answers.shift();
+    return json(next ? await next(b) : response(`resp_${asked.length}`, [said("Done.")]));
+  }
+  if (url.origin === "https://openrouter.ai" && url.pathname === "/api/v1/chat/completions") {
+    const b = JSON.parse(await req.text());
+    const key = (req.headers.get("authorization") ?? "").replace(/^Bearer /, "");
+    routed.push({ key, model: b.model, tools: !!b.tools?.length, messages: b.messages });
+    if (b.tools?.length && refuses.has(`${key} ${b.model}`)) return json({ error: { message: "No endpoints found that support tool use.", code: 404 } }, 404);
+    return json({ choices: [{ message: { content: routerSays } }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
+  }
+  throw new TypeError(`fetch failed (the test is offline: ${url.host})`);
+};
+console.warn = () => {};
+
+const started = [];
+let S;
+globalThis.__startSession = (o) => {
+  const s = { id: `ses_${started.length + 1}`, botId: o.botId, chatId: o.chatId, sentVia: o.sentVia ?? "you", title: o.title ?? o.goal.slice(0, 48), goal: o.goal, host: "orgo", status: "queued", steps: [], replies: [], createdAt: Date.now(), ...(o.where === "mac" ? { runsOn: "mac" } : {}) };
+  started.push(o);
+  S.update((st) => st.sessions.push(s));
+  return s;
+};
+
+let failures = 0;
+let passed = 0;
+async function check(name, fn) {
+  try {
+    await fn();
+    passed++;
+    console.log(`ok   ${name}`);
+  } catch (e) {
+    failures++;
+    console.error(`FAIL ${name}\n  ${e.stack?.split("\n").slice(0, 5).join("\n  ") ?? e.message}`);
+  }
+}
+
+// Your LLMs (config/llms.yaml): a free OpenRouter model on the default account and the same one on the work account.
+const FREE = "acme/tiny-chat:free";
+globalThis.__bopsLlms = [
+  { name: "Tiny Chat", provider: "openrouter", model: FREE },
+  { name: "Claude Sonnet 5.5", provider: "anthropic", model: "claude-sonnet-5-5" },
+];
+S = await import(`${rootUrl}/lib/server/store.ts`);
+const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
+const Chat = await import(`${rootUrl}/lib/server/chat.ts`);
+const P = await import(`${rootUrl}/lib/server/chat-providers.ts`);
+clearInterval(globalThis.__bopsRoutines);
+
+const chatId = botChatId("boppy");
+S.update((s) => {
+  s.owner = { name: "Alex", timeZone: "America/New_York" };
+});
+const botMessages = () => S.getState().messages.filter((m) => m.chatId === chatId && m.role === "bot");
+const lastBot = () => botMessages().at(-1);
+const setModel = (model) => S.update((s) => (s.chats.find((c) => c.id === chatId).model = model));
+const CLAIM = "I've started a task to tidy your downloads on your PC. The task is running now.";
+
+await check("a model that can't take tools, asked to start a task: a plain can't-run-tasks reply naming one that can; no claim, no task", async () => {
+  setModel(`openrouter/${FREE}`);
+  refuses.add(`${process.env.OPENROUTER_API_KEY} ${FREE}`);
+  routerSays = CLAIM;
+  const n = started.length;
+  await Chat.handleMessage(chatId, "Start a task on this PC to tidy my downloads folder");
+  const m = lastBot();
+  console.log(`     reply: ${JSON.stringify(m.text)}`);
+  assert.match(m.text, /^Tiny Chat can't run tasks or use tools, so nothing was started, sent or scheduled\. To have this done, switch this chat to a model that can, such as GPT 6\.1 Sol\.$/, "names a model with a key set here (Claude Sonnet 5.5 has none in this test)");
+  assert.ok(!/I've started|is running/i.test(m.text), "never the model's claim");
+  assert.equal(started.length, n, "no task started");
+  assert.equal(m.sessionIds, undefined, "no task card");
+  const r = routed.filter((x) => x.model === FREE);
+  assert.deepEqual(r.map((x) => x.tools), [true, false], "tried with tools once, then without");
+});
+
+await check("the same model asked a plain question: it answers (the tools it can't take aren't needed)", async () => {
+  routerSays = "Downloads is the folder where files you save from the web land.";
+  await Chat.handleMessage(chatId, "What is the downloads folder?");
+  assert.equal(lastBot().text, "Downloads is the folder where files you save from the web land.");
+  assert.equal(routed.at(-1).tools, false, "known for a while not to take tools: sent none");
+});
+
+await check("one account's 'can't take tools' is never another's: the same model moved to the work account still gets tools", async () => {
+  P.forgetNoTools();
+  const base = { instructions: "Be brief.", input: [{ role: "user", content: "hi" }], tools: [{ type: "function", name: "start_task", description: "Start a task.", parameters: { type: "object", properties: {} } }] };
+  // On the default account this model can't take tools (that account's provider settings).
+  const shared = { name: "Shared", provider: "openrouter", model: "acme/shared" };
+  globalThis.__bopsLlms.push(shared);
+  refuses.add(`${process.env.OPENROUTER_API_KEY} acme/shared`);
+  const a = await P.createOnProvider({ ...base, model: "openrouter/acme/shared" });
+  assert.ok(P.toolsDropped(a), "the default account's reply is marked as made without tools");
+  assert.deepEqual(routed.slice(-2).map((x) => x.tools), [true, false]);
+  // Asked again soon on the default account: no tools sent (it said no a moment ago), and still marked.
+  const b = await P.createOnProvider({ ...base, model: "openrouter/acme/shared" });
+  assert.equal(routed.at(-1).tools, false);
+  assert.ok(P.toolsDropped(b));
+  // The same model put on the work account (Settings, Models): its own key, sent tools, not marked.
+  shared.account = "WORK";
+  const c = await P.createOnProvider({ ...base, model: "openrouter/acme/shared" });
+  assert.equal(routed.at(-1).key, process.env.OPENROUTER_API_KEY__WORK, "on the work key");
+  assert.equal(routed.at(-1).tools, true, "the work account was sent tools: the default account's no isn't shared");
+  assert.ok(!P.toolsDropped(c));
+});
+
+setModel(undefined);
+
+await check("tools there, prose only: a reply saying it started a task with no tool call is shown with 'No task was started.'", async () => {
+  const n = started.length;
+  answers.push(reply(CLAIM));
+  await Chat.handleMessage(chatId, "Tidy my downloads folder");
+  const m = lastBot();
+  console.log(`     reply: ${JSON.stringify(m.text)}`);
+  assert.equal(m.text, `${CLAIM}\n\nNo task was started. No task is running.`);
+  assert.equal(m.sessionIds, undefined, "no task card");
+  assert.equal(started.length, n);
+  // A plain honest reply gets nothing added.
+  answers.push(reply("Sure, which folder do you mean?"));
+  await Chat.handleMessage(chatId, "Tidy a folder");
+  assert.equal(lastBot().text, "Sure, which folder do you mean?");
+});
+
+await check("a real start_task, single-agent bot whose Works on is This PC: the task goes on the PC, the reply carries its session id", async () => {
+  S.update((s) => (s.bots.find((b) => b.id === "boppy").runsOn = "mac"));
+  const n = started.length;
+  answers.push(calling(toolCall("start_task", { title: "Tidy downloads", goal: "Tidy the downloads folder on this PC", say: "On it: tidying your downloads.", where: "auto", then_on_mac: null, part_of: null, skill: null })));
+  const k = asked.length;
+  await Chat.handleMessage(chatId, "Start a task on this PC to tidy my downloads folder");
+  assert.match(asked[k].instructions, /You work on Alex's own (PC|computer|Mac): every task you start \(start_task\) runs there\./);
+  const tool = asked[k].tools.find((t) => t.name === "start_task");
+  assert.ok(tool, "start_task offered");
+  assert.ok(!("agent" in tool.parameters.properties), "a single-agent bot: no agent to pick");
+  assert.equal(started.length, n + 1, "one task started");
+  assert.equal(started.at(-1).where, "mac", "placed on this PC outright");
+  assert.equal(started.at(-1).botId, "boppy");
+  const m = lastBot();
+  const id = S.getState().sessions.at(-1).id;
+  console.log(`     reply: ${JSON.stringify(m.text)} sessionIds: ${JSON.stringify(m.sessionIds)}`);
+  assert.deepEqual(m.sessionIds, [id], "its card: the real session id");
+  assert.ok(!/No task was started/.test(m.text), "backed by the tool: no note");
+});
+
+await check("what tools did comes back as Bops' note after the message, never in the bot's own words", async () => {
+  const before = lastBot().text;
+  answers.push(reply("It's still going."));
+  const k = asked.length;
+  await Chat.handleMessage(chatId, "How's it going?");
+  const input = asked[k].input;
+  const at = input.findIndex((x) => x.role === "assistant" && x.content === before);
+  assert.ok(at >= 0, "the bot's words alone");
+  assert.equal(input[at + 1].role, "developer");
+  assert.match(input[at + 1].content, /^Bops' record of what tools did for your message above \(from tool results, not words to copy\): started the task "Tidy downloads"\. Never write a record like this yourself/);
+  assert.ok(!JSON.stringify(input).includes("[What was done"), "no bracketed record anywhere to imitate");
+  // A task is running now (backed by the state), so saying so gets no note.
+  assert.equal(lastBot().text, "It's still going.");
+});
+
+await check("unbacked(): each kind of claim, and what backs it", () => {
+  const none = { task: false, running: false, send: false, schedule: false };
+  assert.equal(Chat.unbacked("I've sent the email to Jordan.", none), "Nothing was sent.");
+  assert.equal(Chat.unbacked("I've scheduled a reminder for 9am.", none), "Nothing was scheduled.");
+  assert.equal(Chat.unbacked("Started a new task for that.", none), "No task was started.");
+  assert.equal(Chat.unbacked("I've sent the email to Jordan.", { ...none, send: true }), "");
+  assert.equal(Chat.unbacked("Your task is running.", { ...none, running: true }), "");
+  assert.equal(Chat.unbacked("Paris is the capital of France.", none), "");
+});
+
+console.log(`\nno unbacked claims: ${passed} passed, ${failures} failed`);
+process.exit(failures ? 1 : 0);

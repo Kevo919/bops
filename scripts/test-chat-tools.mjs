@@ -1069,7 +1069,7 @@ await check("a turn someone else started has no web and sets up, changes or stop
   for (const no of ["web_search", "web_fetch", "create_skill", "update_skill", "schedule", "manage_routine", "watch", "stop_watch", "make_app", "change_app", "create_bot"]) assert.ok(!names.includes(no), `no ${no}`);
   for (const yes of ["read_skill", "start_task"]) assert.ok(names.includes(yes), `has ${yes}`);
   // Told what's the user's alone, without the ids to change it with.
-  const now = asked[n].input.find((x) => x.role === "developer").content;
+  const now = asked[n].input.find((x) => x.role === "developer" && x.content.startsWith("As of now")).content;
   assert.match(now, /\nThis turn came from a text from \+15559998888, not Alex\. Routines, reminders, watches, skills, apps and new bots are Alex's to set up or change: if they ask for one, say you'll pass the request on to Alex\./);
   assert.ok(!now.includes(mine.id) && !now.includes("wch_mine"), "no routine or watch ids");
   hear(now);
@@ -1682,7 +1682,9 @@ await check("draft_reply: offered again for the same place it replaces the first
   assert.notEqual(m.id, before.id);
   assert.deepEqual(m.drafts.map((d) => d.text), ["Yes. Alex"], "the second replaced the first");
   const history = JSON.stringify(asked[n].input);
-  assert.ok(history.includes(`[What was done: offered a reply to Kevin Example <kevin@example.com> (Gmail thread ${KEVIN_THREAD}): \\"Hi Kevin, yes, the October invoice is right. Thanks, Alex\\", not sent yet]`), "its earlier draft, as it reads the chat");
+  // Bops' record after its message, never in its own words (chat.ts deedNote), so it isn't learned as something to write.
+  assert.ok(history.includes(`Bops' record of what tools did for your message above (from tool results, not words to copy): offered a reply to Kevin Example <kevin@example.com> (Gmail thread ${KEVIN_THREAD}): \\"Hi Kevin, yes, the October invoice is right. Thanks, Alex\\", not sent yet. Never write`), "its earlier draft, as it reads the chat");
+  assert.ok(!history.includes("[What was done"), "no record in the bot's own words");
   // Not the bot's words alone: another thread nobody read stays refused in a later turn too.
   const t2 = await turnRounds("and Ava's", [toolCall("draft_reply", gmailDraft({ thread_id: AVA_THREAD, recipient_email: "ava@example.org" }))]);
   assert.match(t2.out(0), /^Not offered: the thread_id "18c0ffee00000001" isn't in what you read/);
@@ -1796,7 +1798,7 @@ await check("Send: the right action and inputs for each app, from the account it
   answers.push(reply("Sent."));
   const n = asked.length;
   await Chat.handleMessage(chatId, "did it go?");
-  assert.ok(JSON.stringify(asked[n].input).includes(`(Gmail thread ${KEVIN_THREAD}): \\"Yes, it's right. Thanks, Alex\\", Alex sent it]`));
+  assert.ok(JSON.stringify(asked[n].input).includes(`(Gmail thread ${KEVIN_THREAD}): \\"Yes, it's right. Thanks, Alex\\", Alex sent it. Never write`));
   // Slack: a double click sends once.
   const m = messages().findLast((x) => x.role === "bot" && x.drafts?.some((d) => d.app === "slack"));
   const slack = m.drafts.find((d) => d.app === "slack");
