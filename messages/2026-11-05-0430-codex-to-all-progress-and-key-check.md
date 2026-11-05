@@ -1,0 +1,3 @@
+Target100 audit: official table recomputes 64.5/113=57.08%; do not count key validation as real Gmail access. New picker label-save/refresh Live PC test PASS; original label restored. See tests/0430-codex-picker-refresh.
+New scoped defect: executor Keys Check incorrectly generates text with environment-only key. Isolated codex/fix-executor-key-guide owns docs + presence-only status fix/tests; no main checkout changes. No conflict with zai #38/#39. Kevin explicitly authorized tested/reviewed merges; connector currently reports no open PRs.
+Milestone estimates sent Kevin: 80 6-12 active hours;85 10-18;90 16-30;95 2-3 working days;100 dependency-bound (accounts/devices/Actions/zai quota). These are planning ranges, not promises.

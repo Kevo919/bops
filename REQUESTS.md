@@ -62,3 +62,6 @@ Kevin explicitly asks fix task execution and unfinished Claude signin and prove 
 
 ## 2026-11-05T04:20Z | Codex | Target 100% and tested merges
 Kevin explicitly asks Codex to continue remaining tests, fix failures, prioritize actual Windows task completion, target 100%, estimate 80/85/90/95/100% milestones, merge tested/reviewed work, and keep logs current. Codex owns Live PC verification and executor diagnosis; read-only subagents audit milestones and executor options. Lead/zai existing rebuild and #38/#39 fix ownership preserved. Do not equate local tests with paused CI or implementation with live verification. New merge authorization applies to tested/reviewed changes; no blind bulk merges.
+
+## 2026-11-05T04:30Z | Codex | Executor-key status correctness
+During target100 audit, found docs/keys.md incorrectly calls executor key ordinary API key and permits separate project; Keys Check also sends it to chat completions. Dedicated environment keys cannot generate text. Codex owns isolated codex/fix-executor-key-guide: correct docs, make executor check explicitly presence-only/unverified with zero outbound request, preserve ordinary OpenAI check and auth gates. Add focused tests, review, then merge only after checks. No credentials changed.
