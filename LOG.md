@@ -6,6 +6,11 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 5:00 AM (Chicago)
+- **Testing score: 66%.** Everything merged overnight is on your PC and the server.
+- **Merged overnight:** #68 voice privacy fixes, #69 Memory says when its service is down, #70 the new phone layout (every screen reachable at phone width; desktop unchanged), #71 a test fix found on the server, #72 plain wording about which OpenAI key powers chat.
+- **When you're up:** unlock the PC so Codex can test in the real app; sign in to Gmail in Logins; turn GitHub's checks back on; pick a fix for PC bot tasks; install the phone app to try the new layout.
+
 ### Nov 5, 1:55 AM (Chicago)
 - **Testing score: 66%.** Three new features were added to the table, so the number dipped a little even though more is tested. The server passed every automatic test on tonight's version.
 - **Merged:** #64 free local voice (talk to bots through your own speech service; OpenAI only as a fallback), #65 the phone card now asks before Unpair or Pair again, #66 the Repos page spacing. #65 and #66 came from the robot click-through.
