@@ -138,6 +138,7 @@ let snapshots = [local("codex"), local("claude", "missing", { error: "Install Cl
 calls.length = 0;
 answer = (path, body) => {
   if (path === "/api/config") return json({ selfHosted: true });
+  if (path === "/api/pc-task-runner") return json({ choice: null, runner: null, problem: "No AI is set up for bot tasks on this PC.", openaiKey: { set: false, masked: "" } });
   assert.equal(path, "/api/local-subscriptions", "no cloud APIs are needed for local sign-in");
   if (!body) return json({ subscriptions: snapshots });
   assert.equal(body.kind, "codex");
@@ -149,6 +150,8 @@ const noHost = { ...state, host: "mac", bots: [{ ...bot, computerId: undefined, 
 let localMount = await mount({ state: noHost }, AiSubscriptionsCard);
 assert.equal(button(localMount.box, "This PC").getAttribute("aria-pressed"), "true");
 assert.match(localMount.box.textContent, /No bot computer or AI profile is needed/);
+assert.doesNotMatch(localMount.box.textContent, /coming later/);
+assert.ok(button(localMount.box, "Your Claude plan (signed in)") && button(localMount.box, "OpenAI key"), "Bot tasks on this PC offers both runners");
 assert.match(localMount.box.textContent, /Claude subscriptions do not power Bops chat/);
 assert.ok(!button(localMount.box, "Sign in with your ChatGPT subscription").disabled);
 assert.ok(button(localMount.box, "Sign in with your Claude subscription").disabled);
@@ -194,7 +197,47 @@ localMount = await mount({}, LocalSubscriptions);
 assert.match(localMount.box.textContent, /only to the self-hosted owner/);
 await localMount.done();
 console.log("ok API access failure is visible rather than a silent empty card");
-console.log("local subscriptions ui: 4 passed");
+// Bot tasks on this PC: the choice and the OpenAI key box. The key is posted once and never shown back, only its mask.
+{
+  const { PcTaskRunnerCard } = await import(pathToFileURL(`${root}/components/app/setup.tsx`).href);
+  const KEY = `sk-proj-${"K".repeat(40)}`;
+  let view = { choice: null, runner: "claude", openaiKey: { set: false, masked: "" } };
+  calls.length = 0;
+  answer = (path, body) => {
+    assert.equal(path, "/api/pc-task-runner");
+    if (body?.choice !== undefined) view = { ...view, choice: body.choice, runner: body.choice, ...(body.choice === "openai" && !view.openaiKey.set ? { runner: null, problem: "Add an OpenAI environment key in Settings, Bot tasks on this PC, then try again." } : {}) };
+    if (typeof body?.key === "string") view = { ...view, runner: view.choice ?? "claude", problem: undefined, openaiKey: body.key ? { set: true, masked: "ends in KKKK" } : { set: false, masked: "" } };
+    return json(view);
+  };
+  const m2 = await mount({}, PcTaskRunnerCard);
+  assert.match(m2.box.textContent, /Bot tasks on this PC/);
+  assert.match(m2.box.textContent, /Not chosen yet, so tasks use your Claude plan for now/);
+  assert.equal(button(m2.box, "Your Claude plan (signed in)").getAttribute("aria-pressed"), "true");
+  await click(m2.box, "OpenAI key");
+  assert.deepEqual(calls.at(-1).body, { choice: "openai" });
+  assert.match(m2.box.textContent, /Add an OpenAI environment key in Settings, Bot tasks on this PC/);
+  assert.match(m2.box.textContent, /environment key, not an ordinary API key/);
+  assert.match(m2.box.textContent, /Agents, Environments, Keys/);
+  const input = m2.box.querySelector('input[aria-label="OpenAI key for bot tasks"]');
+  assert.equal(input.getAttribute("type"), "password");
+  // React's own change handler for the box (linkedom's input events don't reach a password box's onChange here).
+  await act(async () => {
+    input[Object.keys(input).find((k) => k.startsWith("__reactProps"))].onChange({ target: { value: KEY } });
+    await settle();
+  });
+  assert.ok(!button(m2.box, "Save key").disabled);
+  await act(async () => { m2.box.querySelector("form").dispatchEvent(new win.Event("submit", { bubbles: true, cancelable: true })); await settle(); });
+  assert.deepEqual(calls.at(-1).body, { key: KEY });
+  assert.equal(input.value, "", "the box empties once the key is sent");
+  assert.ok(!m2.box.innerHTML.includes(KEY), "the key is never shown back");
+  assert.match(m2.box.textContent, /Saved on this PC \(ends in KKKK\)/);
+  assert.doesNotMatch(m2.box.textContent, /[\u2013\u2014]/, "no dashes in shown text");
+  await click(m2.box, "Remove key");
+  assert.deepEqual(calls.at(-1).body, { key: "" });
+  await m2.done();
+  console.log("ok Bot tasks on this PC: choice, masked OpenAI key box, never echoed");
+}
+console.log("local subscriptions ui: 5 passed");
 for (const hosted of [false, true]) {
   calls.length = 0;
   if (hosted) win.bopsMac = {}; else delete win.bopsMac;

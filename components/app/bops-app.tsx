@@ -52,7 +52,7 @@ import { readyAgents } from "@/lib/agents";
 import { footerPageOf, openFooterPage } from "./sidebar-footer";
 import { CloudUnreachable, SignIn, useAuthStatus } from "./sign-in";
 import { PickComputer, useSizePick } from "./computer-size";
-import { AiSubscriptionsCard, ThisMacSettings } from "./setup";
+import { AiSubscriptionsCard, PhoneCard, ThisMacSettings, usePhonePairable } from "./setup";
 import { TooltipLayer } from "./tooltip";
 import { LoginsPage } from "./logins";
 import { MacPreviews } from "./mac-tab";
@@ -1205,7 +1205,7 @@ function Bops({ state }: { state: AppState | null }) {
             <>
               {narrow ? <div className={mShow === "chat" ? "contents" : "hidden"}>{chatColumn}</div> : chatColumn}
               {panelOpen && (
-                <section ref={panelRef} className={`relative ${narrow && mShow !== "panel" ? "hidden" : "flex"} min-h-0 min-w-0 flex-col bg-white`}>
+                <section ref={panelRef} data-panel className={`relative ${narrow && mShow !== "panel" ? "hidden" : "flex"} min-h-0 min-w-0 flex-col bg-white`}>
                   {!narrow && <ChatEdge from={sidebarWidth} width={chatWidth} onWidth={setChatWidth} onDragging={setEdgeDragged} />}
                   {cutBack && (
                     <div className="absolute left-1/2 top-3 z-40 flex -translate-x-1/2 animate-[screen-in_300ms_ease-out] items-center gap-2 rounded-full bg-ink py-1 pl-3 pr-1 text-[12.5px] leading-4 text-white shadow-[0_10px_24px_-10px_#00000080]">
@@ -1745,14 +1745,44 @@ function MobileRows({ info, onInfo }: { info: PhoneInfo; onInfo: (p: PhoneInfo) 
 }
 
 /**
- * How your bots reach you: your mobile first (the main way your bots know it's you, and where they
- * text you), then your email addresses (emails from them are you). Shown when texting or email is on
- * here; each row says so when its own service isn't, and the line at the top names only what is.
+ * What a self-hosted Bops with neither texting nor email set up says in How bots reach you (and Email and phone): what
+ * the place is for, that neither is set up on this computer, what it takes, and This PC, where each one's state shows.
  */
-function ReachSettings() {
+function ReachNotSetUp({ title = "How your bots reach you", intro, onOpenPC }: { title?: string; intro: string; onOpenPC?: () => void }) {
+  const computerWords = useComputerWords();
+  return (
+    <div data-reach-off className="flex flex-col gap-2 px-[22px] pt-4">
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[13px] font-semibold">{title}</span>
+        <span className="text-[12px] leading-4 text-[#6B6B6B]">{intro}</span>
+      </div>
+      <div className="flex flex-col gap-2 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+        <span className="text-[13px] font-medium leading-4">Texting and email to your bots aren&apos;t set up on this computer yet.</span>
+        <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">
+          Texts and calls need an AgentPhone account and a public web address for texts to arrive at. Email needs an AgentMail account. Each one is a key you add to the .env.local file in your Bops folder (the Phone and Email parts of .env.example name them). Then restart Bops.
+        </span>
+        <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">Until then, your bots reach you here in the app.</span>
+        {onOpenPC && (
+          <button onClick={onOpenPC} className="self-start rounded-full bg-[#F2F2F0] px-3 py-1.5 text-[12.5px] font-medium leading-4 hover:bg-[#EAEAE7]">
+            See what&apos;s set up in {computerWords("This Mac")}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * How your bots reach you: your mobile first (the main way your bots know it's you, and where they
+ * text you), then your email addresses (emails from them are you). While it asks, each row says
+ * Checking; each row says so when its own service isn't on, and the line at the top names only what
+ * is. With neither on here, it says so and what it takes (ReachNotSetUp), never a blank place.
+ */
+function ReachSettings({ onOpenPC }: { onOpenPC?: () => void }) {
   const [phone, setPhone, phoneRead] = usePhoneInfo<PhoneInfo>();
   const [email, setEmail, emailRead] = useOwnerEmailInfo();
-  if (!phone?.on && !email?.on) return null;
+  if (phone?.on === false && email?.on === false)
+    return <ReachNotSetUp intro="This is where you list your mobile number and email addresses, so your bots know a text or email is from you, and can reach you back." onOpenPC={onOpenPC} />;
   // Not known yet (or not read) counts as on: the rows below say how each stands.
   const texting = phone?.on !== false;
   const mailing = email?.on !== false;
@@ -1794,7 +1824,16 @@ function ReachSettings() {
 /** For self-hosting: how your own phone service stands (texting approval, live-voice calls, numbers). */
 function PhoneService() {
   const [info] = usePhoneInfo<PhoneInfo>();
-  if (!info?.on) return null;
+  if (!info) return null;
+  if (!info.on)
+    return (
+      <div className="flex flex-col gap-2 px-[22px] pt-4">
+        <span className="text-[13px] font-semibold">Phone</span>
+        <div className="flex flex-col gap-2.5 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+          <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">Off. Add AGENTPHONE_API_KEY and BOPS_AGENTPHONE_HOOK_URL to .env.local and you can text and call your bots.</span>
+        </div>
+      </div>
+    );
   const texting = info.texting === "approved" || info.texting === "active" ? "ready" : info.texting === "none" ? "not registered yet" : (info.texting ?? "unknown").replace(/_/g, " ");
   return (
     <div className="flex flex-col gap-2 px-[22px] pt-4">
@@ -1945,7 +1984,7 @@ function WhereBotsWork({ state }: { state: AppState }) {
 }
 
 /** Settings' places: Account (yours, in every workspace), then Workspace (the one open now), then Orgo's team's own. */
-export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains" | "look" | "repos";
+export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "phone" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains" | "look" | "repos";
 
 /** A place in Settings' nav: its name, its glyph, and a quiet value on the right. */
 type NavItem = { id: SettingsPane; name: string; icon: React.ReactNode; value?: string | number };
@@ -1960,6 +1999,7 @@ const GLYPHS: Record<SettingsPane, string> = {
   plan: "M2 4.5h12v7H2zM2 7h12M4.5 9.5h2",
   usage: "M3 13V9M6.3 13V6M9.6 13V8M13 13V3.5",
   reach: "M5 2h6v12H5zM7.3 12h1.4",
+  phone: "M5 1.8h6v12.4H5zM7.3 12.3h1.4M2.6 5.5a3.6 3.6 0 0 1 0 5M13.4 5.5a3.6 3.6 0 0 0 0 5",
   ai: "M8 2l1.3 3.4L13 6.7l-3.7 1.3L8 11.5 6.7 8 3 6.7l3.7-1.3z",
   privacy: "M8 2l5 1.9v3.9c0 3.1-2.1 5.6-5 6.6-2.9-1-5-3.5-5-6.6V3.9z",
   mac: "M2.5 3.5h11v7.5h-11zM1.5 13h13",
@@ -1978,7 +2018,7 @@ const GLYPHS: Record<SettingsPane, string> = {
 /** A pane's title and what it's for, above what it holds. */
 function PaneHead({ title, sub }: { title: string; sub?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 px-[22px] pt-6">
+    <div data-pane-head className="flex flex-col gap-0.5 px-[22px] pt-6">
       <span className="text-[22px] font-bold leading-7 tracking-[-0.02em]">{title}</span>
       {sub && <span className="text-[13px] leading-[19px] text-[#6B6B6B]">{sub}</span>}
     </div>
@@ -2084,11 +2124,16 @@ function WorkspaceBots({ state, onOpenBot }: { state: AppState; onOpenBot?: (bot
 }
 
 /** Workspace, Email and phone: its bots' address (Pick or Change) and the number its main bot is texted and called at. */
-function WorkspaceReach({ state }: { state: AppState }) {
+function WorkspaceReach({ state, onOpenPC }: { state: AppState; onOpenPC?: () => void }) {
   const ws = currentWorkspace(state);
   const w = state.workspaces?.find((x) => x.id === ws);
   const main = state.bots.find((b) => b.isMain && workspaceOf(b) === ws);
   const has = !!(w?.mailClaimed || w?.mailPick);
+  const [phone] = usePhoneInfo<PhoneInfo>();
+  const [email] = useOwnerEmailInfo();
+  // Neither texting nor email here (a self-hosted Bops without AgentPhone or AgentMail): no number or address will come.
+  if (phone?.on === false && email?.on === false && !w?.line?.phone && !has)
+    return <ReachNotSetUp title="Texts, calls and email" intro={`This is where you see the address people email and the number they text to reach ${w?.name ?? "this workspace"}'s bots.`} onOpenPC={onOpenPC} />;
   return (
     <>
       <EmailAddresses state={state} only={ws} />
@@ -2160,10 +2205,12 @@ export function Settings({
   // The workspace's domains (bought through Orgo): only where apps are shown (an @orgo.ai account, its own workspace).
   const domains = appsOwnShown(state);
   const apps = appsShown(state);
+  // Your phone only where pairing works: the owner's own Bops window (the server says, /api/remote), never a shared workspace.
+  const pairable = usePhonePairable(!state.shared);
   // An Admin of a shared workspace has its Team too (who's in: lib/server/shared-people.ts); never its chart or email.
   const adminHere = state.shared?.role === "admin";
   // The look is the owner's own window (never a shared workspace's): its pane is theirs alone too.
-  const fits = (p?: SettingsPane) => !!p && (p !== "domains" || domains) && (p !== "apps" || apps) && (p !== "look" || !state.shared) && (p !== "repos" || !state.shared) && (!state.shared || ((p !== "team" || adminHere) && p !== "chart" && p !== "email"));
+  const fits = (p?: SettingsPane) => !!p && (p !== "domains" || domains) && (p !== "apps" || apps) && (p !== "look" || !state.shared) && (p !== "repos" || !state.shared) && (p !== "phone" || !state.shared) && (!state.shared || ((p !== "team" || adminHere) && p !== "chart" && p !== "email"));
   const [pane, setPane] = useState<SettingsPane>(fits(at) ? at! : "profile");
   // A narrow window (narrow.ts) shows the nav or a place, never both: the nav first when Settings opened at no place in
   // particular; a place asked for (Logins, Plan and credit) opens at it, its Back going to the nav.
@@ -2206,6 +2253,7 @@ export function Settings({
     item("plan", "Plan and credit"),
     item("usage", "Usage"),
     item("reach", "How bots reach you"),
+    ...(pairable && !shared ? [item("phone", "Your phone")] : []),
     ...(BRAINS_ON ? [item("ai", "AI plans")] : []),
     ...(!selfHosted ? [item("privacy", "Privacy")] : []),
     item("look", "Look"),
@@ -2296,7 +2344,16 @@ export function Settings({
     body = (
       <>
         <PaneHead title="How bots reach you" sub="Your numbers and emails: how your bots know it's you." />
-        <ReachSettings />
+        <ReachSettings onOpenPC={() => go("mac")} />
+      </>
+    );
+  else if (pane === "phone" && !shared)
+    body = (
+      <>
+        <PaneHead title="Your phone" sub="Bops on your phone: get the app, turn on Tailscale, and pair with one scan." />
+        <div className="flex flex-col gap-2 px-[22px] pt-4">
+          <PhoneCard />
+        </div>
       </>
     );
   else if (pane === "ai" && BRAINS_ON)
@@ -2372,7 +2429,7 @@ export function Settings({
     body = (
       <>
         <PaneHead title="Email and phone" sub={`How people reach ${wsName}'s bots.`} />
-        <WorkspaceReach state={state} />
+        <WorkspaceReach state={state} onOpenPC={() => go("mac")} />
       </>
     );
   else if (pane === "domains" && domains)

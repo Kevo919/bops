@@ -9,7 +9,7 @@ import { ago, memberAnswers, post, quietNothing, StatusIcon } from "./ui";
 import { you } from "@/lib/shared";
 
 type Fact = { id: string; text: string; private: boolean; at?: number; source?: string };
-type Data = { workspace: string; ws: string; own?: boolean; card: Fact[]; facts: Fact[]; error?: string; unreachable?: boolean };
+type Data = { workspace: string; ws: string; own?: boolean; card: Fact[]; facts: Fact[]; error?: string; unreachable?: boolean; off?: boolean };
 /** The bot whose own memory the tab shows (it keeps its memory to itself: lib/chain.ts), so a change goes to its own bank. */
 const OwnMemoryOf = createContext<string | undefined>(undefined);
 /** Each bot's Memory tab as last loaded, so opening it again is instant (then it refreshes). */
@@ -105,6 +105,14 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
       )}
       {editing ? (
         <BotDocs state={state} bot={b} pinned={(data?.card ?? []).map((l) => l.text)} />
+      ) : data?.off ? (
+        <div data-memory-off className="flex flex-col gap-1.5 rounded-[18px] bg-[#F7F7F6] px-5 py-4 text-[13.5px] leading-5">
+          <span className="font-medium">Memory isn&apos;t set up on this computer yet.</span>
+          <span className="text-[#6B6B6B]">
+            So {b.name} doesn&apos;t learn about you from your chats on its own. To turn it on, add a Honcho key (HONCHO_API_KEY) to the .env.local file in your Bops folder, then restart Bops.
+            {!state.shared && " Until then, use Edit to write down what it should remember."}
+          </span>
+        </div>
       ) : (
       <>
       <form
