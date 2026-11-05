@@ -169,7 +169,7 @@ export function goneWords(g: Gone): string {
 export function UndoLine({ g, onUndo, className = "" }: { g: Gone; onUndo: () => void; className?: string }) {
   const can = !g.error && !g.busy && (g.waiting || !!g.restore);
   return (
-    <div role="status" className={`motion-fade-in flex items-center gap-1.5 px-1 py-1 text-[12.5px] leading-4 ${g.error ? "text-[#B42318]" : "text-[#9A9A98]"} ${className}`}>
+    <div role="status" className={`motion-fade-in flex items-center gap-1.5 px-1 py-1 text-[12.5px] leading-4 ${g.error ? "text-[color:var(--ht-b42318)]" : "text-[color:var(--ht-9a9a98)]"} ${className}`}>
       <TrashIcon size={12} />
       <span>{goneWords(g)}</span>
       {can && (
@@ -195,7 +195,7 @@ export function TrashIcon({ size = 13 }: { size?: number }) {
 /** Select messages: a ring, filled with a tick once picked. */
 export function PickRing({ on }: { on: boolean }) {
   return (
-    <span aria-hidden className={`flex size-[18px] shrink-0 items-center justify-center rounded-full transition-colors ${on ? "bg-ink" : "bg-white shadow-[inset_0_0_0_1.5px_#C9C9C6]"}`}>
+    <span aria-hidden className={`flex size-[18px] shrink-0 items-center justify-center rounded-full transition-colors ${on ? "bg-[color:var(--hb-0a0a0a)]" : "bg-white shadow-[inset_0_0_0_1.5px_var(--h-c9c9c6)]"}`}>
       {on && (
         <svg width="10" height="10" viewBox="0 0 16 16">
           <path d="M3 8.5l3 3L13 4.5" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -208,7 +208,7 @@ export function PickRing({ on }: { on: boolean }) {
 /** "Select messages" in a chat's menu: a list with ticks. */
 export function SelectIcon() {
   return (
-    <svg width="13" height="13" viewBox="0 0 16 16" className="shrink-0 text-[#6B6B6B]" aria-hidden>
+    <svg width="13" height="13" viewBox="0 0 16 16" className="shrink-0 text-[color:var(--ht-6b6b6b)]" aria-hidden>
       <circle cx="3.5" cy="4.5" r="1.9" fill="none" stroke="currentColor" strokeWidth="1.3" />
       <circle cx="3.5" cy="11.5" r="1.9" fill="currentColor" />
       <path d="M7.5 4.5h6M7.5 11.5h6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -222,10 +222,10 @@ export function SelectIcon() {
  */
 export function TickRow({ on, onToggle, children }: { on: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
-    <div className={`relative flex w-full items-center gap-2.5 rounded-[14px] px-1.5 py-0.5 transition-colors ${on ? "bg-[#F4F4F2]" : ""}`}>
+    <div className={`relative flex w-full items-center gap-2.5 rounded-[14px] px-1.5 py-0.5 transition-colors ${on ? "bg-[color:var(--hb-f4f4f2)]" : ""}`}>
       <PickRing on={on} />
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-      <button type="button" aria-pressed={on} aria-label={on ? "Picked" : "Pick"} onClick={onToggle} className="absolute inset-0 z-[3] cursor-pointer rounded-[14px] outline-none focus-visible:shadow-[0_0_0_1.5px_#0A0A0A]" />
+      <button type="button" aria-pressed={on} aria-label={on ? "Picked" : "Pick"} onClick={onToggle} className="absolute inset-0 z-[3] cursor-pointer rounded-[14px] outline-none focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]" />
     </div>
   );
 }
@@ -233,12 +233,12 @@ export function TickRow({ on, onToggle, children }: { on: boolean; onToggle: () 
 /** Select messages, over the message box in its place: how many are picked, Cancel, and Delete them. */
 export function TickBar({ count, onCancel, onDelete }: { count: number; onCancel: () => void; onDelete: () => void }) {
   return (
-    <div className="flex items-center gap-2 rounded-[22px] bg-white py-2 pl-4 pr-2 shadow-[0_0_0_1px_#E2E2DF]">
-      <span className="min-w-0 flex-1 text-[13px] leading-[18px] text-[#6B6B6B]">{count ? `${count.toLocaleString("en-US")} picked` : "Pick the messages to delete"}</span>
-      <button type="button" autoFocus onClick={onCancel} className="rounded-full px-3 py-1.5 text-[13px] font-medium leading-4 text-ink hover:bg-[#F2F2F0]">
+    <div className="flex items-center gap-2 rounded-[22px] bg-white py-2 pl-4 pr-2 shadow-[0_0_0_1px_var(--h-e2e2df)]">
+      <span className="min-w-0 flex-1 text-[13px] leading-[18px] text-[color:var(--ht-6b6b6b)]">{count ? `${count.toLocaleString("en-US")} picked` : "Pick the messages to delete"}</span>
+      <button type="button" autoFocus onClick={onCancel} className="rounded-full px-3 py-1.5 text-[13px] font-medium leading-4 text-ink hover:bg-[color:var(--hb-f2f2f0)]">
         Cancel
       </button>
-      <button type="button" disabled={!count} onClick={onDelete} className="rounded-full bg-[#B42318] px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-white disabled:opacity-40">
+      <button type="button" disabled={!count} onClick={onDelete} className="rounded-full bg-[color:var(--hb-b42318)] px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-40">
         {count ? `Delete ${count.toLocaleString("en-US")}` : "Delete"}
       </button>
     </div>

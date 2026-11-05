@@ -211,11 +211,11 @@ function fromLocalInput(v: string, tz: string): number | undefined {
 /* ---------------- Pieces ---------------- */
 
 const chip = (on: boolean) =>
-  `inline-flex h-7 items-center rounded-full px-2.5 text-[12.5px] leading-4 outline-none focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] disabled:opacity-40 ${
-    on ? "bg-ink text-white" : "bg-[#F2F2F0] text-[#3A3A38] hover:bg-[#EAEAE7]"
+  `inline-flex h-7 items-center rounded-full px-2.5 text-[12.5px] leading-4 outline-none focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] disabled:opacity-40 ${
+    on ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "bg-[color:var(--hb-f2f2f0)] text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-eaeae7)]"
   }`;
-const field = "h-7 rounded-full bg-white px-2.5 text-[12.5px] tabular-nums text-ink outline-none shadow-[0_0_0_1px_#E6E6E3] focus:shadow-[0_0_0_1.5px_#0A0A0A] disabled:opacity-40";
-const label = "text-[11.5px] font-medium leading-4 text-[#9A9A98]";
+const field = "h-7 rounded-full bg-white px-2.5 text-[12.5px] tabular-nums text-ink outline-none shadow-[0_0_0_1px_var(--h-e6e6e3)] focus:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] disabled:opacity-40";
+const label = "text-[11.5px] font-medium leading-4 text-[color:var(--ht-9a9a98)]";
 
 /** Left and right arrows move between the buttons of a row of chips. */
 function arrows(e: KeyboardEvent<HTMLElement>) {
@@ -292,7 +292,7 @@ function Minutes({
           {text}
         </button>
       ))}
-      <label className="flex items-center gap-1 text-[12.5px] text-[#6B6B6B]">
+      <label className="flex items-center gap-1 text-[12.5px] text-[color:var(--ht-6b6b6b)]">
         <input
           type="number"
           inputMode="numeric"
@@ -311,7 +311,7 @@ function Minutes({
             if (draft !== null && draft !== "") onChange(clamp(Number(draft), min, max, value));
             setDraft(null);
           }}
-          className={`${field} w-[68px] ${known ? "" : "shadow-[0_0_0_1.5px_#0A0A0A]"}`}
+          className={`${field} w-[68px] ${known ? "" : "shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"}`}
         />
         min
       </label>
@@ -444,7 +444,7 @@ export function CadencePicker({
           : `${words}${next ? `. Next: ${whenText(next, now, tz)}` : ""}`;
 
   return (
-    <div className="flex flex-col gap-2.5 text-[12.5px] leading-4 text-[#3A3A38]">
+    <div className="flex flex-col gap-2.5 text-[12.5px] leading-4 text-[color:var(--ht-3a3a38)]">
       <Group name="Suggested">
         <div role="radiogroup" aria-label="Suggested times" onKeyDown={arrows} className="flex flex-wrap gap-1">
           {chips.map((p, i) => {
@@ -473,7 +473,7 @@ export function CadencePicker({
       </Group>
 
       {custom && (
-        <div id={`${id}-custom`} className="motion-fade-in flex flex-col gap-2.5 rounded-xl bg-white/70 p-2.5 shadow-[inset_0_0_0_1px_#FFFFFF,0_0_0_1px_#0000000F]">
+        <div id={`${id}-custom`} className="motion-fade-in flex flex-col gap-2.5 rounded-xl bg-white/70 p-2.5 shadow-[inset_0_0_0_1px_var(--h-ffffff),0_0_0_1px_var(--h-0000000f)]">
           <label className="flex flex-col gap-1">
             <span className={label}>How often</span>
             <select value={value.kind} disabled={disabled} onChange={(e) => switchTo(e.target.value as Kind)} className={`${field} w-full pr-7`}>
@@ -507,7 +507,7 @@ export function CadencePicker({
                 ))}
                 <option value={-1}>Last day</option>
               </select>
-              {value.dayOfMonth > 28 && <span className="text-[11.5px] text-[#9A9A98]">In a shorter month it runs on the last day.</span>}
+              {value.dayOfMonth > 28 && <span className="text-[11.5px] text-[color:var(--ht-9a9a98)]">In a shorter month it runs on the last day.</span>}
             </label>
           )}
 
@@ -531,7 +531,7 @@ export function CadencePicker({
                         disabled={disabled}
                         aria-label={`Remove ${hhmm(t) ?? t}`}
                         onClick={() => setTimes(all.filter((_, j) => j !== i))}
-                        className="flex h-7 w-6 items-center justify-center rounded-r-full bg-white text-[#9A9A98] shadow-[0_0_0_1px_#E6E6E3] outline-none hover:text-ink focus-visible:shadow-[0_0_0_1.5px_#0A0A0A]"
+                        className="flex h-7 w-6 items-center justify-center rounded-r-full bg-white text-[color:var(--ht-9a9a98)] shadow-[0_0_0_1px_var(--h-e6e6e3)] outline-none hover:text-ink focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
                       >
                         <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden>
                           <path d="M1 1l6 6M7 1L1 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -541,7 +541,7 @@ export function CadencePicker({
                   </span>
                 ))}
                 {timesOf(value).length < MAX_TIMES && (
-                  <button type="button" disabled={disabled} onClick={() => setTimes([...timesOf(value), later(timesOf(value).at(-1))])} className={`${chip(false)} bg-transparent font-medium hover:bg-[#F2F2F0]`}>
+                  <button type="button" disabled={disabled} onClick={() => setTimes([...timesOf(value), later(timesOf(value).at(-1))])} className={`${chip(false)} bg-transparent font-medium hover:bg-[color:var(--hb-f2f2f0)]`}>
                     Add a time
                   </button>
                 )}
@@ -570,7 +570,7 @@ export function CadencePicker({
                     checked={!!value.hours}
                     disabled={disabled}
                     onChange={(e) => onChange({ ...value, hours: e.target.checked ? { from: "09:00", to: "17:00" } : undefined })}
-                    className="size-3.5 accent-[#0A0A0A]"
+                    className="size-3.5 accent-[color:var(--ht-0a0a0a)]"
                   />
                   Only between
                 </label>
@@ -620,9 +620,9 @@ export function CadencePicker({
                 placeholder={DEFAULT_CRON}
                 value={value.expr}
                 onChange={(e) => onChange({ kind: "cron", expr: e.target.value })}
-                className={`${field} w-full font-mono ${cronBad ? "shadow-[0_0_0_1.5px_#C0392B]" : ""}`}
+                className={`${field} w-full font-mono ${cronBad ? "shadow-[0_0_0_1.5px_var(--h-c0392b)]" : ""}`}
               />
-              <span id={`${id}-cron-help`} className="text-[11.5px] text-[#9A9A98]">
+              <span id={`${id}-cron-help`} className="text-[11.5px] text-[color:var(--ht-9a9a98)]">
                 Minute, hour, day of the month, month, day of the week. Steps (*/15), ranges (9-17), lists (1,15) and names (mon, jan) read. At least 15 minutes apart.
               </span>
             </label>
@@ -645,7 +645,7 @@ export function CadencePicker({
             </label>
           )}
 
-          <label className="flex flex-wrap items-center gap-1.5 text-[12px] text-[#6B6B6B]">
+          <label className="flex flex-wrap items-center gap-1.5 text-[12px] text-[color:var(--ht-6b6b6b)]">
             Times are in
             <select value={tz} disabled={disabled} onChange={(e) => onZone(e.target.value)} className={`${field} pr-7`}>
               {zones.map((z) => {
@@ -663,7 +663,7 @@ export function CadencePicker({
         </div>
       )}
 
-      <span aria-live="polite" role={cronBad ? "alert" : undefined} className={`text-[12px] leading-4 ${cronBad ? "text-[#C0392B]" : "text-[#6B6B6B]"}`}>
+      <span aria-live="polite" role={cronBad ? "alert" : undefined} className={`text-[12px] leading-4 ${cronBad ? "text-[color:var(--ht-c0392b)]" : "text-[color:var(--ht-6b6b6b)]"}`}>
         {undash(preview)}
         {!custom && zone && ownerZone && zone !== ownerZone ? ` (${zoneName(zone)} time)` : ""}
       </span>

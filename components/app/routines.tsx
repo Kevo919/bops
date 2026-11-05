@@ -301,7 +301,7 @@ export function RoutineSuggest({
       aria-labelledby={titleId}
       onKeyDown={trap}
       style={{ left: place.left, top: place.top, bottom: place.bottom, width: WIDTH, maxHeight: Math.max(240, place.maxHeight) }}
-      className="motion-dialog-in fixed z-50 flex flex-col overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_#0000000F,0_20px_50px_-18px_#00000059]"
+      className="motion-dialog-in fixed z-50 flex flex-col overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_var(--h-0000000f),0_20px_50px_-18px_var(--h-00000059)]"
     >
       <div className="flex items-start gap-3 px-4 pb-2 pt-3.5">
         <AppLogo app={app} name={appName} size={30} />
@@ -309,13 +309,13 @@ export function RoutineSuggest({
           <span id={titleId} className="text-[14.5px] font-semibold leading-[19px]">
             {bot ? `${bot.name} can handle ${appName} for you` : `Your bots can handle ${appName} for you`}
           </span>
-          <span className="text-[12px] leading-4 text-[#6B6B6B]">Pick what it does on its own. You can change these any time in Routines.</span>
+          <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">Pick what it does on its own. You can change these any time in Routines.</span>
         </div>
       </div>
 
       {pickBot && choices.length > 1 && (
         <div className="flex flex-col gap-1.5 px-4 pb-2">
-          <span className="text-[11.5px] font-medium leading-4 text-[#9A9A98]">Who handles it</span>
+          <span className="text-[11.5px] font-medium leading-4 text-[color:var(--ht-9a9a98)]">Who handles it</span>
           <div role="radiogroup" aria-label="Who handles it" className="flex flex-wrap gap-1.5">
             {choices.map((b) => {
               const on = b.id === botId;
@@ -330,7 +330,7 @@ export function RoutineSuggest({
                     setTicks({});
                     setOpenId(null);
                   }}
-                  className={`flex items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 text-[12.5px] leading-4 outline-none focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] ${on ? "bg-ink text-white" : "bg-[#F2F2F0] text-[#3A3A38] hover:bg-[#EAEAE7]"}`}
+                  className={`flex items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 text-[12.5px] leading-4 outline-none focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] ${on ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "bg-[color:var(--hb-f2f2f0)] text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-eaeae7)]"}`}
                 >
                   <Mascot botId={b.id} color={b.color} size={18} antenna={false} />
                   {b.name}
@@ -369,18 +369,18 @@ export function RoutineSuggest({
       </div>
 
       {error && (
-        <span role="alert" className="px-4 pb-1 text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="px-4 pb-1 text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}
-      <div className="flex items-center justify-end gap-1.5 border-t border-[#F0F0EE] px-3 py-2.5">
-        <button onClick={() => notNow.current()} disabled={busy} className="rounded-full px-3 py-1.5 text-[13px] font-medium leading-4 text-[#3A3A38] outline-none hover:bg-[#F2F2F0] focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] disabled:opacity-40">
+      <div className="flex items-center justify-end gap-1.5 border-t border-[color:var(--h-f0f0ee)] px-3 py-2.5">
+        <button onClick={() => notNow.current()} disabled={busy} className="rounded-full px-3 py-1.5 text-[13px] font-medium leading-4 text-[color:var(--ht-3a3a38)] outline-none hover:bg-[color:var(--hb-f2f2f0)] focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] disabled:opacity-40">
           Not now
         </button>
         <button
           onClick={() => void setUp()}
           disabled={busy || !picked.length || cronBad}
-          className="rounded-full bg-ink px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-white outline-none hover:bg-[#2A2A28] focus-visible:shadow-[0_0_0_1.5px_#0A0A0A,0_0_0_3px_#FFFFFF_inset] disabled:opacity-40"
+          className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-[color:var(--bops-on-fill)] outline-none hover:bg-[color:var(--hb-2a2a28)] focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a),0_0_0_3px_var(--h-ffffff)_inset] disabled:opacity-40"
         >
           {busy ? "Setting up…" : `Set up ${picked.length}`}
         </button>
@@ -422,7 +422,7 @@ function OfferRow({
 }) {
   const id = `offer-${t.id}`;
   return (
-    <div className={`flex flex-col rounded-xl ${open ? "bg-[#F7F7F6]" : ""}`}>
+    <div className={`flex flex-col rounded-xl ${open ? "bg-[color:var(--hb-f7f7f6)]" : ""}`}>
       <div className="flex items-start gap-2.5 px-2 py-2">
         <input
           id={id}
@@ -430,24 +430,24 @@ function OfferRow({
           checked={t.already || ticked}
           disabled={t.already || disabled}
           onChange={(e) => onTick(e.target.checked)}
-          className="mt-0.5 size-4 shrink-0 accent-[#0A0A0A] disabled:opacity-50"
+          className="mt-0.5 size-4 shrink-0 accent-[color:var(--ht-0a0a0a)] disabled:opacity-50"
         />
         <label htmlFor={id} className="flex min-w-0 flex-1 flex-col">
-          <span className={`text-[13.5px] font-medium leading-[18px] ${t.already ? "text-[#9A9A98]" : "text-ink"}`}>{undash(t.title)}</span>
-          <span className="truncate text-[12px] leading-4 text-[#6B6B6B]">{t.already ? `Already on · ${when}` : when}</span>
+          <span className={`text-[13.5px] font-medium leading-[18px] ${t.already ? "text-[color:var(--ht-9a9a98)]" : "text-ink"}`}>{undash(t.title)}</span>
+          <span className="truncate text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{t.already ? `Already on · ${when}` : when}</span>
         </label>
         <button
           onClick={onToggle}
           aria-expanded={open}
           aria-controls={`${id}-more`}
           aria-label={`${open ? "Hide" : "Show"} what ${undash(t.title)} does`}
-          className="flex size-6 shrink-0 items-center justify-center rounded-md text-[#9A9A98] outline-none hover:bg-black/[0.05] hover:text-ink focus-visible:shadow-[0_0_0_1.5px_#0A0A0A]"
+          className="flex size-6 shrink-0 items-center justify-center rounded-md text-[color:var(--ht-9a9a98)] outline-none hover:bg-[color:var(--bops-tint)]/[0.05] hover:text-ink focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
         >
           <Chevron open={open} />
         </button>
       </div>
       {open && (
-        <div id={`${id}-more`} className="motion-fade-in flex flex-col gap-2 pb-3 pl-[34px] pr-3 text-[12.5px] leading-[17px] text-[#3A3A38]">
+        <div id={`${id}-more`} className="motion-fade-in flex flex-col gap-2 pb-3 pl-[34px] pr-3 text-[12.5px] leading-[17px] text-[color:var(--ht-3a3a38)]">
           <span>{undash(t.summary)}</span>
           {schedule && !t.already ? (
             <CadencePicker
@@ -481,7 +481,7 @@ function OfferRow({
 function Line({ label, children }: { label: string; children: ReactNode }) {
   return (
     <span>
-      <span className="text-[#9A9A98]">{label}: </span>
+      <span className="text-[color:var(--ht-9a9a98)]">{label}: </span>
       {children}
     </span>
   );
@@ -505,7 +505,7 @@ export function AppRoutinesButton({
 }) {
   return (
     <span ref={anchorRef} className="flex">
-      <button onClick={onClick} aria-label={label} data-tip={label} className="flex rounded-[8px] outline-none hover:opacity-80 focus-visible:shadow-[0_0_0_1.5px_#0A0A0A]">
+      <button onClick={onClick} aria-label={label} data-tip={label} className="flex rounded-[8px] outline-none hover:opacity-80 focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]">
         <AppLogo app={app} name={name} size={size} />
       </button>
     </span>
@@ -600,10 +600,10 @@ export function BotRoutines({
   return (
     <div className="flex w-full flex-col gap-3">
       {offers.length > 0 && total > 0 && (
-        <div className="flex w-full items-center gap-3 rounded-2xl bg-white/60 px-4 py-3 shadow-[inset_0_0_0_1px_#FFFFFF,0_0_0_1px_#0000000F]">
+        <div className="flex w-full items-center gap-3 rounded-2xl bg-white/60 px-4 py-3 shadow-[inset_0_0_0_1px_var(--h-ffffff),0_0_0_1px_var(--h-0000000f)]">
           <div className="flex min-w-0 flex-1 flex-col">
             <span className="text-[13px] font-semibold leading-4">Add routines</span>
-            <span className="text-[12px] leading-4 text-[#6B6B6B]">{withKeys ? `From the Connected Apps and keys ${b.name} uses` : `From the Connected Apps ${b.name} uses`}</span>
+            <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{withKeys ? `From the Connected Apps and keys ${b.name} uses` : `From the Connected Apps ${b.name} uses`}</span>
           </div>
           <span className="flex shrink-0 flex-wrap justify-end gap-1.5">{logos}</span>
         </div>
@@ -613,28 +613,28 @@ export function BotRoutines({
         <div className="flex flex-col gap-2.5">
           <div className="flex items-center gap-1.5 px-1">
             <span className="text-[13px] font-semibold leading-4">
-              Routines <span className="font-normal tabular-nums text-[#9A9A98]">{only ? `${shown.schedules.length + shown.monitors.length} of ${total}` : total}</span>
+              Routines <span className="font-normal tabular-nums text-[color:var(--ht-9a9a98)]">{only ? `${shown.schedules.length + shown.monitors.length} of ${total}` : total}</span>
             </span>
-            {needs > 0 && <span className="rounded-full bg-[#FEF3F2] px-2 py-0.5 text-[11.5px] font-medium leading-4 text-[#B42318]">{needs === 1 ? "1 needs you" : `${needs} need you`}</span>}
+            {needs > 0 && <span className="rounded-full bg-[color:var(--hb-fef3f2)] px-2 py-0.5 text-[11.5px] font-medium leading-4 text-[color:var(--ht-b42318)]">{needs === 1 ? "1 needs you" : `${needs} need you`}</span>}
             <span className="flex-1" />
             <button
               onClick={seeAll}
               aria-label={`See all of ${b.name}'s routines`}
-              className="rounded-md text-[12px] font-medium leading-4 text-ink outline-none hover:text-[#3A3A38] focus-visible:shadow-[0_0_0_1.5px_#0A0A0A]"
+              className="rounded-md text-[12px] font-medium leading-4 text-ink outline-none hover:text-[color:var(--ht-3a3a38)] focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
             >
               See all ›
             </button>
           </div>
           {/* Opened for one Connected App: only its, until the pill's x. */}
           {only && (
-            <span className="flex h-7 items-center gap-1.5 self-start rounded-full bg-ink pl-3 pr-1 text-[12.5px] font-medium leading-4 text-white">
+            <span className="flex h-7 items-center gap-1.5 self-start rounded-full bg-[color:var(--hb-0a0a0a)] pl-3 pr-1 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)]">
               <AppLogo app={only} name={appName} size={14} />
               {appName}
               <button
                 onClick={() => onApp(null)}
                 aria-label={`Show all of ${b.name}'s routines`}
                 data-tip="Show all"
-                className="flex size-5 items-center justify-center rounded-full text-white/70 outline-none hover:bg-white/15 hover:text-white focus-visible:shadow-[0_0_0_1.5px_#FFFFFF]"
+                className="flex size-5 items-center justify-center rounded-full text-[color:var(--bops-on-fill)]/70 outline-none hover:bg-white/15 hover:text-[color:var(--bops-on-fill)] focus-visible:shadow-[0_0_0_1.5px_var(--h-ffffff)]"
               >
                 <svg width="9" height="9" viewBox="0 0 12 12" aria-hidden>
                   <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -658,7 +658,7 @@ export function BotRoutines({
             </Summary>
           )}
           {rest && (
-            <button onClick={seeAll} className="self-start px-1 text-[12px] leading-4 text-[#6B6B6B] outline-none hover:text-ink focus-visible:underline">
+            <button onClick={seeAll} className="self-start px-1 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)] outline-none hover:text-ink focus-visible:underline">
               {rest}
             </button>
           )}
@@ -678,7 +678,7 @@ export function BotRoutines({
               ))}
             </Summary>
           )}
-          {only && !shown.schedules.length && !shown.monitors.length && <span className="px-1 text-[12.5px] leading-4 text-[#9A9A98]">{`No routines from ${appName}`}</span>}
+          {only && !shown.schedules.length && !shown.monitors.length && <span className="px-1 text-[12.5px] leading-4 text-[color:var(--ht-9a9a98)]">{`No routines from ${appName}`}</span>}
         </div>
       )}
 
@@ -686,7 +686,7 @@ export function BotRoutines({
         <RoutinesEmpty bot={b} asks={askable(state, b)} onAsk={onAsk}>
           {offers.length > 0 && (
             <div className="flex flex-col items-center gap-2 pt-1">
-              <span className="text-[12.5px] leading-4 text-[#6B6B6B]">{withKeys ? `Start with the Connected Apps and keys ${b.name} uses` : `Start with the Connected Apps ${b.name} uses`}</span>
+              <span className="text-[12.5px] leading-4 text-[color:var(--ht-6b6b6b)]">{withKeys ? `Start with the Connected Apps and keys ${b.name} uses` : `Start with the Connected Apps ${b.name} uses`}</span>
               <span className="flex flex-wrap justify-center gap-1.5">{logos}</span>
             </div>
           )}
@@ -714,8 +714,8 @@ export function BotRoutines({
 function Summary({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="px-1 text-[12px] font-medium leading-4 text-[#6B6B6B]">{label}</span>
-      <div role="group" aria-label={label} className="flex flex-col divide-y divide-[#F0F0EE] overflow-hidden rounded-2xl bg-white/60 shadow-[inset_0_0_0_1px_#FFFFFF,0_0_0_1px_#0000000F]">
+      <span className="px-1 text-[12px] font-medium leading-4 text-[color:var(--ht-6b6b6b)]">{label}</span>
+      <div role="group" aria-label={label} className="flex flex-col divide-y divide-[color:var(--h-f0f0ee)] overflow-hidden rounded-2xl bg-white/60 shadow-[inset_0_0_0_1px_var(--h-ffffff),0_0_0_1px_var(--h-0000000f)]">
         {children}
       </div>
     </div>
@@ -748,16 +748,16 @@ function SummaryLine({
   return (
     <button
       onClick={onClick}
-      className="flex min-w-0 items-center gap-3 px-3.5 py-2.5 text-left outline-none transition-colors duration-150 ease-out hover:bg-black/[0.025] focus-visible:shadow-[inset_0_0_0_1.5px_#0A0A0A] motion-reduce:transition-none"
+      className="flex min-w-0 items-center gap-3 px-3.5 py-2.5 text-left outline-none transition-colors duration-150 ease-out hover:bg-[color:var(--bops-tint)]/[0.025] focus-visible:shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)] motion-reduce:transition-none"
     >
-      {when !== undefined && <span className="w-[116px] shrink-0 truncate text-[12.5px] tabular-nums leading-[18px] text-[#9A9A98]">{when}</span>}
+      {when !== undefined && <span className="w-[116px] shrink-0 truncate text-[12.5px] tabular-nums leading-[18px] text-[color:var(--ht-9a9a98)]">{when}</span>}
       <span className="min-w-0 flex-1 truncate text-[13.5px] leading-[18px]">
-        <span className={`font-medium ${dim ? "text-[#9A9A98]" : "text-ink"}`}>{title}</span>
-        {news && <span className="text-[#6B6B6B]">{` · ${news}`}</span>}
+        <span className={`font-medium ${dim ? "text-[color:var(--ht-9a9a98)]" : "text-ink"}`}>{title}</span>
+        {news && <span className="text-[color:var(--ht-6b6b6b)]">{` · ${news}`}</span>}
       </span>
       {app && <SourceMark state={state} app={app} />}
-      {note && <span className={`shrink-0 text-[12px] leading-4 ${note === "Needs you" ? "text-[#B42318]" : "text-[#9A9A98]"}`}>{note}</span>}
-      <span className="text-[#B0B0AD]">
+      {note && <span className={`shrink-0 text-[12px] leading-4 ${note === "Needs you" ? "text-[color:var(--ht-b42318)]" : "text-[color:var(--ht-9a9a98)]"}`}>{note}</span>}
+      <span className="text-[color:var(--ht-b0b0ad)]">
         <Chevron open={false} />
       </span>
     </button>
@@ -797,14 +797,14 @@ export function AppRoutines({ state, app, onOpenWatch }: { state: AppState; app:
   return (
     <QuestionScope reset={openId ?? ""}>
       <div ref={list} data-rows className="flex flex-col gap-2">
-        <span data-list-heading tabIndex={-1} className="flex items-center gap-1.5 px-2 text-[12px] font-medium leading-4 text-[#6B6B6B] outline-none">
-          Routines <span className="font-normal tabular-nums text-[#9A9A98]">{total}</span>
-          {needs > 0 && <span className="rounded-full bg-[#FEF3F2] px-2 py-px text-[11px] font-medium leading-4 text-[#B42318]">{needs === 1 ? "1 needs you" : `${needs} need you`}</span>}
+        <span data-list-heading tabIndex={-1} className="flex items-center gap-1.5 px-2 text-[12px] font-medium leading-4 text-[color:var(--ht-6b6b6b)] outline-none">
+          Routines <span className="font-normal tabular-nums text-[color:var(--ht-9a9a98)]">{total}</span>
+          {needs > 0 && <span className="rounded-full bg-[color:var(--hb-fef3f2)] px-2 py-px text-[11px] font-medium leading-4 text-[color:var(--ht-b42318)]">{needs === 1 ? "1 needs you" : `${needs} need you`}</span>}
         </span>
         {groups.map((g) => (
           <div key={g.bot.id} className="flex flex-col gap-1.5">
             {groups.length > 1 && (
-              <span className="flex items-center gap-1.5 px-2 text-[11.5px] leading-4 text-[#9A9A98]">
+              <span className="flex items-center gap-1.5 px-2 text-[11.5px] leading-4 text-[color:var(--ht-9a9a98)]">
                 <Mascot botId={g.bot.id} color={g.bot.color} size={14} antenna={false} />
                 {g.bot.name}
               </span>

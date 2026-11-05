@@ -70,10 +70,10 @@ export function ChatSwitch({ state }: { state: AppState }) {
   return (
     <div className="flex flex-col gap-2 px-[22px] pt-[18px]">
       <span className="text-[13px] font-semibold">Chat</span>
-      <div className="flex items-center gap-3 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="flex items-center gap-3 rounded-[14px] p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         <div className="flex flex-1 flex-col gap-0.5">
           <span className="text-[13px] font-medium">{state.shared ? "Answer with every Mac closed" : "Answer with your Mac closed"}</span>
-          <span className="text-[12px] leading-4 text-[#6B6B6B]">{view.line}</span>
+          <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{view.line}</span>
         </div>
         <button
           type="button"
@@ -82,13 +82,13 @@ export function ChatSwitch({ state }: { state: AppState }) {
           aria-label={state.shared ? "Answer with every Mac closed" : "Answer with your Mac closed"}
           disabled={busy}
           onClick={() => void flip()}
-          className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors disabled:opacity-60 ${view.on ? "bg-ink" : "bg-[#E6E6E3]"}`}
+          className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors disabled:opacity-60 ${view.on ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-e6e6e3)]"}`}
         >
-          <span className={`absolute top-[3px] size-4 rounded-full bg-white shadow-[0_1px_2px_#00000033] transition-[left] ${view.on ? "left-[19px]" : "left-[3px]"}`} />
+          <span className={`absolute top-[3px] size-4 rounded-full bg-white shadow-[0_1px_2px_var(--h-00000033)] transition-[left] ${view.on ? "left-[19px]" : "left-[3px]"}`} />
         </button>
       </div>
       {error && (
-        <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}

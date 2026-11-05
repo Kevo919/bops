@@ -193,17 +193,17 @@ export function workOn(state: Pick<AppState, "workspaces" | "bots" | "chats"> | 
 
 const bare = (url: string) => url.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
-export const PULSE = "animate-pulse bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A]";
+export const PULSE = "animate-pulse bg-highlighter shadow-[0_0_0_1.5px_var(--h-0a0a0a)]";
 export const STATES: Record<DeployState, { word: string; dot: string }> = {
   queued: { word: "Waiting to deploy", dot: PULSE },
   running: { word: "Deploying", dot: PULSE },
-  succeeded: { word: "Live", dot: "bg-[#2BB673]" },
-  failed: { word: "Failed", dot: "bg-[#B42318]" },
-  cancelled: { word: "Deploy stopped", dot: "bg-[#9A9A98]" },
-  superseded: { word: "Deploy replaced", dot: "bg-[#9A9A98]" },
+  succeeded: { word: "Live", dot: "bg-[color:var(--hb-2bb673)]" },
+  failed: { word: "Failed", dot: "bg-[color:var(--hb-b42318)]" },
+  cancelled: { word: "Deploy stopped", dot: "bg-[color:var(--hb-9a9a98)]" },
+  superseded: { word: "Deploy replaced", dot: "bg-[color:var(--hb-9a9a98)]" },
 };
 
-const NEVER = { word: "Not on the web yet", dot: "shadow-[inset_0_0_0_1.5px_#C9C9C6]" };
+const NEVER = { word: "Not on the web yet", dot: "shadow-[inset_0_0_0_1.5px_var(--h-c9c9c6)]" };
 
 /** What its newest deploy says, in a word and a dot, and in full for the tooltip (the changeset it built, when, and why it failed). */
 export function stateOf(a: Pick<HostedApp, "live">) {
@@ -494,8 +494,8 @@ function StateDot({ app }: { app: Pick<HostedApp, "live"> }) {
  */
 function DeployButton({ why, busy, onClick, label = "Deploy", primary }: { why?: string; busy: boolean; onClick: () => void; label?: string; primary?: boolean }) {
   const look = primary
-    ? "rounded-full bg-ink px-3 py-1 font-semibold text-white disabled:bg-[#E6E6E3] disabled:text-[#9A9A98]"
-    : "rounded-full px-2.5 py-1 font-medium text-ink shadow-[0_0_0_1px_#E2E2DF] hover:bg-white disabled:text-[#9A9A98] disabled:shadow-[0_0_0_1px_#ECECEA]";
+    ? "rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1 font-semibold text-[color:var(--bops-on-fill)] disabled:bg-[color:var(--hb-e6e6e3)] disabled:text-[color:var(--ht-9a9a98)]"
+    : "rounded-full px-2.5 py-1 font-medium text-ink shadow-[0_0_0_1px_var(--h-e2e2df)] hover:bg-white disabled:text-[color:var(--ht-9a9a98)] disabled:shadow-[0_0_0_1px_var(--h-ececea)]";
   return (
     <span data-tip={why} onClick={(e) => e.stopPropagation()} className="flex shrink-0">
       <button disabled={!!why || busy} onClick={onClick} className={`whitespace-nowrap text-[12px] leading-4 ${look}`}>
@@ -508,7 +508,7 @@ function DeployButton({ why, busy, onClick, label = "Deploy", primary }: { why?:
 export function UrlLink({ url }: { url: string }) {
   // It opens in the browser (the Mac app sends a new window's address there), never on the row under it.
   return (
-    <a href={url} target="_blank" rel="noreferrer" title={url} onClick={(e) => e.stopPropagation()} className="min-w-0 shrink-[2] truncate font-mono text-[11.5px] leading-4 text-[#6B6B6B] hover:text-ink hover:underline">
+    <a href={url} target="_blank" rel="noreferrer" title={url} onClick={(e) => e.stopPropagation()} className="min-w-0 shrink-[2] truncate font-mono text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)] hover:text-ink hover:underline">
       {bare(url)}
     </a>
   );
@@ -529,7 +529,7 @@ export function CopyLink({ url, label = "Copy link" }: { url: string; label?: st
           .catch(() => {})
       }
       aria-label={copied ? "Copied" : label}
-      className="flex size-6 shrink-0 items-center justify-center rounded-md text-[#6B6B6B] hover:bg-black/[0.05] hover:text-ink"
+      className="flex size-6 shrink-0 items-center justify-center rounded-md text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--bops-tint)]/[0.05] hover:text-ink"
     >
       {copied ? (
         <svg width="12" height="12" viewBox="0 0 14 14">
@@ -545,11 +545,11 @@ export function CopyLink({ url, label = "Copy link" }: { url: string; label?: st
   );
 }
 
-export const QUIET = "text-[12.5px] leading-[18px] text-[#9A9A98]";
+export const QUIET = "text-[12.5px] leading-[18px] text-[color:var(--ht-9a9a98)]";
 /** What an app whose computer is gone says of it. */
 const lostTip = (a: Pick<HostedApp, "sites">) =>
   `Its computer is gone, and ${a.sites && a.sites.length > 1 ? "its sites went" : "its site went"} with it. Deploy puts it on the web again, or ask a bot to work on it.`;
-export const PROBLEM = "truncate text-[12px] leading-4 text-[#B42318]";
+export const PROBLEM = "truncate text-[12px] leading-4 text-[color:var(--ht-b42318)]";
 
 /**
  * The Apps page's "On the web" list (made-apps.tsx MadeAppsHome), read from the server (again when this
@@ -600,7 +600,7 @@ export function HostedAppsList({
         data-add-app
         disabled={!!why}
         onClick={() => setAdding(true)}
-        className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E2E2DF] hover:bg-[#F6F6F4] disabled:text-[#9A9A98] disabled:shadow-[0_0_0_1px_#ECECEA]"
+        className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e2e2df)] hover:bg-[color:var(--hb-f6f6f4)] disabled:text-[color:var(--ht-9a9a98)] disabled:shadow-[0_0_0_1px_var(--h-ececea)]"
       >
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
           <path d="M5 1.5v7M1.5 5h7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -612,7 +612,7 @@ export function HostedAppsList({
   return (
     <div data-hosted-apps className="flex flex-col gap-1">
       <div className="flex min-h-7 items-center gap-2">
-        <span className="text-[12px] font-semibold leading-4 text-[#6B6B6B]">On the web</span>
+        <span className="text-[12px] font-semibold leading-4 text-[color:var(--ht-6b6b6b)]">On the web</span>
         <span className="flex-1" />
         {!!answer?.apps.length && addButton}
       </div>
@@ -647,7 +647,7 @@ export function HostedAppsList({
                 data-hosted-app={a.name}
                 data-state={a.live?.state ?? "none"}
                 onClick={() => open?.(ws, a.name)}
-                className="flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 hover:bg-[#F6F6F4]"
+                className="flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 hover:bg-[color:var(--hb-f6f6f4)]"
               >
                 <StateDot app={a} />
                 {/* The row's button for the keyboard: its press comes up to the row. */}
@@ -655,16 +655,16 @@ export function HostedAppsList({
                   {a.name}
                 </button>
                 {a.hosting?.lost ? (
-                  <span data-lost data-tip={lostTip(a)} className="shrink-0 text-[12px] leading-4 text-[#9A9A98]">
+                  <span data-lost data-tip={lostTip(a)} className="shrink-0 text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">
                     Needs a new home
                   </span>
                 ) : url ? (
                   <UrlLink url={url} />
                 ) : (
-                  <span className="shrink-0 text-[12px] leading-4 text-[#9A9A98]">{noAddress(a)}</span>
+                  <span className="shrink-0 text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{noAddress(a)}</span>
                 )}
                 {a.sites && (
-                  <span data-site-count data-tip={a.sites.map((x) => x.name).join(", ")} className="shrink-0 text-[12px] leading-4 text-[#9A9A98]">
+                  <span data-site-count data-tip={a.sites.map((x) => x.name).join(", ")} className="shrink-0 text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">
                     {a.sites.length} sites
                   </span>
                 )}
@@ -673,7 +673,7 @@ export function HostedAppsList({
               {/* Its three environments, all on its computer: Local, Preview (where Deploy goes), Published (Publish). */}
               <ListedEnvs ws={ws} answer={answer} app={a} onChanged={onChanged} />
               {theirs && (
-                <span data-member-act className={`-mt-1 truncate pl-[26px] pr-2 text-[11.5px] leading-4 ${theirs.ok ? "text-[#9A9A98]" : "text-[#B42318]"}`}>
+                <span data-member-act className={`-mt-1 truncate pl-[26px] pr-2 text-[11.5px] leading-4 ${theirs.ok ? "text-[color:var(--ht-9a9a98)]" : "text-[color:var(--ht-b42318)]"}`}>
                   {actLine(theirs)}
                 </span>
               )}
@@ -742,9 +742,9 @@ export function HostedAppTab({
   }, [fresh, answer]);
   if (!answer || !app)
     return (
-      <div data-app-gone className="flex flex-1 flex-col items-center justify-center gap-1.5 px-8 text-center text-[13px] text-[#6B6B6B]">
+      <div data-app-gone className="flex flex-1 flex-col items-center justify-center gap-1.5 px-8 text-center text-[13px] text-[color:var(--ht-6b6b6b)]">
         {removed ? `Removed ${name}.` : answer ? "This app isn't here any more." : failed ? "Couldn't read this app. Try again in a moment." : ""}
-        {removed?.said && <span className="max-w-[420px] text-[12.5px] leading-[18px] text-[#B42318]">{removed.said}</span>}
+        {removed?.said && <span className="max-w-[420px] text-[12.5px] leading-[18px] text-[color:var(--ht-b42318)]">{removed.said}</span>}
       </div>
     );
   const ask = onAsk && workOn(state, ws, app);
@@ -1057,8 +1057,8 @@ export function HostedAppView({
     const on = sites ? servedBy(c.id) : c.id === serving ? [app.name] : [];
     const st = previewSites(c.id);
     const chip = st.length ? (
-      <span data-on-preview className="flex shrink-0 items-center gap-1 rounded-full bg-[#EEF2FF] px-2 py-0.5 text-[11px] font-medium leading-4 text-[#3346A8]">
-        <span className="size-1.5 shrink-0 rounded-full bg-[#5B6BD6]" />
+      <span data-on-preview className="flex shrink-0 items-center gap-1 rounded-full bg-[color:var(--hb-eef2ff)] px-2 py-0.5 text-[11px] font-medium leading-4 text-[color:var(--ht-3346a8)]">
+        <span className="size-1.5 shrink-0 rounded-full bg-[color:var(--hb-5b6bd6)]" />
         Preview
       </span>
     ) : null;
@@ -1069,9 +1069,9 @@ export function HostedAppView({
         <span
           data-live
           title={sites ? `Live on ${on.join(", ")}` : undefined}
-          className="flex min-w-0 max-w-[180px] shrink-0 items-center gap-1 rounded-full bg-[#EAF7EF] px-2 py-0.5 text-[11px] font-medium leading-4 text-[#1E7A4C]"
+          className="flex min-w-0 max-w-[180px] shrink-0 items-center gap-1 rounded-full bg-[color:var(--hb-eaf7ef)] px-2 py-0.5 text-[11px] font-medium leading-4 text-[color:var(--ht-1e7a4c)]"
         >
-          <span className="size-1.5 shrink-0 rounded-full bg-[#2BB673]" />
+          <span className="size-1.5 shrink-0 rounded-full bg-[color:var(--hb-2bb673)]" />
           <span className="truncate">{sites && on.length < sites.length ? `Published: ${on.join(", ")}` : "Published"}</span>
         </span>
         </span>
@@ -1079,7 +1079,7 @@ export function HostedAppView({
     if (chip && !going.has(c.id)) return chip;
     if (going.has(c.id))
       return (
-        <span data-going className="flex shrink-0 items-center gap-1 rounded-full bg-[#F2F2F0] px-2 py-0.5 text-[11px] font-medium leading-4 text-[#3A3A38]">
+        <span data-going className="flex shrink-0 items-center gap-1 rounded-full bg-[color:var(--hb-f2f2f0)] px-2 py-0.5 text-[11px] font-medium leading-4 text-[color:var(--ht-3a3a38)]">
           <span className={`size-1.5 rounded-full ${PULSE}`} />
           Deploying
         </span>
@@ -1093,7 +1093,7 @@ export function HostedAppView({
   };
   return (
     <div data-hosted-tab={app.name} className="flex min-h-0 flex-1 flex-col bg-white">
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-[#F0F0EE] px-4">
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-[color:var(--h-f0f0ee)] px-4">
         <StateDot app={app} />
         <span title={app.name} className="min-w-0 shrink truncate text-[13px] font-semibold leading-4 text-ink">
           {app.name}
@@ -1104,14 +1104,14 @@ export function HostedAppView({
             <CopyLink url={url} />
           </>
         ) : (
-          <span className="shrink-0 text-[12px] leading-4 text-[#9A9A98]">{lost ? "Needs a new home" : noAddress(app)}</span>
+          <span className="shrink-0 text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{lost ? "Needs a new home" : noAddress(app)}</span>
         )}
         <span className="flex-1" />
         {work && (
           <button
             onClick={work.go}
             data-tip={`Opens ${work.name}'s chat with this typed, not sent`}
-            className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E2E2DF] hover:bg-[#F6F6F4]"
+            className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e2e2df)] hover:bg-[color:var(--hb-f6f6f4)]"
           >
             Work on it
           </button>
@@ -1126,7 +1126,7 @@ export function HostedAppView({
         )}
         {sites && current && (
           <div data-sites className="flex flex-col">
-            <span className="pb-1 text-[12px] font-semibold leading-4 text-[#6B6B6B]">Sites</span>
+            <span className="pb-1 text-[12px] font-semibold leading-4 text-[color:var(--ht-6b6b6b)]">Sites</span>
             <div className="-mx-2 flex flex-col gap-0.5">
               {sites.map((x) => (
                 <SiteLine
@@ -1213,7 +1213,7 @@ export function HostedAppView({
           )}
         </AppSite.Provider>
         <div ref={historyBox} data-history className="flex scroll-mt-3 flex-col">
-          <span className="pb-1 text-[12px] font-semibold leading-4 text-[#6B6B6B]">History</span>
+          <span className="pb-1 text-[12px] font-semibold leading-4 text-[color:var(--ht-6b6b6b)]">History</span>
           {history === null ? (
             <span className={QUIET}>Reading it…</span>
           ) : history === false ? (
@@ -1236,7 +1236,7 @@ export function HostedAppView({
                   data-older
                   onClick={older.go}
                   disabled={older.reading}
-                  className="-mx-2 mt-0.5 h-7 self-start rounded-lg px-2 text-[12px] leading-4 text-[#6B6B6B] hover:bg-[#F6F6F4] hover:text-ink disabled:text-[#9A9A98] disabled:hover:bg-transparent"
+                  className="-mx-2 mt-0.5 h-7 self-start rounded-lg px-2 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--hb-f6f6f4)] hover:text-ink disabled:text-[color:var(--ht-9a9a98)] disabled:hover:bg-transparent"
                 >
                   {older.reading ? "Reading…" : older.failed ? "Couldn't read older ones. Try again" : "Show older"}
                 </button>
@@ -1262,7 +1262,7 @@ function SiteLine({ site: x, picked, lost, onPick, deploy }: { site: HostedSite;
   // (Its computer gone: its domains went with it.)
   const url = lost ? null : (x.domain ?? null);
   return (
-    <div data-site-line={x.name} className={`relative flex min-w-0 items-start gap-2 rounded-lg px-2 py-1 ${picked ? "bg-[#F2F2F0] shadow-[0_0_0_1px_#E2E2DF]" : "hover:bg-[#F6F6F4]"}`}>
+    <div data-site-line={x.name} className={`relative flex min-w-0 items-start gap-2 rounded-lg px-2 py-1 ${picked ? "bg-[color:var(--hb-f2f2f0)] shadow-[0_0_0_1px_var(--h-e2e2df)]" : "hover:bg-[color:var(--hb-f6f6f4)]"}`}>
       {/* (Its press covers all of its line, its padding too, under Deploy this site.) */}
       <button data-site={x.name} aria-pressed={picked} onClick={onPick} className="flex min-w-0 flex-1 items-start gap-2 py-1 text-left after:absolute after:inset-0 after:rounded-lg">
         <span className="flex h-4 shrink-0 items-center">
@@ -1277,16 +1277,16 @@ function SiteLine({ site: x, picked, lost, onPick, deploy }: { site: HostedSite;
               return (
                 <span key={d.domain} data-site-domain={d.domain} data-domain-state={d.status} data-tip={s.word} className="flex min-w-0 max-w-full items-center gap-1">
                   <span role="img" aria-label={s.word} className={`size-1.5 shrink-0 rounded-full ${s.dot}`} />
-                  <span className="truncate font-mono text-[11.5px] leading-4 text-[#6B6B6B]">{d.domain}</span>
+                  <span className="truncate font-mono text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]">{d.domain}</span>
                 </span>
               );
             })
           ) : url ? (
-            <span data-site-address className="min-w-0 max-w-full truncate font-mono text-[11.5px] leading-4 text-[#6B6B6B]">
+            <span data-site-address className="min-w-0 max-w-full truncate font-mono text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
               {bare(url)}
             </span>
           ) : lost ? null : (
-            <span className="text-[12px] leading-4 text-[#9A9A98]">{noAddress(x)}</span>
+            <span className="text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{noAddress(x)}</span>
           )}
         </span>
       </button>
@@ -1302,17 +1302,17 @@ function SiteLine({ site: x, picked, lost, onPick, deploy }: { site: HostedSite;
 function CommitLine({ commit: c, serving, end }: { commit: AppCommit; serving: boolean; end: ReactNode }) {
   const message = firstLine(c.message);
   return (
-    <div data-commit={c.id} data-serving={serving || undefined} className="group flex h-8 items-center gap-2 rounded-lg px-2 hover:bg-[#F6F6F4]">
-      <span title={c.id} className="w-[52px] shrink-0 font-mono text-[11.5px] leading-4 text-[#6B6B6B]">
+    <div data-commit={c.id} data-serving={serving || undefined} className="group flex h-8 items-center gap-2 rounded-lg px-2 hover:bg-[color:var(--hb-f6f6f4)]">
+      <span title={c.id} className="w-[52px] shrink-0 font-mono text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
         {short(c.id)}
       </span>
-      <span title={c.message} className={`min-w-0 flex-1 truncate text-[12.5px] leading-4 ${message ? "text-ink" : "text-[#9A9A98]"}`}>
+      <span title={c.message} className={`min-w-0 flex-1 truncate text-[12.5px] leading-4 ${message ? "text-ink" : "text-[color:var(--ht-9a9a98)]"}`}>
         {message || "No message"}
       </span>
-      <span title={c.author} className="max-w-[110px] shrink-0 truncate text-[12px] leading-4 text-[#6B6B6B]">
+      <span title={c.author} className="max-w-[110px] shrink-0 truncate text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
         {c.author}
       </span>
-      <span title={new Date(c.at).toLocaleString()} className="w-8 shrink-0 text-right text-[12px] leading-4 text-[#9A9A98]">
+      <span title={new Date(c.at).toLocaleString()} className="w-8 shrink-0 text-right text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">
         {ago(c.at)}
       </span>
       <Changes changes={c.changes} />
@@ -1325,9 +1325,9 @@ function CommitLine({ commit: c, serving, end }: { commit: AppCommit; serving: b
 function Changes({ changes }: { changes?: AppCommit["changes"] | null }) {
   const { added = 0, modified = 0, deleted = 0 } = changes ?? {};
   const parts = [
-    { n: added, mark: "+", word: "added", look: "text-[#1E7A4C]" },
-    { n: modified, mark: "~", word: "changed", look: "text-[#6B6B6B]" },
-    { n: deleted, mark: "-", word: "deleted", look: "text-[#B42318]" },
+    { n: added, mark: "+", word: "added", look: "text-[color:var(--ht-1e7a4c)]" },
+    { n: modified, mark: "~", word: "changed", look: "text-[color:var(--ht-6b6b6b)]" },
+    { n: deleted, mark: "-", word: "deleted", look: "text-[color:var(--ht-b42318)]" },
   ].filter((p) => p.n > 0);
   if (!parts.length) return null;
   const files = added + modified + deleted;
@@ -1393,15 +1393,15 @@ function DeployLog({ ws, name, live }: { ws: string; name: string; live: NonNull
   const facts = [live.at ? short(live.at) : null, state ? STATES[state]?.word : null, live.when ? ago(live.when) : null].filter(Boolean).join(" · ");
   return (
     <div data-deploy-log className="flex flex-col gap-1.5">
-      <button onClick={() => setOpen(!open)} aria-expanded={open} className="-mx-2 flex h-8 items-center gap-2 rounded-lg px-2 text-left hover:bg-[#F6F6F4]">
-        <svg width="10" height="10" viewBox="0 0 10 10" className={`shrink-0 text-[#6B6B6B] transition-transform ${open ? "rotate-90" : ""}`}>
+      <button onClick={() => setOpen(!open)} aria-expanded={open} className="-mx-2 flex h-8 items-center gap-2 rounded-lg px-2 text-left hover:bg-[color:var(--hb-f6f6f4)]">
+        <svg width="10" height="10" viewBox="0 0 10 10" className={`shrink-0 text-[color:var(--ht-6b6b6b)] transition-transform ${open ? "rotate-90" : ""}`}>
           <path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <span className="shrink-0 text-[12px] font-semibold leading-4 text-[#6B6B6B]">Deploy log</span>
-        <span className="min-w-0 truncate text-[12px] leading-4 text-[#9A9A98]">{facts}</span>
+        <span className="shrink-0 text-[12px] font-semibold leading-4 text-[color:var(--ht-6b6b6b)]">Deploy log</span>
+        <span className="min-w-0 truncate text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{facts}</span>
       </button>
       {open && (
-        <pre ref={box} className="max-h-[320px] min-h-[64px] overflow-auto whitespace-pre-wrap break-all rounded-xl bg-[#F6F6F4] px-3 py-2.5 font-mono text-[11px] leading-[16px] text-[#3A3A38]">
+        <pre ref={box} className="max-h-[320px] min-h-[64px] overflow-auto whitespace-pre-wrap break-all rounded-xl bg-[color:var(--hb-f6f6f4)] px-3 py-2.5 font-mono text-[11px] leading-[16px] text-[color:var(--ht-3a3a38)]">
           {log?.text || (!log ? "Reading it…" : log.failed ? "Couldn't read the log." : "Nothing logged yet.")}
         </pre>
       )}
@@ -1415,9 +1415,9 @@ function DeployLog({ ws, name, live }: { ws: string; name: string; live: NonNull
 export const DOMAIN_STATES: Record<AppDomainStatus, { word: string; dot: string }> = {
   pending: { word: "Waiting for its DNS", dot: PULSE },
   verifying: { word: "Checking its DNS", dot: PULSE },
-  active: { word: "Live", dot: "bg-[#2BB673]" },
-  failed: { word: "Couldn't be verified", dot: "bg-[#B42318]" },
-  disabled: { word: "Turned off by Orgo", dot: "bg-[#9A9A98]" },
+  active: { word: "Live", dot: "bg-[color:var(--hb-2bb673)]" },
+  failed: { word: "Couldn't be verified", dot: "bg-[color:var(--hb-b42318)]" },
+  disabled: { word: "Turned off by Orgo", dot: "bg-[color:var(--hb-9a9a98)]" },
 };
 
 /** A domain's state in a word, and in full for its dot's tooltip (its HTTPS certificate, once it's live). */
@@ -1429,7 +1429,7 @@ function domainState(d: AppDomain) {
 }
 
 /** What Orgo found of a record to set, when it looked. */
-const FOUND = { ok: { word: "Found", look: "text-[#1E7A4C]" }, missing: { word: "Not there yet", look: "text-[#9A9A98]" }, wrong: { word: "Says something else", look: "text-[#B42318]" } };
+const FOUND = { ok: { word: "Found", look: "text-[color:var(--ht-1e7a4c)]" }, missing: { word: "Not there yet", look: "text-[color:var(--ht-9a9a98)]" }, wrong: { word: "Says something else", look: "text-[color:var(--ht-b42318)]" } };
 
 /** A record's name as it's shown: @ for the domain itself. */
 const atName = (name: string) => name || "@";
@@ -1537,17 +1537,17 @@ function Domains({
   return (
     <div data-domains className="flex flex-col">
       <div className="flex items-center gap-2 pb-1">
-        <span className="text-[12px] font-semibold leading-4 text-[#6B6B6B]">Domains</span>
+        <span className="text-[12px] font-semibold leading-4 text-[color:var(--ht-6b6b6b)]">Domains</span>
         <span className="flex-1" />
         {/* Every domain the workspace bought, in Settings. */}
         {openSettings && (
-          <button data-all-domains onClick={() => openSettings("domains")} className="text-[12px] leading-4 text-[#6B6B6B] hover:text-ink hover:underline">
+          <button data-all-domains onClick={() => openSettings("domains")} className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)] hover:text-ink hover:underline">
             All domains
           </button>
         )}
       </div>
       {removedSaid && (
-        <span data-removed-said className="pb-1 text-[12px] leading-[18px] text-[#6B6B6B]">
+        <span data-removed-said className="pb-1 text-[12px] leading-[18px] text-[color:var(--ht-6b6b6b)]">
           {removedSaid}
         </span>
       )}
@@ -1603,7 +1603,7 @@ function Domains({
           <button
             data-add-domain
             onClick={() => setAdding(true)}
-            className="-mx-2 mt-0.5 flex h-7 items-center gap-1.5 self-start rounded-lg px-2 text-[12px] leading-4 text-[#6B6B6B] hover:bg-[#F6F6F4] hover:text-ink"
+            className="-mx-2 mt-0.5 flex h-7 items-center gap-1.5 self-start rounded-lg px-2 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--hb-f6f6f4)] hover:text-ink"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
               <path d="M5 1.5v7M1.5 5h7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -1684,7 +1684,7 @@ function DomainLine({
   const waits = d.status !== "active" && d.status !== "disabled";
   return (
     <>
-      <div data-domain={d.domain} data-status={d.status} className="group flex h-8 min-w-0 items-center gap-2 rounded-lg px-2 hover:bg-[#F6F6F4]">
+      <div data-domain={d.domain} data-status={d.status} className="group flex h-8 min-w-0 items-center gap-2 rounded-lg px-2 hover:bg-[color:var(--hb-f6f6f4)]">
         <span data-tip={s.tip} className={`size-2 shrink-0 rounded-full ${checking ? PULSE : s.dot}`} />
         {d.status === "active" ? (
           <UrlLink url={`https://${d.domain}`} />
@@ -1693,16 +1693,16 @@ function DomainLine({
             {d.domain}
           </span>
         )}
-        <span className="min-w-0 shrink truncate text-[12px] leading-4 text-[#6B6B6B]">{checking ? "Checking its DNS…" : s.word}</span>
+        <span className="min-w-0 shrink truncate text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{checking ? "Checking its DNS…" : s.word}</span>
         <span className="flex-1" />
         {/* In a narrow panel these give way (cut short) before the buttons do. */}
         {d.managed ? (
-          <span className="min-w-0 shrink-[3] truncate text-[12px] leading-4 text-[#9A9A98]">Bought through Orgo</span>
+          <span className="min-w-0 shrink-[3] truncate text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">Bought through Orgo</span>
         ) : (
-          d.status !== "disabled" && <span className="min-w-0 shrink-[3] truncate text-[12px] leading-4 text-[#9A9A98]">{d.where ? `DNS at ${d.where}` : "DNS outside Orgo"}</span>
+          d.status !== "disabled" && <span className="min-w-0 shrink-[3] truncate text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{d.where ? `DNS at ${d.where}` : "DNS outside Orgo"}</span>
         )}
         {d.managed && waits && !checking && (
-          <button data-check onClick={check} disabled={!!busy} className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[12px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E2E2DF] hover:bg-white disabled:text-[#9A9A98]">
+          <button data-check onClick={check} disabled={!!busy} className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[12px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e2e2df)] hover:bg-white disabled:text-[color:var(--ht-9a9a98)]">
             {busy === "check" ? "Checking…" : "Check again"}
           </button>
         )}
@@ -1741,7 +1741,7 @@ function DomainLine({
       {/* Bought through Orgo, but Orgo didn't say which of the workspace's bought domains it's in (DNS isn't
           open to the account, its list couldn't be read, the computer moved workspace): no zone to show, so why. */}
       {d.managed && !d.zone && (
-        <span data-no-zone={d.domain} className="mb-1 ml-6 text-[12px] leading-[18px] text-[#9A9A98]">
+        <span data-no-zone={d.domain} className="mb-1 ml-6 text-[12px] leading-[18px] text-[color:var(--ht-9a9a98)]">
           Couldn&apos;t read its DNS records.
         </span>
       )}
@@ -1763,7 +1763,7 @@ function DomainLine({
         />
       )}
       {(said || error) && (
-        <span role={error ? "alert" : undefined} className={`mb-1 ml-6 text-[12px] leading-[18px] ${error ? "text-[#B42318]" : "text-[#6B6B6B]"}`}>
+        <span role={error ? "alert" : undefined} className={`mb-1 ml-6 text-[12px] leading-[18px] ${error ? "text-[color:var(--ht-b42318)]" : "text-[color:var(--ht-6b6b6b)]"}`}>
           {error ?? said}
         </span>
       )}
@@ -1837,25 +1837,25 @@ function OutsideDns({
     });
   };
   return (
-    <div data-publish={d.domain} data-outside-dns className="mb-1 ml-6 flex min-w-0 flex-col rounded-lg bg-[#F6F6F4] px-2.5 py-1.5">
+    <div data-publish={d.domain} data-outside-dns className="mb-1 ml-6 flex min-w-0 flex-col rounded-lg bg-[color:var(--hb-f6f6f4)] px-2.5 py-1.5">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="min-w-0 flex-1 text-[12px] leading-[18px] text-[#9A9A98]">{said}</span>
+        <span className="min-w-0 flex-1 text-[12px] leading-[18px] text-[color:var(--ht-9a9a98)]">{said}</span>
         {offer && !plan && !planElsewhere && (
-          <button data-set-in-cloudflare onClick={look} disabled={disabled || reading} className="shrink-0 whitespace-nowrap rounded-full bg-ink px-2 py-0.5 text-[12px] font-medium leading-4 text-white disabled:opacity-40">
+          <button data-set-in-cloudflare onClick={look} disabled={disabled || reading} className="shrink-0 whitespace-nowrap rounded-full bg-[color:var(--hb-0a0a0a)] px-2 py-0.5 text-[12px] font-medium leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-40">
             {reading ? "Reading…" : "Set it in Cloudflare"}
           </button>
         )}
-        <button data-verify onClick={onVerify} disabled={disabled} className="shrink-0 whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-[12px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E2E2DF] hover:bg-[#FBFBFA] disabled:text-[#9A9A98]">
+        <button data-verify onClick={onVerify} disabled={disabled} className="shrink-0 whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-[12px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e2e2df)] hover:bg-[color:var(--hb-fbfbfa)] disabled:text-[color:var(--ht-9a9a98)]">
           {busy ? "Verifying…" : "Verify"}
         </button>
       </div>
       {d.publish.map((r, i) => (
         <div key={i} className="flex h-7 min-w-0 items-center gap-2">
-          <span className="w-[46px] shrink-0 font-mono text-[11.5px] leading-4 text-[#9A9A98]">{r.type}</span>
-          <span title={r.name} className="w-[112px] min-w-0 shrink truncate font-mono text-[11.5px] leading-4 text-[#6B6B6B]">
+          <span className="w-[46px] shrink-0 font-mono text-[11.5px] leading-4 text-[color:var(--ht-9a9a98)]">{r.type}</span>
+          <span title={r.name} className="w-[112px] min-w-0 shrink truncate font-mono text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
             {r.name}
           </span>
-          <span title={r.value} className="min-w-0 flex-1 truncate font-mono text-[11.5px] leading-4 text-[#6B6B6B]">
+          <span title={r.value} className="min-w-0 flex-1 truncate font-mono text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
             {r.value}
           </span>
           {/* Nothing to copy where Bops sets them itself, but when it can't. */}
@@ -1864,12 +1864,12 @@ function OutsideDns({
         </div>
       ))}
       {error && (
-        <span role="alert" className="text-[12px] leading-[18px] text-[#B42318]">
+        <span role="alert" className="text-[12px] leading-[18px] text-[color:var(--ht-b42318)]">
           {undash(error)}
         </span>
       )}
       {plan && (
-        <div className="mt-1.5 rounded-lg bg-white p-2.5 shadow-[0_0_0_1px_#ECECEA]">
+        <div className="mt-1.5 rounded-lg bg-white p-2.5 shadow-[0_0_0_1px_var(--h-ececea)]">
           <CloudflarePlanBox
             key={plan.fingerprint}
             ws={ws}
@@ -2003,15 +2003,15 @@ export function DnsZone({
   return (
     <div ref={box} data-zone={zone.domain} className="mt-3 flex flex-col">
       <div className="flex h-6 items-center gap-2">
-        <span className="min-w-0 truncate text-[12px] leading-4 text-[#6B6B6B]">
+        <span className="min-w-0 truncate text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
           DNS records for <span className="font-medium text-ink">{zone.domain}</span>
         </span>
         {!zone.serving && !zone.error && (
-          <span data-not-serving data-tip="Its nameservers aren't Orgo's, so these records are kept but don't answer on the internet." className="shrink-0 text-[12px] leading-4 text-[#B54708]">
+          <span data-not-serving data-tip="Its nameservers aren't Orgo's, so these records are kept but don't answer on the internet." className="shrink-0 text-[12px] leading-4 text-[color:var(--ht-b54708)]">
             Not answering
           </span>
         )}
-        {zone.ttl !== null && <span className="shrink-0 text-[12px] leading-4 text-[#9A9A98]">TTL {zone.ttl}s</span>}
+        {zone.ttl !== null && <span className="shrink-0 text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">TTL {zone.ttl}s</span>}
       </div>
       <RenewalLine zone={zone} flip={flip} onRenewal={onRenewal} />
       {zone.error ? (
@@ -2060,7 +2060,7 @@ export function DnsZone({
                         }}
                       />
                       {error && (
-                        <span role="alert" className="px-1 text-[12px] leading-4 text-[#B42318]">
+                        <span role="alert" className="px-1 text-[12px] leading-4 text-[color:var(--ht-b42318)]">
                           {error.text}
                         </span>
                       )}
@@ -2077,7 +2077,7 @@ export function DnsZone({
               data-add-record
               onClick={() => open("new")}
               disabled={busy}
-              className="-mx-2 mt-0.5 flex h-7 items-center gap-1.5 self-start rounded-lg px-2 text-[12px] leading-4 text-[#6B6B6B] hover:bg-[#F6F6F4] hover:text-ink disabled:text-[#9A9A98]"
+              className="-mx-2 mt-0.5 flex h-7 items-center gap-1.5 self-start rounded-lg px-2 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--hb-f6f6f4)] hover:text-ink disabled:text-[color:var(--ht-9a9a98)]"
             >
               <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
                 <path d="M5 1.5v7M1.5 5h7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -2086,7 +2086,7 @@ export function DnsZone({
             </button>
           )}
           {error && !editing && !asking && (
-            <span role="alert" className="pt-1 text-[12px] leading-4 text-[#B42318]">
+            <span role="alert" className="pt-1 text-[12px] leading-4 text-[color:var(--ht-b42318)]">
               {error.text}
             </span>
           )}
@@ -2100,8 +2100,8 @@ export function DnsZone({
 function RecordLine({ r, busy, onEdit, onRemove }: { r: AppDnsRecord; busy: boolean; onEdit: () => void; onRemove: () => void }) {
   const numbers = numbersOf(r);
   return (
-    <div data-record={r.id} data-locked={r.locked ? "true" : undefined} className="group flex h-8 items-center gap-2 rounded-lg px-2 hover:bg-[#F6F6F4]">
-      <span className="w-[46px] shrink-0 font-mono text-[11.5px] leading-4 text-[#6B6B6B]">{r.type}</span>
+    <div data-record={r.id} data-locked={r.locked ? "true" : undefined} className="group flex h-8 items-center gap-2 rounded-lg px-2 hover:bg-[color:var(--hb-f6f6f4)]">
+      <span className="w-[46px] shrink-0 font-mono text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]">{r.type}</span>
       <span title={r.fqdn} className="w-[112px] shrink-0 truncate font-mono text-[11.5px] leading-4 text-ink">
         {atName(r.name)}
       </span>
@@ -2109,7 +2109,7 @@ function RecordLine({ r, busy, onEdit, onRemove }: { r: AppDnsRecord; busy: bool
         {valueOf(r)}
       </span>
       {r.locked ? (
-        <span role="img" data-tip={r.locked} aria-label={r.locked} className="flex size-7 shrink-0 items-center justify-center text-[#9A9A98]">
+        <span role="img" data-tip={r.locked} aria-label={r.locked} className="flex size-7 shrink-0 items-center justify-center text-[color:var(--ht-9a9a98)]">
           <LockIcon />
         </span>
       ) : (
@@ -2159,7 +2159,7 @@ export function DnsRecordForm({
   const [port, setPort] = useState(start?.port !== undefined ? String(start.port) : "");
   const needs = dnsNeeds(type);
   const field = (f: string, extra = "") =>
-    `h-8 rounded-full bg-[#F7F7F6] px-3 font-mono text-[12px] outline-none ${error?.field === f ? "shadow-[0_0_0_1.5px_#B42318]" : "shadow-[0_0_0_1px_#E6E6E3] focus:shadow-[0_0_0_1.5px_#0A0A0A]"} ${extra}`;
+    `h-8 rounded-full bg-[color:var(--hb-f7f7f6)] px-3 font-mono text-[12px] outline-none ${error?.field === f ? "shadow-[0_0_0_1.5px_var(--h-b42318)]" : "shadow-[0_0_0_1px_var(--h-e6e6e3)] focus:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"} ${extra}`;
   const typed = (set: (v: string) => void) => (e: { target: { value: string } }) => {
     set(e.target.value);
     if (error) onTyped();
@@ -2188,7 +2188,7 @@ export function DnsRecordForm({
           if (!busy) onCancel();
         }
       }}
-      className="flex flex-col gap-2 rounded-[12px] bg-[#FCFCFB] p-2.5 shadow-[0_0_0_1px_#ECECEA]"
+      className="flex flex-col gap-2 rounded-[12px] bg-[color:var(--hb-fcfcfb)] p-2.5 shadow-[0_0_0_1px_var(--h-ececea)]"
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="relative flex">
@@ -2197,7 +2197,7 @@ export function DnsRecordForm({
             aria-invalid={error?.field === "type" || undefined}
             value={type}
             onChange={typed(setType)}
-            className={`h-8 appearance-none rounded-full bg-white pl-3 pr-7 font-mono text-[12px] text-ink outline-none hover:bg-[#FCFCFB] ${error?.field === "type" ? "shadow-[0_0_0_1.5px_#B42318]" : "shadow-[0_0_0_1px_#E6E6E3] focus-visible:shadow-[0_0_0_1.5px_#0A0A0A]"}`}
+            className={`h-8 appearance-none rounded-full bg-white pl-3 pr-7 font-mono text-[12px] text-ink outline-none hover:bg-[color:var(--hb-fcfcfb)] ${error?.field === "type" ? "shadow-[0_0_0_1.5px_var(--h-b42318)]" : "shadow-[0_0_0_1px_var(--h-e6e6e3)] focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"}`}
           >
             {DNS_TYPES.map((t) => (
               <option key={t} value={t}>
@@ -2238,14 +2238,14 @@ export function DnsRecordForm({
         {needs.port && <input aria-label="Port" aria-invalid={error?.field === "port" || undefined} data-tip="Port" value={port} onChange={typed(setPort)} placeholder="Port" inputMode="numeric" className={field("port", "w-[76px]")} />}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="submit" disabled={busy || !value.trim()} className={`${PILL} bg-ink text-white disabled:opacity-40`}>
+        <button type="submit" disabled={busy || !value.trim()} className={`${PILL} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)] disabled:opacity-40`}>
           {busy ? "Saving…" : start ? "Save" : "Add"}
         </button>
-        <button type="button" disabled={busy} onClick={onCancel} className={`${PILL} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
+        <button type="button" disabled={busy} onClick={onCancel} className={`${PILL} bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)]`}>
           Cancel
         </button>
         {error && (
-          <span role="alert" className="min-w-0 text-[12px] leading-4 text-[#B42318]">
+          <span role="alert" className="min-w-0 text-[12px] leading-4 text-[color:var(--ht-b42318)]">
             {error.text}
           </span>
         )}

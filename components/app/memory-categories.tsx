@@ -816,7 +816,7 @@ function KnowledgeView({
   );
 }
 
-const BUTTON = "rounded-full bg-[#F2F2F0] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[#3A3A38] hover:bg-[#EAEAE7] disabled:opacity-40";
+const BUTTON = "rounded-full bg-[color:var(--hb-f2f2f0)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-eaeae7)] disabled:opacity-40";
 
 /** What the add box suggests telling Knowledge, for each kind (all of them: a person). */
 const EXAMPLE: Record<KnowledgeFilter, string> = {
@@ -886,11 +886,11 @@ function KnowledgeChips({
                 : undefined
             }
             aria-pressed={here}
-            className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium leading-4 ${here ? "bg-ink text-white" : "bg-[#F2F2F0] text-[#3A3A38] hover:bg-[#EAEAE7]"}`}
+            className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium leading-4 ${here ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "bg-[color:var(--hb-f2f2f0)] text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-eaeae7)]"}`}
           >
             {x.label}
-            {x.n !== undefined && <span className={`tabular-nums ${here ? "text-white/60" : "text-[#9A9A98]"}`}>{x.n}</span>}
-            {x.more && <span className={here ? "text-white/60" : "text-[#9A9A98]"}>· {x.more}</span>}
+            {x.n !== undefined && <span className={`tabular-nums ${here ? "text-[color:var(--bops-on-fill)]/60" : "text-[color:var(--ht-9a9a98)]"}`}>{x.n}</span>}
+            {x.more && <span className={here ? "text-[color:var(--bops-on-fill)]/60" : "text-[color:var(--ht-9a9a98)]"}>· {x.more}</span>}
           </button>
         );
         if (!kind) return chip;
@@ -903,7 +903,7 @@ function KnowledgeChips({
               aria-label={words}
               aria-pressed={pinned}
               title={words}
-              className={`absolute -right-1 -top-1 flex size-[18px] items-center justify-center rounded-full bg-white opacity-0 shadow-[0_0_0_1px_#E6E6E3,0_1px_2px_rgba(0,0,0,0.08)] outline-none transition-opacity duration-150 ease-out hover:text-ink focus-visible:opacity-100 focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] group-hover/chip:opacity-100 group-has-[:focus-visible]/chip:opacity-100 motion-reduce:transition-none ${pinned ? "text-ink" : "text-[#9A9A98]"}`}
+              className={`absolute -right-1 -top-1 flex size-[18px] items-center justify-center rounded-full bg-white opacity-0 shadow-[0_0_0_1px_var(--h-e6e6e3),0_1px_2px_rgba(0,0,0,0.08)] outline-none transition-opacity duration-150 ease-out hover:text-ink focus-visible:opacity-100 focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] group-hover/chip:opacity-100 group-has-[:focus-visible]/chip:opacity-100 motion-reduce:transition-none ${pinned ? "text-ink" : "text-[color:var(--ht-9a9a98)]"}`}
             >
               <PinIcon on={pinned} size={10} />
             </button>
@@ -1128,10 +1128,10 @@ export function MemoryPage({
   const listView = (
     <div ref={list} key={category} className="motion-fade-in flex flex-col gap-5">
       {owners ? (
-        <p className="mx-auto max-w-[400px] py-12 text-center text-[13.5px] leading-5 text-[#6B6B6B]">{owners}</p>
+        <p className="mx-auto max-w-[400px] py-12 text-center text-[13.5px] leading-5 text-[color:var(--ht-6b6b6b)]">{owners}</p>
       ) : !snap && failed ? (
         <div role="alert" className="flex flex-col items-center gap-3 py-12 text-center">
-          <span className="max-w-[360px] text-[13.5px] leading-5 text-[#6B6B6B]">{failed}</span>
+          <span className="max-w-[360px] text-[13.5px] leading-5 text-[color:var(--ht-6b6b6b)]">{failed}</span>
           {onRetry && (
             <button onClick={onRetry} className={BUTTON}>
               Try again
@@ -1143,27 +1143,27 @@ export function MemoryPage({
           <Spinner size={16} color="#9A9A98" />
         </div>
       ) : !snap.on ? (
-        <div className="py-12 text-center text-[13.5px] leading-5 text-[#6B6B6B]">Memory isn&rsquo;t on yet.</div>
+        <div className="py-12 text-center text-[13.5px] leading-5 text-[color:var(--ht-6b6b6b)]">Memory isn&rsquo;t on yet.</div>
       ) : !all.length ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
           <Mascot botId="boppy" color="#0A0A0A" size={52} />
-          <span className="max-w-[300px] text-[13.5px] leading-5 text-[#6B6B6B]">
+          <span className="max-w-[300px] text-[13.5px] leading-5 text-[color:var(--ht-6b6b6b)]">
             {c ? (snap.hidden?.some((h) => h.category === c.id) ? "Everything here is hidden." : c.empty) : "What your bots learn as you chat shows up here: people, plans, promises and more."}
           </span>
         </div>
       ) : !groups.length ? (
-        <div className="py-10 text-center text-[13.5px] leading-5 text-[#6B6B6B]">Nothing matches &ldquo;{search.trim()}&rdquo;.</div>
+        <div className="py-10 text-center text-[13.5px] leading-5 text-[color:var(--ht-6b6b6b)]">Nothing matches &ldquo;{search.trim()}&rdquo;.</div>
       ) : (
         groups.map((g) => (
           <div key={g.label ?? "all"} className="flex flex-col gap-2">
             {g.label && (
-              <span className="px-1 text-[12px] font-medium leading-4 text-[#9A9A98]">
-                {g.label} <span className="font-normal tabular-nums text-[#B0B0AD]">{g.items.length + g.more}</span>
+              <span className="px-1 text-[12px] font-medium leading-4 text-[color:var(--ht-9a9a98)]">
+                {g.label} <span className="font-normal tabular-nums text-[color:var(--ht-b0b0ad)]">{g.items.length + g.more}</span>
               </span>
             )}
-            <div className="flex flex-col overflow-hidden rounded-2xl shadow-[0_0_0_1px_#ECECEA]">
+            <div className="flex flex-col overflow-hidden rounded-2xl shadow-[0_0_0_1px_var(--h-ececea)]">
               {g.items.map((i, n) => (
-                <div key={i.id} className={sideBySide && !picked && open?.id === i.id ? "bg-[#F7F7F6]" : ""}>
+                <div key={i.id} className={sideBySide && !picked && open?.id === i.id ? "bg-[color:var(--hb-f7f7f6)]" : ""}>
                   <ItemRow
                     item={i}
                     last={n === g.items.length - 1 && !g.more}
@@ -1177,7 +1177,7 @@ export function MemoryPage({
                 </div>
               ))}
               {g.more > 0 && "id" in g && (
-                <button onClick={() => onCategory(g.id as CategoryId)} className="px-3.5 py-2.5 text-left text-[12.5px] font-medium leading-4 text-[#6B6B6B] hover:bg-[#F7F7F6] hover:text-ink">
+                <button onClick={() => onCategory(g.id as CategoryId)} className="px-3.5 py-2.5 text-left text-[12.5px] font-medium leading-4 text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--hb-f7f7f6)] hover:text-ink">
                   Show all {g.items.length + g.more}
                 </button>
               )}
@@ -1192,12 +1192,12 @@ export function MemoryPage({
     <div ref={measure} className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 pt-7">
       <div className={`flex w-full flex-col gap-5 ${sideBySide ? "max-w-[980px]" : "max-w-[560px]"}`}>
         <div className="flex items-start gap-3.5">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#F2F2F0] text-[#3A3A38]">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[color:var(--hb-f2f2f0)] text-[color:var(--ht-3a3a38)]">
             <KnowledgeIcon size={20} />
           </span>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <span className="text-[20px] font-semibold leading-6 tracking-[-0.01em]">{GROUP_NAME}</span>
-            <span className="text-[13px] leading-[19px] text-[#6B6B6B]">
+            <span className="text-[13px] leading-[19px] text-[color:var(--ht-6b6b6b)]">
               {owners ? "What the bots here know, learned as the owner chats" : snap?.on && items.length ? `${items.length.toLocaleString("en-US")} things your bots know, learned as you chat` : "What your bots know, learned as you chat"}
             </span>
           </div>
@@ -1212,7 +1212,7 @@ export function MemoryPage({
                 e.preventDefault();
                 void putQuestion();
               }}
-              className="flex h-11 items-center gap-2 rounded-2xl bg-white pl-4 pr-1.5 shadow-[0_0_0_1px_#E2E2DF] focus-within:shadow-[0_0_0_1.5px_#0A0A0A]"
+              className="flex h-11 items-center gap-2 rounded-2xl bg-white pl-4 pr-1.5 shadow-[0_0_0_1px_var(--h-e2e2df)] focus-within:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
             >
               <input
                 value={question}
@@ -1229,23 +1229,23 @@ export function MemoryPage({
                 placeholder="Ask what your bots know: what does Priya need from me?"
                 aria-label="Ask what your bots know"
                 maxLength={1000}
-                className="min-w-0 flex-1 bg-transparent text-[14px] leading-5 text-ink outline-none placeholder:text-[#9A9A98]"
+                className="min-w-0 flex-1 bg-transparent text-[14px] leading-5 text-ink outline-none placeholder:text-[color:var(--ht-9a9a98)]"
               />
               {question.trim() && (
-                <button type="submit" disabled={thinking} className="h-8 shrink-0 rounded-full bg-ink px-3.5 text-[12.5px] font-medium text-white disabled:opacity-50">
+                <button type="submit" disabled={thinking} className="h-8 shrink-0 rounded-full bg-[color:var(--hb-0a0a0a)] px-3.5 text-[12.5px] font-medium text-[color:var(--bops-on-fill)] disabled:opacity-50">
                   {thinking ? "Thinking…" : "Ask"}
                 </button>
               )}
             </form>
             {(thinking || answer) && (
-              <div className="flex flex-col gap-3 rounded-2xl bg-[#F7F7F6] px-4 py-3.5">
+              <div className="flex flex-col gap-3 rounded-2xl bg-[color:var(--hb-f7f7f6)] px-4 py-3.5">
                 {thinking ? (
-                  <span className="flex items-center gap-2 text-[13.5px] text-[#9A9A98]">
+                  <span className="flex items-center gap-2 text-[13.5px] text-[color:var(--ht-9a9a98)]">
                     <Spinner size={11} color="#9A9A98" />
                     Thinking back…
                   </span>
                 ) : answer && "error" in answer ? (
-                  <span role="alert" className="text-[13.5px] leading-5 text-[#B42318]">
+                  <span role="alert" className="text-[13.5px] leading-5 text-[color:var(--ht-b42318)]">
                     {answer.error}
                   </span>
                 ) : (
@@ -1253,12 +1253,12 @@ export function MemoryPage({
                     <>
                       <span className="whitespace-pre-wrap text-[14.5px] leading-[22px] text-ink [overflow-wrap:anywhere]">{undash(answer.answer.replace(/\*\*/g, ""))}</span>
                       {answer.based.length > 0 && (
-                        <div className="flex flex-col gap-1.5 border-t border-black/[0.06] pt-3">
-                          <span className="text-[11.5px] font-medium leading-4 text-[#9A9A98]">Based on</span>
+                        <div className="flex flex-col gap-1.5 border-t border-[color:var(--bops-tint)]/[0.06] pt-3">
+                          <span className="text-[11.5px] font-medium leading-4 text-[color:var(--ht-9a9a98)]">Based on</span>
                           {answer.based.map((f) => (
-                            <span key={f.id} className="flex flex-wrap items-baseline gap-x-2 text-[13px] leading-[19px] text-[#3A3A38]">
+                            <span key={f.id} className="flex flex-wrap items-baseline gap-x-2 text-[13px] leading-[19px] text-[color:var(--ht-3a3a38)]">
                               <span className="[overflow-wrap:anywhere]">{undash(f.text)}</span>
-                              <span className="text-[11.5px] text-[#9A9A98]">{f.source}</span>
+                              <span className="text-[11.5px] text-[color:var(--ht-9a9a98)]">{f.source}</span>
                             </span>
                           ))}
                         </div>
@@ -1281,9 +1281,9 @@ export function MemoryPage({
                 e.preventDefault();
                 void add();
               }}
-              className="flex h-9 items-center gap-2 rounded-full bg-white pl-3.5 pr-1 shadow-[0_0_0_1px_#E6E6E3] focus-within:shadow-[0_0_0_1.5px_#0A0A0A]"
+              className="flex h-9 items-center gap-2 rounded-full bg-white pl-3.5 pr-1 shadow-[0_0_0_1px_var(--h-e6e6e3)] focus-within:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
             >
-              <span aria-hidden className="text-[16px] leading-none text-[#9A9A98]">
+              <span aria-hidden className="text-[16px] leading-none text-[color:var(--ht-9a9a98)]">
                 +
               </span>
               <input
@@ -1292,7 +1292,7 @@ export function MemoryPage({
                 placeholder={`Add something your bots should know: ${EXAMPLE[category]}`}
                 aria-label="Add something your bots should know"
                 maxLength={500}
-                className="min-w-0 flex-1 bg-transparent text-[13.5px] leading-5 text-ink outline-none placeholder:text-[#9A9A98]"
+                className="min-w-0 flex-1 bg-transparent text-[13.5px] leading-5 text-ink outline-none placeholder:text-[color:var(--ht-9a9a98)]"
               />
               {adding.trim() && (
                 <button type="submit" disabled={saving} className={BUTTON}>
@@ -1300,7 +1300,7 @@ export function MemoryPage({
                 </button>
               )}
             </form>
-            <label className="flex h-9 items-center gap-2 rounded-full bg-[#F7F7F6] px-3.5 text-[#9A9A98] focus-within:bg-white focus-within:shadow-[0_0_0_1.5px_#0A0A0A]">
+            <label className="flex h-9 items-center gap-2 rounded-full bg-[color:var(--hb-f7f7f6)] px-3.5 text-[color:var(--ht-9a9a98)] focus-within:bg-white focus-within:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]">
               <SearchIcon />
               <input
                 value={search}
@@ -1314,11 +1314,11 @@ export function MemoryPage({
                 placeholder={c ? `Search ${c.label.toLowerCase()}` : "Search knowledge"}
                 spellCheck={false}
                 aria-label={c ? `Search ${c.label.toLowerCase()}` : "Search knowledge"}
-                className="min-w-0 flex-1 bg-transparent text-[13.5px] leading-5 text-ink outline-none placeholder:text-[#9A9A98]"
+                className="min-w-0 flex-1 bg-transparent text-[13.5px] leading-5 text-ink outline-none placeholder:text-[color:var(--ht-9a9a98)]"
               />
             </label>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-              <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] leading-4 text-[#6B6B6B]">
+              <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
                 {sorting && <Spinner size={11} color="#6B6B6B" />}
                 <span className="truncate">
                   {busy === "sort-older" ? "Sorting older things" : sorting ? "Sorting new things" : snap.syncedAt ? updated(snap.syncedAt) : "Not updated yet"}
@@ -1329,7 +1329,7 @@ export function MemoryPage({
                   onClick={() => setPicking(picked ? null : { category, ids: new Set() })}
                   aria-pressed={!!picked}
                   title={picked ? "Stop picking" : c ? `Pick ${c.label.toLowerCase()} to forget together` : "Pick things to forget together"}
-                  className={picked ? "rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white" : BUTTON}
+                  className={picked ? "rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)]" : BUTTON}
                 >
                   {picked ? "Done" : "Select"}
                 </button>
@@ -1342,31 +1342,31 @@ export function MemoryPage({
                 onClick={() => canTidy && void run("tidy-up")}
                 aria-disabled={!canTidy}
                 title={tidyTip}
-                className={`${BUTTON} aria-disabled:cursor-default aria-disabled:opacity-40 aria-disabled:hover:bg-[#F2F2F0]`}
+                className={`${BUTTON} aria-disabled:cursor-default aria-disabled:opacity-40 aria-disabled:hover:bg-[color:var(--hb-f2f2f0)]`}
               >
                 Tidy up
               </button>
             </div>
             {/* New facts wait to be sorted together (Refresh sorts them now); not while sorting, which is taking them. */}
             {!!snap.waiting && !sorting && (
-              <span className="-mt-1 text-[12.5px] leading-4 text-[#9A9A98]">{snap.waiting.toLocaleString("en-US")} new waiting to sort</span>
+              <span className="-mt-1 text-[12.5px] leading-4 text-[color:var(--ht-9a9a98)]">{snap.waiting.toLocaleString("en-US")} new waiting to sort</span>
             )}
             {/* Facts older than the newest ones sorted at first wait here, and Sort older sorts 300 more. */}
             {!!snap.behind && (
-              <span className="-mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] leading-4 text-[#9A9A98]">
+              <span className="-mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] leading-4 text-[color:var(--ht-9a9a98)]">
                 {snap.behind.toLocaleString("en-US")} older not sorted
                 <button
                   onClick={() => void run("sort-older")}
                   disabled={!!busy}
                   title="Sorts 300 more of the older facts. Uses a little credit."
-                  className="rounded-full bg-[#F2F2F0] px-2 py-0.5 text-[11.5px] font-medium leading-[14px] text-[#3A3A38] hover:bg-[#EAEAE7] disabled:opacity-40"
+                  className="rounded-full bg-[color:var(--hb-f2f2f0)] px-2 py-0.5 text-[11.5px] font-medium leading-[14px] text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-eaeae7)] disabled:opacity-40"
                 >
                   Sort older
                 </button>
               </span>
             )}
             {said && (
-              <span role={said.bad ? "alert" : undefined} className={`text-[12.5px] leading-[17px] ${said.bad ? "text-[#B42318]" : "text-[#6B6B6B]"}`}>
+              <span role={said.bad ? "alert" : undefined} className={`text-[12.5px] leading-[17px] ${said.bad ? "text-[color:var(--ht-b42318)]" : "text-[color:var(--ht-6b6b6b)]"}`}>
                 {said.text}
               </span>
             )}
@@ -1377,8 +1377,8 @@ export function MemoryPage({
           // The list beside the open item: a mail app's way, so moving between people is one click.
           <div className="flex items-start gap-5">
             <div className="w-[300px] shrink-0">{listView}</div>
-            <div className="sticky top-0 min-w-0 flex-1 overflow-hidden rounded-2xl shadow-[0_0_0_1px_#ECECEA]">
-              <span className="block px-3.5 pt-3 text-[11.5px] font-medium leading-4 text-[#9A9A98]">{kindOf(open.category)}</span>
+            <div className="sticky top-0 min-w-0 flex-1 overflow-hidden rounded-2xl shadow-[0_0_0_1px_var(--h-ececea)]">
+              <span className="block px-3.5 pt-3 text-[11.5px] font-medium leading-4 text-[color:var(--ht-9a9a98)]">{kindOf(open.category)}</span>
               <ItemRow key={open.id} item={open} last open onToggle={() => setOpenId(null)} act={act} forgetting={forgetting} />
             </div>
           </div>
@@ -1390,19 +1390,19 @@ export function MemoryPage({
       {/* At the foot of the page, over what scrolls: Forget N while picking, else Undo for 5 seconds after a Forget. */}
       <div className={`pointer-events-none sticky bottom-0 mt-auto flex w-full justify-center pb-5 pt-6 ${sideBySide ? "max-w-[980px]" : "max-w-[560px]"}`}>
         {picked ? (
-          <div className="motion-rise-in pointer-events-auto flex items-center gap-1 rounded-full bg-ink py-1 pl-4 pr-1 text-[13px] leading-4 text-white shadow-[0_12px_30px_-10px_#00000066]">
-            <span className="pr-2 tabular-nums text-white/70">{pickedItems.length ? `${pickedItems.length} picked` : "Pick what to forget"}</span>
-            <button onClick={forgetPicked} disabled={!pickedItems.length} className="rounded-full bg-[#B42318] px-3 py-1.5 text-[12.5px] font-semibold leading-4 text-white disabled:opacity-40">
+          <div className="motion-rise-in pointer-events-auto flex items-center gap-1 rounded-full bg-[color:var(--hb-0a0a0a)] py-1 pl-4 pr-1 text-[13px] leading-4 text-[color:var(--bops-on-fill)] shadow-[0_12px_30px_-10px_var(--h-00000066)]">
+            <span className="pr-2 tabular-nums text-[color:var(--bops-on-fill)]/70">{pickedItems.length ? `${pickedItems.length} picked` : "Pick what to forget"}</span>
+            <button onClick={forgetPicked} disabled={!pickedItems.length} className="rounded-full bg-[color:var(--hb-b42318)] px-3 py-1.5 text-[12.5px] font-semibold leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-40">
               Forget{pickedItems.length ? ` ${pickedItems.length}` : ""}
             </button>
-            <button onClick={() => setPicking(null)} className="rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white/80 hover:bg-white/10 hover:text-white">
+            <button onClick={() => setPicking(null)} className="rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)]/80 hover:bg-white/10 hover:text-[color:var(--bops-on-fill)]">
               Cancel
             </button>
           </div>
         ) : forgetting.undo ? (
-          <div key={forgetting.undo.ids.join()} role="status" className="motion-rise-in pointer-events-auto flex max-w-full items-center gap-1 rounded-full bg-ink py-1 pl-4 pr-1 text-[13px] leading-4 text-white shadow-[0_12px_30px_-10px_#00000066]">
+          <div key={forgetting.undo.ids.join()} role="status" className="motion-rise-in pointer-events-auto flex max-w-full items-center gap-1 rounded-full bg-[color:var(--hb-0a0a0a)] py-1 pl-4 pr-1 text-[13px] leading-4 text-[color:var(--bops-on-fill)] shadow-[0_12px_30px_-10px_var(--h-00000066)]">
             <span className="min-w-0 truncate pr-2">{forgetting.undo.label}</span>
-            <button onClick={() => forgetting.undoForget()} className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-[12.5px] font-semibold leading-4 text-white hover:bg-white/25">
+            <button onClick={() => forgetting.undoForget()} className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-[12.5px] font-semibold leading-4 text-[color:var(--bops-on-fill)] hover:bg-white/25">
               Undo
             </button>
           </div>
@@ -1420,18 +1420,18 @@ function HiddenList({ hidden, act }: { hidden: NonNullable<MemorySnapshot["hidde
   if (!hidden.length) return null;
   return (
     <div className="flex flex-col gap-2">
-      <button onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-1.5 self-start px-1 text-[12px] font-medium leading-4 text-[#9A9A98] hover:text-[#6B6B6B]">
+      <button onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-1.5 self-start px-1 text-[12px] font-medium leading-4 text-[color:var(--ht-9a9a98)] hover:text-[color:var(--ht-6b6b6b)]">
         <Chevron open={open} />
-        Hidden <span className="font-normal tabular-nums text-[#B0B0AD]">{hidden.length}</span>
+        Hidden <span className="font-normal tabular-nums text-[color:var(--ht-b0b0ad)]">{hidden.length}</span>
       </button>
       <Fold open={open}>
         {/* 1px of room, or the fold's clip cuts off the card's outer ring. */}
         <div className="p-px">
-          <div className="flex flex-col rounded-2xl shadow-[0_0_0_1px_#ECECEA]">
+          <div className="flex flex-col rounded-2xl shadow-[0_0_0_1px_var(--h-ececea)]">
             {hidden.map((h, n) => (
-              <div key={h.id} data-hidden={h.id} className={`flex flex-col ${n < hidden.length - 1 ? "border-b border-[#F0F0EE]" : ""}`}>
+              <div key={h.id} data-hidden={h.id} className={`flex flex-col ${n < hidden.length - 1 ? "border-b border-[color:var(--h-f0f0ee)]" : ""}`}>
                 <div className="flex h-11 items-center gap-3 px-4">
-                  <span className="min-w-0 flex-1 truncate text-[13.5px] leading-5 text-[#6B6B6B]">{undash(h.title)}</span>
+                  <span className="min-w-0 flex-1 truncate text-[13.5px] leading-5 text-[color:var(--ht-6b6b6b)]">{undash(h.title)}</span>
                   <button
                     disabled={busy === h.id}
                     onClick={async () => {
@@ -1446,7 +1446,7 @@ function HiddenList({ hidden, act }: { hidden: NonNullable<MemorySnapshot["hidde
                     Show
                   </button>
                 </div>
-                {failed?.id === h.id && <span className="px-4 pb-3 text-[12.5px] leading-4 text-[#B42318]">{failed.text}</span>}
+                {failed?.id === h.id && <span className="px-4 pb-3 text-[12.5px] leading-4 text-[color:var(--ht-b42318)]">{failed.text}</span>}
               </div>
             ))}
           </div>
@@ -1516,7 +1516,7 @@ export function ItemRow({
     return typeof e !== "string";
   };
   const toggleDone = () => void run({ action: "edit", id: item.id, done: !item.done });
-  const errorLine = error && !editing && <span className={`pr-3.5 text-[12.5px] leading-4 text-[#B42318] ${INDENT[item.category] ?? "pl-3.5"}`}>{error}</span>;
+  const errorLine = error && !editing && <span className={`pr-3.5 text-[12.5px] leading-4 text-[color:var(--ht-b42318)] ${INDENT[item.category] ?? "pl-3.5"}`}>{error}</span>;
   const [fresh, setFresh] = useState(() => justArrived(item.id));
   // Shut, the row drops its Delete everywhere question and its menu: reopened, it shows the actions again.
   if (!open && (wipe || menu)) {
@@ -1543,21 +1543,21 @@ export function ItemRow({
     <div
       data-item={item.id}
       onAnimationEnd={(e) => e.target === e.currentTarget && e.animationName === "wash" && setFresh(false)}
-      className={`flex flex-col ${last ? "" : "border-b border-[#F0F0EE]"} ${fresh ? "motion-new-item" : ""}`}>
+      className={`flex flex-col ${last ? "" : "border-b border-[color:var(--h-f0f0ee)]"} ${fresh ? "motion-new-item" : ""}`}>
       {picking ? (
-        <button onClick={onPick} role="checkbox" aria-checked={picked} className={`flex items-start gap-3 px-3.5 py-3 text-left ${picked ? "bg-[#F7F7F6]" : "hover:bg-[#FAFAF9]"}`}>
+        <button onClick={onPick} role="checkbox" aria-checked={picked} className={`flex items-start gap-3 px-3.5 py-3 text-left ${picked ? "bg-[color:var(--hb-f7f7f6)]" : "hover:bg-[color:var(--hb-fafaf9)]"}`}>
           <span
-            className={`mt-px flex size-[18px] shrink-0 items-center justify-center rounded-[6px] ${picked ? "bg-ink" : "shadow-[inset_0_0_0_1.5px_#C9C9C6]"}`}
+            className={`mt-px flex size-[18px] shrink-0 items-center justify-center rounded-[6px] ${picked ? "bg-[color:var(--hb-0a0a0a)]" : "shadow-[inset_0_0_0_1.5px_var(--h-c9c9c6)]"}`}
             aria-hidden
           >
             {picked && <CheckIcon size={11} color="#FFFFFF" />}
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className={`truncate text-[14px] font-medium leading-[18px] ${greyed(item) ? "text-[#9A9A98]" : "text-ink"}`}>{undash(item.title)}</span>
-            {line && <span className="truncate text-[12.5px] leading-[17px] text-[#6B6B6B]">{line}</span>}
+            <span className={`truncate text-[14px] font-medium leading-[18px] ${greyed(item) ? "text-[color:var(--ht-9a9a98)]" : "text-ink"}`}>{undash(item.title)}</span>
+            {line && <span className="truncate text-[12.5px] leading-[17px] text-[color:var(--ht-6b6b6b)]">{line}</span>}
           </span>
           {item.when && (
-            <span className="shrink-0 pt-px text-[12px] leading-4 text-[#9A9A98]">
+            <span className="shrink-0 pt-px text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">
               <When item={item} />
             </span>
           )}
@@ -1583,7 +1583,7 @@ export function ItemRow({
               disabled={busy}
               aria-label={item.done ? "Mark not done" : "Mark done"}
               className={`mt-px flex size-[18px] shrink-0 items-center justify-center rounded-full disabled:opacity-50 ${
-                item.done ? "bg-[#9A9A98]" : "shadow-[inset_0_0_0_1.5px_#C9C9C6] hover:shadow-[inset_0_0_0_1.5px_#0A0A0A]"
+                item.done ? "bg-[color:var(--hb-9a9a98)]" : "shadow-[inset_0_0_0_1.5px_var(--h-c9c9c6)] hover:shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)]"
               }`}
             >
               {item.done && <CheckIcon size={11} color="#FFFFFF" />}
@@ -1594,17 +1594,17 @@ export function ItemRow({
           <button onClick={onToggle} aria-expanded={open} className="flex min-w-0 flex-1 items-start gap-3 text-left">
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="flex items-center gap-1.5">
-                <span className={`truncate text-[14px] font-medium leading-[18px] ${greyed(item) ? "text-[#9A9A98]" : "text-ink"}`}>{undash(item.title)}</span>
+                <span className={`truncate text-[14px] font-medium leading-[18px] ${greyed(item) ? "text-[color:var(--ht-9a9a98)]" : "text-ink"}`}>{undash(item.title)}</span>
                 {item.private && <Private />}
               </span>
-              {line && <span className={`text-[12.5px] leading-[17px] text-[#6B6B6B] ${open ? "[overflow-wrap:anywhere]" : "truncate"}`}>{line}</span>}
+              {line && <span className={`text-[12.5px] leading-[17px] text-[color:var(--ht-6b6b6b)] ${open ? "[overflow-wrap:anywhere]" : "truncate"}`}>{line}</span>}
             </span>
             {item.when && (
-              <span className="shrink-0 pt-px text-[12px] leading-4 text-[#9A9A98]">
+              <span className="shrink-0 pt-px text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">
                 <When item={item} />
               </span>
             )}
-            <span className="pt-[3px] text-[#B0B0AD]">
+            <span className="pt-[3px] text-[color:var(--ht-b0b0ad)]">
               <Chevron open={open} />
             </span>
           </button>
@@ -1615,13 +1615,13 @@ export function ItemRow({
         <div className={`flex flex-col gap-3 pb-3.5 pr-3.5 ${INDENT[item.category] ?? "pl-3.5"}`}>
           <Sources sources={item.sources} />
           {item.private && (
-            <span className="flex items-center gap-1.5 text-[12.5px] leading-4 text-[#6B6B6B]">
+            <span className="flex items-center gap-1.5 text-[12.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
               <LockIcon />
               Kept out of your bots&rsquo; prompts
             </span>
           )}
           {wipe === "looking" ? (
-            <span className="flex items-center gap-1.5 text-[12.5px] leading-4 text-[#6B6B6B]">
+            <span className="flex items-center gap-1.5 text-[12.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
               <Spinner size={11} color="#6B6B6B" />
               Looking up the chats it came from
             </span>
@@ -1664,7 +1664,7 @@ export function ItemRow({
                   title="More"
                   aria-haspopup="menu"
                   aria-expanded={menu}
-                  className="flex size-6 items-center justify-center rounded-full text-[#6B6B6B] hover:bg-[#F2F2F0] hover:text-ink disabled:opacity-40"
+                  className="flex size-6 items-center justify-center rounded-full text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--hb-f2f2f0)] hover:text-ink disabled:opacity-40"
                 >
                   <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden>
                     <circle cx="3.2" cy="8" r="1.3" fill="currentColor" />
@@ -1683,16 +1683,16 @@ export function ItemRow({
                         setMenu(false);
                         moreButton.current?.focus();
                       }}
-                      className="motion-menu-in absolute left-0 top-[calc(100%+6px)] z-40 flex w-[200px] origin-top-left flex-col rounded-xl bg-white p-1 shadow-[0_0_0_1px_#0000000F,0_12px_30px_-10px_#00000040]"
+                      className="motion-menu-in absolute left-0 top-[calc(100%+6px)] z-40 flex w-[200px] origin-top-left flex-col rounded-xl bg-white p-1 shadow-[0_0_0_1px_var(--h-0000000f),0_12px_30px_-10px_var(--h-00000040)]"
                     >
                       <button
                         role="menuitem"
                         autoFocus
                         onClick={() => void lookUp()}
-                        className="flex w-full flex-col items-start gap-0.5 rounded-lg px-2.5 py-1.5 text-left outline-none hover:bg-[#FEF3F2] focus-visible:bg-[#FEF3F2]"
+                        className="flex w-full flex-col items-start gap-0.5 rounded-lg px-2.5 py-1.5 text-left outline-none hover:bg-[color:var(--hb-fef3f2)] focus-visible:bg-[color:var(--hb-fef3f2)]"
                       >
-                        <span className="text-[13px] font-medium leading-4 text-[#B42318]">Delete everywhere</span>
-                        <span className="text-[11.5px] leading-[15px] text-[#6B6B6B]">Forgets it and deletes the memory copy of the chats it came from</span>
+                        <span className="text-[13px] font-medium leading-4 text-[color:var(--ht-b42318)]">Delete everywhere</span>
+                        <span className="text-[11.5px] leading-[15px] text-[color:var(--ht-6b6b6b)]">Forgets it and deletes the memory copy of the chats it came from</span>
                       </button>
                     </div>
                   </>
@@ -1713,7 +1713,7 @@ function Lead({ item }: { item: MemoryItem }) {
   if (item.category === "people" || item.category === "companies") {
     const letter = (undash(item.title).match(/[\p{L}\p{N}]/u)?.[0] ?? "?").toUpperCase();
     return (
-      <span className={`flex size-9 shrink-0 items-center justify-center bg-[#F2F2F0] text-[14px] font-semibold text-[#3A3A38] ${item.category === "people" ? "rounded-full" : "rounded-[10px]"}`}>
+      <span className={`flex size-9 shrink-0 items-center justify-center bg-[color:var(--hb-f2f2f0)] text-[14px] font-semibold text-[color:var(--ht-3a3a38)] ${item.category === "people" ? "rounded-full" : "rounded-[10px]"}`}>
         {letter}
       </span>
     );
@@ -1722,14 +1722,14 @@ function Lead({ item }: { item: MemoryItem }) {
   const d = item.when ? new Date(item.when.length > 10 ? item.when : `${item.when}T12:00`) : null;
   if (!d || Number.isNaN(d.getTime()))
     return (
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[#F2F2F0] text-[#9A9A98]">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[color:var(--hb-f2f2f0)] text-[color:var(--ht-9a9a98)]">
         <CategoryIcon id="events" size={15} />
       </span>
     );
   return (
     <span
       className={`flex size-9 shrink-0 flex-col items-center justify-center rounded-[10px] leading-none ${
-        pressing(item) ? "bg-highlighter text-ink shadow-[0_0_0_1px_#0000001F]" : greyed(item) ? "bg-[#F4F4F2] text-[#9A9A98]" : "bg-[#F2F2F0] text-ink"
+        pressing(item) ? "bg-highlighter text-ink shadow-[0_0_0_1px_var(--h-0000001f)]" : greyed(item) ? "bg-[color:var(--hb-f4f4f2)] text-[color:var(--ht-9a9a98)]" : "bg-[color:var(--hb-f2f2f0)] text-ink"
       }`}
     >
       <span className="text-[9px] font-semibold uppercase tracking-[0.06em] opacity-70">{d.toLocaleDateString(undefined, { month: "short" })}</span>
@@ -1750,15 +1750,15 @@ export function Sources({ sources }: { sources: ItemSource[] }) {
   if (!sources.length) return null;
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[11.5px] font-medium leading-4 text-[#9A9A98]">Learned from</span>
+      <span className="text-[11.5px] font-medium leading-4 text-[color:var(--ht-9a9a98)]">Learned from</span>
       {sources.map((s) => {
         const how = HOW[s.how] ?? HOW.said;
         const meta = [s.how === "card" ? "" : undash(s.from), since(s.at)].filter(Boolean).join(" · ");
         return (
-          <div key={s.fact} className="flex flex-col gap-1 rounded-xl bg-[#F7F7F6] px-3 py-2">
-            <span className="text-[13px] leading-[19px] text-[#3A3A38] [overflow-wrap:anywhere]">{undash(s.text)}</span>
-            <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11.5px] leading-4 text-[#9A9A98]">
-              <span data-tip={how.tip} className="rounded-full bg-white px-1.5 py-px text-[10.5px] font-medium leading-[14px] text-[#3A3A38] shadow-[0_0_0_1px_#E6E6E3]">
+          <div key={s.fact} className="flex flex-col gap-1 rounded-xl bg-[color:var(--hb-f7f7f6)] px-3 py-2">
+            <span className="text-[13px] leading-[19px] text-[color:var(--ht-3a3a38)] [overflow-wrap:anywhere]">{undash(s.text)}</span>
+            <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11.5px] leading-4 text-[color:var(--ht-9a9a98)]">
+              <span data-tip={how.tip} className="rounded-full bg-white px-1.5 py-px text-[10.5px] font-medium leading-[14px] text-[color:var(--ht-3a3a38)] shadow-[0_0_0_1px_var(--h-e6e6e3)]">
                 {how.label}
               </span>
               {s.private && <Private />}
@@ -1790,9 +1790,9 @@ function DeleteEverywhere({ sessions, busy, onConfirm, onCancel }: { sessions: D
         e.preventDefault();
         if (!busy) onCancel();
       }}
-      className="flex flex-col gap-2 rounded-xl bg-[#FEF3F2] px-3 py-2.5 outline-none"
+      className="flex flex-col gap-2 rounded-xl bg-[color:var(--hb-fef3f2)] px-3 py-2.5 outline-none"
     >
-      <span className="text-[12.5px] font-medium leading-[17px] text-[#3A3A38]">
+      <span className="text-[12.5px] font-medium leading-[17px] text-[color:var(--ht-3a3a38)]">
         {sessions.length
           ? `Delete everywhere? Bops forgets this and deletes ${sessions.length === 1 ? "this chat" : `these ${sessions.length} chats`} from memory:`
           : "Delete everywhere? No Bops chat in memory taught Knowledge this, so Bops only forgets it."}
@@ -1800,28 +1800,28 @@ function DeleteEverywhere({ sessions, busy, onConfirm, onCancel }: { sessions: D
       {sessions.length > 0 && (
         <ul className="flex flex-col gap-1">
           {sessions.map((x) => (
-            <li key={x.id} className="flex flex-col rounded-lg bg-white px-2.5 py-1.5 shadow-[0_0_0_1px_#F4D9D6]">
+            <li key={x.id} className="flex flex-col rounded-lg bg-white px-2.5 py-1.5 shadow-[0_0_0_1px_var(--h-f4d9d6)]">
               <span className="text-[12.5px] leading-[17px] text-ink [overflow-wrap:anywhere]">
                 {undash(x.name)}
-                {x.at ? <span className="text-[#9A9A98]">{` · ${since(x.at)}`}</span> : null}
+                {x.at ? <span className="text-[color:var(--ht-9a9a98)]">{` · ${since(x.at)}`}</span> : null}
               </span>
               {x.alsoFor.length > 0 && (
-                <span className="text-[11.5px] leading-4 text-[#9A5B00] [overflow-wrap:anywhere]">Knowledge also learned {x.alsoFor.map(undash).join(", ")} from it</span>
+                <span className="text-[11.5px] leading-4 text-[color:var(--ht-9a5b00)] [overflow-wrap:anywhere]">Knowledge also learned {x.alsoFor.map(undash).join(", ")} from it</span>
               )}
             </li>
           ))}
         </ul>
       )}
-      {sessions.length > 0 && <span className="text-[11.5px] leading-4 text-[#6B6B6B]">These chats stay in your Bops chat history; their memory copy is deleted</span>}
+      {sessions.length > 0 && <span className="text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]">These chats stay in your Bops chat history; their memory copy is deleted</span>}
       <span className="flex items-center gap-1">
-        <button onClick={onConfirm} disabled={busy} className="rounded-full bg-[#B42318] px-3 py-1 text-[12px] font-semibold leading-4 text-white disabled:opacity-60">
+        <button onClick={onConfirm} disabled={busy} className="rounded-full bg-[color:var(--hb-b42318)] px-3 py-1 text-[12px] font-semibold leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-60">
           {busy ? "Deleting…" : "Delete everywhere"}
         </button>
         <button
           autoFocus
           onClick={onCancel}
           disabled={busy}
-          className="rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-[#3A3A38] outline-none hover:bg-white focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] disabled:opacity-40"
+          className="rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-[color:var(--ht-3a3a38)] outline-none hover:bg-white focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] disabled:opacity-40"
         >
           Cancel
         </button>
@@ -1847,7 +1847,7 @@ export function EditForm({
   const [title, setTitle] = useState(item.title);
   const [detail, setDetail] = useState(item.detail);
   const name = useRef<HTMLInputElement>(null);
-  const field = "w-full rounded-xl bg-[#F7F7F6] px-3 py-2 text-[13.5px] leading-[18px] outline-none placeholder:text-[#9A9A98] focus:bg-white focus:shadow-[0_0_0_1.5px_#0A0A0A]";
+  const field = "w-full rounded-xl bg-[color:var(--hb-f7f7f6)] px-3 py-2 text-[13.5px] leading-[18px] outline-none placeholder:text-[color:var(--ht-9a9a98)] focus:bg-white focus:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]";
   return (
     <form
       onSubmit={(e) => {
@@ -1869,12 +1869,12 @@ export function EditForm({
     >
       <input ref={name} autoFocus value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Name" placeholder="Name" maxLength={90} className={`${field} font-medium`} />
       <input value={detail} onChange={(e) => setDetail(e.target.value)} aria-label="Line" placeholder="A line about it" maxLength={160} className={field} />
-      {error && <span className="text-[12.5px] leading-4 text-[#B42318]">{error}</span>}
+      {error && <span className="text-[12.5px] leading-4 text-[color:var(--ht-b42318)]">{error}</span>}
       <span className="flex items-center gap-2">
-        <button type="submit" disabled={busy || !title.trim()} className="rounded-full bg-ink px-3.5 py-1.5 text-[12.5px] font-semibold leading-4 text-white disabled:opacity-40">
+        <button type="submit" disabled={busy || !title.trim()} className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3.5 py-1.5 text-[12.5px] font-semibold leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-40">
           {busy ? "Saving…" : "Save"}
         </button>
-        <button type="button" onClick={onCancel} disabled={busy} className="rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[#3A3A38] hover:bg-[#F2F2F0] disabled:opacity-40">
+        <button type="button" onClick={onCancel} disabled={busy} className="rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)] disabled:opacity-40">
           Cancel
         </button>
       </span>

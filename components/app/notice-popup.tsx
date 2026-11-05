@@ -95,21 +95,21 @@ export function NoticeCard() {
         e.preventDefault();
         void ok();
       }}
-      className={`mx-1 mt-3 flex flex-col rounded-[14px] bg-white px-3.5 pb-3 pt-3 shadow-[0_0_0_1px_#E6E6E3,0_8px_20px_-14px_#00000040] ${rises?.id === n.id && rises.late ? "motion-rise-in" : ""}`}
+      className={`mx-1 mt-3 flex flex-col rounded-[14px] bg-white px-3.5 pb-3 pt-3 shadow-[0_0_0_1px_var(--h-e6e6e3),0_8px_20px_-14px_var(--h-00000040)] ${rises?.id === n.id && rises.late ? "motion-rise-in" : ""}`}
     >
       <span id="notice-title" className="text-[13.5px] font-semibold leading-[18px]">
         {n.title}
       </span>
-      <span id="notice-body" className="whitespace-pre-line pt-1 text-[12.5px] leading-[17px] text-[#6B6B6B]">
+      <span id="notice-body" className="whitespace-pre-line pt-1 text-[12.5px] leading-[17px] text-[color:var(--ht-6b6b6b)]">
         {n.body}
       </span>
       <div className="flex items-center justify-end gap-2 pt-3">
         {link && (
-          <button onClick={() => window.open(link.url, "_blank")} className={`${pill} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
+          <button onClick={() => window.open(link.url, "_blank")} className={`${pill} bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)]`}>
             {link.label}
           </button>
         )}
-        <button disabled={closing} onClick={() => void ok()} className={`${pill} min-w-[56px] bg-ink text-white`}>
+        <button disabled={closing} onClick={() => void ok()} className={`${pill} min-w-[56px] bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]`}>
           OK
         </button>
       </div>
@@ -128,12 +128,12 @@ export function NoticeRail({ onOpen }: { onOpen: () => void }) {
       aria-label={tip}
       data-tip={tip}
       data-notice="rail"
-      className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#FCFCFB] active:scale-[.96]"
+      className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-fcfcfb)] active:scale-[.96]"
     >
       <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden>
         <path d="M8 2.2a4 4 0 0 0-4 4v2.6L2.8 11h10.4L12 8.8V6.2a4 4 0 0 0-4-4zM6.5 13a1.6 1.6 0 0 0 3 0" fill="none" stroke="#0A0A0A" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <span aria-hidden className="absolute -right-px -top-px size-2.5 rounded-full bg-[#2F7BFF] shadow-[0_0_0_2px_#F9F9F8]" />
+      <span aria-hidden className="absolute -right-px -top-px size-2.5 rounded-full bg-[color:var(--hb-2f7bff)] shadow-[0_0_0_2px_var(--h-f9f9f8)]" />
     </button>
   );
 }

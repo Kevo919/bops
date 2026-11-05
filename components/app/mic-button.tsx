@@ -113,9 +113,9 @@ export function MicButton({ botId, onText, onError }: { botId?: string; onText: 
         onClick={() => stop(true)}
         aria-label="Stop recording"
         data-tip="Stop · Enter to finish, Esc to cancel"
-        className="flex h-[30px] shrink-0 items-center gap-1.5 rounded-full bg-[#FDECEA] pl-2.5 pr-3 text-[12.5px] font-medium tabular-nums leading-4 text-[#B42318]"
+        className="flex h-[30px] shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--hb-fdecea)] pl-2.5 pr-3 text-[12.5px] font-medium tabular-nums leading-4 text-[color:var(--ht-b42318)]"
       >
-        <span className="size-2 animate-pulse rounded-full bg-[#D92D20]" />
+        <span className="size-2 animate-pulse rounded-full bg-[color:var(--hb-d92d20)]" />
         {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, "0")}
       </button>
     );
@@ -126,7 +126,7 @@ export function MicButton({ botId, onText, onError }: { botId?: string; onText: 
       disabled={phase === "transcribing"}
       aria-label={phase === "transcribing" ? "Transcribing" : "Talk instead of typing"}
       data-tip={phase === "transcribing" ? "Writing down what you said…" : "Talk instead of typing"}
-      className="flex size-[30px] shrink-0 items-center justify-center rounded-full text-[#6B6B6B] hover:bg-[#F2F2F0] hover:text-ink disabled:hover:bg-transparent"
+      className="flex size-[30px] shrink-0 items-center justify-center rounded-full text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--hb-f2f2f0)] hover:text-ink disabled:hover:bg-transparent"
     >
       {phase === "transcribing" ? (
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden className="animate-spin">

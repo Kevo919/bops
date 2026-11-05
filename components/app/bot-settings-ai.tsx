@@ -52,7 +52,7 @@ export function AiSlot({
         onPick={(v) => void send({ runsOn: v })}
       />
       {error && (
-        <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}

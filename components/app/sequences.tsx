@@ -48,9 +48,9 @@ export function Toggle({ label, on, onFlip, disabled, tip }: { label: string; on
       data-tip={tip}
       disabled={disabled}
       onClick={() => onFlip?.(!on)}
-      className={`relative h-[18px] w-[30px] shrink-0 rounded-full transition-colors disabled:cursor-default ${on ? "bg-ink" : "bg-[#D9D9D5]"} ${disabled && !tip ? "opacity-50" : ""}`}
+      className={`relative h-[18px] w-[30px] shrink-0 rounded-full transition-colors disabled:cursor-default ${on ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-d9d9d5)]"} ${disabled && !tip ? "opacity-50" : ""}`}
     >
-      <span className={`absolute top-0.5 size-[14px] rounded-full bg-white shadow-[0_1px_2px_#00000033] transition-all ${on ? "left-[14px]" : "left-0.5"}`} />
+      <span className={`absolute top-0.5 size-[14px] rounded-full bg-white shadow-[0_1px_2px_var(--h-00000033)] transition-all ${on ? "left-[14px]" : "left-0.5"}`} />
     </button>
   );
 }
@@ -59,7 +59,7 @@ export function Toggle({ label, on, onFlip, disabled, tip }: { label: string; on
 export function InnerLabel({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="mb-2 mt-2.5 flex items-center justify-between gap-2">
-      <span className="text-[11px] font-semibold uppercase leading-4 tracking-[0.02em] text-[#9A9A97]">{children}</span>
+      <span className="text-[11px] font-semibold uppercase leading-4 tracking-[0.02em] text-[color:var(--ht-9a9a97)]">{children}</span>
       {action}
     </div>
   );
@@ -82,10 +82,10 @@ function TriggerIcon({ channel }: { channel: "email" | "phone" }) {
 function Chip({ step, channel }: { step: Step; channel: "email" | "phone" }) {
   const look =
     step.kind === "trigger"
-      ? "bg-ink text-white"
+      ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]"
       : step.kind === "ok"
-        ? "bg-[#EEF4FF] text-[#1D4ED8] shadow-[inset_0_0_0_1px_#CFE0FF]"
-        : "bg-[#F6F6F4] text-[#3A3A38] shadow-[inset_0_0_0_1px_#E8E8E5]";
+        ? "bg-[color:var(--hb-eef4ff)] text-[color:var(--ht-1d4ed8)] shadow-[inset_0_0_0_1px_var(--h-cfe0ff)]"
+        : "bg-[color:var(--hb-f6f6f4)] text-[color:var(--ht-3a3a38)] shadow-[inset_0_0_0_1px_var(--h-e8e8e5)]";
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-[9px] py-1 text-[11.5px] leading-4 ${look}`}>
       {step.kind === "trigger" && <TriggerIcon channel={channel} />}
@@ -99,12 +99,12 @@ export function SequenceRow({ seq, bot: b, set, today, onFlip, busy }: { seq: Bu
   const on = seq.on(set);
   const steps = seq.steps(b, set);
   return (
-    <div data-seq={seq.id} data-on={on} className={`rounded-xl bg-white px-3 py-2.5 shadow-[0_0_0_1px_#ECECEA] ${on ? "" : "opacity-[0.55]"}`}>
+    <div data-seq={seq.id} data-on={on} className={`rounded-xl bg-white px-3 py-2.5 shadow-[0_0_0_1px_var(--h-ececea)] ${on ? "" : "opacity-[0.55]"}`}>
       <div className="flex items-center gap-2.5">
         <Toggle label={seq.title} on={on} disabled={seq.locked || busy} tip={seq.locked ? W.locked : undefined} onFlip={seq.locked ? undefined : onFlip} />
         <span className="text-[13px] font-semibold leading-4">{seq.title}</span>
-        <span className="rounded-full px-[7px] py-px text-[10px] leading-[14px] text-[#6B6B6B] shadow-[inset_0_0_0_1px_#E8E8E5]">{W.builtIn}</span>
-        <span className="ml-auto truncate text-[11.5px] leading-4 text-[#6B6B6B]" data-seq-count>
+        <span className="rounded-full px-[7px] py-px text-[10px] leading-[14px] text-[color:var(--ht-6b6b6b)] shadow-[inset_0_0_0_1px_var(--h-e8e8e5)]">{W.builtIn}</span>
+        <span className="ml-auto truncate text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]" data-seq-count>
           {on ? seq.count(today) : seq.offLine}
         </span>
       </div>
@@ -112,7 +112,7 @@ export function SequenceRow({ seq, bot: b, set, today, onFlip, busy }: { seq: Bu
         {steps.map((s, i) => (
           <span key={s.text} className="inline-flex items-center gap-1.5">
             {i > 0 && (
-              <span aria-hidden className="text-[11px] text-[#B5B5B1]">
+              <span aria-hidden className="text-[11px] text-[color:var(--ht-b5b5b1)]">
                 →
               </span>
             )}
@@ -140,7 +140,7 @@ export function Sequences({ bot: b, set, channel, today }: { bot: Bot; set: BotS
         ))}
       </div>
       {error && (
-        <span role="alert" className="mt-1.5 block text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="mt-1.5 block text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}
@@ -155,7 +155,7 @@ export function FactChips({ items, plain }: { items: readonly string[]; plain?: 
       {items.map((x) => (
         <span
           key={x}
-          className={`inline-flex items-center gap-1 rounded-full px-[9px] py-1 text-[11.5px] leading-4 ${plain ? "bg-white text-[#3A3A38] shadow-[inset_0_0_0_1px_#E8E8E5]" : "bg-[#F2F7F2] text-[#1F6F3A] shadow-[inset_0_0_0_1px_#D5E8D7]"}`}
+          className={`inline-flex items-center gap-1 rounded-full px-[9px] py-1 text-[11.5px] leading-4 ${plain ? "bg-white text-[color:var(--ht-3a3a38)] shadow-[inset_0_0_0_1px_var(--h-e8e8e5)]" : "bg-[color:var(--hb-f2f7f2)] text-[color:var(--ht-1f6f3a)] shadow-[inset_0_0_0_1px_var(--h-d5e8d7)]"}`}
         >
           {!plain && (
             <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden>
@@ -172,8 +172,8 @@ export function FactChips({ items, plain }: { items: readonly string[]; plain?: 
 /** Today's row: the counts, and an action on its right. */
 export function TodayRow({ text, action }: { text: string; action?: React.ReactNode }) {
   return (
-    <div data-today className="mt-3 flex items-center gap-3 rounded-xl bg-[#F6F6F4] px-3.5 py-3">
-      <span className="min-w-0 flex-1 text-[12.5px] leading-[18px] text-[#3A3A38]">{text}</span>
+    <div data-today className="mt-3 flex items-center gap-3 rounded-xl bg-[color:var(--hb-f6f6f4)] px-3.5 py-3">
+      <span className="min-w-0 flex-1 text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{text}</span>
       {action}
     </div>
   );

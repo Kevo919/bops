@@ -338,19 +338,19 @@ export function RoutineWeek({
                 if (x.key !== day.key && sureId !== null) question.close(sureId);
                 setPicked(x.key);
               }}
-              className={`relative flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 pb-2 pt-1.5 outline-none transition-colors focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] ${
-                on ? "bg-ink text-white" : x.today ? "bg-white shadow-[0_0_0_1.5px_#0A0A0A]" : "bg-white shadow-[0_0_0_1px_#ECECEA] hover:bg-[#FAFAF9]"
+              className={`relative flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 pb-2 pt-1.5 outline-none transition-colors focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] ${
+                on ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : x.today ? "bg-white shadow-[0_0_0_1.5px_var(--h-0a0a0a)]" : "bg-white shadow-[0_0_0_1px_var(--h-ececea)] hover:bg-[color:var(--hb-fafaf9)]"
               }`}
             >
-              {needs && <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-highlighter shadow-[0_0_0_1px_#0A0A0A]" aria-hidden />}
-              <span className={`text-[10.5px] font-medium uppercase leading-3 tracking-[0.04em] ${on ? "text-white/70" : "text-[#9A9A98]"}`}>{x.today ? "Today" : DOW[x.dow]}</span>
+              {needs && <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-highlighter shadow-[0_0_0_1px_var(--h-0a0a0a)]" aria-hidden />}
+              <span className={`text-[10.5px] font-medium uppercase leading-3 tracking-[0.04em] ${on ? "text-[color:var(--bops-on-fill)]/70" : "text-[color:var(--ht-9a9a98)]"}`}>{x.today ? "Today" : DOW[x.dow]}</span>
               <span className="text-[17px] font-semibold leading-5 tabular-nums">{x.date}</span>
               <span className="flex h-[6px] items-center gap-[3px]" aria-hidden>
                 {dots.slice(0, 4).map((it, j) => {
                   // A dark bot's dot is white on the picked (dark) day.
                   return <span key={j} style={{ background: dotOf(botOf(it.routine)?.color, on) }} className="size-[6px] rounded-full" />;
                 })}
-                {dots.length > 4 && <span className={`text-[9px] font-semibold leading-none ${on ? "text-white/70" : "text-[#9A9A98]"}`}>+{dots.length - 4}</span>}
+                {dots.length > 4 && <span className={`text-[9px] font-semibold leading-none ${on ? "text-[color:var(--bops-on-fill)]/70" : "text-[color:var(--ht-9a9a98)]"}`}>+{dots.length - 4}</span>}
               </span>
             </button>
           );
@@ -362,10 +362,10 @@ export function RoutineWeek({
           <span ref={heading} data-list-heading tabIndex={-1} className="text-[13px] font-semibold leading-4 outline-none">
             {day.today ? "Today" : DOW_LONG[day.dow]}, {MONTH[day.month]} {day.date}
           </span>
-          <span className="text-[12px] tabular-nums leading-4 text-[#9A9A98]">{total ? (total === 1 ? "1 run" : `${total} runs`) : ""}</span>
+          <span className="text-[12px] tabular-nums leading-4 text-[color:var(--ht-9a9a98)]">{total ? (total === 1 ? "1 run" : `${total} runs`) : ""}</span>
         </span>
         {!day.items.length ? (
-          <span className="px-1 py-2 text-[12.5px] leading-4 text-[#9A9A98]">Nothing runs this day</span>
+          <span className="px-1 py-2 text-[12.5px] leading-4 text-[color:var(--ht-9a9a98)]">Nothing runs this day</span>
         ) : (
           <ol ref={lines} className="flex flex-col">
             {day.items.map((it, i) => {
@@ -417,14 +417,14 @@ export function RoutineWeek({
 function NowLine({ at, tz }: { at: number; tz?: string }) {
   return (
     <span className="flex items-center gap-2 py-1 pl-[13px]" aria-label={`Now, ${clockOf(at, tz)}`}>
-      <span className="size-[7px] shrink-0 rounded-full bg-ink" aria-hidden />
-      <span className="h-px flex-1 bg-ink/80" aria-hidden />
+      <span className="size-[7px] shrink-0 rounded-full bg-[color:var(--hb-0a0a0a)]" aria-hidden />
+      <span className="h-px flex-1 bg-[color:var(--hb-0a0a0a)]/80" aria-hidden />
       <span className="text-[10.5px] font-semibold uppercase leading-3 tracking-[0.04em]">Now {clockOf(at, tz)}</span>
     </span>
   );
 }
 
-const btn = "flex h-[26px] shrink-0 items-center justify-center gap-1 rounded-full text-[11.5px] font-medium leading-4 outline-none transition-colors focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] disabled:opacity-40";
+const btn = "flex h-[26px] shrink-0 items-center justify-center gap-1 rounded-full text-[11.5px] font-medium leading-4 outline-none transition-colors focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] disabled:opacity-40";
 
 /** A line in the day: when, its bot (`named`: its name too), its name and how it runs or ran, and what can be done. */
 function Item({
@@ -491,11 +491,11 @@ function Item({
   const skipAt = s.kind === "once" || s.kind === "before_event" || !r.enabled ? undefined : it.kind === "run" && !it.skipped ? it.at : it.kind === "many" ? it.next : undefined;
   const any = busy !== null;
   const words = (
-    <span className={`text-[12px] leading-4 ${status === "failed" || needsYou ? "text-[#B42318]" : "text-[#6B6B6B]"} [overflow-wrap:anywhere]`}>
+    <span className={`text-[12px] leading-4 ${status === "failed" || needsYou ? "text-[color:var(--ht-b42318)]" : "text-[color:var(--ht-6b6b6b)]"} [overflow-wrap:anywhere]`}>
       {named && bot && (
         <>
-          <span className="font-medium text-[#3A3A38]">{bot.name}</span>
-          <span className="text-[#9A9A98]">{" · "}</span>
+          <span className="font-medium text-[color:var(--ht-3a3a38)]">{bot.name}</span>
+          <span className="text-[color:var(--ht-9a9a98)]">{" · "}</span>
         </>
       )}
       {line}
@@ -503,9 +503,9 @@ function Item({
   );
   return (
     <div className={`group flex items-start gap-2.5 rounded-xl px-1 py-1.5 ${off ? "opacity-60" : ""}`}>
-      <span className={`w-[52px] shrink-0 pt-[5px] text-right text-[11.5px] font-medium tabular-nums leading-4 ${it.kind === "ran" ? "text-[#9A9A98]" : "text-[#3A3A38]"} ${off ? "line-through" : ""}`}>{when}</span>
+      <span className={`w-[52px] shrink-0 pt-[5px] text-right text-[11.5px] font-medium tabular-nums leading-4 ${it.kind === "ran" ? "text-[color:var(--ht-9a9a98)]" : "text-[color:var(--ht-3a3a38)]"} ${off ? "line-through" : ""}`}>{when}</span>
       <span className="relative flex shrink-0 pt-[1px]">
-        {bot ? <Mascot botId={bot.id} color={bot.color} size={24} antenna={false} /> : <span className="size-6 rounded-full bg-[#ECECEA]" />}
+        {bot ? <Mascot botId={bot.id} color={bot.color} size={24} antenna={false} /> : <span className="size-6 rounded-full bg-[color:var(--hb-ececea)]" />}
         {status && <StatusMark status={status} />}
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -517,35 +517,35 @@ function Item({
           </button>
         ) : (
           <>
-            <button data-row-head onClick={onOpen} className={`min-w-0 truncate text-left text-[13.5px] font-medium leading-[18px] outline-none hover:underline focus-visible:underline ${off ? "line-through decoration-[#9A9A98]" : ""}`}>
+            <button data-row-head onClick={onOpen} className={`min-w-0 truncate text-left text-[13.5px] font-medium leading-[18px] outline-none hover:underline focus-visible:underline ${off ? "line-through decoration-[color:var(--h-9a9a98)]" : ""}`}>
               {undash(r.title)}
             </button>
             {words}
           </>
         )}
         {error && (
-          <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
+          <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
             {error}
           </span>
         )}
       </div>
       {!viewOnly && <span className="flex shrink-0 items-center gap-0.5 pt-px">
         {off ? (
-          <button onClick={() => onUnskip(it.at)} disabled={any} className={`${btn} bg-[#F2F2F0] px-2.5 text-[#3A3A38] hover:bg-[#EAEAE7]`}>
+          <button onClick={() => onUnskip(it.at)} disabled={any} className={`${btn} bg-[color:var(--hb-f2f2f0)] px-2.5 text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-eaeae7)]`}>
             {busy === "unskip" ? <Spinner size={11} /> : "Undo skip"}
           </button>
         ) : (
           <>
-            <button onClick={onRun} disabled={any || running} aria-label={`Run ${r.title} now`} data-tip="Run now" className={`${btn} w-[26px] text-[#9A9A98] hover:bg-[#F2F2F0] hover:text-ink`}>
+            <button onClick={onRun} disabled={any || running} aria-label={`Run ${r.title} now`} data-tip="Run now" className={`${btn} w-[26px] text-[color:var(--ht-9a9a98)] hover:bg-[color:var(--hb-f2f2f0)] hover:text-ink`}>
               {busy === "run" ? <Spinner size={11} /> : <Icon d={PLAY} />}
             </button>
             {skipAt !== undefined && (
-              <button onClick={() => onSkip(skipAt)} disabled={any} aria-label={`Skip ${r.title} at ${clockOf(skipAt, tz)}`} data-tip={it.kind === "many" ? `Skip the next one, ${clockOf(skipAt, tz)}` : "Skip this one"} className={`${btn} w-[26px] text-[#9A9A98] hover:bg-[#F2F2F0] hover:text-ink`}>
+              <button onClick={() => onSkip(skipAt)} disabled={any} aria-label={`Skip ${r.title} at ${clockOf(skipAt, tz)}`} data-tip={it.kind === "many" ? `Skip the next one, ${clockOf(skipAt, tz)}` : "Skip this one"} className={`${btn} w-[26px] text-[color:var(--ht-9a9a98)] hover:bg-[color:var(--hb-f2f2f0)] hover:text-ink`}>
                 {busy === "skip" ? <Spinner size={11} /> : <Icon d={SKIP} />}
               </button>
             )}
             {r.enabled && r.schedule.kind !== "once" && (
-              <button onClick={onPause} disabled={any} aria-label={`Pause ${r.title}`} data-tip="Pause it" className={`${btn} w-[26px] text-[#9A9A98] hover:bg-[#F2F2F0] hover:text-ink`}>
+              <button onClick={onPause} disabled={any} aria-label={`Pause ${r.title}`} data-tip="Pause it" className={`${btn} w-[26px] text-[color:var(--ht-9a9a98)] hover:bg-[color:var(--hb-f2f2f0)] hover:text-ink`}>
                 {busy === "pause" ? <Spinner size={11} /> : <Icon d={PAUSE} />}
               </button>
             )}
@@ -558,7 +558,7 @@ function Item({
           disabled={any}
           aria-label={`Delete ${undash(r.title)}`}
           data-tip="Delete routine"
-          className={`${btn} w-[26px] text-[#9A9A98] hover:bg-[#FEF3F2] hover:text-[#B42318]`}
+          className={`${btn} w-[26px] text-[color:var(--ht-9a9a98)] hover:bg-[color:var(--hb-fef3f2)] hover:text-[color:var(--ht-b42318)]`}
         >
           {busy === "remove" ? <Spinner size={11} /> : <TrashIcon size={12} />}
         </button>
@@ -577,7 +577,7 @@ export function StatusMark({ status }: { status: "ok" | "failed" | "running" | "
     running: { bg: "#0A0A0A", path: <circle cx="5" cy="5" r="1.6" fill="#FFFFFF" stroke="none" /> },
   }[status];
   return (
-    <span className={`absolute -bottom-0.5 -right-1 flex size-[13px] items-center justify-center rounded-full shadow-[0_0_0_1.5px_#FFFFFF] ${status === "running" ? "animate-pulse" : ""}`} style={{ background: look.bg }} aria-hidden>
+    <span className={`absolute -bottom-0.5 -right-1 flex size-[13px] items-center justify-center rounded-full shadow-[0_0_0_1.5px_var(--h-ffffff)] ${status === "running" ? "animate-pulse" : ""}`} style={{ background: look.bg }} aria-hidden>
       <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#FFFFFF" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
         {look.path}
       </svg>
@@ -612,7 +612,7 @@ export function WeekLetters({ days, routineId, color }: { days: DayPlan[]; routi
         <span
           key={x.key}
           style={on(x) ? { background: color ?? "#0A0A0A", color: textOn(color ?? "#0A0A0A") } : undefined}
-          className={`flex size-[14px] items-center justify-center rounded-full text-[8.5px] font-semibold leading-none ${on(x) ? "" : "bg-[#F2F2F0] text-[#B0B0AD]"} ${x.today ? "shadow-[0_0_0_1px_#0A0A0A]" : ""}`}
+          className={`flex size-[14px] items-center justify-center rounded-full text-[8.5px] font-semibold leading-none ${on(x) ? "" : "bg-[color:var(--hb-f2f2f0)] text-[color:var(--ht-b0b0ad)]"} ${x.today ? "shadow-[0_0_0_1px_var(--h-0a0a0a)]" : ""}`}
         >
           {DOW[x.dow][0]}
         </span>
@@ -626,7 +626,7 @@ export const legendPick = (on: string | undefined, botId: string) => (on === bot
 
 /** A pill in the row of bots (WeekLegend), as the page's other filters (autopilot.tsx FilterPill). */
 const PILL =
-  "flex h-7 items-center gap-1.5 rounded-full pr-3 text-[12.5px] font-medium leading-4 outline-none transition-[background-color,opacity] duration-150 ease-out focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] motion-reduce:transition-none";
+  "flex h-7 items-center gap-1.5 rounded-full pr-3 text-[12.5px] font-medium leading-4 outline-none transition-[background-color,opacity] duration-150 ease-out focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] motion-reduce:transition-none";
 
 /**
  * Who runs what: each bot, its dot's color (as in the strip), mascot and name, and with `counts` how many
@@ -651,13 +651,13 @@ export function WeekLegend({
 }) {
   // Picked: white with an ink ring; the others quieter while one is.
   const look = (here: boolean, none: boolean) =>
-    here ? "bg-white text-ink shadow-[0_0_0_1.5px_#0A0A0A]" : `bg-[#F2F2F0] hover:bg-[#EAEAE7] ${none ? "text-[#9A9A98]" : "text-[#3A3A38]"} ${on ? "opacity-60 hover:opacity-100" : ""}`;
+    here ? "bg-white text-ink shadow-[0_0_0_1.5px_var(--h-0a0a0a)]" : `bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)] ${none ? "text-[color:var(--ht-9a9a98)]" : "text-[color:var(--ht-3a3a38)]"} ${on ? "opacity-60 hover:opacity-100" : ""}`;
   return (
     <div role="group" aria-label="Bots" className="flex flex-wrap gap-1.5">
       {all !== undefined && (
         <button onClick={() => onPick(undefined)} aria-pressed={!on} data-tip="Show every bot's routines" className={`${PILL} pl-3 ${look(!on, false)}`}>
           All
-          <span className="tabular-nums text-[#9A9A98]">{all}</span>
+          <span className="tabular-nums text-[color:var(--ht-9a9a98)]">{all}</span>
         </button>
       )}
       {bots.map((b) => {
@@ -677,7 +677,7 @@ export function WeekLegend({
               <Mascot botId={b.id} color={b.color} size={16} antenna={false} />
             </span>
             {b.name}
-            {n !== undefined && <span className="tabular-nums text-[#9A9A98]">{n}</span>}
+            {n !== undefined && <span className="tabular-nums text-[color:var(--ht-9a9a98)]">{n}</span>}
           </button>
         );
       })}

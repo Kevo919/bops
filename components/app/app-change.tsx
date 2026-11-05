@@ -69,19 +69,19 @@ export function AppChangeCard({ m, state }: { m: Message; state: AppState }) {
   const later = asking ? asking.later : [];
   const mineAt = later.findIndex((x) => x.id === c.to);
   const others = mineAt >= 0 ? later.slice(0, mineAt) : later.filter((x) => x.id !== c.to);
-  const button = "shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium leading-4 text-ink hover:bg-black/[0.05] disabled:opacity-40";
+  const button = "shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium leading-4 text-ink hover:bg-[color:var(--bops-tint)]/[0.05] disabled:opacity-40";
   return (
-    <div data-app-change={c.app} className="flex w-[380px] max-w-full flex-col gap-1 self-start rounded-[14px] bg-[#F7F7F6] py-2 pl-3 pr-1.5 text-[12px] leading-4">
+    <div data-app-change={c.app} className="flex w-[380px] max-w-full flex-col gap-1 self-start rounded-[14px] bg-[color:var(--hb-f7f7f6)] py-2 pl-3 pr-1.5 text-[12px] leading-4">
       <div className="flex min-w-0 items-center gap-1.5 pr-1.5">
-        <span aria-hidden className="shrink-0 font-mono text-[10.5px] font-semibold text-[#9A9A98]">
+        <span aria-hidden className="shrink-0 font-mono text-[10.5px] font-semibold text-[color:var(--ht-9a9a98)]">
           {"</>"}
         </span>
         <span className="min-w-0 truncate font-semibold text-ink">{c.app}</span>
-        <span className="shrink-0 font-mono text-[11px] text-[#9A9A98]">{short(c.to)}</span>
-        {restored && <span className="ml-auto shrink-0 font-medium text-[#9A9A98]">Restored</span>}
+        <span className="shrink-0 font-mono text-[11px] text-[color:var(--ht-9a9a98)]">{short(c.to)}</span>
+        {restored && <span className="ml-auto shrink-0 font-medium text-[color:var(--ht-9a9a98)]">Restored</span>}
       </div>
-      <span className={`pr-1.5 text-[13px] leading-[18px] [overflow-wrap:anywhere] ${restored ? "text-[#9A9A98] line-through" : "text-[#3A3A38]"}`}>{undash(c.title)}</span>
-      <span className="truncate pr-1.5 text-[#6B6B6B]" title={c.authors.length ? `By ${names(c.authors)}` : undefined}>
+      <span className={`pr-1.5 text-[13px] leading-[18px] [overflow-wrap:anywhere] ${restored ? "text-[color:var(--ht-9a9a98)] line-through" : "text-[color:var(--ht-3a3a38)]"}`}>{undash(c.title)}</span>
+      <span className="truncate pr-1.5 text-[color:var(--ht-6b6b6b)]" title={c.authors.length ? `By ${names(c.authors)}` : undefined}>
         {c.count === 1 ? "1 change" : `${c.count} changes`}
         {c.authors.length ? ` by ${names(c.authors)}` : ""}
       </span>
@@ -106,17 +106,17 @@ export function AppChangeCard({ m, state }: { m: Message; state: AppState }) {
             }}
           >
             {!!others.length && (
-              <ul data-restore-later className="flex flex-col gap-0.5 text-[12px] leading-4 text-[#3A3A38]">
+              <ul data-restore-later className="flex flex-col gap-0.5 text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">
                 {others.slice(0, SHOWN).map((x) => (
                   <li key={x.id} className="flex min-w-0 gap-1.5">
-                    <span className="shrink-0 font-mono text-[11px] text-[#9A9A98]">{short(x.id)}</span>
+                    <span className="shrink-0 font-mono text-[11px] text-[color:var(--ht-9a9a98)]">{short(x.id)}</span>
                     <span className="min-w-0 truncate">
                       {undash(x.title) || "A change"}
-                      {x.author ? <span className="text-[#9A9A98]"> · {x.author}</span> : null}
+                      {x.author ? <span className="text-[color:var(--ht-9a9a98)]"> · {x.author}</span> : null}
                     </span>
                   </li>
                 ))}
-                {others.length > SHOWN && <li className="text-[#9A9A98]">and {others.length - SHOWN} more</li>}
+                {others.length > SHOWN && <li className="text-[color:var(--ht-9a9a98)]">and {others.length - SHOWN} more</li>}
               </ul>
             )}
           </AskInPlace>
@@ -143,12 +143,12 @@ export function AppChangeCard({ m, state }: { m: Message; state: AppState }) {
         </div>
       )}
       {!asking && error && (
-        <span role="alert" className="pr-1.5 text-[#B42318]">
+        <span role="alert" className="pr-1.5 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}
       {note && (
-        <span role="status" className="pr-1.5 text-[#6B6B6B]">
+        <span role="status" className="pr-1.5 text-[color:var(--ht-6b6b6b)]">
           {note}
         </span>
       )}

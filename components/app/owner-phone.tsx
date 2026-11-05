@@ -152,7 +152,7 @@ export function useOwnerPhone<P extends PhoneCodeInfo>(info: P, onInfo: (p: P) =
 export type OwnerPhoneState = ReturnType<typeof useOwnerPhone<PhoneCodeInfo>>;
 
 const chip = "rounded-full px-2 py-0.5 text-[11.5px]";
-const quiet = "text-[12px] text-[#9A9A98] hover:text-ink disabled:opacity-40";
+const quiet = "text-[12px] text-[color:var(--ht-9a9a98)] hover:text-ink disabled:opacity-40";
 
 /**
  * Your mobile: add it with your OK to texts, prove it's yours with the code texted to it, and only
@@ -199,7 +199,7 @@ export function OwnerPhone({
 
   const codeEntry = waiting && (
     <div className="flex flex-col gap-2 pt-1">
-      <span role="status" className="text-[12.5px] leading-4 text-[#3A3A38]">
+      <span role="status" className="text-[12.5px] leading-4 text-[color:var(--ht-3a3a38)]">
         Enter the code we texted to <span className="font-medium text-ink">{waiting.pretty}</span>.
       </span>
       <CodeInput key={phone.round} disabled={busy} onComplete={(c) => void phone.check(c)} />
@@ -211,7 +211,7 @@ export function OwnerPhone({
           disabled={busy}
           onResend={() => void phone.send(waiting.number, !!waiting.consent, waiting.pretty, "code")}
         />
-        <button disabled={busy} onClick={phone.leave} className="text-[#9A9A98] hover:text-ink disabled:opacity-40">
+        <button disabled={busy} onClick={phone.leave} className="text-[color:var(--ht-9a9a98)] hover:text-ink disabled:opacity-40">
           Use a different number
         </button>
       </span>
@@ -236,12 +236,12 @@ export function OwnerPhone({
           aria-label="Your mobile number"
           inputMode="tel"
           autoComplete="tel"
-          className="h-8 w-[190px] rounded-full bg-[#F7F7F6] px-3 text-[13px] outline-none shadow-[0_0_0_1px_#E6E6E3] focus:shadow-[0_0_0_1.5px_#0A0A0A] disabled:opacity-50"
+          className="h-8 w-[190px] rounded-full bg-[color:var(--hb-f7f7f6)] px-3 text-[13px] outline-none shadow-[0_0_0_1px_var(--h-e6e6e3)] focus:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] disabled:opacity-50"
         />
         <button
           disabled={busy || !!formRetry || !number.trim() || !agree}
           onClick={sendNew}
-          className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 tabular-nums text-white disabled:opacity-40"
+          className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 tabular-nums text-[color:var(--bops-on-fill)] disabled:opacity-40"
         >
           {formRetry ? <RetryLabel key={formRetry.at} seconds={formRetry.seconds} onDone={() => phone.setRetry(null)} /> : busy ? "Sending…" : "Send code"}
         </button>
@@ -256,8 +256,8 @@ export function OwnerPhone({
           </button>
         )}
       </div>
-      <label className="flex max-w-[560px] items-start gap-2 text-[12px] leading-[17px] text-[#6B6B6B]">
-        <input type="checkbox" checked={agree} disabled={busy} onChange={(e) => phone.setAgree(e.target.checked)} className="mt-[2px] accent-[#0A0A0A]" />
+      <label className="flex max-w-[560px] items-start gap-2 text-[12px] leading-[17px] text-[color:var(--ht-6b6b6b)]">
+        <input type="checkbox" checked={agree} disabled={busy} onChange={(e) => phone.setAgree(e.target.checked)} className="mt-[2px] accent-[color:var(--ht-0a0a0a)]" />
         <span>
           Yes, text me from my Bops bots (Bops by Orgo): replies to my texts, finished tasks and heads-ups. How often depends on what I ask for. Message and data rates may apply. Reply STOP to opt out, HELP for help. Texts and calls from this number count as me.{" "}
           <a href={PRIVACY} target="_blank" rel="noreferrer" className="underline">Privacy</a> ·{" "}
@@ -281,30 +281,30 @@ export function OwnerPhone({
     <div className="flex flex-col gap-1.5">
       <span className="flex items-center gap-2">
         <span className="text-[13px] font-medium leading-4">Your mobile</span>
-        {recommended && <span className={`${chip} bg-[#F2F2F0] font-medium text-[#3A3A38]`}>Recommended</span>}
+        {recommended && <span className={`${chip} bg-[color:var(--hb-f2f2f0)] font-medium text-[color:var(--ht-3a3a38)]`}>Recommended</span>}
       </span>
-      <span className="text-[12px] leading-4 text-[#6B6B6B]">Text and call your bots from it, and get texts from them. We text you a code to make sure it&apos;s yours.</span>
+      <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">Text and call your bots from it, and get texts from them. We text you a code to make sure it&apos;s yours.</span>
 
       {owners.map((o) => (
         <div key={o.number} className="flex flex-col gap-1.5">
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] leading-4 text-[#3A3A38]">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] leading-4 text-[color:var(--ht-3a3a38)]">
             <span className="font-medium text-ink">{o.pretty}</span>
             {o.verifiedAt ? (
-              <span className={`inline-flex items-center gap-1 ${chip} bg-[#E9F6EE] font-medium text-[#1E7A44]`}>
+              <span className={`inline-flex items-center gap-1 ${chip} bg-[color:var(--hb-e9f6ee)] font-medium text-[color:var(--ht-1e7a44)]`}>
                 <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
                   <path d="M2 5.2 4.1 7.2 8 3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 {o.claimedVia ? "Linked" : "Verified"}
               </span>
             ) : o.fromEnv ? (
-              <span className={`${chip} bg-[#F2F2F0] text-[#6B6B6B]`}>Set on this server</span>
+              <span className={`${chip} bg-[color:var(--hb-f2f2f0)] text-[color:var(--ht-6b6b6b)]`}>Set on this server</span>
             ) : (
-              <span className={`${chip} bg-[#FFF4E5] font-medium text-[#9A5B00]`}>Not verified</span>
+              <span className={`${chip} bg-[color:var(--hb-fff4e5)] font-medium text-[color:var(--ht-9a5b00)]`}>Not verified</span>
             )}
             {o.claimedVia && o.verifiedAt ? (
-              <span className="text-[#9A9A98]">{`${o.claimedVia === "call" ? "called" : "texted"} your bot first ${new Date(o.verifiedAt).toLocaleDateString()}`}</span>
+              <span className="text-[color:var(--ht-9a9a98)]">{`${o.claimedVia === "call" ? "called" : "texted"} your bot first ${new Date(o.verifiedAt).toLocaleDateString()}`}</span>
             ) : (
-              o.consentAt && <span className="text-[#9A9A98]">{`agreed to texts ${new Date(o.consentAt).toLocaleDateString()}`}</span>
+              o.consentAt && <span className="text-[color:var(--ht-9a9a98)]">{`agreed to texts ${new Date(o.consentAt).toLocaleDateString()}`}</span>
             )}
             {!o.verifiedAt && !o.fromEnv && canVerify && waiting?.number !== o.number && bannerFor !== o.number && (
               <VerifyButton phone={phone} owner={o} />
@@ -313,14 +313,14 @@ export function OwnerPhone({
               <button
                 disabled={busy}
                 onClick={() => (o.verifiedAt && lastCounting(o.number) ? setConfirming(o.number) : void phone.remove(o.number))}
-                className="text-[12px] text-[#9A9A98] hover:text-[#B42318] disabled:opacity-40"
+                className="text-[12px] text-[color:var(--ht-9a9a98)] hover:text-[color:var(--ht-b42318)] disabled:opacity-40"
               >
                 Remove
               </button>
             )}
           </span>
           {confirming === o.number && (
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[10px] bg-[#F7F7F6] px-2.5 py-2 text-[12px] leading-4 text-[#3A3A38]">
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[10px] bg-[color:var(--hb-f7f7f6)] px-2.5 py-2 text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">
               <span>{`Remove ${o.pretty}? Texts and calls from it won't count as you anymore.`}</span>
               <span className="flex items-center gap-3">
                 <button
@@ -329,7 +329,7 @@ export function OwnerPhone({
                     setConfirming(null);
                     void phone.remove(o.number);
                   }}
-                  className="font-medium text-[#B42318] disabled:opacity-40"
+                  className="font-medium text-[color:var(--ht-b42318)] disabled:opacity-40"
                 >
                   Remove
                 </button>
@@ -343,10 +343,10 @@ export function OwnerPhone({
       ))}
       {/* The banner above says this already while it's showing. */}
       {toVerify.length > 0 && !bannerFor && (
-        <span className="text-[12px] leading-4 text-[#9A5B00]">Until a number is verified, texts and calls from it don&apos;t count as you, and your bots won&apos;t text it.</span>
+        <span className="text-[12px] leading-4 text-[color:var(--ht-9a5b00)]">Until a number is verified, texts and calls from it don&apos;t count as you, and your bots won&apos;t text it.</span>
       )}
       {phone.justVerified && (
-        <span role="status" className="text-[12px] leading-4 text-[#1E7A44]">
+        <span role="status" className="text-[12px] leading-4 text-[color:var(--ht-1e7a44)]">
           Verified. Texts and calls from this number now count as you.
         </span>
       )}
@@ -354,7 +354,7 @@ export function OwnerPhone({
       {waiting ? (
         codeEntry
       ) : !canVerify ? (
-        <span className="text-[12px] leading-4 text-[#6B6B6B]">Adding or changing a number isn&apos;t available on this server yet.</span>
+        <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">Adding or changing a number isn&apos;t available on this server yet.</span>
       ) : collapsible && !phone.adding ? (
         <button onClick={() => phone.setAdding(true)} className="self-start pt-0.5 text-[12px] font-medium text-ink underline-offset-2 hover:underline">
           Add another number

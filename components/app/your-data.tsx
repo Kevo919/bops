@@ -98,11 +98,11 @@ function daysLeft(until: number) {
 }
 
 const pill = (on: boolean) =>
-  `rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 disabled:opacity-60 ${on ? "bg-ink text-white" : "shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6]"}`;
-const small = "shrink-0 rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6] disabled:opacity-60";
-const card = "flex flex-col gap-2.5 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]";
-const danger = "rounded-full bg-[#B42318] px-3 py-1.5 text-[12.5px] font-semibold leading-4 text-white disabled:opacity-60";
-const sub = "text-[12px] leading-4 text-[#6B6B6B]";
+  `rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 disabled:opacity-60 ${on ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f7f7f6)]"}`;
+const small = "shrink-0 rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f7f7f6)] disabled:opacity-60";
+const card = "flex flex-col gap-2.5 rounded-[14px] p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]";
+const danger = "rounded-full bg-[color:var(--hb-b42318)] px-3 py-1.5 text-[12.5px] font-semibold leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-60";
+const sub = "text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]";
 
 /** Where each kind of thing is kept and how it goes, one plain line each. */
 function WhereKept({ info }: { info: PrivacyInfo }) {
@@ -126,7 +126,7 @@ function WhereKept({ info }: { info: PrivacyInfo }) {
       kind: "Chats, routines and settings",
       where: "Bops Cloud, Orgo's database, so your Macs and iPhone match.",
       how: "Delete a message from its menu, or several from a chat's menu, or delete or keep them for less time below.",
-      extra: <span className="text-[12px] leading-4 text-[#3A3A38]">{many(info.messages, "message")}</span>,
+      extra: <span className="text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">{many(info.messages, "message")}</span>,
     },
     { kind: "Memory and Knowledge", where: "Honcho, the memory service Orgo uses, keeps what it learned from your chats and calls.", how: "It stays until you forget it in Knowledge." },
     { kind: "Skill, app and table files", where: "Orgo's file storage.", how: "Delete a skill, app or CRM file where you see it." },
@@ -137,7 +137,7 @@ function WhereKept({ info }: { info: PrivacyInfo }) {
       extra: (
         <span className="flex flex-wrap gap-1.5">
           {here.map(([name, line]) => (
-            <span key={name} className="rounded-full bg-[#F7F7F6] px-2 py-0.5 text-[11.5px] leading-4 text-[#3A3A38]">
+            <span key={name} className="rounded-full bg-[color:var(--hb-f7f7f6)] px-2 py-0.5 text-[11.5px] leading-4 text-[color:var(--ht-3a3a38)]">
               {name} {line}
             </span>
           ))}
@@ -149,9 +149,9 @@ function WhereKept({ info }: { info: PrivacyInfo }) {
     { kind: "Answers to chats and tasks", where: "OpenAI keeps each one 30 days.", how: "Then it's deleted there." },
   ];
   return (
-    <div className="flex flex-col rounded-[14px] px-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+    <div className="flex flex-col rounded-[14px] px-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
       {rows.map((r) => (
-        <div key={r.kind} className="flex flex-col gap-1 border-b border-[#F0F0EE] py-2.5 last:border-0">
+        <div key={r.kind} className="flex flex-col gap-1 border-b border-[color:var(--h-f0f0ee)] py-2.5 last:border-0">
           <span className="text-[13px] font-medium leading-4">{r.kind}</span>
           <span className={sub}>
             {r.where} {r.how}
@@ -166,17 +166,17 @@ function WhereKept({ info }: { info: PrivacyInfo }) {
 /** One in Recently deleted: what it was, when it was deleted and goes for good, Restore and Delete now. */
 function DeletedRow({ item, busy, act }: { item: DeletedItem; busy: boolean; act: (body: { restore: string } | { deleteNow: string }) => void }) {
   return (
-    <div className="flex items-center gap-3 border-b border-[#F0F0EE] py-2 last:border-0">
+    <div className="flex items-center gap-3 border-b border-[color:var(--h-f0f0ee)] py-2 last:border-0">
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="truncate text-[12.5px] font-medium leading-4">{item.what}</span>
-        <span className="text-[11.5px] leading-4 text-[#6B6B6B]">
+        <span className="text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
           {heldLine(item)} · deleted {daysAgo(item.at)} · goes {daysLeft(item.until)}
         </span>
       </div>
       <button type="button" disabled={busy} onClick={() => act({ restore: item.id })} className={small}>
         Restore
       </button>
-      <button type="button" disabled={busy} onClick={() => act({ deleteNow: item.id })} className={`${small} text-[#B42318]`}>
+      <button type="button" disabled={busy} onClick={() => act({ deleteNow: item.id })} className={`${small} text-[color:var(--ht-b42318)]`}>
         Delete now
       </button>
     </div>
@@ -303,8 +303,8 @@ export function YourData() {
           ))}
         </div>
         {asking && (
-          <div className="flex flex-col gap-2 rounded-[10px] bg-[#FFF4F2] p-3">
-            <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">{goesLine(asking.keepDays, asking.goes)}</span>
+          <div className="flex flex-col gap-2 rounded-[10px] bg-[color:var(--hb-fff4f2)] p-3">
+            <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{goesLine(asking.keepDays, asking.goes)}</span>
             <div className="flex gap-2">
               <button type="button" disabled={busy} onClick={() => void send({ keepDays: asking.keepDays }).then(() => setAsking(null))} className={danger}>
                 Delete and keep {KEEP_NAMES.get(asking.keepDays)}
@@ -316,7 +316,7 @@ export function YourData() {
           </div>
         )}
         {/* Once, now: everything or what's older, every bot's or one's; the keep above stays as it is. */}
-        <div className="flex flex-col gap-2 border-t border-[#F0F0EE] pt-2.5">
+        <div className="flex flex-col gap-2 border-t border-[color:var(--h-f0f0ee)] pt-2.5">
           <div className="flex flex-col gap-0.5">
             <span className="text-[13px] font-medium">Delete now</span>
             <span className={sub}>Deletes messages and finished threads once, from Bops Cloud and all your Macs. What you keep above stays as it is.</span>
@@ -328,7 +328,7 @@ export function YourData() {
               </button>
             ))}
             {(info.bots?.length ?? 0) > 1 && (
-              <label className="flex items-center gap-1.5 text-[12px] leading-4 text-[#6B6B6B]">
+              <label className="flex items-center gap-1.5 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
                 For
                 <select
                   value={clearBot}
@@ -338,7 +338,7 @@ export function YourData() {
                     setAskingClear(null);
                     setClearNote(null);
                   }}
-                  className="rounded-full bg-white px-2.5 py-1.5 text-[12.5px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E6E6E3] outline-none focus-visible:shadow-[0_0_0_1.5px_#0A0A0A]"
+                  className="rounded-full bg-white px-2.5 py-1.5 text-[12.5px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e6e6e3)] outline-none focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
                 >
                   <option value="">Every bot</option>
                   {info.bots!.map((b) => (
@@ -351,8 +351,8 @@ export function YourData() {
             )}
           </div>
           {askingClear && (
-            <div className="flex flex-col gap-2 rounded-[10px] bg-[#FFF4F2] p-3">
-              <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">{clearLine(askingClear.goes, info.deletedDays, botName(askingClear.choice.bot))}</span>
+            <div className="flex flex-col gap-2 rounded-[10px] bg-[color:var(--hb-fff4f2)] p-3">
+              <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{clearLine(askingClear.goes, info.deletedDays, botName(askingClear.choice.bot))}</span>
               <div className="flex gap-2">
                 <button type="button" disabled={busy} onClick={() => void clearIt(askingClear.choice)} className={danger}>
                   Delete
@@ -363,7 +363,7 @@ export function YourData() {
               </div>
             </div>
           )}
-          {clearNote && <span className="text-[12px] leading-4 text-[#3A3A38]">{clearNote}</span>}
+          {clearNote && <span className="text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">{clearNote}</span>}
         </div>
       </div>
 
@@ -385,8 +385,8 @@ export function YourData() {
           ))}
         </div>
         {askingDeleted && (
-          <div className="flex flex-col gap-2 rounded-[10px] bg-[#FFF4F2] p-3">
-            <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">{deletedGoesLine(askingDeleted.deletedDays, askingDeleted.goes)}</span>
+          <div className="flex flex-col gap-2 rounded-[10px] bg-[color:var(--hb-fff4f2)] p-3">
+            <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{deletedGoesLine(askingDeleted.deletedDays, askingDeleted.goes)}</span>
             <div className="flex gap-2">
               <button type="button" disabled={busy} onClick={() => void send({ deletedDays: askingDeleted.deletedDays }).then(() => setAskingDeleted(null))} className={danger}>
                 {askingDeleted.deletedDays ? `Delete and keep ${askingDeleted.deletedDays} days` : "Delete and keep none"}
@@ -409,8 +409,8 @@ export function YourData() {
         )}
       </div>
 
-      {left && <span className="text-[12px] leading-4 text-[#3A3A38]">{left}</span>}
-      {error && <span className="text-[12px] leading-4 text-[#B42318]">{error}</span>}
+      {left && <span className="text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">{left}</span>}
+      {error && <span className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">{error}</span>}
       <span className={sub}>
         Not covered yet: Honcho keeps what it learned from chats and calls until you forget it in Knowledge. OpenAI keeps answers to chats and tasks 30 days. Start over keeps a copy of your chats in Bops Cloud.
       </span>
