@@ -1,6 +1,6 @@
 # Bops build: progress for Kevin
 
-Plain-English status of the build, kept up to date by the lead. Last updated **2026-11-03 1:30 PM Chicago time**.
+Plain-English status of the build, kept up to date by the lead. Last updated **2026-11-04 8:45 PM Chicago time**.
 
 **Quick links**
 - The project on GitHub: https://github.com/Kevo919/bops (the code is on branch `windows-port`)
@@ -21,12 +21,12 @@ Plain-English status of the build, kept up to date by the lead. Last updated **2
 | Chat replies with a real model (OpenRouter, DeepSeek V3.1) | ✅ Done, first reply 1:05 PM |
 | Model picker in each chat | ✅ Done |
 | Settings → Models: add models (OpenRouter search), choose what each is for and which agent runs it | ✅ Done |
-| AI subscriptions card: ChatGPT and Claude Code sign-in through your normal browser | ✅ Done (small follow-ups in review) |
+| AI subscriptions card: ChatGPT and Claude Code sign-in through your normal browser | ✅ Done |
 | Bots' agents on cloud computers (Claude Code, Codex, OpenCode, DeepSeek Harness) | ✅ Done |
 | Bops on your Hostinger server, private on Tailscale | ✅ Done |
 | Android app (APK) | ✅ Done, not tried on a phone yet |
-| Repos section: open and run GitHub projects, and bots can use them | 🔍 Built, in security review |
-| Connections: Composio, Zapier, OpenRouter in Settings | 🔍 Built, in review |
+| Repos section: open and run GitHub projects, and bots can use them | ✅ Merged (not on the PC yet) |
+| Connections: Composio, Zapier, OpenRouter in Settings | ✅ Merged (waiting on your Composio key) |
 | Phone connected to the server | ⏳ Waiting on you to install the APK and Tailscale on your phone |
 
 ## Done (merged)
@@ -39,19 +39,16 @@ Plain-English status of the build, kept up to date by the lead. Last updated **2
 - **Repos:** 16 ready-to-run recipes (Paperclip, CLI-Anything, REA, God's Eye and more).
 - **Quality:** checks on every change, a secret scan of the whole history, and 5 flaky tests fixed.
 
-## In review (built, waiting for the independent check)
-- Repos section and bots' repo tools (#38)
-- Connections card: Composio, Zapier, OpenRouter (#40)
-- Editable bot files: "who I am" and "what I remember" (#39)
-- Custom schedules for routines, any time pattern (#35)
-- Word, PowerPoint and Excel files from chat (#41)
-- Subscription card follow-ups (#37), installer follow-ups (#33)
-- Your own tool servers per bot (MCP) (#32), fixes in progress
+## In review
+- Nothing open. Everything built so far is merged.
 
-## Being built now
-- OpenRouter presets, custom models, OpenRouter Auto, a model picker per routine
-- Several accounts per provider (for example a work and a personal OpenRouter key)
-- New models showing in the chat picker straight away (no Ctrl+R)
+## Merged Nov 4
+- Repos section (#38), Connections (#40), OpenRouter presets, custom models, Auto Router and a model per routine (#44), several accounts per provider (#45), editable bot files (#39), your own tool servers per bot (#32), Word/PowerPoint/Excel from chat (#41), Goals and ideas (#51), custom schedules (#52)
+
+## Next
+- Rebuild the PC and the server with today's merges
+- Get GitHub's automatic checks running again
+- Windows task runner key (needs your OpenAI Platform sign-in)
 
 ## Planned (after the MVP)
 - Checking each repo recipe actually runs, in Docker
