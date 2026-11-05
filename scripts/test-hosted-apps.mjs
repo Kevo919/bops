@@ -1538,7 +1538,7 @@ await check("No vendored binary for the computer: a clear error, nothing put the
   const c = central.calls.length;
   await assert.rejects(I.ensureIngotCli("c_arm", WS), (e) => {
     assert.ok(e instanceof I.IngotError);
-    assert.match(hear(e.message), /^This Bops has no Ingot for the computer to run \(.*vendor-ingot\/ingot-linux-arm64 is missing\), so its apps can't be set up there\.$/);
+    assert.match(hear(e.message), /^This Bops has no Ingot for the computer to run \(.*vendor-ingot[\\/]ingot-linux-arm64 is missing\), so its apps can't be set up there\.$/);
     return true;
   });
   assert.deepEqual(kinds("c_arm", n), ["probe"]);
@@ -2243,7 +2243,7 @@ await check("Asked of a task already on the app (foldInto hands that one back): 
   assert.equal(sessionOf("ses_plain").app, undefined);
   H.askDeploy("ses_notes", RECIPE);
   assert.equal(sessionOf("ses_notes").app.deployAfter, undefined);
-  const src = readFileSync(`${root}/lib/server/sessions.ts`, "utf8");
+  const src = readFileSync(`${root}/lib/server/sessions.ts`, "utf8").replace(/\r\n/g, "\n");
   const twin = src.slice(src.indexOf("const twin = opts.fresh"), src.indexOf("let to = await chooseWhere"));
   assert.match(twin, /foldInto\(twin, s\.goal, where, opts\);\n.*\n\s*if \(s\.app\?\.deployAfter\) askDeploy\(twin\.id, s\.app\);/);
 });
@@ -2400,7 +2400,7 @@ await check("Nothing for a task with no deploy ask, one that moved on to another
 });
 
 await check("sessions.ts: a run that ended done asks after its result is posted, one that failed after its failure is (never one the user stopped), and so does a task whose computer couldn't be set up", async () => {
-  const src = readFileSync(`${root}/lib/server/sessions.ts`, "utf8");
+  const src = readFileSync(`${root}/lib/server/sessions.ts`, "utf8").replace(/\r\n/g, "\n");
   const runAt = src.indexOf("async function run(sessionId");
   const doneAt = src.indexOf('patchSession(sessionId, { status: "done"', runAt);
   const hook = src.indexOf("void deployAfterTask(sessionId)", doneAt);
