@@ -177,3 +177,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 20:22 lead: merged #98 (llms config createRequire; scripts-only bug, app unaffected; new test-llms-config in CI). #97 re-review = REQUEST CHANGES (append/replay race loses a use); builder fixing.
 - 20:38 lead: #95 (zai 78/81 fixes) independent review = REQUEST CHANGES (hook at module top level breaks Logins/Your data; lint 2 errors; CI red; conflicts). Notes: messages 2045.
 - 20:45 lead: #97 round-4 independent review = APPROVE WITH NITS (overcharge closed under per-ref lock; 351/351). update-branch + merge-when-green running. Task 72 = remaining nit.
+- 20:52 lead: merged #97 (usage durability + bounded start admission) at 4671f7a after 4 review rounds, all checks green. Bops Cloud isn't deployed on Kevin's VPS (only bops.service), so nothing to deploy; whoever deploys cloud/ needs the new StateDirectory line in bops-cloud.service, which install.sh copies.
