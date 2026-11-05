@@ -3297,6 +3297,9 @@ const withoutBriefing = (text: string) =>
     .filter((p) => !/^\s*(computer briefing|briefing)\s*:/i.test(p) && !/^\s*computer\s*:.*\b(screens?|idle|free|untouched|home screen)\b/i.test(p))
     .join("\n\n") || text;
 
+/** Under the buttons of an ask that always asks (AppApproval.onceOnly). */
+export const ONCE_ONLY_LINE = "This always asks: each time is a yes for that time only.";
+
 const CHANNEL_NAME: Record<string, string> = { slack: "Slack", telegram: "Telegram", discord: "Discord" };
 
 /**
@@ -3394,12 +3397,14 @@ function AppApprovalCard({ state, approval: a, className = "" }: { state: AppSta
             <button disabled={busy} onClick={() => void decide("reject")} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
               Deny
             </button>
-            <button disabled={busy} onClick={() => void decide("always")} title={alwaysScope(name, a)} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
-              Always allow
-            </button>
+            {!a.onceOnly && (
+              <button disabled={busy} onClick={() => void decide("always")} title={alwaysScope(name, a)} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
+                Always allow
+              </button>
+            )}
             {/* A thread's own app or data asks (the kinds that honour it, permission.ts Session.allowedAsks):
                 the same thing runs on without asking again, this thread alone. Never in a shared workspace. */}
-            {!!a.threadId && !state.shared && (a.kind === "app" || a.kind === "data") && (
+            {!!a.threadId && !state.shared && !a.onceOnly && (a.kind === "app" || a.kind === "data") && (
               <button disabled={busy} onClick={() => void decide("session")} title="This thread runs the same thing on without asking again; a new thread asks as new" className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
                 Allow for this thread
               </button>
@@ -3415,7 +3420,7 @@ function AppApprovalCard({ state, approval: a, className = "" }: { state: AppSta
       </div>
       )}
       {/* What Always allow covers: this bot and this action from now on, whoever it's for (lib/permission.ts). */}
-      {!telling && answerer === "you" && <span className="text-[12px] leading-4 text-[#6B6B6B]">{alwaysScope(name, a)}</span>}
+      {!telling && answerer === "you" && <span className="text-[12px] leading-4 text-[#6B6B6B]">{a.onceOnly ? ONCE_ONLY_LINE : alwaysScope(name, a)}</span>}
       {going && <span className="text-[12px] leading-4 text-[#9A9A98]">{sent?.state === "sending" ? "Sending…" : ANSWER_WAITS_LINE}</span>}
       {shownError && (
         <span role="alert" className="text-[12px] leading-4 text-[#B42318]">

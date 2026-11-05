@@ -258,7 +258,8 @@ class MultiServerTests : Instrumentation() {
         awaitCookie(a.address, null)
         waitForIdleSync()
         click("Servers")
-        // An external pairing link shows its address but cannot save anything without Connect.
+        // An external pairing link with a disguised address (user information) is refused by the same
+        // check Scan QR code uses (PairLink.parse): it never even fills the form, and nothing is saved.
         val qr = android.net.Uri.Builder().scheme("bops").authority("pair")
             .appendQueryParameter("a", "https://my-pc.ts.net@evil.example.invalid")
             .appendQueryParameter("c", "q".repeat(32)).build()
@@ -268,14 +269,26 @@ class MultiServerTests : Instrumentation() {
         Thread.sleep(500)
         runOnMainSync {
             check(views(activity.window.decorView).filterIsInstance<android.widget.EditText>()
-                .any { it.text.toString() == "https://my-pc.ts.net@evil.example.invalid" })
+                .none { it.text.toString().contains("evil.example.invalid") })
             check(views(activity.window.decorView).filterIsInstance<android.widget.TextView>()
-                .any { it.text.toString() == "Target server: evil.example.invalid:443" })
+                .any { it.text.toString() == PairLink.UNSAFE })
         }
-        click("Connect")
+        check(store.all().size == 2)
+        // A good link fills the form and waits for the person: nothing connects or saves before Yes, connect.
+        val good = android.net.Uri.Builder().scheme("bops").authority("pair")
+            .appendQueryParameter("a", "http://100.64.0.9:3210")
+            .appendQueryParameter("c", "q".repeat(43)).build()
+        targetContext.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, good, targetContext, MainActivity::class.java)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+        waitForIdleSync()
+        Thread.sleep(500)
         runOnMainSync {
             check(views(activity.window.decorView).filterIsInstance<android.widget.TextView>()
-                .any { it.text.toString() == "Use an address without user information, a query, or a fragment." })
+                .any { it.text.toString() == "Target server: 100.64.0.9:3210" })
+            check(views(activity.window.decorView).filterIsInstance<android.widget.Button>()
+                .any { it.text.toString() == "Yes, connect" })
+            check(views(activity.window.decorView).filterIsInstance<android.widget.Button>()
+                .any { it.text.toString() == "Scan QR code" })
         }
         check(store.all().size == 2)
         click("Saved servers")

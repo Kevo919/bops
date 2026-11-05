@@ -74,7 +74,7 @@ The idea: you say how Bops should look, in plain words, and it changes.
 
 You need: an Android phone and the Bops app on it (built from the android folder; ask the team for the current APK).
 
-1. In Bops on the PC: **Settings → This Mac → Your phone → Pair a phone**. **You should see:** an address and a one-time code.
+1. In Bops on the PC: **Settings → Your phone → Pair a phone**. **You should see:** an address and a one-time code.
 2. On the phone, open the Bops app and enter both. **You should see:** your bots and chats, live.
 3. From the phone, ask a bot something. **You should see:** the answer on the phone, and the same conversation on the PC a moment later.
 4. When a bot needs you (a task asks a question), **you should see** the phone notify you, and answering there continues the task.

@@ -1,6 +1,7 @@
 import "server-only";
 import { ROUTE_KEYS, ROUTE_NAMES, type AgentRoute } from "@/lib/agents";
 import { checkZapier, zapierSet } from "./zapier";
+import { checkComposioMcp, composioMcpSet, maskedComposioMcp } from "./composio-mcp";
 import { ACCOUNT_LABEL, accountWord } from "@/lib/accounts";
 import { accountLabels } from "./provider-accounts";
 
@@ -9,9 +10,11 @@ export type KeyCheckResult = {
   label: string;
   status: "not set" | "set" | "works" | "no credit" | "invalid" | "unavailable" | "rate limited";
   message?: string;
+  /** What is set, masked (Composio, your account: its host, never the rest of the address or the key). */
+  shown?: string;
 };
 
-type Probe = { key: string; label: string; url: string; kind: "openai" | "executor" | "anthropic" | "models" | "openrouter" | "orgo" | "ollama" | "composio" | "zapier" };
+type Probe = { key: string; label: string; url: string; kind: "openai" | "executor" | "anthropic" | "models" | "openrouter" | "orgo" | "ollama" | "composio" | "zapier" | "composio-mcp" };
 const provider = (route: AgentRoute, url: string, kind: Probe["kind"]): Probe => ({ key: ROUTE_KEYS[route], label: ROUTE_NAMES[route], url, kind });
 // Scope is intentionally these six providers plus the executor, Orgo, Ollama, Composio and Zapier, not every Vault service.
 // Fixed HTTPS destinations: request data and environment overrides cannot redirect a secret. Ollama is the one
@@ -33,6 +36,8 @@ const probes: Probe[] = [
   { key: "COMPOSIO_API_KEY", label: "Composio (connected apps)", url: "https://backend.composio.dev/api/v3.1/auth_configs?limit=1", kind: "composio" },
   // Zapier (lib/server/zapier.ts): its address is the secret, so the check is zapier.ts's own (MCP initialize and tools/list).
   { key: "ZAPIER_MCP_URL", label: "Zapier", url: "", kind: "zapier" },
+  // Composio, your account (lib/server/composio-mcp.ts): For You's MCP address and its key, checked by composio-mcp.ts (MCP initialize and tools/list).
+  { key: "COMPOSIO_MCP_URL", label: "Composio (your account)", url: "", kind: "composio-mcp" },
 ];
 const ollamaModels = () => `${(process.env.OLLAMA_BASE_URL?.trim() ?? "").replace(/\/+$/, "")}/models`;
 
@@ -52,7 +57,14 @@ function probeOf(key: string): Probe | undefined {
 }
 
 export function keyCheckList(): KeyCheckResult[] {
-  return probes.flatMap((p) => [p, ...withAccounts(p)]).map(({ key, label, kind }) => ({ key, label, status: (kind === "zapier" ? zapierSet() : !!process.env[key]?.trim()) ? "set" : "not set" }));}
+  return probes.flatMap((p) => [p, ...withAccounts(p)]).map(({ key, label, kind }): KeyCheckResult => {
+    if (kind === "composio-mcp") {
+      const shown = maskedComposioMcp();
+      return { key, label, status: composioMcpSet() ? "set" : "not set", ...(shown ? { shown } : {}) };
+    }
+    return { key, label, status: (kind === "zapier" ? zapierSet() : !!process.env[key]?.trim()) ? "set" : "not set" };
+  });
+}
 
 /** Read only a bounded diagnostic payload; never return any upstream text or credentials. */
 async function payload(response: Response): Promise<Record<string, unknown> | null> {
@@ -84,6 +96,11 @@ export async function checkKey(key: string): Promise<KeyCheckResult | null> {
   if (kind === "zapier") {
     const z = await checkZapier();
     return result(z.status, z.message);
+  }
+  if (kind === "composio-mcp") {
+    const z = await checkComposioMcp();
+    const shown = maskedComposioMcp();
+    return { ...result(z.status, z.message), ...(shown ? { shown } : {}) };
   }
   const secret = process.env[key]?.trim();
   if (!secret) return result("not set", "This key is not set in the running server's environment.");

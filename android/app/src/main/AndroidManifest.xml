@@ -21,6 +21,11 @@
         android:networkSecurityConfig="@xml/network_security"
         android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar">
 
+        <!-- Scan QR code (Google's code scanner): Play services fetches the scanner when the app installs. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
+
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
