@@ -163,7 +163,9 @@ export async function POST(request: Request) {
         if (!chatId || !chat(chatId)) return Response.json({ error: "That chat is gone." }, { status: 404 });
         const sessionId = str(b.sessionId) || undefined;
         const r = await draftSkill(botId, chatId, { sessionId });
-        if (!r.draft) return Response.json({ error: r.error ?? "Couldn't write a draft." }, { status: 400 });
+        // "Couldn't write a draft right now" is the model being unreachable (crawl L5): a right-now
+        // problem (503), not the caller's (400). Everything else here is the request's own fault.
+        if (!r.draft) return Response.json({ error: r.error ?? "Couldn't write a draft." }, { status: /Try again|right now/.test(r.error ?? "") ? 503 : 400 });
         const sessionIds = chatThreads(botId, chatId, sessionId).map((s) => s.id).slice(-20);
         const updating = r.draft.updates ? refsOf(wsId, "skill").find((x) => x.slug === r.draft!.updates)?.name : undefined;
         return Response.json({ draft: r.draft, ...(updating ? { updating } : {}), from: { chatId, ...(sessionIds.length ? { sessionIds } : {}) } });

@@ -735,7 +735,7 @@ export function ChatView({
             <div ref={callSlot} className="h-[52px] self-stretch" />
           ) : (
             <>
-              <button onClick={() => solo && onShowBot(solo.id)} className="relative top-2 z-10" title={solo ? `${solo.name}'s profile` : undefined}>
+              <button onClick={() => solo && onShowBot(solo.id)} aria-label={solo ? `${solo.name}'s profile` : "Chat profile"} title={solo ? `${solo.name}'s profile` : undefined} className="relative top-2 z-10">
                 <ChatAvatar chat={c} bots={state.bots} size={40} />
               </button>
               <div className="relative flex flex-col items-center rounded-[14px] bg-white px-3.5 pb-1.5 pt-2.5 shadow-[0_0_0_1px_#E6E6E3,0_6px_16px_-8px_#00000020] max-md:max-w-[calc(100%-24px)]">
@@ -2891,8 +2891,9 @@ export function ToPicker({ state, onOpenChat, onCancel }: { state: AppState; onO
           {mode === "bot" ? (
             <div className="flex flex-col gap-2.5 p-2">
               <span className="text-[14px] font-semibold">Create a new bot</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, e.g. Nova" className="rounded-xl px-3 py-2 text-[14px] shadow-[0_0_0_1px_#E2E2DF] outline-none" />
-              <input value={role} onChange={(e) => setRole(e.target.value)} placeholder="What it does, e.g. Research" className="rounded-xl px-3 py-2 text-[14px] shadow-[0_0_0_1px_#E2E2DF] outline-none" />
+              {/* 40 is what createBot keeps (lib/server/bots.ts): the field says so instead of taking 3000 and quietly cutting (crawl L6). */}
+              <input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="Name, e.g. Nova" className="rounded-xl px-3 py-2 text-[14px] shadow-[0_0_0_1px_#E2E2DF] outline-none" />
+              <input value={role} maxLength={80} onChange={(e) => setRole(e.target.value)} placeholder="What it does, e.g. Research" className="rounded-xl px-3 py-2 text-[14px] shadow-[0_0_0_1px_#E2E2DF] outline-none" />
               <span className="text-[12px] leading-4 text-[#6B6B6B]">
                 It works on {teamOf(state).find((b) => b.isMain)?.name ?? "the main bot"}&apos;s computer, on screens of its own there. You can give it a computer of its own in its Details.
               </span>
@@ -2917,7 +2918,7 @@ export function ToPicker({ state, onOpenChat, onCancel }: { state: AppState; onO
               )}
               {mode === "group" && (
                 <div className="flex items-center gap-2 px-2.5 pb-1 pt-1.5">
-                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Group name (optional)" className="min-w-0 flex-1 rounded-xl px-3 py-2 text-[14px] shadow-[0_0_0_1px_#E2E2DF] outline-none" />
+                  <input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="Group name (optional)" className="min-w-0 flex-1 rounded-xl px-3 py-2 text-[14px] shadow-[0_0_0_1px_#E2E2DF] outline-none" />
                   <button disabled={picked.length < 2} onClick={() => void createGroup()} className="rounded-full bg-ink px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-30">
                     Start group
                   </button>
