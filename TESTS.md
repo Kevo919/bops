@@ -12,7 +12,7 @@ Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an indepen
 | Chat replies with a real model (OpenRouter) | ✅ Nov 3 (#28, #31 tests) | ✅ Nov 3, reviewer (#31) | ✅ Nov 3 1:05 PM, lead: Boppy answered on DeepSeek V3.1 | ⏳ | ✅ Nov 3, lead: OpenRouter key check 200 | |
 | Chat model picker | ✅ Nov 3 | ✅ Nov 3 | ✅ Nov 3, lead: picked DeepSeek V3.1, reply came back | ⏳ | n/a | Picker refresh without Ctrl+R (#46): ✅ CI only, ⏳ live |
 | Chat box layout in narrow windows (#42) | ✅ Nov 3, lead | ✅ Nov 3, lead (self-review, small) | ✅ Nov 3 12:52 PM, lead: text box full width with the side panel open | n/a | n/a | |
-| Models section (#31), presets, custom ids, Auto Router, routine model (#44), several accounts (#45) | ✅ Nov 3-4 (#31 tests; #44: 7+8 new tests; #45: 9) | ✅ #31 Nov 3 reviewer; #44/#45 ⏳ no independent review recorded | ⚠️ #31 live Nov 3, lead (added 3 models via the card's API); #44/#45 ⏳ (not built on the PC yet) | ⏳ | ⏳ presets with Kevin's real presets | |
+| Models section (#31), presets, custom ids, Auto Router, routine model (#44), several accounts (#45) | ✅ Nov 3-4 (#31 tests; #44: 7+8 new tests; #45: 9) | ✅ #31 Nov 3 reviewer; ✅ #44 Nov 5 reviewer; ⚠️ #45 Nov 5 reviewer: OpenAI models ignore `account:` (fix in progress) | ⚠️ #31 live Nov 3, lead (added 3 models via the card's API); #44/#45 ⏳ (not built on the PC yet) | ⏳ | ⏳ presets with Kevin's real presets | |
 | AI subscriptions card + local sign-in (#30, #37) | ✅ Nov 3 | ✅ Nov 3, reviewer | ⚠️ Nov 3, codex: Claude Code Max-plan sign-in confirmed in the live UI | ⏳ | ✅ Claude Max plan (codex) | ChatGPT plan sign-in ⏳ |
 | Bot tasks on the PC (local executor) | ✅ CI | ✅ #47-#49 codex | ❌ Nov 4 9:00 PM, Kevin: "Local executor exited with code 1 (authentication rejected)" | n/a | ❌ OpenAI environment key missing, no credit | Fix: OpenAI key + credit, or tasks on the cloud computer |
 | Bot tasks on the cloud computer (Claude Code, Max plan) | ✅ CI | ✅ | ⏳ | n/a | ⚠️ sign-in confirmed by codex, a task run ⏳ | |
@@ -24,9 +24,9 @@ Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an indepen
 | Custom schedules / cron (#52) | ✅ Nov 4, lead (test-cron 15, test-schedules 69, chat-tools 84) | ✅ Nov 3, reviewer (2 fixes confirmed) | ⏳ | ⏳ | n/a | No GitHub CI (Actions paused) |
 | Pause routines when away (#19) | ✅ Nov 3 (10 tests) | ✅ Nov 3, reviewer + lead fix | ⏳ | ⏳ | n/a | |
 | Allow for this conversation (#27) | ✅ Nov 3 (7 + scope 19) | ✅ Nov 3, reviewer + lead fix | ⏳ | ⏳ | n/a | |
-| Your own tool servers per bot / MCP (#32) | ✅ CI | ⚠️ Nov 3 review: 6 defects; zai reports A-F fixed (Nov 3 21:15), re-review ⏳ | ⏳ | ⏳ | n/a | |
+| Your own tool servers per bot / MCP (#32) | ✅ CI | ⚠️ Nov 5 reviewer: A, C, E, F fixed; B, D partly; Windows .cmd servers not fully killed; brain threads get MCP without owner ask (fix in progress) | ⏳ | ⏳ | n/a | |
 | Word/PowerPoint/Excel from chat (#41) | ✅ CI | ⚠️ Nov 3 review: download link likely 403 in the desktop app; fix not confirmed | ⏳ | ⏳ | n/a | |
-| Goals and ideas (#51) | ⚠️ local only (zai): tsc, lint, 7 tests; no GitHub CI | ⏳ no independent review | ⏳ | ⏳ | n/a | |
+| Goals and ideas (#51) | ⚠️ local only (zai): tsc, lint, 7 tests; no GitHub CI | ❌ Nov 5 reviewer: set_goal's tool schema likely breaks OpenAI strict mode (HIGH), raw schedules, silent step failures (fix in progress) | ⏳ | ⏳ | n/a | |
 | Change the look by chat (#4) | ✅ | ✅ Nov 3 (11 bypasses tested) | ⏳ | ⏳ | n/a | |
 | Voice typing card / Handy (#34) | ✅ | ✅ lead | ⏳ | n/a | n/a | |
 | Keys card + key checks (#10) | ✅ | ✅ | ⏳ | ⏳ | ⚠️ OpenRouter + Composio keys accepted (lead) | |
