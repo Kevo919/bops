@@ -2658,7 +2658,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
      * has its branch. `bring` takes what it brought in from outside (a page read, an email that came, what an app
      * or a data lookup answered), whose addresses are then written down (bringIn).
      */
-    const lookup = async (name: string, a: Args, bring: (text: string) => void, approved = false): Promise<string> => {
+    const lookup = async (name: string, a: Args, bring: (text: string) => void, approved = false, askedPlan?: string): Promise<string> => {
       if (name === "remember" && bg) return "Not saved: a routine's run doesn't save to memory.";
       if (!offered.has(name)) return `${name} isn't a tool you have here.`;
       // Whose words it reads (a proposal's card says so); use_app's are its read log's, a page's and an API's said where they're read.
@@ -2682,8 +2682,9 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
           })
           .catch(failed);
       if (CRM_TOOL_NAMES.has(name)) return runCrmTool(botId, name, a, { chatId }).catch(failed);
-      // A repo run is the owner's own turn's alone; its first run of a plan asks them (NeedsOk), and their yes runs it (`approved`).
-      if (REPO_TOOL_NAMES.has(name)) return repoTool(botId, name, a as Record<string, unknown>, { owner: !(opts.outside || member || bg || opts.call || onBox), chatId, approved }).catch(failed);
+      // A repo run is the owner's own turn's alone; its first run of a plan asks them (NeedsOk), and their yes runs
+      // exactly the plan that ask showed (`approved`, `askedPlan`).
+      if (REPO_TOOL_NAMES.has(name)) return repoTool(botId, name, a as Record<string, unknown>, { owner: !(opts.outside || member || bg || opts.call || onBox), chatId, approved, askedPlan }).catch(failed);
       if (ORBIT_TOOL_NAMES.has(name)) return runOrbitTool(botId, name, a, { chatId, routineId: bg?.routineId, readIn: (key) => read.accountsWith(key) }).catch(failed);
       if (name === "ask_teammate") return askTeammate(b, String(a.bot_id ?? ""), String(a.question ?? ""), chatId, asked, member).catch((e: Error) => `Couldn't reach them: ${e.message}`);
       if (name === "web_fetch") {
@@ -2924,7 +2925,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       try {
         a = JSON.parse(resumed.call.arguments || "{}") as Args;
       } catch {}
-      const out = opts.resume.reply?.reply === "reject" ? declined(opts.resume) : await lookup(resumed.call.name, a, bringIn, true).catch((e: Error) => (e instanceof NeedsOk ? "Failed: it still needs the user's OK." : `Failed: ${e.message}`));
+      const out = opts.resume.reply?.reply === "reject" ? declined(opts.resume) : await lookup(resumed.call.name, a, bringIn, true, opts.resume.repoPlan).catch((e: Error) => (e instanceof NeedsOk ? "Failed: it still needs the user's OK." : `Failed: ${e.message}`));
       if (opts.resume.reply?.reply === "reject") notes.push(`${b.name} didn't do it: ${declined(opts.resume).replace(/^Declined: /, "")}`);
       response = await create([...resumed.outputs.map((o) => ({ type: "function_call_output" as const, call_id: o.callId, output: o.output })), { type: "function_call_output" as const, call_id: resumed.callId, output: out }], resumed.responseId);
     } else

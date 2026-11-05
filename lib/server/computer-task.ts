@@ -305,7 +305,7 @@ async function answerPaused(t: ComputerTurn, a: AppApproval, call: { name: strin
     return { type: "function_call_output", call_id: callId, output: declined(a) };
   }
   keep("Not known: Bops stopped while doing it, so it may or may not have happened. Check before doing it again.");
-  const answered = await runFunction(t, { type: "function_call", call_id: callId, name: call.name, arguments: call.arguments }, guard, { approved: true });
+  const answered = await runFunction(t, { type: "function_call", call_id: callId, name: call.name, arguments: call.arguments }, guard, { approved: true, askedPlan: a.repoPlan });
   const output = "pause" in answered ? "Failed: it still needs the user's OK." : answered.output;
   keep(typeof output === "string" ? output : (output.find((c) => c.type === "input_text")?.text ?? ""));
   return { type: "function_call_output", call_id: callId, output };
@@ -705,7 +705,7 @@ function orStop<T>(t: ComputerTurn, work: Promise<T>): Promise<T> {
  * One tool call, answered. `approved`: the user said yes to this very call (its run paused for it). A call that
  * needs their OK and hasn't it answers `pause`, with what to ask: the run pauses there (pauseAt).
  */
-async function runFunction(t: ComputerTurn, o: OutputItem, guard: PageGuard = newPageGuard(), opts: { approved?: boolean } = {}): Promise<FunctionOutput | { pause: AskSpec }> {
+async function runFunction(t: ComputerTurn, o: OutputItem, guard: PageGuard = newPageGuard(), opts: { approved?: boolean; askedPlan?: string } = {}): Promise<FunctionOutput | { pause: AskSpec }> {
   const s = session(t.sessionId)!;
   // A stranger's task has none of the owner's logins; anyone else's (a member's too) none of the CRM.
   const outside = strangersTask(t.sessionId);
@@ -766,7 +766,7 @@ async function runFunction(t: ComputerTurn, o: OutputItem, guard: PageGuard = ne
       output = await orStop(t, runDataTool(s.botId, o.name, args, { sessionId: t.sessionId }, { approved: opts.approved }));
     } else if (o.name && REPO_TOOL_NAMES.has(o.name) && !outside) {
       t.step(o.name, o.name === "run_repo" ? `asked to run ${String(args.repo_id ?? args.url ?? "a repo")}` : o.name === "open_repo" ? `opened ${String(args.repo_id ?? args.url ?? "a repo")}` : "checked the repos");
-      output = await orStop(t, repoTool(s.botId, o.name, args, { owner: !others, threadId: t.sessionId, approved: opts.approved }));
+      output = await orStop(t, repoTool(s.botId, o.name, args, { owner: !others, threadId: t.sessionId, approved: opts.approved, askedPlan: opts.askedPlan }));
     } else if (o.name && CRM_TOOL_NAMES.has(o.name) && !others) {
       t.step(o.name, crmStep(o.name, args));
       output = await orStop(t, runCrmTool(s.botId, o.name, args, { sessionId: t.sessionId }));

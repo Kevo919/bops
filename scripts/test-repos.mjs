@@ -2,7 +2,8 @@
 // load checked (a broken one is left out, with why), a GitHub address is taken only as https://github.com/<owner>/<name>,
 // a plan pins a commit and names the user, every command and the ports, Docker and keys a repo can't run without are
 // refused, run_repo is the owner's alone and asks first whatever the bot's rules say (Always allow counts as once, a
-// member can't answer), the owner's yes runs exactly the plan they saw (a new commit asks again), the run goes step by
+// member can't answer), the owner's yes runs exactly the plan they saw and settles only that one (a plan that
+// changed while the ask waited asks again), the run goes step by
 // step on a computer (installed, running, its health check) and is said in the chat, a private repo's tarball comes
 // through the key broker and only its bytes reach the computer (no token, no download address, no key name's value in
 // any command, env or log), a repo's output is kept with keys taken out, two bots each see their own, the window's Run
@@ -203,6 +204,7 @@ const reset = () =>
     s.appApprovals = [];
   });
 const owner = { owner: true, chatId: botChatId(MAIN) };
+let firstAskPlan; // The plan (AppApproval.repoPlan) the first run_repo ask showed; the owner's yes settles only it.
 const decodeB64Args = (cmd) => [...cmd.matchAll(/\b([A-Za-z0-9+/]{8,}={0,2})(?=\s|$)/g)].map((m) => Buffer.from(m[1], "base64").toString("utf8"));
 
 /* ---------------- Recipes ---------------- */
@@ -294,6 +296,7 @@ await check("the first run asks the owner, whatever the bot's rules say (Just do
   assert.match(err.ask.preview, /npm ci/);
   assert.match(err.ask.preview, /Ports: 4173/);
   assert.deepEqual(err.ask.resources, ["bilawalsidhu/gods-eye-view@aaaaaaaaaaaa", "port 4173"]);
+  firstAskPlan = err.ask.repoPlan;
   assert.equal(computers["comp-1"].length, 0, "nothing reached the computer before the yes");
   S.update((s) => {
     const b = s.bots.find((x) => x.id === MAIN);
@@ -305,7 +308,7 @@ await check("the first run asks the owner, whatever the bot's rules say (Just do
 await check("the owner's yes runs that plan: installed, running, its health check, said in the chat; output kept with keys taken out", async () => {
   computers["comp-1"].length = 0;
   const before = S.getState().messages.length;
-  const out = await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, { ...owner, approved: true });
+  const out = await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, { ...owner, approved: true, askedPlan: firstAskPlan });
   assert.match(out, /Kevin said yes. Started God's Eye View/);
   await settle();
   const r = lastRun(MAIN, "gods-eye-view");
@@ -337,6 +340,34 @@ await check("approved once: the same plan runs again without asking; a new commi
   assert.match(err.ask.preview, /eeeeeeeeeeee/);
 });
 
+await check("the owner's yes settles only the exact plan the card showed: a plan made while it waited asks again", async () => {
+  reset();
+  computers["comp-1"].length = 0;
+  const first = await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, owner).then(() => null, (e) => e);
+  assert.ok(first instanceof P.NeedsOk, "it asks");
+  assert.ok(first.ask.repoPlan, "the ask carries the plan it showed");
+  // While that ask waits, the repo moves and run_repo asks about the new plan: it takes the waiting plan's place.
+  head = { ...head, "bilawalsidhu/gods-eye-view": "9".repeat(40) };
+  const second = await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, owner).then(() => null, (e) => e);
+  assert.ok(second instanceof P.NeedsOk, "the new plan asks too");
+  assert.notEqual(second.ask.repoPlan, first.ask.repoPlan, "a different plan is a different ask");
+  // The owner answers the first card: it doesn't settle the plan made since it (nothing runs, nothing recorded).
+  const said = await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, { ...owner, approved: true, askedPlan: first.ask.repoPlan });
+  assert.match(said, /older plan/);
+  assert.equal(computers["comp-1"].length, 0, "nothing ran on the older plan's yes");
+  assert.equal((S.getState().repos?.approved ?? []).length, 0, "nothing recorded for it");
+  // Asked about again, the plan as it is now is shown, and its yes runs exactly that one.
+  const third = await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, owner).then(() => null, (e) => e);
+  assert.ok(third instanceof P.NeedsOk, "the changed plan asks again");
+  assert.match(third.ask.preview, /999999999999/);
+  const go = await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, { ...owner, approved: true, askedPlan: third.ask.repoPlan });
+  assert.match(go, /Kevin said yes. Started God's Eye View/);
+  await settle();
+  const r = lastRun(MAIN, "gods-eye-view");
+  assert.equal(r.planId, third.ask.repoPlan, "the run is the plan the card showed");
+  assert.equal((S.getState().repos?.approved ?? []).at(-1)?.planId, third.ask.repoPlan, "the recorded approval is that plan's");
+});
+
 await check("Always allow counts as once, a member can't answer, and no rule is saved", async () => {
   reset();
   const err = await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, owner).then(() => null, (e) => e);
@@ -352,8 +383,8 @@ await check("a failed safety check on the computer fails the run closed, said in
   reset();
   fail = { verb: "prepare", code: "unsafe", why: "reads /root/.bops" };
   try {
-    await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, { ...owner, approved: false }).catch(() => {});
-    await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, { ...owner, approved: true });
+    const ask = await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, owner).then(() => null, (e) => e);
+    await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, { ...owner, approved: true, askedPlan: ask.ask.repoPlan });
     await settle();
     const r = lastRun(MAIN, "gods-eye-view");
     assert.equal(r.state, "failed");
@@ -371,8 +402,8 @@ await check("a private repo: the broker fetches a pinned tarball, only its bytes
   computers["comp-1"].length = 0;
   brokered.length = 0;
   ghFetches.length = 0;
-  await R.repoTool(MAIN, "run_repo", { repo_id: "kevo919-paperclip", url: null, action: "run" }, owner).catch(() => {});
-  await R.repoTool(MAIN, "run_repo", { repo_id: "kevo919-paperclip", url: null, action: "run" }, { ...owner, approved: true });
+  const ask = await R.repoTool(MAIN, "run_repo", { repo_id: "kevo919-paperclip", url: null, action: "run" }, owner).then(() => null, (e) => e);
+  await R.repoTool(MAIN, "run_repo", { repo_id: "kevo919-paperclip", url: null, action: "run" }, { ...owner, approved: true, askedPlan: ask.ask.repoPlan });
   await settle();
   const r = lastRun(MAIN, "kevo919-paperclip");
   assert.equal(r.state, "running", r.error);
@@ -400,8 +431,8 @@ await check("a private repo whose broker answer isn't a redirect to GitHub's dow
   const real = R.repoDeps.callKey;
   R.repoDeps.callKey = async (c) => (c.path.includes("/tarball/") ? { status: 200, contentType: "text/plain", body: "binary?", truncated: true, headers: {} } : real(c));
   try {
-    await R.repoTool(MAIN, "run_repo", { repo_id: "kevo919-paperclip", url: null, action: "run" }, owner).catch(() => {});
-    await R.repoTool(MAIN, "run_repo", { repo_id: "kevo919-paperclip", url: null, action: "run" }, { ...owner, approved: true });
+    const ask = await R.repoTool(MAIN, "run_repo", { repo_id: "kevo919-paperclip", url: null, action: "run" }, owner).then(() => null, (e) => e);
+    await R.repoTool(MAIN, "run_repo", { repo_id: "kevo919-paperclip", url: null, action: "run" }, { ...owner, approved: true, askedPlan: ask.ask.repoPlan });
     await settle();
     const r = lastRun(MAIN, "kevo919-paperclip");
     assert.equal(r.state, "failed");
@@ -428,8 +459,8 @@ await check("a private repo with no GITHUB_TOKEN in Keys says so, and asks nothi
 await check("two bots: each runs on its own computer and sees its own status and briefing line", async () => {
   reset();
   computers["comp-2"].length = 0;
-  await R.repoTool("nova", "run_repo", { repo_id: "cli-anything", url: null, action: "run" }, { owner: true, chatId: botChatId("nova") }).catch(() => {});
-  await R.repoTool("nova", "run_repo", { repo_id: "cli-anything", url: null, action: "run" }, { owner: true, chatId: botChatId("nova"), approved: true });
+  const ask = await R.repoTool("nova", "run_repo", { repo_id: "cli-anything", url: null, action: "run" }, { owner: true, chatId: botChatId("nova") }).then(() => null, (e) => e);
+  await R.repoTool("nova", "run_repo", { repo_id: "cli-anything", url: null, action: "run" }, { owner: true, chatId: botChatId("nova"), approved: true, askedPlan: ask.ask.repoPlan });
   await settle();
   assert.ok(computers["comp-2"].length > 0, "on Nova's computer");
   assert.ok(lastRun("nova", "cli-anything"), "Nova's run");
@@ -514,6 +545,9 @@ await check("the briefing line is in the bot's computer briefing", async () => {
   assert.match(text, /Repos \(list_repos, open_repo, run_repo, repo_status\): 16 ready-to-run GitHub repos/);
 });
 
-rmSync(scratch, { recursive: true, force: true });
+process.chdir(tmpdir());
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+} catch {}
 console.log(`repos: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

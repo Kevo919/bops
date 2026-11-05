@@ -3576,7 +3576,7 @@ const sendMessage = (agentSessionId: string, text: string) =>
  * requires_action), run here as the computer tool's are (computer-task.ts runFunction). `approved`: the user said
  * yes to this very call. One that needs their OK and hasn't it throws NeedsOk: the run pauses there (runTurn).
  */
-async function agentTool(sessionId: string, botId: string, name: string, args: Record<string, unknown>, opts: { approved?: boolean } = {}): Promise<string> {
+async function agentTool(sessionId: string, botId: string, name: string, args: Record<string, unknown>, opts: { approved?: boolean; askedPlan?: string } = {}): Promise<string> {
   if (name === "find_app_actions") {
     step(sessionId, name, `looked for "${String(args.query ?? "").slice(0, 60)}" in your apps`);
     return findAppActions(botId, String(args.query ?? ""), { sessionId });
@@ -3588,7 +3588,7 @@ async function agentTool(sessionId: string, botId: string, name: string, args: R
   if (REPO_TOOL_NAMES.has(name)) {
     const s = session(sessionId);
     if (!opts.approved) step(sessionId, name, name === "run_repo" ? `asked to run ${String(args.repo_id ?? args.url ?? "a repo")}` : name === "open_repo" ? `opened ${String(args.repo_id ?? args.url ?? "a repo")}` : "checked the repos");
-    return repoTool(botId, name, args, { owner: !othersThread(s, session), threadId: sessionId, approved: opts.approved });
+    return repoTool(botId, name, args, { owner: !othersThread(s, session), threadId: sessionId, approved: opts.approved, askedPlan: opts.askedPlan });
   }
   if (DATA_TOOL_NAMES.has(name)) {
     if (!opts.approved) step(sessionId, name, name === "business_search" ? `looked up ${String(args.job ?? "business data")}` : name === "find_data" ? `looked for "${String(args.query ?? "").slice(0, 60)}" in business data` : `got ${String(args.endpoint_id ?? "data")}`);
@@ -3625,7 +3625,7 @@ async function answerPausedCall(sessionId: string, agentSessionId: string, a: Ap
     step(sessionId, "note", declined(a).replace(/^Declined:/, "Declined by you:"));
     return void (await toolResult(agentSessionId, call, declined(a)));
   }
-  const output = await agentTool(sessionId, a.botId, r.call.name, argsOf(r.call), { approved: true }).catch((e: Error) => `Failed: ${e.message}`);
+  const output = await agentTool(sessionId, a.botId, r.call.name, argsOf(r.call), { approved: true, askedPlan: a.repoPlan }).catch((e: Error) => `Failed: ${e.message}`);
   await toolResult(agentSessionId, call, output);
 }
 
