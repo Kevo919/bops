@@ -1,27 +1,19 @@
 # Codex status
-Updated 2026-11-05T10:27:46.0866239Z. Build IN PROGRESS. Published score67% (96.5/145); expanded checklist, not directly comparable with earlier percentages.
+Updated 2026-11-05T13:52Z. Build IN PROGRESS. Windows unlocked; live checks resumed on c313758, build 1dDITvEsqsc1hnKKxI4wj (lead mapping confirmed).
 
-## Current verified state
-- Lead deployed1fb2921 (+PR71 test-only). Independently confirmed PChealth200 build hWKiXL7d5vY1BpOjDfNkT thisrun.
-- Windows remains visibly locked. Native Bopswindow920274 present but UI inaccessible. No livePC featurechecks credited thisrun; existingunlockrequest remainspending.
-- PrivacyPR62/63 and WindowsSSHPR60 merged, tested/reviewed source. SSH134hosted+11focused passed; nativekeygen/ACL/argumentparse real, transportdoubles; realremoteSSH stillunverified.
-- PR68 source re-review closed Codexvoicefindings (down-onlyopt-infallback, truthfulhelp, loopbackrecipe). Realmicrophone/service/UI and120stimeout test stillunverified. Evidence tests/2026-11-05-0925-codex-voice-rereview.md.
+## Verified this session
+- ChatGPT and Claude subscription connection checks refreshed connected. This is not native task execution proof.
+- Repos approval card shows commands, permissions and endpoint; Cancel verified. No install/execution.
+- SOUL/MEMORY editor renders, unsaved edit enables Save, undo restores original. No persisted data changed.
+- Memory tab FAIL: raw workspaceId validation JSON. Source investigation found blank template env IDs bypass ?? defaults; disabled memory still initializes SDK. Lead/zai notified; they own fixes.
+- Goals/Routines render; task completion not yet verified.
+- Evidence: tests/2026-11-05-1348-codex-*.md.
 
-## Next and ownership
-Afterunlock: lead0958 livePC list on hWKiXL7d5vY1BpOjDfNkT: Reposapproval/private-member, SOUL/MEMORY, Goals,MCP, sign-instatus,tray,close/reopen,restartpersistence,freshinstaller; add minimumwindowwidth andphone412px whereavailable. One evidencefileperfeature.
-Lead ownsrebuilds/mobilelayout; zai owns remainingcrawlbugs/key-store decision. No overlappingcodeedits. PriorOffice/chat/Connections/picker/Ideas evidence retained; not rerunwithoutreason.
+## Next
+Continue bounded live MCP/Goals/cron checks, retest memory after owner fix. Lead owns deployment; notify before restart. No heavy jobs or merges this session. Source privacy and Windows SSH evidence remains in previous reports; remote SSH not proven by mocked tests.
 
 ## Needs Kevin
-UnlockWindows forliveUI checks (alreadyrequested; avoidhourlyrepeatnotifications). NativePC tasks stillrequirecorrect OpenAIenvironmentkey/access andAPIcredit; no credentials changed. Gmail/Zapier/Android/realprovideraccounts remainexternalprerequisites. No100%claim.
+Native Windows tasks still need working executor authorization and API credit. No credentials changed; no 100% claim. Windows unlock is resolved.
 
-## Run coordination
-Hourlyautomation bops-hourly-build-check active. Thisrun readboard/newmessages, verifiedhealth andlockscreen, updatedlogs. Noheavyjobs, sourceedits, merges, restarts orforeignprocesschanges. Ownhourlylockreleasedonexit. Leadreviews/merges.
-
-Hourly checkpoint 2026-11-05T11:25:10.7687710Z : no new messages forCodex/all. Read expandedTESTS and LOG update; scoredenominator145. Health200 unchangedhWKiXL7d5vY1BpOjDfNkT; screenshotstillWindowslockscreen. Read initialPR69/72diffs (nofullreview/testcredit); sourceforkb754835. Noheavywork/restart/merge. Next unchangedlivePC list afterunlock; newfeaturechecks notassumedpassed fromdeployment.
-
-
-Hourly checkpoint 2026-11-05T12:23:42.5320520Z : boardadc56a7 read, no newCodex/all assignment; leadreview69/72 andzaifollowupownership noted. No duplicate review/edit. Native screenshotstillWindowslocked; health200 unchangedhWKiXL7d5vY1BpOjDfNkT. Livechecks pendingexistingunlockrequest; noheavyjob/merge/restart. Score65%94/145 isleadpublished.
-
-
-Hourly checkpoint 2026-11-05T13:23:54.9418329Z : lead1300 rebuildb754835 acknowledged. Independently verifiedhealth200 jnA8BpVtpragfOXxiXFeB; supersedesearlierbuild. Windowsstillvisiblylocked (Bopswindow985810). Leadprioritylistready:Reposapproval,SOUL/MEMORY,Goals,MCP,sign-ins,tray,persistence,narrowwindow,Memoryoutage. Noheavyjob/merge/restart; no newUIcredit. Existingunlockrequestpending.
-
+## Coordination
+Hourly automation bops-hourly-build-check remains active. Current interactive session uses no heavy-build resources. Preserve dirty config/llms.yaml. Lead owns score and merges.
