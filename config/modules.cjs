@@ -21,6 +21,7 @@ const path = require("node:path");
 /**
  * A setting: `key` in the module's section, the `env` it drives, a `label` and `help` for Settings, and
  * its `type` ("text", "toggle" or a list of `options`). A toggle writes "1" or "0" (or `on`/`off`).
+ * `check`: a check Settings and the save run on a text value ("local-address": lib/voice-address.ts).
  * `keys`: the secrets the module needs (in .env.local), cleared when the module is off.
  */
 const MODULES = [
@@ -113,11 +114,12 @@ const MODULES = [
   {
     id: "voice-local",
     name: "Voice (local)",
-    help: "The chat's mic runs through your own speech service instead of OpenAI: nothing leaves this machine and no OpenAI key is needed. Any service that speaks OpenAI's /v1/audio/transcriptions works — Speaches (which also speaks /v1/audio/speech, recipe in the Repos section), whisper.cpp's server, faster-whisper-server. While your service is down, OpenAI is the fallback (never without a key). Spoken replies on calls stay with AgentPhone's voice agent: it speaks, Bops only writes the words.",
+    help: "The chat's mic runs through your own speech service instead of OpenAI, and no OpenAI key is needed. With an address on this machine (127.0.0.1 or localhost) your recordings never leave it; any other address gets them, and Settings warns you. Any service that speaks OpenAI's /v1/audio/transcriptions works: Speaches (recipe in the Repos section; download its model first), faster-whisper-server, or whisper.cpp's server started with --inference-path /v1/audio/transcriptions. If your service doesn't answer, the mic shows an error unless you choose OpenAI below (your own OPENAI_API_KEY, called directly; Bops Cloud only when that's your only way to OpenAI), and then it tells you each time OpenAI was used. An answer with an error is never sent on to OpenAI. Spoken replies on calls stay with AgentPhone's voice agent: it speaks, Bops only writes the words.",
     keys: [],
     settings: [
-      { key: "baseURL", env: "VOICE_LOCAL_BASE_URL", label: "Service address", help: "Your Whisper service's OpenAI-style address, for example http://127.0.0.1:8080/v1.", type: "text" },
-      { key: "model", env: "VOICE_LOCAL_STT_MODEL", label: "Model name the service expects", type: "text", placeholder: "whisper-1" },
+      { key: "baseURL", env: "VOICE_LOCAL_BASE_URL", label: "Service address", help: "Your Whisper service's OpenAI-style address, http or https, for example http://127.0.0.1:8000/v1. Keep it on 127.0.0.1 or localhost so recordings stay on this machine.", type: "text", check: "local-address" },
+      { key: "model", env: "VOICE_LOCAL_STT_MODEL", label: "Model name the service expects", help: "For Speaches, the model you downloaded, for example Systran/faster-whisper-small.", type: "text", placeholder: "whisper-1" },
+      { key: "whenDown", env: "VOICE_LOCAL_FALLBACK", label: "If the local service is down", help: "error: show an error (the default: nothing goes to OpenAI). openai: use OpenAI for that recording, and say so.", type: ["error", "openai"], placeholder: "error" },
     ],
   },
   {
@@ -240,6 +242,7 @@ function describe(root, env = process.env) {
         help: s.help ?? null,
         type: s.type,
         placeholder: s.placeholder ?? null,
+        check: s.check ?? null,
         value: s.key in section ? section[s.key] : s.type === "toggle" ? (env[s.env] !== undefined ? env[s.env] === toggleValue(s, true) : (s.default ?? false)) : (env[s.env] ?? ""),
       })),
     };

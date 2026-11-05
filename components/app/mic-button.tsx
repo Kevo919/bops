@@ -13,9 +13,10 @@ const recordingType = () => ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"
 /**
  * The composer's mic: click to talk, click again (or press Enter) to stop, and what you said lands in
  * the message box to read before sending (Esc throws the recording away). Transcribed by
- * /api/transcribe (gpt-transcribe), counted for the bot the chat is with.
+ * /api/transcribe (gpt-transcribe, or the owner's own service with Voice (local)), counted for the bot
+ * the chat is with. `note`: how the words came when not the way the owner set up (Voice (local) down, OpenAI used).
  */
-export function MicButton({ botId, onText, onError }: { botId?: string; onText: (text: string) => void; onError: (message: string) => void }) {
+export function MicButton({ botId, onText, onError }: { botId?: string; onText: (text: string, note?: string) => void; onError: (message: string) => void }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [startedAt, setStartedAt] = useState(0);
   const [now, setNow] = useState(0);
@@ -87,9 +88,9 @@ export function MicButton({ botId, onText, onError }: { botId?: string; onText: 
       if (botId) form.append("botId", botId);
       try {
         const res = await fetch("/api/transcribe", { method: "POST", body: form });
-        const body = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
+        const body = (await res.json().catch(() => ({}))) as { text?: string; note?: string; error?: string };
         if (!res.ok) throw new Error(body.error ?? "Couldn't hear that. Try again.");
-        if (body.text) onText(body.text);
+        if (body.text) onText(body.text, body.note);
         else onError("Didn't catch any words. Try again.");
       } catch (e) {
         onError((e as Error).message);

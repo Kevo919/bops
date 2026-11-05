@@ -66,6 +66,22 @@
 #   area:                         # Area code for new numbers
 #   hookURL:                      # Webhook address
 
+# Voice (local). The chat's mic runs through your own speech service instead of OpenAI, and no
+# OpenAI key is needed. With an address on this machine (127.0.0.1 or localhost) your recordings
+# never leave it; any other address gets them, and Settings warns you. Any service that speaks
+# OpenAI's /v1/audio/transcriptions works: Speaches (recipe in the Repos section; download its
+# model first), faster-whisper-server, or whisper.cpp's server started with --inference-path
+# /v1/audio/transcriptions. If your service doesn't answer, the mic shows an error unless you
+# choose OpenAI below (your own OPENAI_API_KEY, called directly; Bops Cloud only when that's your
+# only way to OpenAI), and then it tells you each time OpenAI was used. An answer with an error is
+# never sent on to OpenAI. Spoken replies on calls stay with AgentPhone's voice agent: it speaks,
+# Bops only writes the words.
+# voice-local:
+#   enabled: true
+#   baseURL:                      # Service address
+#   model: whisper-1              # Model name the service expects
+#   whenDown: error               # If the local service is down (error, openai)
+
 # Your phone and the internet. Reaching this Bops from the Bops Android app, or from the internet.
 # remote:
 #   enabled: true

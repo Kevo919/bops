@@ -11,24 +11,32 @@ requirements:
   docker: true
   other:
     - CPU image here; a CUDA image (ghcr.io/speaches-ai/speaches:latest-cuda) is faster with a GPU
-    - models download on first use into the hf-hub-cache volume (a few GB)
+    - "Models don't download on first use: the run line preloads Systran/faster-whisper-small (about 500 MB, fine on a PC CPU) with PRELOAD_MODELS, into the hf-hub-cache volume. Another model: speaches-cli model download <model> (uvx speaches-cli, SPEACHES_BASE_URL=http://127.0.0.1:8000)"
+    - "Windows PowerShell 5.1 drops the inner quotes of the -e value: there, leave -e out and run the speaches-cli download above once it's up"
+    - "In Bops, set Voice (local) to address http://127.0.0.1:8000/v1 and model Systran/faster-whisper-small (the default whisper-1 means large-v3 to Speaches, which isn't downloaded)"
 keys_optional: []
 keys_required: []
 clone: git clone --depth 1 https://github.com/speaches-ai/speaches.git speaches
 install:
   - docker pull ghcr.io/speaches-ai/speaches:latest-cpu
-run: docker run -d --name speaches -p 8000:8000 -v hf-hub-cache:/home/ubuntu/.cache/huggingface/hub ghcr.io/speaches-ai/speaches:latest-cpu
+run: docker run -d --name speaches -p 127.0.0.1:8000:8000 -e 'PRELOAD_MODELS=["Systran/faster-whisper-small"]' -v hf-hub-cache:/home/ubuntu/.cache/huggingface/hub ghcr.io/speaches-ai/speaches:latest-cpu
 background: false
 kind: web
 port: 8000
 health:
-  http: http://127.0.0.1:8000/health
+  http: http://127.0.0.1:8000/v1/models/Systran%2Ffaster-whisper-small
   expect: 200
 fits_bot_computer: false
-fits_reason: Needs a Docker daemon; the CPU image is a few GB and models add a few more on first use — a PC or the VPS rather than a small bot computer.
+fits_reason: Needs a Docker daemon; the CPU image is a few GB and the preloaded model about 500 MB more — a PC or the VPS rather than a small bot computer.
 verified: false
 verified_reason: >-
   MIT (LICENSE read), the endpoints the Voice (local) module uses (/v1/audio/transcriptions,
   /v1/audio/speech) and the /health path were confirmed from a fresh clone (993994f); the run line is
-  speaches.ai's documented CPU docker run with -d instead of --rm so it stays up. Not run yet: Docker
+  speaches.ai's documented CPU docker run with -d instead of --rm so it stays up, published on 127.0.0.1 only
+  (the service has no auth and binds 0.0.0.0 in the container), with PRELOAD_MODELS (config.py preload_models,
+  a JSON list) so the model is there before the first recording. The health check is
+  GET /v1/models/{id} (routers/models.py, {model_id:path}; the slash is %2F, which uvicorn decodes: 404 until
+  that model is downloaded), not /health, which answers
+  before any model is there. Read from master on 2026-11-05 (docs/installation.md, docs/usage/speech-to-text.md,
+  src/speaches/config.py, routers/models.py, model_aliases.json). Not run yet: Docker
   Desktop was reserved for the lead's rebuild — live verification to follow in the next Docker window.
