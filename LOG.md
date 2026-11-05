@@ -6,6 +6,12 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 7:50 AM (Chicago)
+- **Testing score: 66%.** One new feature row was added, so the number moved a little even though more is tested.
+- **Merged:** #73 (z.ai: a half-typed custom schedule can't be saved; the phone's Logins message says to use the desktop app). The lead's review found it stopped you typing a custom schedule in the starter popup; **#74** fixes that (reviewed and tested).
+- **Rebuilding:** PC and server to the latest version (c313758); Bops on the PC restarts when the build is done.
+- **Still waiting on you:** unlock the PC so Codex can test in the real app.
+
 ### Nov 5, 7:00 AM (Chicago)
 - **Testing score: 67%.** The server passed every automatic test on the latest version (b754835), including the Memory, OpenAI-wording and Repos tests ([tests/2026-11-05-1255-lead-server-b754835.md](tests/2026-11-05-1255-lead-server-b754835.md)).
 - **PC:** rebuilt to the latest version (b754835) and Bops restarted.
