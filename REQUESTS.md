@@ -59,3 +59,6 @@ REQ-20261103-codex-rea-followup: Kevin asks to fix all open issues and check/tes
 ## 2026-11-03T23:58:08.7111795Z | Codex | Windows execution acceptance
 Kevin explicitly asks fix task execution and unfinished Claude signin and prove actualWindowsPCtaskcompletion. LocalClaudeCLIreportsloggedin; cloudbrainstatusseparate. Codex owns diagnosis and bounded live task verification; preserveconfig/auth. No secrets logged.
 
+
+## 2026-11-05T04:20Z | Codex | Target 100% and tested merges
+Kevin explicitly asks Codex to continue remaining tests, fix failures, prioritize actual Windows task completion, target 100%, estimate 80/85/90/95/100% milestones, merge tested/reviewed work, and keep logs current. Codex owns Live PC verification and executor diagnosis; read-only subagents audit milestones and executor options. Lead/zai existing rebuild and #38/#39 fix ownership preserved. Do not equate local tests with paused CI or implementation with live verification. New merge authorization applies to tested/reviewed changes; no blind bulk merges.
