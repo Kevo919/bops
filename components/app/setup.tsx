@@ -874,7 +874,7 @@ export function KeysCard() {
     <Card
       icon={ICONS.modules}
       title="Keys"
-      line="Server API keys from your environment. Values are never shown. Check sends one request to that provider; OpenAI checks generate up to one token and may cost a tiny amount."
+      line="Server API keys from your environment. Values are never shown. Provider checks may make a small paid request. The OpenAI executor check only confirms a key is set; run a task on this computer to verify it can connect."
       tone={error ? "todo" : set ? "ok" : "none"}
       status={busy === "refresh" ? "Reading key status…" : keys ? `${set} of ${keys.length} set` : "Key status unavailable"}
       below={

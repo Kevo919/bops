@@ -1,17 +1,17 @@
 # Set up your provider keys
 
-This guide covers the eight keys, plus the free Ollama setting, shown in **Settings → This Mac → Keys** when you run your own Bops server. A key is a password that lets Bops use your provider account. Only configure the providers you use. Provider API usage and cloud computers can cost money; a chat-app subscription does not automatically include API credits.
+This guide covers the provider keys and free Ollama setting shown in **Settings → This PC → Keys** on Windows (**This Mac** on macOS) when you run your own Bops server. A key is a password that lets Bops use your provider account. Only configure the providers you use. Provider API usage and cloud computers can cost money; a chat-app subscription does not automatically include API credits.
 
 ## Put keys on the machine running Bops
 
 1. Open the Bops repository folder on your PC or server. If `.env.local` does not exist, copy `.env.example` to `.env.local`. Do not replace an existing `.env.local`.
 2. Open `.env.local` in a text editor. For each provider below, replace the value on its existing line, or add the line if absent: `KEY_NAME=your_key_here`. Replace the placeholder with the complete key, without spaces around `=`. Keep only one line for each key.
 3. Save the file and restart Bops. On Windows, closing its window leaves it running: use the Bops tray menu to quit, then reopen it. Restart the Bops service if it runs on a server.
-4. In the desktop Bops window, open **Settings → This Mac → Keys**. **set** means a nonempty value was found, not that the provider accepted it. Click **Check** beside a key to check it explicitly. This screen reads and checks keys; it does not save or edit them. Paired phones cannot use the key-check API.
+4. In the desktop Bops window, open **Settings → This PC → Keys** on Windows (**This Mac** on macOS). **set** means a nonempty value was found, not that the provider accepted it. Click **Check** beside a key to check it explicitly. This screen reads and checks keys; it does not save or edit them. Paired phones cannot use the key-check API.
 
 `.env.local` is ignored by this repository's Git rules. Keep it private anyway: never paste real keys into chats, screenshots, issues, pull requests or documentation. If a key is exposed, revoke it at the provider and create a replacement. Do not put keys in `config/llms.yaml`; that file contains model settings.
 
-**Check can cost a small amount:** the two OpenAI checks generate at most one output token, with a small input prompt, to test usable access. Other checks request model lists or account/key information. A successful metadata check proves access to that endpoint, not that every model has credits or permissions. **unavailable** may mean a timeout, service problem or unsupported check; it does not prove the key is invalid. **rate limited** is different from **no credit**.
+**Check can cost a small amount:** the application OpenAI key check attempts a generation of at most one output token, with a small input prompt. Other provider checks request model lists or account/key information. The **OpenAI executor** check only confirms that a key is set: it makes no network request, starts no task and does not verify permission or credit. A successful provider check proves only access to that endpoint; neither a model-list response nor a generation verifies executor registration. Verify the executor with an actual task as described below. **unavailable** may mean a timeout, service problem or unsupported check; it does not prove the key is invalid. **rate limited** is different from **no credit**.
 
 The prefixes below are recognition hints from official examples, not validation rules. Copy the entire secret supplied by the provider; never add a prefix yourself.
 
@@ -25,11 +25,14 @@ This key supports Bops' OpenAI features, including chat and calls. Check your AP
 
 ## 2. OpenAI for tasks — `OPENAI_EXECUTOR_API_KEY`
 
-1. Use the same [OpenAI API keys page](https://platform.openai.com/api-keys) to create a second key for the bots' computer/Codex tasks. This is an ordinary OpenAI API key, not a separate provider product.
-2. Put it in `OPENAI_EXECUTOR_API_KEY=`. Its prefix example is also `sk-proj-…`.
-3. Give it only the permissions its tasks need. Set spending controls using the OpenAI instructions above. A separate project lets you give tasks their own project spend limit; two keys in the same project share that project's limit.
+1. Sign in to OpenAI Platform and open [Agents → Environments → Keys](https://platform.openai.com/agents?environment_view=keys&tab=environments). Select **Create** to make a dedicated environment key. This key needs `api.agents.environments.connect`; creating another ordinary API key does not supply it.
+2. Use the **same owner, organization and project** as the application key in `OPENAI_API_KEY`. Do not put the executor in a separate project. If your organization restricts outbound IP addresses, its rules must allow the computer running the executor. See [OpenAI's executor setup instructions](https://developers.openai.com/cookbook/examples/agents_api/apps/slack_bot/readme).
+3. Save the full environment key as `OPENAI_EXECUTOR_API_KEY=` in `.env.local`, then restart Bops. Bops passes it to its executor as `CODEX_API_KEY`; it must remain separate from the application key. An environment key only authorizes environment connections, not model-list or generation calls. See [OpenAI's credential separation guide](https://developers.openai.com/api/docs/guides/agents-api/environments/security).
+4. Check the application's API credit and spending controls, then run a small task on **Your PC**, such as calculating `17 × 23` with no file changes. Confirm the task completes and reports its result; a working chat reply or a green Keys check is not proof that the executor connected.
 
-The repository supports keys from the same project, but a separate task key makes revocation and access management easier. Do not substitute a ChatGPT login token.
+If registration fails with `403 missing required scope api.agents.environments.connect`, check that the executor has the dedicated environment key, not a general API key. This is the cause described in [OpenAI's troubleshooting guide](https://developers.openai.com/cookbook/examples/agents_api/sandboxes/databricks/readme).
+
+Local Claude Code and ChatGPT subscription sign-ins currently connect their accounts only; Bops does not use them to run tasks on this Windows PC. Subscription tasks run on a bot's cloud computer instead. Do not copy a ChatGPT or Claude login token into either API-key setting.
 
 ## 3. Orgo computers — `ORGO_API_KEY`
 
@@ -94,11 +97,11 @@ To use other Ollama models, add them to `config/llms.yaml` with `provider: ollam
 
 ## Composio, Zapier and OpenRouter
 
-**Settings → This Mac → Connections** (below Models) has a row each for Composio (`COMPOSIO_API_KEY`, your connected apps), Zapier (`ZAPIER_MCP_URL`, your Zapier MCP server's address) and OpenRouter (`OPENROUTER_API_KEY`), with where to get each and a **Check** button. They also show in the Keys list. Step by step, including connecting Gmail or Slack and using OpenRouter's free models: [Connect Composio, Zapier and OpenRouter](connections.md).
+**Settings → This PC → Connections** on Windows (**This Mac** on macOS) (below Models) has a row each for Composio (`COMPOSIO_API_KEY`, your connected apps), Zapier (`ZAPIER_MCP_URL`, your Zapier MCP server's address) and OpenRouter (`OPENROUTER_API_KEY`), with where to get each and a **Check** button. They also show in the Keys list. Step by step, including connecting Gmail or Slack and using OpenRouter's free models: [Connect Composio, Zapier and OpenRouter](connections.md).
 
 ## After setup
 
-Restart Bops, check the configured keys in **Settings → This Mac → Keys**, then select the corresponding provider/model in Bops. Keep spending alerts enabled where available, but use an enforced cap when you need requests to stop. Rate limits control request speed; they are not spending budgets.
+Restart Bops, check the configured keys in **Settings → This PC → Keys** on Windows (**This Mac** on macOS), then select the corresponding provider/model in Bops. Keep spending alerts enabled where available, but use an enforced cap when you need requests to stop. Rate limits control request speed; they are not spending budgets.
 
 ## More than one account for a provider
 
@@ -113,7 +116,7 @@ For now, bots' tasks on their computers (OpenCode, DeepSeek Harness) still use t
 
 ## Adding models
 
-Once a key is set, add the provider's models in **Settings → This Mac → Models** (right under Keys). No file editing or restart is needed.
+Once a key is set, add the provider's models in **Settings → This PC → Models** on Windows (**This Mac** on macOS; right under Keys). No file editing or restart is needed.
 
 1. **Add a model** → pick a provider. For **OpenRouter (hundreds of models)**, search its list (for example `qwen coder` or `deepseek`) and click one: the id and a name are filled in, with its price per million tokens. If OpenRouter's list can't be reached, type the id from [openrouter.ai/models](https://openrouter.ai/models), such as `qwen/qwen3-coder-next`.
    For OpenRouter you can also pick, in the same place:
@@ -128,4 +131,4 @@ A model you add or change shows in each chat's model box right away (no reload).
 
 Each row shows whether its provider's key is set on this server (green) or not yet (amber, naming the key). Saving writes `config/llms.yaml`, keeping its comments. That file is tracked by git, so your changes show up as local edits there (`git status`), and an update that also changes it may ask you to keep or merge yours; you can still edit that file by hand (restart Bops after). Bots you have set up in their own AI section keep their own setup.
 
-Provider links and instructions were checked against public official sources on 2026-11-03. Account pages may show a sign-in or JavaScript app shell; that does not verify the controls inside your account. Providers may change their screens, prefixes, prices and billing rules.
+The OpenAI environment-key instructions were rechecked against public official sources on 2026-11-05. Other provider links and instructions were checked on 2026-11-03. Account pages may show a sign-in or JavaScript app shell; that does not verify the controls inside your account. Providers may change their screens, prefixes, prices and billing rules.

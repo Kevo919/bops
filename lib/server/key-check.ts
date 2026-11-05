@@ -11,14 +11,15 @@ export type KeyCheckResult = {
   message?: string;
 };
 
-type Probe = { key: string; label: string; url: string; kind: "openai" | "anthropic" | "models" | "openrouter" | "orgo" | "ollama" | "composio" | "zapier" };
+type Probe = { key: string; label: string; url: string; kind: "openai" | "executor" | "anthropic" | "models" | "openrouter" | "orgo" | "ollama" | "composio" | "zapier" };
 const provider = (route: AgentRoute, url: string, kind: Probe["kind"]): Probe => ({ key: ROUTE_KEYS[route], label: ROUTE_NAMES[route], url, kind });
 // Scope is intentionally these six providers plus the executor, Orgo, Ollama, Composio and Zapier, not every Vault service.
 // Fixed HTTPS destinations: request data and environment overrides cannot redirect a secret. Ollama is the one
 // exception: its address is the owner's own setting, and the only secret sent there is its own (OLLAMA_API_KEY).
 const probes: Probe[] = [
   provider("openai", "https://api.openai.com/v1/chat/completions", "openai"),
-  { key: "OPENAI_EXECUTOR_API_KEY", label: "OpenAI executor", url: "https://api.openai.com/v1/chat/completions", kind: "openai" },
+  // Environment keys only connect executors; model-list/generation calls cannot validate them.
+  { key: "OPENAI_EXECUTOR_API_KEY", label: "OpenAI executor", url: "", kind: "executor" },
   provider("anthropic", "https://api.anthropic.com/v1/models", "anthropic"),
   provider("zai", "https://api.z.ai/api/paas/v4/models", "models"),
   provider("zai-coding-cn", "https://open.bigmodel.cn/api/paas/v4/models", "models"),
@@ -74,7 +75,7 @@ async function payload(response: Response): Promise<Record<string, unknown> | nu
   } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
 }
 
-/** Exactly one outbound request, only after the owner explicitly presses Check. No file writes. */
+/** Provider checks run only on request. The executor check is presence-only: no network or task launch. No file writes. */
 export async function checkKey(key: string): Promise<KeyCheckResult | null> {
   const probe = probeOf(key);
   if (!probe) return null;
@@ -86,6 +87,7 @@ export async function checkKey(key: string): Promise<KeyCheckResult | null> {
   }
   const secret = process.env[key]?.trim();
   if (!secret) return result("not set", "This key is not set in the running server's environment.");
+  if (kind === "executor") return result("set", "A key is set for the executor, but its connection permission has not been verified. Use a dedicated OpenAI environment key. Run a task on this computer to verify it.");
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
   try {
