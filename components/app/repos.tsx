@@ -123,14 +123,15 @@ export function ReposSection() {
 
   if (error && !data)
     return (
-      <p role="alert" className="text-[12.5px] text-[#B00020]">
+      <p role="alert" className="px-[22px] pt-4 text-[12.5px] text-[#B00020]">
         {error}
       </p>
     );
-  if (!data) return <p className="text-[12.5px] text-pencil">Loading the repos…</p>;
+  if (!data) return <p className="px-[22px] pt-4 text-[12.5px] text-pencil">Loading the repos…</p>;
 
   return (
-    <div data-repos className="flex flex-col gap-3">
+    // Settings' own padding, as every other pane's body has it (PaneHead's px-[22px]): flush against the nav and the window's edge without it.
+    <div data-repos className="flex flex-col gap-3 px-[22px] pt-4">
       <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
         <label className="flex items-center gap-2">
           <span className="text-pencil">Runs on</span>

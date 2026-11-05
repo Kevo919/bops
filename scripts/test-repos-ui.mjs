@@ -167,6 +167,14 @@ await act(async () => {
 });
 
 try {
+  await test("it sits inside Settings' padding like every other pane (not flush against the nav and the window's edge)", async () => {
+    const own = box.querySelector("[data-repos]");
+    assert.ok(own, "the section");
+    assert.match(own.getAttribute("class"), /(^|\s)px-\[22px\](\s|$)/, "the same side padding as the pane's heading (PaneHead)");
+    const bops = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
+    assert.match(bops, /function PaneHead[\s\S]{0,200}px-\[22px\]/, "PaneHead still pads by 22px");
+  });
+
   await test("every repo with its name, what it is, its license and its status on the bot's computer", async () => {
     const text = box.textContent;
     for (const w of ["Run a GitHub repo", "God's Eye View", "God's Eye View does things.", "License: MIT", "Paperclip (Kevo919 fork)", "Private", "Boppy's computer", "Nova's computer"]) assert.ok(text.includes(w), `says ${w}`);
