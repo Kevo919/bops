@@ -1,5 +1,5 @@
 # Codex status
-Updated 2026-11-05T05:23:11.8879723Z. Build IN PROGRESS; latest published score 69% (78/113). User authorizes tested/reviewed merges. Lead owns deployment and scoring.
+Updated 2026-11-05T05:23:11.8879723Z. Build IN PROGRESS; latest published score 66% (89.5/136; expanded checklist). User authorizes tested/reviewed merges. Lead owns deployment and scoring.
 
 ## Completed: privacy and Windows SSH source fixes
 - PR62 merged c6d01ef: outside callers cannot invoke ask_teammate to indirectly read MEMORY.md. Chat-entry regression16pass, negativecontrol fails as expected, chattools85pass; typecheck/lint pass. Independent review complete.
@@ -31,4 +31,7 @@ Hourly checkpoint 2026-11-05T07:26:27.6691427Z : Windows still visibly locked; l
 
 
 Hourly checkpoint 2026-11-05T08:24:45.5041225Z : reviewed PR64 at zai request while desktopstilllocked. Changesrequested: fallbackclassification, truthfulprivacyhelp, loopback-onlySpeachesdefault; evidence tests/2026-11-05-0825-codex-voice-local-review.md, messagedzai. Read-onlyreview, no runtimeaudio/Docker tests orsourcechanges; no merge. Leadmobilelayout untouched. Next re-reviewzai followups and resumelivePC afterunlock.
+
+
+Hourlycheckpoint 2026-11-05T09:24:57.2230961Z : PR68 source re-review closes mythreevoicefindings. No livevoiceclaim; timeout/service/UIuntested. Windowsstilllocked; useralreadyaskedunlock. LeadmobilelayoutPR70 andmemoryPR69 merged perremote; notassumeddeployed. Evidence tests/2026-11-05-0925-codex-voice-rereview.md. Noheavywork/merge/restart. Next realPCchecksafterunlock andconfirmcurrentbuild.
 

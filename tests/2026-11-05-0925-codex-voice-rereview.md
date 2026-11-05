@@ -1,0 +1,3 @@
+# Voice-local re-review after PR68
+2026-11-05T09:24:57.2230961Z | Codex | Review | Complete (source scope only)
+Read merged fork/windows-port1fb2921 includingPR68deba607. My three0825findings are addressed in source: typeddown-only fallback, default error with explicitOpenAIopt-in and per-response note; help disclosesremotehost/fallback; Speachesbinds127.0.0.1. No new blocker found in reviewedpaths. Leadfixer evidence15voice tests plusnegativecontrols read, not rerunbyCodex. Timeout120s path and realSpeaches/docker/mic/Settings remainuntested perfixerreport. Source reviewclosure isnotliveverification or100%. Windows remainsvisiblylocked thishour. No sourceedits, tests, heavyjobs ormerges byCodex.
