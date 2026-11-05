@@ -89,6 +89,8 @@ globalThis.fetch = async (input, init = {}) => {
     if (who === "OPENROUTER_API_KEY__PERSONAL_2") return json({ error: { message: "Insufficient credits" } }, 402);
     return who ? json({ choices: [{ message: { role: "assistant", content: `answered on ${who}` } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }) : json({ error: "bad key" }, 401);
   }
+  if (url.host === "api.openai.com" && url.pathname === "/v1/responses")
+    return who ? json({ id: "resp_side", object: "response", model: "gpt-5-side", status: "completed", output: [{ type: "message", id: "msg_1", role: "assistant", status: "completed", content: [{ type: "output_text", text: `answered on ${who}`, annotations: [] }] }], usage: { input_tokens: 1, output_tokens: 1 } }) : json({ error: { message: "bad key" } }, 401);
   if (url.host === "api.openai.com") return who ? json({ choices: [{ message: { content: "." } }] }) : json({ error: { message: "bad" } }, 401);
   throw new TypeError(`offline: ${url.host}`);
 };
@@ -191,6 +193,25 @@ try {
     assert.equal(def.output_text, "answered on OPENROUTER_API_KEY");
     const other = await P.createOnProvider({ model: "openrouter/some/unlisted", input: "hi" });
     assert.equal(other.output_text, "answered on OPENROUTER_API_KEY", "a model not in Your LLMs: the default");
+  });
+
+  await test("an OpenAI LLM with an account chats on that account's key, never the default client; one not set says which line to add", async () => {
+    const extra = L.clean({ llms: [{ name: "GPT side", provider: "openai", model: "gpt-5-side", account: "side" }, { name: "GPT gone", provider: "openai", model: "gpt-5-gone", account: "nope" }, { name: "GPT plain", provider: "openai", model: "gpt-5-plain" }] }, []);
+    assert.equal(extra[0].account, "SIDE", "openai accounts are kept by llms.cjs");
+    A.setLlms([...L.read(temp, () => {}), ...extra]);
+    const used = [];
+    const def = { timeout: 1000, maxRetries: 0, responses: { create: async (p) => (used.push(p.model), { id: "resp_default", output: [], output_text: "default" }) } };
+    asked.length = 0;
+    const side = await P.respond(def, { model: "openai/gpt-5-side", input: "hi" });
+    assert.equal(side.output_text ?? side.output[0].content[0].text, "answered on OPENAI_API_KEY__SIDE");
+    assert.equal(asked.at(-1).url, "https://api.openai.com/v1/responses");
+    assert.equal(asked.at(-1).auth, `Bearer ${SECRETS.OPENAI_API_KEY__SIDE}`);
+    assert.deepEqual(used, [], "the default client (OPENAI_API_KEY or Orgo) isn't used");
+    await assert.rejects(P.respond(def, { model: "openai/gpt-5-gone", input: "hi" }), /The OpenAI \(nope\) account isn't set on this server: add OPENAI_API_KEY__NOPE to \.env\.local/);
+    assert.deepEqual(used, []);
+    await P.respond(def, { model: "openai/gpt-5-plain", input: "hi" });
+    assert.deepEqual(used, ["gpt-5-plain"], "no account: the default client, as before");
+    A.setLlms(L.read(temp, () => {}));
   });
 
   await test("a no names the account (\"OpenRouter (personal 2)\"), and an account that isn't set says which line to add; never a key", async () => {

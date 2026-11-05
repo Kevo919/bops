@@ -1,5 +1,5 @@
 import "server-only";
-import type OpenAI from "openai";
+import OpenAI from "openai";
 import type { Response, ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
 import type { AgentRoute } from "@/lib/agents";
 import { chatKeyName, providerOf } from "@/lib/chat-models";
@@ -446,13 +446,37 @@ export async function createOnProvider(params: Params, opts: { timeoutMs?: numbe
   } as unknown as Response;
 }
 
+/** One OpenAI client per account key (config/llms.yaml account: on an openai LLM), made when first used. */
+const accountClients = new Map<string, OpenAI>();
+function accountClient(base: OpenAI, keyName: string, key: string): OpenAI {
+  const id = `${keyName}\n${key}`;
+  let c = accountClients.get(id);
+  if (!c) {
+    // Straight to OpenAI on that account's own key: never Bops Cloud's proxy or the default key (its billing is the account's).
+    c = new OpenAI({ apiKey: key, timeout: base.timeout, maxRetries: base.maxRetries });
+    for (const k of accountClients.keys()) if (k.startsWith(`${keyName}\n`)) accountClients.delete(k);
+    accountClients.set(id, c);
+  }
+  return c;
+}
+
 /**
  * The one call chat.ts makes for a reply: a model on another provider goes there (createOnProvider), "openai/…"
- * and a plain model name go to OpenAI's Responses API, as before.
+ * and a plain model name go to OpenAI's Responses API, as before. An "openai/…" LLM with an account
+ * (config/llms.yaml account: SIDE) goes on that account's key (OPENAI_API_KEY__SIDE), as other providers' do.
  */
 export function respond(client: OpenAI, params: Params, options?: Parameters<OpenAI["responses"]["create"]>[1]): Promise<Response> {
   const provider = providerOf(String(params.model ?? ""));
   if (provider && provider !== "openai") return createOnProvider(params);
   const model = provider === "openai" ? String(params.model).slice("openai/".length) : params.model;
+  const acct = provider === "openai" ? llms().find((l) => `${l.provider}/${l.model}` === params.model)?.account : undefined;
+  if (acct) {
+    const { keyName, key } = accountKey(chatKeyName("openai"), acct);
+    if (!key)
+      return Promise.reject(
+        new ChatProviderError(`The ${whoOf("openai", acct)} account isn't set on this server: add ${keyName} to .env.local, then restart Bops. Or pick another account for this model in Settings, Models.`, "openai"),
+      );
+    return accountClient(client, keyName, key).responses.create({ ...params, model }, options) as Promise<Response>;
+  }
   return client.responses.create({ ...params, model }, options) as Promise<Response>;
 }

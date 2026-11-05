@@ -64,19 +64,42 @@ const sendInPieces = (o, piece = 4096) => {
   };
   step();
 };
+// --slow-init: initialize is answered late, and anything asked before the initialized notification is an error
+// (as a strict server does), so a client that sends tools/list before the handshake is done is caught.
+const slowInit = process.argv.includes("--slow-init");
+let initialized = false;
+// Bytes, not characters: pieces of 1 byte cut every multibyte character in two across chunks.
+const sendBytes = (o, piece = 1) => {
+  const buf = Buffer.from(JSON.stringify(o) + "\n", "utf8");
+  let i = 0;
+  const step = () => {
+    stdout.write(buf.subarray(i, i + piece));
+    i += piece;
+    if (i < buf.length) setTimeout(step, 1);
+  };
+  step();
+};
 stdin.on("data", (d) => {
   for (const line of d.toString().split("\n")) {
     if (!line.trim()) continue;
     const msg = JSON.parse(line);
-    if (msg.method === "initialize") {
+    if (slowInit && msg.id !== undefined && msg.method !== "initialize" && !initialized) {
+      send({ jsonrpc: "2.0", id: msg.id, error: { code: -32002, message: "asked before the handshake was done" } });
+      continue;
+    }
+    if (msg.method === "initialize" && slowInit) {
+      setTimeout(() => send({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: msg.params.protocolVersion, capabilities: {}, serverInfo: { name: "fake", version: "1" } } }), 400);
+    } else if (msg.method === "initialize") {
       send({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: msg.params.protocolVersion, capabilities: {}, serverInfo: { name: "fake", version: "1" } } });
       send({ jsonrpc: "2.0", method: "notifications/ready" }); // A notification Bops never asked for: to be ignored.
     } else if (msg.method === "notifications/initialized") {
+      initialized = true;
       send({ jsonrpc: "2.0", method: "notifications/seen-init" });
     } else if (msg.method === "tools/list") {
       const page1 = [ { name: "ping", description: "Say pong", annotations: { readOnlyHint: true } }, { name: "log", description: "Write a line" } ];
-      const page2 = [ { name: "boom", description: "Fails on purpose past the cap too", annotations: { readOnlyHint: true } }, { name: "slow", description: "Never answers", annotations: { readOnlyHint: true } }, { name: "wall", description: "A very long answer", annotations: { readOnlyHint: true } }, { name: "chunk", description: "A mid-size answer in small pieces" , annotations: { readOnlyHint: true } }, { name: "flood", description: "A listing far past one chunk " + "f".repeat(100_000), annotations: { readOnlyHint: true } } ];
-      if (msg.params?.cursor === "p2") sendInPieces({ jsonrpc: "2.0", id: msg.id, result: { tools: page2 } });
+      const page2 = [ { name: "boom", description: "Fails on purpose past the cap too", annotations: { readOnlyHint: true } }, { name: "slow", description: "Never answers", annotations: { readOnlyHint: true } }, { name: "wall", description: "A very long answer", annotations: { readOnlyHint: true } }, { name: "chunk", description: "A mid-size answer in small pieces" , annotations: { readOnlyHint: true } }, { name: "flood", description: "A listing far past one chunk " + "f".repeat(100_000), annotations: { readOnlyHint: true } }, { name: "accents", description: "Multibyte text cut mid-character" }, { name: "endless", description: "Never ends its line" } ];
+      // Whole lines in slow-init mode: its test lists twice at once, and two piecewise answers would interleave.
+      if (msg.params?.cursor === "p2") (slowInit ? send : sendInPieces)({ jsonrpc: "2.0", id: msg.id, result: { tools: page2 } });
       else send({ jsonrpc: "2.0", id: msg.id, result: { tools: page1, nextCursor: "p2" } });
     } else if (msg.method === "tools/call") {
       const name = msg.params?.name;
@@ -86,6 +109,14 @@ stdin.on("data", (d) => {
       else if (name === "wall") send({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: "x".repeat(20000) }] } });
       else if (name === "flood") sendInPieces({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: "y".repeat(120_000) }] } }, 8192);
       else if (name === "chunk") sendInPieces({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: "z".repeat(7000) }] } }, 512);
+      else if (name === "accents") sendBytes({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: "héllo wörld 😀 ñ ".repeat(20) }] } }, 1);
+      else if (name === "endless") {
+        // 9 MB and no newline, in 1 MB pieces.
+        const mb = "e".repeat(1024 * 1024);
+        let n = 0;
+        const step = () => { if (n++ < 9) stdout.write(mb, () => setImmediate(step)); };
+        step();
+      }
       // "slow": no answer at all; the client's timeout is what's tested.
     }
   }
@@ -190,6 +221,16 @@ writeFileSync(
     "      env: [MCP_TEST_KEY]",
     "    far:",
     "      url: https://mcp.example.com/mcp",
+    "    slowinit:",
+    "      command: node",
+    `      args: ["${join(bin, "fake-mcp.mjs").replace(/\\/g, "/")}", "--slow-init"]`,
+    // Bops' own names on a brain's computer: never a config server's.
+    "    screen:",
+    "      command: node",
+    `      args: ["${join(bin, "fake-mcp.mjs").replace(/\\/g, "/")}"]`,
+    "    Browser:",
+    "      command: node",
+    '      args: ["-e", "0"]',
     "",
   ].join("\n"),
 );
@@ -231,7 +272,7 @@ async function turnWith(text, items, final = "Ok.") {
 await check("handshake, pages, caps, errors, timeouts, stderr to the log", async () => {
   give(["fake"]);
   const tools = await M.listTools("fake", M.mcpServers().fake);
-  assert.deepEqual(tools.map((t) => t.name), ["ping", "log", "boom", "slow", "wall", "chunk", "flood"], "both pages, in order");
+  assert.deepEqual(tools.map((t) => t.name), ["ping", "log", "boom", "slow", "wall", "chunk", "flood", "accents", "endless"], "both pages, in order");
   assert.equal(tools.find((t) => t.name === "ping").readOnly, true, "the server's own claim is carried (and counted for nothing at ask time)");
   const out = await M.callMcp(bot(), { server: "fake", tool: "ping", arguments: { a: 1 } }, true);
   assert.match(out, /^pong \{"a":1\}/);
@@ -250,6 +291,53 @@ await check("answers far past one pipe chunk survive: stdout is buffered by whol
   assert.equal((await M.callMcp(bot(), { server: "fake", tool: "flood" }, true)).length, 8_000, "a past-cap answer is capped (by design)");
   const out = await M.callMcp(bot(), { server: "fake", tool: "chunk" }, true);
   assert.ok(out.length >= 6_999, `a mid-size answer in 512-byte pieces came back whole (${out.length} chars)`);
+});
+
+await check("UTF-8 cut mid-character across chunks arrives whole (a streaming decoder, not chunk by chunk)", async () => {
+  give(["fake"]);
+  const out = await M.callMcp(bot(), { server: "fake", tool: "accents" }, true);
+  assert.equal(out, "héllo wörld 😀 ñ ".repeat(20));
+  assert.ok(!out.includes("\uFFFD"), "no replacement characters");
+});
+
+await check("a server that never ends its line is stopped past 8 MB, not kept growing", async () => {
+  give(["fake"]);
+  assert.equal(M.LINE_CAP, 8 * 1024 * 1024);
+  const out = await M.callMcp(bot(), { server: "fake", tool: "endless" }, true);
+  assert.match(out, /^Failed: the server sent over 8 MB without ending its line/, out.slice(0, 200));
+  assert.equal(globalThis.__bopsMcpRunning.has("fake"), false, "stopped");
+  assert.match(await M.callMcp(bot(), { server: "fake", tool: "ping" }, true), /^pong/, "and starts again on the next use");
+});
+
+await check("two first uses at once: the second waits for the handshake, never asks before initialize is answered", async () => {
+  give(["slowinit"]);
+  const def = M.mcpServers().slowinit;
+  const [tools, out] = await Promise.all([M.listTools("slowinit", def), M.callMcp(bot(), { server: "slowinit", tool: "ping" }, true)]);
+  assert.ok(tools.some((t) => t.name === "ping"), "the listing came");
+  assert.match(out, /^pong/, `the call went through (${out.slice(0, 80)})`);
+});
+
+await check("Bops' own server names (screen, browser, ingot) are reserved: a config server can't take one", () => {
+  const names = Object.keys(M.mcpServers());
+  assert.ok(!names.includes("screen") && !names.includes("Browser"), names.join(","));
+  assert.ok(names.includes("fake"), "the others are kept");
+  assert.ok(warned.some((w) => /"screen", which is one of Bops' own/.test(w)), "said in the log");
+  for (const n of ["screen", "browser", "ingot"]) assert.ok(M.RESERVED_MCP.has(n), n);
+  // And sessions.ts spreads the bot's servers first, so Bops' own always win.
+  const src = readFileSync(new URL("lib/server/sessions.ts", rootUrl), "utf8");
+  const tools = src.slice(src.indexOf("function brainTools"), src.indexOf("function lostContext"));
+  assert.ok(tools.indexOf("...brainMcp(botId, sessionId)") < tools.indexOf("screen: {"), "brainMcp before screen");
+});
+
+await check("stopping a server on Windows takes its whole tree (taskkill /T /F), never kill() on cmd.exe alone", () => {
+  assert.deepEqual(M.killPlan({ pid: 4242, exitCode: null, signalCode: null }, "win32"), { taskkill: ["/PID", "4242", "/T", "/F"] });
+  assert.equal(M.killPlan({ pid: 4242, exitCode: null, signalCode: null }, "linux"), "kill");
+  assert.equal(M.killPlan({ pid: 4242, exitCode: 0, signalCode: null }, "win32"), "gone");
+  // Every stop (idle, an error, at exit) goes through killServer: no bare proc.kill() left anywhere else.
+  const src = readFileSync(new URL("lib/server/mcp.ts", rootUrl), "utf8");
+  const code = src.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*\*)/.test(l));
+  assert.deepEqual(code.filter((l) => /\.kill\(/.test(l)).map((l) => l.trim()), ['if (plan === "kill") proc.kill();'], "one kill() call, inside killServer");
+  assert.equal((src.match(/killServer\(/g) ?? []).length, 4, "the exit hook, fail, stop, and its definition");
 });
 
 await check("a bare command resolves along PATH with PATHEXT (.exe first, no shell for an .exe)", async () => {
@@ -354,9 +442,18 @@ await check("the chat: a member's turn never sees it either (the owner's keys, t
   else console.error("member turn made no model call (member gate upstream); nothing offered either way");
 });
 
-await check("brains: only key-less local servers reach a computer", async () => {
+await check("brains: only key-less local servers reach a computer, and only on a thread the owner started", async () => {
   give(["fake", "native", "keyed", "far", "dies"]);
-  const merged = M.brainMcp(bot().id);
+  const base = { botId: bot().id, chatId, title: "T", goal: "g", host: "orgo", status: "running", steps: [], replies: [], createdAt: 1 };
+  S.update((s) => {
+    s.sessions.push({ ...base, id: "ses_own", sentVia: "you" });
+    s.sessions.push({ ...base, id: "ses_member", sentVia: "you", member: { userId: "u_mem", name: "Sam" } });
+    s.sessions.push({ ...base, id: "ses_told", sentVia: "you", replies: [{ role: "user", text: "and this", at: 2, member: { userId: "u_mem", name: "Sam" } }] });
+    s.sessions.push({ ...base, id: "ses_out", sentVia: "you", fromOutside: true });
+    s.sessions.push({ ...base, id: "ses_out_part", sentVia: "you", partOf: "ses_out" });
+  });
+  for (const id of ["ses_member", "ses_told", "ses_out", "ses_out_part", "ses_nowhere"]) assert.deepEqual(M.brainMcp(bot().id, id), {}, `none on ${id}`);
+  const merged = M.brainMcp(bot().id, "ses_own");
   assert.deepEqual(Object.keys(merged).sort(), ["dies", "fake", "native"].sort(), "the key-less local ones alone (a dying one still named: it's the bot's own to pick)");
   assert.equal(merged.fake.type, "stdio");
 });
