@@ -40,7 +40,7 @@ import { addMessage, bot, changeLanded, getState, id, ownerName, pullState, sess
  */
 
 /** What a tool call needs the user's OK for, in the request's own words (AppApproval). */
-export type AskSpec = Pick<AppApproval, "action" | "resources" | "preview" | "kind" | "api" | "askedFor" | "repoPlan">;
+export type AskSpec = Pick<AppApproval, "action" | "resources" | "preview" | "kind" | "api" | "askedFor" | "repoPlan" | "onceOnly">;
 
 /** A tool's call needs the user's OK: the engine running it pauses there (askFor). */
 export class NeedsOk extends Error {
@@ -93,6 +93,7 @@ export function askFor(spec: AskSpec, place: AskPlace, resume: AskResume): AppAp
     ...(spec.api ? { api: spec.api } : {}),
     ...(spec.askedFor ? { askedFor: spec.askedFor } : {}),
     ...(spec.repoPlan ? { repoPlan: spec.repoPlan } : {}),
+    ...(spec.onceOnly ? { onceOnly: true } : {}),
     at: Date.now(),
     resume,
   };
@@ -157,6 +158,8 @@ export function replyToAsk(askId: string, reply: AskReply, message?: string, mem
   // A repo's first run (lib/server/repos.ts) is the owner's own yes to that one plan: never a member's, and Always allow counts as once.
   if (a.action === REPO_ASK_ACTION && member) return "Only the owner can approve running a repo.";
   if (a.action === REPO_ASK_ACTION && reply === "always") reply = "once";
+  // One that always asks (AppApproval.onceOnly): a yes is for this call alone, never a rule or the thread.
+  if (a.onceOnly && (reply === "always" || reply === "session")) reply = "once";
   const me = stateDevice();
   const at = Date.now();
   const said = reply === "reject" ? message?.trim().slice(0, 2000) : undefined;
@@ -187,7 +190,7 @@ export function replyToAsk(askId: string, reply: AskReply, message?: string, mem
     const added = alwaysRule(x.action, b.permissions);
     if (added) b.permissions = [...(b.permissions ?? []), added];
     for (const y of s.appApprovals ?? [])
-      if (!y.reply && y.botId === x.botId && y.action !== REPO_ASK_ACTION && ruleFor(b, y.action) === "allow") {
+      if (!y.reply && y.botId === x.botId && y.action !== REPO_ASK_ACTION && !y.onceOnly && ruleFor(b, y.action) === "allow") {
         y.reply = { reply: "always", ...(me ? { by: me } : {}), at, ...(member ? { member } : {}) };
         answered.push(y);
       }

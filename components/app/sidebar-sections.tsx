@@ -221,7 +221,7 @@ function AskCard({ ask: a, botName, where, shared, onOpen }: { ask: AppApproval;
     await post("/api/apps/approvals", { id: a.id, reply });
   };
   const title = `${botName} wants to ${toDo(undash(a.action))}`;
-  const scope = alwaysScope(botName, { ...a, action: undash(a.action) });
+  const scope = a.onceOnly ? "This always asks: each time is a yes for that time only." : alwaysScope(botName, { ...a, action: undash(a.action) });
   const meta = [where ? `For ${undash(where)}` : shared ? "Waiting for an OK" : "Waiting for your OK", ago(a.at)].join(" · ");
   const said = sent && sent.state !== "failed" ? (sent.state === "sending" ? "Sending…" : "Waiting for the owner's Bops to open.") : null;
   const shownError = said ? null : (error ?? (sent?.state === "failed" ? (sent.error ?? "That didn't go. Try again.") : null));
@@ -245,11 +245,13 @@ function AskCard({ ask: a, botName, where, shared, onOpen }: { ask: AppApproval;
         <button disabled={busy} onClick={() => void decide("reject")} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
           Deny
         </button>
-        <button disabled={busy} onClick={() => void decide("always")} title={scope} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
-          Always allow
-        </button>
+        {!a.onceOnly && (
+          <button disabled={busy} onClick={() => void decide("always")} title={scope} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
+            Always allow
+          </button>
+        )}
         {/* A thread's own app or data ask (the kinds that honour it), from the owner's own Bops (members' answers can't scope to a thread). */}
-        {!!a.threadId && !shared && (a.kind === "app" || a.kind === "data") && (
+        {!!a.threadId && !shared && !a.onceOnly && (a.kind === "app" || a.kind === "data") && (
           <button disabled={busy} onClick={() => void decide("session")} title="This thread runs the same thing on without asking again" className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
             For this thread
           </button>

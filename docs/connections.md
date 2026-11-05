@@ -1,10 +1,11 @@
 # Connect Composio, Zapier and OpenRouter
 
-Bops can use three outside accounts of yours. Each one is set up the same way: you get a key (or, for Zapier, a server address) from the service, paste it into `.env.local` on the computer that runs Bops, restart Bops, and press **Check** in **Settings → This Mac → Connections**.
+Bops can use four outside accounts of yours. Each one is set up the same way: you get a key (or, for Zapier, a server address) from the service, paste it into `.env.local` on the computer that runs Bops, restart Bops, and press **Check** in **Settings → This Mac → Connections**.
 
 | Connection | What it gives your bots | What goes in `.env.local` | Where to get it |
 | --- | --- | --- | --- |
 | Composio | Your apps: Gmail, Slack, Notion, Google Sheets and about 1,000 more | `COMPOSIO_API_KEY=` | [composio.dev](https://composio.dev) |
+| Composio (your account) | The apps you already connected yourself in Composio's For You area | `COMPOSIO_MCP_URL=` and, if shown, `COMPOSIO_MCP_KEY=` | Composio, For You, Connect my agent |
 | Zapier | The Zapier actions you pick, in your own chats | `ZAPIER_MCP_URL=` | [mcp.zapier.com](https://mcp.zapier.com) |
 | OpenRouter | Hundreds of AI models for chats and bots, some free | `OPENROUTER_API_KEY=` | [openrouter.ai/keys](https://openrouter.ai/keys) |
 
@@ -28,6 +29,17 @@ Composio keeps the logins to your apps. Bops never sees your app passwords; it o
 5. Press **Connected apps … in Logins** on that row (or open **Settings → Logins**). Pick an app, for example Gmail, Slack, Notion or Google Sheets, choose which bots may use it, and press **Connect**.
 6. The app's own sign in page opens in your browser (on Windows, from the Bops window; if nothing opens, allow pop ups for Bops and press **Try again**). Sign in and allow access. When you see "connected", go back to Bops: the account shows in Logins.
 7. Ask a bot in its chat, for example "find my latest email from Sam" or "add a row to my Leads sheet". Reading runs at once. Anything that sends, creates, changes or pays shows you a request first, with what it will do; nothing happens until you say yes.
+
+## Composio (your account)
+
+Use this when you connected Gmail, Google Drive or other apps in Composio's **For You** area. The Composio row above uses a Platform project key (`ak_...`), and a project only sees the apps connected inside that project, so it can't see the ones you connected in For You.
+
+1. In Composio, open **For You**, then **Connect my agent**.
+2. Copy the address it shows. Composio's docs give it as `https://connect.composio.dev/mcp`.
+3. If the page also shows a key (it starts with `ck_`; it is also under For You, **Settings, Sessions & API Key**), copy that too. Bops sends it as the `x-consumer-api-key` header, only to that address.
+4. In `.env.local`, add `COMPOSIO_MCP_URL=` followed by the address, and, if you have one, `COMPOSIO_MCP_KEY=` followed by the key. Restart Bops and press **Check**: it lists the tools and apps Composio offers.
+
+Bops only uses an address that starts with `https://` and is on `connect.composio.dev`, and refuses a Platform key (`ak_`) here. Like Zapier, it is offered only in your own chats in the Bops app. Reading runs right away; anything that sends, changes, deletes or pays asks you first, and so does running code in Composio's sandbox or changing your connections. The key never leaves this computer's `.env.local`: Settings shows only the host and that a key is saved.
 
 ## Zapier
 
