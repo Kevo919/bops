@@ -50,4 +50,5 @@ In this table, the Bops user id is `bops-<install id>`, because COMPOSIO_USER_ID
 | GitHub (Kevo919/bops) | agents' gh CLI | REST works; GraphQL blocked; Actions on since Nov 5 | 2026-11-05 lead |
 
 ## History
+- 2026-11-05 15:40 UTC, lead: #83 (in review) reaches For You at https://connect.composio.dev/mcp with a `ck_` key (header x-consumer-api-key), per Composio's docs. After it merges, Kevin pastes his For You address and key (task 59 screen), and the lead lists every app and tool it finds here.
 - 2026-11-05 14:50 UTC, lead: file created. The Platform project has auth configs for 5 apps but no live accounts. Kevin's Gmail and Drive are in For You. Task 50 is building "Composio (your account)" via the For You MCP address.
