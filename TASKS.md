@@ -102,6 +102,12 @@ Shared rules for 35–38:
 | 49 | COMPETITORS.md: Bops vs Meta Muse, ChatGPT Dots, Grok Bot and other leaders, with the gaps to work on | lead (research) | IN PROGRESS | | Kevin, Nov 5 |
 | 50 | Composio: use the accounts already connected in Composio (choose which Composio user), once Kevin says which project they're in | lead | WAITING ON KEVIN | | Kevin, Nov 5 |
 | 51 | GitHub checks green again (#79: cron picker test, .gitleaksignore conflict markers, secret scan details) | lead | IN REVIEW (#79) | | |
+| 52 | Gap (COMPETITORS.md #2): built-in Microsoft 365 access (Outlook, Teams, SharePoint, OneDrive) | unassigned | BACKLOG | | M |
+| 53 | Gap #3: edit existing Word/Excel/PowerPoint files in place (keep formulas, pivots, templates) | unassigned | BACKLOG | | M |
+| 54 | Gap #5: learn a task by watching (record a workflow once, save it as a routine) | unassigned | BACKLOG | | M |
+| 55 | Gap #8: video, podcast and voice-over generation | unassigned | BACKLOG | | M |
+| 56 | Gap #9: WhatsApp channel (needs a Meta business account) | unassigned | BACKLOG | | S to M |
+| 57 | Gap #10: shopping and payments with approval | unassigned | BACKLOG | | L, high risk |
 
 ## Merged 2026-11-03 (lead, with Kevin's OK)
 #3, #1, #2, #10, #14, #13, #9, #6, #4, #12, #16. windows-port = 7c52c29. Post-merge checks: tsc 0; bot-ai 25, cli-agents 40, chat-providers 18, chat-tools 84, look 20, config 15, key-check 8, llms 11.

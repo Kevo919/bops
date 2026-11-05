@@ -60,7 +60,7 @@ The overnight ETAs for 80% slipped because the PC was locked, so Codex couldn't 
 
 ## Next
 - Widgets, tabs and pages you can add by asking Boppy, plus an Animations setting in Look (building now)
-- COMPETITORS.md: what Bops has vs Meta Muse, ChatGPT Dots, Grok Bot and others, and the gaps (researching now)
+- [COMPETITORS.md](COMPETITORS.md): what Bops has vs Meta Muse, ChatGPT Dots, Grok Bot and others, and the 12 gaps (done; gaps added to TASKS 52 to 57)
 - No blank screens: an automatic check that opens every page like your PC and fails on blank pages, error text or dead buttons, with a screenshot each; then fixes ("How bots reach you" first) (building now)
 - Dark mode that turns the whole app dark, every screen (Kevin found the sidebar and Settings list stay light) (building now)
 - Settings needs a real "Your phone" item; the pairing card is buried in This PC, and the phone app needs a Scan button (#77, in progress)

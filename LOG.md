@@ -6,6 +6,11 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 8:45 AM (Chicago)
+- **[COMPETITORS.md](COMPETITORS.md) is up:** Bops compared with Meta Muse, ChatGPT Dots, Grok Bot, Claude, Gemini, Copilot, Manus, Perplexity Comet and Lindy, plus 12 ranked gaps. The gaps are on TASKS as 52 to 57; the top ones (PC tasks, phone app, widgets and dark mode) are already being built.
+- **#80** (PC tasks on your Claude plan): the security review asked for changes (2 serious). The builder is fixing them, and a second review follows before merge.
+- **New work items 43 to 51** are on TASKS: phone pairing, PC tasks, dark mode, no blank screens, widgets/tabs/pages by chat, animations, competitors, Composio accounts, and the GitHub checks fix.
+
 ### Nov 5, 8:20 AM (Chicago)
 - **GitHub checks are running again** (thanks, Kevin). They show two problems on the main branch: a schedule-picker test broken by #75, and leftover merge markers in the secret-scan ignore list. Fix: #79.
 - **From Kevin's screenshots:**
