@@ -6,6 +6,17 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 10:35 AM (Chicago)
+- **Merged #77: easy phone pairing.**
+  - On the computer, Settings now has a "Your phone" item with QR codes: get the app, Tailscale, pair.
+  - The phone app has a big Scan QR code button.
+  - Pairing waits until Tailscale is set up, so you never get a "Paired" card no phone can reach.
+  - The new phone app (APK) builds automatically from this merge.
+- **Next to merge:**
+  - #83 Composio (your account): fixes checked, CI running.
+  - #84 in-progress badges: the builder is adding a "Being tested" state.
+  - #85 dark mode everywhere: in review.
+
 ### Nov 5, 10:05 AM (Chicago)
 - **Merged #80: bot tasks on this PC can use your Claude Code Max plan.** Two reviews passed, and all checks are green. Commands, new websites and file reads outside the task folder ask you first; writes outside it are refused. A live test on your PC is next, once it's back online.
 - **#77 phone pairing and #83 Composio (your account):** both reviews asked for small fixes, and the builders are on them.
