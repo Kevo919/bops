@@ -191,7 +191,10 @@ const TAPBACK_EMOJI: Record<string, string> = { love: "❤️", like: "👍", di
 const brief = (t: string) => (t.length > 80 ? `${t.slice(0, 80)}…` : t);
 const textOf = (m: Msg | undefined) => (typeof m?.text === "string" ? m.text : "");
 
-/** A bot message's record of what the bot did for it (deeds in lib/server/chat.ts), "" when nothing. */
+/**
+ * A bot message's record of what the bot did for it (deeds in lib/server/chat.ts), "" when nothing. It goes to the
+ * model as Bops' note after the message (deedNote), never in the bot's own words, so it isn't learned as something to write.
+ */
 function deeds(m: Msg, v: AgentView) {
   const out: string[] = [];
   const title = (id: unknown) => v.sessions.find((s) => s.id === id)?.title;
@@ -200,8 +203,13 @@ function deeds(m: Msg, v: AgentView) {
   if (isObject(m.picture)) out.push(`sent a picture you made, from the prompt "${textOf({ text: m.picture.prompt }).slice(0, 400)}"`);
   if (typeof m.resultOf === "string" && m.resultOf) out.push(`this is the result of the task "${title(m.resultOf) ?? "a task"}"`);
   else for (const id of strings(m.sessionIds)) if (title(id)) out.push(`started the task "${title(id)}"`);
-  return out.length ? `\n[What was done: ${out.join("; ")}]` : "";
+  return out.join("; ");
 }
+/** A message's record (deeds) as the model reads it: Bops' note after the message, not words to copy (chat.ts deedNote). */
+export const deedNote = (whose: string, did: string): InputItem => ({
+  role: "developer",
+  content: `Bops' record of what tools did for ${whose} message above (from tool results, not words to copy): ${did}. Never write a record like this yourself, and never say a task, send or routine happened unless a tool did it in this turn.`,
+});
 
 /**
  * The chat so far, oldest first, as the model's input (history in lib/server/chat.ts): the bot's own
@@ -217,6 +225,7 @@ export function historyInput(messages: Msg[], roots: Map<string, Msg>, v: AgentV
   for (const m of messages) {
     const text = textOf(m);
     let item: InputItem;
+    let did = "";
     if (isObject(m.appResult)) {
       const r = m.appResult;
       item = {
@@ -244,14 +253,15 @@ export function historyInput(messages: Msg[], roots: Map<string, Msg>, v: AgentV
       const quote = root ? `(replying to ${root.role === "user" ? owner : name(root.botId)}: "${brief(textOf(root))}") ` : "";
       const reactions = objects(m.reactions);
       const reacted = reactions.length ? ` [reactions: ${reactions.map((r) => `${name(r.by)} ${typeof r.emoji === "string" ? r.emoji : (TAPBACK_EMOJI[str(r.type)] ?? "")}`.trim()).join(", ")}]` : "";
-      const did = m.role === "bot" ? deeds(m, v) : "";
+      did = m.role === "bot" ? deeds(m, v) : "";
       const via = m.via === "sms" ? "[by text message] " : typeof m.via === "string" && m.via ? `[in ${m.via[0].toUpperCase()}${m.via.slice(1)}] ` : "";
-      let said = `${via}${quote}${text}${reacted}${did}`;
+      let said = `${via}${quote}${text}${reacted}`;
       const pics = Array.isArray(m.images) ? m.images.length : 0;
       if (m.role === "user" && pics) said = `${said || "(an image)"} [${pics === 1 ? "an image" : `${pics} images`} attached, which you can't see from here]`;
       item = m.role === "user" ? { role: "user", content: said } : m.botId === selfId ? { role: "assistant", content: said } : { role: "user", content: `[${name(m.botId)}] ${said}` };
     }
     if (item.content.trim()) items.push(item);
+    if (did && item.content.trim()) items.push(deedNote(m.botId === selfId ? "your" : `${name(m.botId)}'s`, did));
   }
   return items;
 }
