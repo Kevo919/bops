@@ -4,6 +4,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { OpenSettings } from "./open-settings";
 import type { AppState } from "@/lib/types";
 import type { KeyCheckResult } from "@/lib/server/key-check";
+import { InProgress } from "./in-progress";
 
 /*
  * Settings → This Mac → Connections: the outside accounts Bops can use, one row each, in plain words. Composio (your
@@ -150,7 +151,7 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
           const r = rows?.find((x) => x.key === c.key);
           const s = statusOf(r, busy === c.key);
           const checked = r && r.status !== "set" && r.status !== "not set";
-          return (
+          const row = (
             <div key={c.key} data-connection={c.key} className="flex flex-col gap-1 rounded-md px-2.5 py-2 shadow-[0_0_0_1px_#E6E6E3]">
               <div className="flex items-center gap-2">
                 <span data-dot={s.tone} className={`size-[8px] shrink-0 rounded-full ${DOT[s.tone]}`} />
@@ -177,6 +178,14 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
                 )}
               </div>
             </div>
+          );
+          // Being tested (lib/feature-status.ts): usable, marked with its percent until its live check passes.
+          return c.key === "COMPOSIO_MCP_URL" ? (
+            <InProgress key={c.key} id="composio-for-you">
+              {row}
+            </InProgress>
+          ) : (
+            row
           );
         })}
         <a className="text-[12px] underline" href="https://github.com/Kevo919/bops/blob/windows-port/docs/connections.md" target="_blank" rel="noopener noreferrer">Step by step: connecting Composio, Zapier and OpenRouter</a>

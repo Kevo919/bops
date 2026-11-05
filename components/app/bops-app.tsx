@@ -55,6 +55,7 @@ import { PickComputer, useSizePick } from "./computer-size";
 import { AiSubscriptionsCard, PhoneCard, ThisMacSettings, usePhonePairable } from "./setup";
 import { TooltipLayer } from "./tooltip";
 import { LoginsPage } from "./logins";
+import { InProgressRow } from "./in-progress";
 import { MacPreviews } from "./mac-tab";
 import { OPEN_MAC_KEY } from "./mac-pip";
 import { MacComputer } from "./mac-computer";
@@ -2055,6 +2056,9 @@ const GLYPHS: Record<SettingsPane, string> = {
   services: "M5.5 2v3M10.5 2v3M3.5 5h9v2.5a4.5 4.5 0 0 1-9 0zM8 12v2",
 };
 
+/** Widgets (being built: lib/feature-status.ts), for its placeholder in Settings' nav. */
+const WIDGETS_GLYPH = "M2.5 2.5h5v5h-5zM9.5 2.5h4v3h-4zM9.5 7.5h4v6h-4zM2.5 9.5h5v4h-5z";
+
 /** A pane's title and what it's for, above what it holds. */
 function PaneHead({ title, sub }: { title: string; sub?: string }) {
   return (
@@ -2519,6 +2523,8 @@ export function Settings({
         </div>
         {group("Account", "Yours, in every workspace", account)}
         {group("Workspace", shared ? "Shared with you" : "Shared with its people", workspace, switcher)}
+        {/* Being built (lib/feature-status.ts): a placeholder, grayed with its percent, until feature/widgets-by-chat lands. */}
+        {!shared && <InProgressRow id="widgets-by-chat" name="Widgets" icon={glyph(WIDGETS_GLYPH)} className="h-[30px] text-[13px] text-ink max-md:h-11 max-md:text-[15px]" />}
         {team_.length > 0 && group("Orgo team only", null, team_)}
       </nav>
       <main data-settings-pane={pane} className={`${narrow && listing ? "hidden" : "flex"} min-h-0 min-w-0 flex-1 flex-col ${framed ? "" : "overflow-y-auto pb-8"}`}>

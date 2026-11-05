@@ -44,8 +44,6 @@ type Service = {
   summary?: () => string | undefined;
   /** Only on a self-hosted Bops (Bops Cloud doesn't run it): not listed when signed in with Orgo. */
   selfOnly?: boolean;
-  /** Not finished in this build: shown in the in-progress style, its boxes not offered (services.tsx). */
-  pending?: { percent: number; why: string };
 };
 
 /*
@@ -197,8 +195,6 @@ export type ServiceView = {
   check?: CheckWords;
   /** Whether a Check exists for it (a safe read at the provider). */
   canCheck: boolean;
-  /** Not finished in this build: how far along, and why (shown grayed out, "Not set up yet"). */
-  pending?: { percent: number; why: string };
 };
 export type ServicesView = { mode: "self" | "cloud"; editable: boolean; services: ServiceView[] };
 
@@ -218,8 +214,7 @@ const shownSecret = (v: string | undefined) => {
 };
 
 function viewOf(s: Service, owner: boolean, cloud: boolean): ServiceView {
-  const base = { id: s.id, name: s.name, provider: s.provider, what: s.what, getKey: s.getKey, canCheck: !!(s.probe || s.check), ...(s.pending ? { pending: s.pending } : {}) };
-  if (s.pending) return { ...base, status: "off", words: "Not set up yet." };
+  const base = { id: s.id, name: s.name, provider: s.provider, what: s.what, getKey: s.getKey, canCheck: !!(s.probe || s.check) };
   if (cloud) {
     const on = s.on();
     return { ...base, status: on ? "on" : "off", words: on ? "Set up. Bops Cloud runs it for you." : "Not on for your account right now. Bops Cloud runs it for you while you're signed in with Orgo." };
@@ -259,7 +254,7 @@ export async function servicesView(request: Request): Promise<ServicesView> {
 export function saveServiceSetting(id: unknown, name: unknown, value: unknown) {
   const s = serviceOf(id);
   const f = s?.fields.find((x) => x.name === name);
-  if (!s || !f || s.pending) throw new EnvLocalError("Choose one of the services on this screen.");
+  if (!s || !f) throw new EnvLocalError("Choose one of the services on this screen.");
   if (typeof value !== "string") throw new EnvLocalError("Paste the key as text.");
   const v = value.trim();
   if (!v) throw new EnvLocalError(f.secret ? "Paste the key first." : "Type the address first.");
@@ -282,7 +277,7 @@ async function drain(response: Response) {
  */
 export async function checkService(id: unknown, fetcher: typeof fetch = fetch): Promise<CheckWords | null> {
   const s = serviceOf(id);
-  if (!s || s.pending || !(s.probe || s.check)) return null;
+  if (!s || !(s.probe || s.check)) return null;
   const value = savedValue(s.fields[0].name);
   const done = (c: CheckWords) => (checks.set(s.id, { ...c, of: fingerprint(value ?? "") }), c);
   if (!value) return done({ ok: false, status: "not set", words: "No key is saved yet." });

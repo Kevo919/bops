@@ -53,13 +53,12 @@ export function ServicesSettings({ focus }: { focus?: { id: ServiceRow; at: numb
   }, [view, focus]);
   if (error && !view) return <p role="alert" className="px-[22px] pt-4 text-[12.5px] text-[#B00020]">{error}</p>;
   if (!view) return <p className="px-[22px] pt-4 text-[12.5px] text-[#6B6B6B]">Checking your services…</p>;
-  const ready = view.services.filter((s) => !s.pending);
-  const on = ready.filter((s) => s.status === "on").length;
+  const on = view.services.filter((s) => s.status === "on").length;
   return (
     <div data-services className="flex flex-col gap-2 px-[22px] pt-4">
       <div className="flex flex-col gap-0.5">
         <span className="text-[13px] font-semibold">
-          {on} of {ready.length} set up
+          {on} of {view.services.length} set up
         </span>
         <span className="text-[12px] leading-4 text-[#6B6B6B]">
           {view.mode === "cloud"
@@ -70,20 +69,23 @@ export function ServicesSettings({ focus }: { focus?: { id: ServiceRow; at: numb
         </span>
       </div>
       {view.services.map((s) =>
-        s.pending ? (
-          <div key={s.id} id={serviceAnchor(s.id)} data-service={s.id} data-status="pending" className="scroll-mt-4">
-            <InProgress title={s.name} line={`${s.what} ${s.pending.why}`} percent={s.pending.percent} />
-          </div>
+        // Composio (your account) is in lib/feature-status.ts as being tested: usable, with #84's red label.
+        s.id === "composio-account" ? (
+          <InProgress key={s.id} id="composio-for-you">
+            <ServiceCard s={s} editable={view.editable} focused={focus?.id === s.id} onView={setView} />
+          </InProgress>
         ) : (
           <ServiceCard key={s.id} s={s} editable={view.editable} focused={focus?.id === s.id} onView={setView} />
         ),
       )}
       {view.mode === "self" && (
-        <InProgress
-          title="Proving your mobile number (texted codes)"
-          line="So a text from your phone counts as you, Bops texts a code through Twilio Verify. Its keys can't be added here yet: they still go in .env.local (TWILIO_VERIFY_SERVICE_SID and an API key)."
-          percent={0}
-        />
+        // Not built yet (lib/feature-status.ts, "phone-verify-codes"): grayed, red "Not set up yet", its percent.
+        <InProgress id="phone-verify-codes">
+          <div className="flex flex-col gap-1 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+            <span className="text-[13.5px] font-semibold leading-[18px]">Proving your mobile number</span>
+            <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">So a text from your phone counts as you, Bops texts you a code through Twilio Verify. Its keys can&apos;t be pasted here yet.</span>
+          </div>
+        </InProgress>
       )}
     </div>
   );

@@ -328,6 +328,12 @@ await test("each 'not set up yet' note links to its own row in Services, never t
   assert.match(pane, /export const serviceAnchor = \(id: ServiceRow\) => `service-\$\{id\}`/);
   assert.match(pane, /id=\{serviceAnchor\(s\.id\)\}/);
   assert.match(app, /<ServicesSettings focus=\{service && atAt \? \{ id: service, at: atAt \} : undefined\} \/>/);
+  // What isn't built yet goes through #84's in-progress badge and its registry, not a look of its own.
+  assert.match(pane, /<InProgress id="phone-verify-codes">/);
+  assert.match(pane, /<InProgress key=\{s\.id\} id="composio-for-you">/);
+  const { FEATURES_IN_PROGRESS } = await import("../lib/feature-status.ts");
+  const verify = FEATURES_IN_PROGRESS.find((f) => f.id === "phone-verify-codes");
+  assert.deepEqual([verify?.state, verify?.percent], ["building", 0]);
   // (b) the memory route reads the cloud session before deciding memory is off.
   const memRoute = at("app/api/memory/route.ts");
   assert.ok(memRoute.indexOf("await cloudSession()") > 0 && memRoute.indexOf("await cloudSession()") < memRoute.indexOf("if (!memoryOn()) return Response.json({ off: true"));
