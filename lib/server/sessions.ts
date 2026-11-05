@@ -2275,10 +2275,12 @@ function brainTools(sessionId: string, botId: string, display: number, browser: 
   const env = { DISPLAY: `:${display}` };
   return {
     mcpServers: {
+      // The bot's own MCP servers (lib/server/mcp.ts): the key-less ones, so nothing secret reaches the computer, and
+      // only on a thread the owner started (a brain's calls don't ask, as call_mcp's do). First, so Bops' own below
+      // always win (mcp.ts RESERVED_MCP keeps a config server from taking their names at all).
+      ...brainMcp(botId, sessionId),
       screen: { type: "stdio", command: "/opt/bops/venv/bin/python", args: ["/opt/bops/screen_mcp.py", "stdio", "--session", sessionId, "--bot", botId, ...(approve ? ["--approve"] : [])], env },
       ...(browser ? { browser: { type: "stdio", command: "/usr/bin/node", args: [BROWSER_MCP, "--cdp-endpoint", `http://127.0.0.1:${9200 + display}`, "--init-page", BROWSER_FRONT], env } } : {}),
-      // The bot's own MCP servers (lib/server/mcp.ts): the key-less ones, so nothing secret reaches the computer.
-      ...brainMcp(botId),
       // A task on one of the workspace's apps (work_on_app): Ingot's tools, for the app's repo on this computer.
       ...appMcp(sessionId),
     },

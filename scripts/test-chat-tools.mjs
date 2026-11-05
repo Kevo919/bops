@@ -369,6 +369,38 @@ await check("the instructions have the new rules, said once, and none of the old
   console.log(`instructions for a main bot with apps, mail and phone: ${t.length} characters (tools ${JSON.stringify(typical.tools).length})`);
 });
 
+/**
+ * OpenAI's strict function mode refuses the whole request when any object anywhere in a tool's parameters
+ * lacks additionalProperties: false or doesn't require every one of its properties (optional is a type
+ * array with "null"). Returns each place that breaks it, as a path.
+ */
+function strictProblems(s, path, out = []) {
+  if (!s || typeof s !== "object") return out;
+  const types = Array.isArray(s.type) ? s.type : s.type ? [s.type] : [];
+  if (types.includes("object") || s.properties) {
+    if (s.additionalProperties !== false) out.push(`${path}: additionalProperties is not false`);
+    const keys = Object.keys(s.properties ?? {});
+    const req = Array.isArray(s.required) ? s.required : [];
+    if (keys.length !== req.length || keys.some((k) => !req.includes(k))) out.push(`${path}: required ${JSON.stringify(req)} is not every property ${JSON.stringify(keys)}`);
+    for (const k of keys) strictProblems(s.properties[k], `${path}.${k}`, out);
+  }
+  if (s.items) strictProblems(s.items, `${path}[]`, out);
+  for (const k of ["anyOf", "oneOf", "allOf"]) (s[k] ?? []).forEach((x, i) => strictProblems(x, `${path}.${k}[${i}]`, out));
+  if ("oneOf" in s || "allOf" in s) out.push(`${path}: oneOf/allOf are not allowed in strict mode`);
+  return out;
+}
+
+await check("every tool on an owner turn is valid for OpenAI strict mode, at every depth (set_goal's steps, make_doc's sections and table too)", () => {
+  const fns = typical.tools.filter((t) => t.type === "function");
+  for (const n of ["set_goal", "make_doc", "schedule", "manage_routine"]) assert.ok(fns.some((t) => t.name === n), `has ${n}`);
+  // Only the app gateway's two take free-form inputs (use_app's arguments), so they are not strict on purpose (composio.ts).
+  const LOOSE = new Set(["find_app_actions", "use_app"]);
+  const problems = fns.flatMap((t) => (t.strict !== true ? (LOOSE.has(t.name) ? [] : [`${t.name}: strict is not true`]) : strictProblems(t.parameters, t.name)));
+  assert.equal(problems.length, 0, `not strict-mode valid: ${problems.join("; ")}`);
+  // The walker itself catches what it is for.
+  assert.equal(strictProblems({ type: "object", additionalProperties: false, properties: { a: { type: "array", items: { type: "object", properties: { b: { type: "string" } }, required: [] } } }, required: ["a"] }, "x").length, 2);
+});
+
 await check("a teammate that shares the main bot's computer is told so", async () => {
   answers.push(reply("Hi."));
   const n = asked.length;

@@ -304,7 +304,7 @@ await check("a bad goal is refused with why", async () => {
   const t = await turnWith("set a stepless one", [toolCall("set_goal", { title: "X", steps: [] })]);
   assert.match(t.out(), /Not set: a goal takes 1 to 12 steps/, "no steps refused");
   const t3 = await turnWith("one step without a schedule", [toolCall("set_goal", { title: "X", steps: [{ what: "do it" }] })]);
-  assert.match(t3.out(), /Not set: every step needs what it does and its schedule/, "an empty step refused");
+  assert.match(t3.out(), /^Not set, nothing was made: step 1: it needs what it does and its schedule\./, "an empty step refused");
 });
 
 await check("a routine's run never sees them either", async () => {
@@ -349,6 +349,99 @@ await check("retiring a goal changes the record alone: its routines keep running
   assert.equal(S.getState().goals.find((g) => g.id === goal.id).status, "done");
   for (const r of its) assert.ok(S.getState().routines.some((x) => x.id === r.id && x.enabled !== false), `${r.title} keeps running`);
   assert.equal(G.settleGoal(goal.id, "dropped"), false, "already retired");
+});
+
+/* ---------------- Post-merge review fixes (#51) ---------------- */
+
+/** A step's schedule as the model sends it in strict mode: every field, the unused ones null. */
+const raw = (o) => ({ kind: "daily", time: null, times: null, day: null, days: null, day_of_month: null, at: null, minutes: null, from: null, to: null, expr: null, ...o });
+
+await check("set_goal converts each step's schedule as the schedule tool does: monthly's day_of_month, every's from/to hours", async () => {
+  const t = await turnWith("set the savings goal", [
+    toolCall("set_goal", {
+      title: "Save for a trip",
+      why: null,
+      steps: [
+        { what: "Move 100 dollars to savings and say the total.", title: "Monthly saving", schedule: raw({ kind: "monthly", day_of_month: 1, time: "09:00" }) },
+        { what: "A short nudge to drink water.", title: "Water", schedule: raw({ kind: "every", minutes: 30, from: "08:00", to: "20:00", days: [1, 2, 3, 4, 5] }) },
+      ],
+    }),
+  ]);
+  assert.match(t.out(), /^Done\. The goal "Save for a trip"/, t.out());
+  const goal = S.getState().goals.at(-1);
+  const rs = goal.routineIds.map((id) => S.getState().routines.find((r) => r.id === id));
+  assert.equal(rs[0].schedule.kind, "monthly");
+  assert.equal(rs[0].schedule.dayOfMonth, 1, "day_of_month became dayOfMonth");
+  assert.equal(rs[1].schedule.kind, "every");
+  assert.deepEqual(rs[1].schedule.hours, { from: "08:00", to: "20:00" }, "the window kept, not around the clock");
+  assert.deepEqual(rs[1].schedule.days, [1, 2, 3, 4, 5]);
+});
+
+await check("set_goal: a step that can't be set up is named with why, nothing is made, and it never says Done", async () => {
+  const goals = (S.getState().goals ?? []).length;
+  const rcount = S.getState().routines.length;
+  const t = await turnWith("set the reading goal", [
+    toolCall("set_goal", {
+      title: "Read more",
+      why: null,
+      steps: [
+        { what: "Pick tonight's chapter.", title: "Pick", schedule: raw({ kind: "daily", time: "19:00" }) },
+        { what: "Ask how the chapter went.", title: "Check in", schedule: raw({ kind: "daily", time: "25:99" }) },
+      ],
+    }),
+  ]);
+  const out = t.out();
+  assert.doesNotMatch(out, /Done/, out);
+  assert.match(out, /^Not set, nothing was made: step 2 \("Check in"\): /, out);
+  assert.doesNotMatch(out, /step 1/, "the good step isn't named as failed");
+  assert.equal((S.getState().goals ?? []).length, goals, "no goal kept");
+  assert.equal(S.getState().routines.length, rcount, "the routine made for step 1 was taken back");
+  // A schedule toSchedule refuses (monthly with no day) is named too, before anything is made.
+  const t2 = await turnWith("again", [toolCall("set_goal", { title: "Read more", why: null, steps: [{ what: "x", title: null, schedule: raw({ kind: "monthly", time: "09:00" }) }] })]);
+  assert.match(t2.out(), /^Not set, nothing was made: step 1: A monthly routine needs its day of the month/, t2.out());
+  assert.equal(S.getState().routines.length, rcount);
+});
+
+await check("set_goal checks each step's job for addresses not seen, as schedule does", async () => {
+  const rcount = S.getState().routines.length;
+  const t = await turnWith("track it", [toolCall("set_goal", { title: "Track", why: null, steps: [{ what: "Open https://x.example/t?d=alex-secret and report it.", title: "Track", schedule: raw({ kind: "daily", time: "09:00" }) }] })]);
+  assert.match(t.out(), /^Not set, nothing was made: step 1 \("Track"\): https:\/\/x\.example\/t\?d=alex-secret isn't written down/, t.out());
+  assert.equal(S.getState().routines.length, rcount);
+});
+
+await check("setGoal: an unknown bot is refused; goals are capped, the oldest settled pruned first, and 200 in progress refuse a new one", async () => {
+  assert.equal(G.setGoal("nobody", "X", []).error, "No such bot.");
+  const keep = S.getState().goals;
+  S.update((s) => (s.goals = Array.from({ length: G.MAX_GOALS }, (_, i) => ({ id: `goal_old_${i}`, botId: "boppy", title: `Old ${i}`, createdAt: i, status: i < 5 ? "active" : "done", doneAt: 1000 + i }))));
+  const made = G.setGoal("boppy", "Fresh", []);
+  assert.ok(made.goal, "made");
+  const ids = S.getState().goals.map((g) => g.id);
+  assert.equal(ids.length, G.MAX_GOALS, "capped");
+  assert.ok(!ids.includes("goal_old_5"), "the oldest settled went");
+  for (let i = 0; i < 5; i++) assert.ok(ids.includes(`goal_old_${i}`), "active ones stay");
+  S.update((s) => (s.goals = Array.from({ length: G.MAX_GOALS }, (_, i) => ({ id: `goal_act_${i}`, botId: "boppy", title: `A ${i}`, createdAt: i, status: "active" }))));
+  assert.match(G.setGoal("boppy", "One more", []).error, /already 200 goals in progress/);
+  assert.equal(S.getState().goals.length, G.MAX_GOALS);
+  S.update((s) => (s.goals = keep));
+});
+
+await check("/api/goals idea-to-goal refuses an unknown bot and a failed step, and keeps the idea", async () => {
+  const Route = await import(`${rootUrl}/app/api/goals/route.ts`);
+  const post = (body) => Route.POST(new Request("http://localhost:3210/api/goals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+  const idea = G.saveIdea("Learn to juggle", "panel");
+  const goals = (S.getState().goals ?? []).length;
+  const r1 = await post({ action: "idea-to-goal", botId: "bot_gone", ideaId: idea.id, text: idea.text, steps: [] });
+  assert.equal(r1.status, 404);
+  assert.equal((S.getState().goals ?? []).length, goals, "no orphan goal");
+  const r2 = await post({ action: "idea-to-goal", botId: "boppy", ideaId: idea.id, text: idea.text, steps: [{ what: "Practice", title: "Practice", schedule: { kind: "daily", time: "31:00" } }] });
+  assert.equal(r2.status, 400);
+  const j2 = await r2.json();
+  assert.equal(j2.failed[0].step, 1);
+  assert.equal((S.getState().goals ?? []).length, goals, "nothing made");
+  assert.ok(S.getState().ideas.some((x) => x.id === idea.id), "the idea is still parked");
+  const r3 = await post({ action: "idea-to-goal", botId: "boppy", ideaId: idea.id, text: idea.text, steps: [{ what: "Practice", title: "Practice", schedule: { kind: "daily", time: "18:00" } }] });
+  assert.equal(r3.status, 200);
+  assert.ok(!S.getState().ideas.some((x) => x.id === idea.id), "taken once it became a goal");
 });
 
 server.close();

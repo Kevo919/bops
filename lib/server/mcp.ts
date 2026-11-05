@@ -1,12 +1,12 @@
 import "server-only";
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { bot, getState, ownerName } from "./store";
+import { bot, getState, ownerName, session } from "./store";
 import { allows, NeedsOk } from "./permission";
 import { editBotSettings } from "./bot-settings";
-import { settingsOf, type Bot } from "@/lib/types";
+import { othersThread, settingsOf, type Bot } from "@/lib/types";
 
 /**
  * A bot's own MCP servers (Model Context Protocol): the servers config/bops.yaml names under `mcp:
@@ -36,6 +36,14 @@ const IDLE_MS = 60_000;
 const ANSWER_CAP = 8_000;
 /** The tool list is asked again after this long, so a changed server shows up. */
 const LIST_MS = 5 * 60_000;
+/** The most a server may send without ending its line: past this it's stopped, not kept growing in memory. */
+export const LINE_CAP = 8 * 1024 * 1024;
+/**
+ * Bops' own MCP servers on a brain's computer (sessions.ts brainTools: the screen, the browser, Ingot for an
+ * app's task). A config server can't take one of these names, so it can never stand in for Bops' own (the
+ * screen's carries the approve flag).
+ */
+export const RESERVED_MCP = new Set(["screen", "browser", "ingot"]);
 
 /** require that works both as Bops runs it (Next's server build) and as a plain ESM module (the tests). */
 const configRequire: NodeJS.Require = typeof require === "function" ? require : createRequire(import.meta.url);
@@ -52,7 +60,15 @@ export function mcpServers(): Record<string, McpServerDef> {
     return {};
   }
   const out: Record<string, McpServerDef> = {};
-  if (section && typeof section === "object") for (const [name, def] of Object.entries(section as Record<string, unknown>)) if (def && typeof def === "object") out[name] = def as McpServerDef;
+  if (section && typeof section === "object")
+    for (const [name, def] of Object.entries(section as Record<string, unknown>)) {
+      if (!def || typeof def !== "object") continue;
+      if (RESERVED_MCP.has(name.toLowerCase())) {
+        console.warn(`[mcp] config/bops.yaml names an MCP server "${name}", which is one of Bops' own: left out. Give it another name.`);
+        continue;
+      }
+      out[name] = def as McpServerDef;
+    }
   return out;
 }
 
@@ -84,10 +100,16 @@ export function setBotMcp(s: Parameters<typeof editBotSettings>[0], b: Bot, name
   });
 }
 
-/** The servers a bot's own, for a brain's computer (sessions.ts brainTools): key-less stdio ones only, as its MCP config. */
-export function brainMcp(botId: string): Record<string, { type: "stdio"; command: string; args?: string[] }> {
+/**
+ * The servers a bot's own, for a brain's computer (sessions.ts brainTools): key-less stdio ones only, as its MCP
+ * config. Only on a thread the owner started: a brain calls them with no per-call ask, which the chat's call_mcp
+ * makes (every call asks the owner), so a member's or a stranger's thread (lib/types.ts othersThread) gets none.
+ */
+export function brainMcp(botId: string, sessionId: string): Record<string, { type: "stdio"; command: string; args?: string[] }> {
   const b = bot(botId);
   if (!b) return {};
+  const s = session(sessionId);
+  if (!s || othersThread(s, session)) return {};
   return Object.fromEntries(
     Object.entries(botMcp(b))
       // A key-bearing server can't run there (its keys stay here), and a remote one isn't wired up: both chat only.
@@ -99,17 +121,31 @@ export function brainMcp(botId: string): Record<string, { type: "stdio"; command
 /* ---------------- The stdio client ---------------- */
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: NodeJS.Timeout };
-type Running = { proc: ChildProcess; next: number; pending: Map<number, Pending>; stderr: string; buf: string };
+type Running = { proc: ChildProcess; next: number; pending: Map<number, Pending>; stderr: string; buf: string; ready?: Promise<void> };
+
+/**
+ * How a server's child is stopped. On Windows a .cmd server (the usual npx one) runs under cmd.exe, and
+ * kill() stops cmd.exe alone while the node server under it goes on: its whole tree goes (taskkill /T /F, as
+ * local.ts stopExecutor does). Elsewhere, kill().
+ */
+export function killPlan(proc: Pick<ChildProcess, "pid" | "exitCode" | "signalCode">, platform: NodeJS.Platform = process.platform): { taskkill: string[] } | "kill" | "gone" {
+  if (proc.exitCode !== null && proc.exitCode !== undefined) return "gone";
+  if (proc.signalCode) return "gone";
+  return platform === "win32" && proc.pid ? { taskkill: ["/PID", String(proc.pid), "/T", "/F"] } : "kill";
+}
+function killServer(proc: ChildProcess) {
+  const plan = killPlan(proc);
+  try {
+    if (plan === "kill") proc.kill();
+    else if (plan !== "gone") execFile("taskkill", plan.taskkill, { windowsHide: true }, () => {});
+  } catch {}
+}
 
 /** Live servers, on globalThis so a hot reload doesn't leak children it can no longer reach or kill. */
 const running: Map<string, Running> = ((globalThis as Record<string, unknown>).__bopsMcpRunning ??= new Map()) as Map<string, Running>;
 // And no child outlives Bops itself, whatever happened to a request.
 void process.on("exit", () => {
-  for (const [, r] of running) {
-    try {
-      r.proc.kill();
-    } catch {}
-  }
+  for (const [, r] of running) killServer(r.proc);
 });
 
 /**
@@ -169,8 +205,12 @@ function spawnServer(def: McpServerDef, env: NodeJS.ProcessEnv): ChildProcess {
  * a server that fails the handshake (or never starts) is killed and forgotten, not left running.
  */
 async function start(name: string, def: McpServerDef): Promise<Running> {
+  // A second caller while the first is still shaking hands waits for it: nothing is sent before initialize is answered.
   const already = running.get(name);
-  if (already) return already;
+  if (already) {
+    await already.ready;
+    return already;
+  }
   if (def.url) throw new Error(`The MCP server "${name}" is a remote one (a web address), and remote MCP servers aren't wired up yet. Run it locally as a command, or wait for that.`);
   if (!def.command) throw new Error(`The MCP server "${name}" has no command to run.`);
   let r: Running;
@@ -187,10 +227,18 @@ async function start(name: string, def: McpServerDef): Promise<Running> {
     });
     // Stdout arrives in chunks that cut lines anywhere: buffer, and answer only whole lines, so a long
     // reply (a big tools/list, a whole file) survives the pipe instead of ending as a lost half.
-    proc.stdout!.on("data", (d: Buffer) => {
-      r.buf += d.toString();
+    // Decoded as a stream, so a character cut across two chunks arrives whole (not two broken halves).
+    proc.stdout!.setEncoding("utf8");
+    proc.stdout!.on("data", (d: string) => {
+      r.buf += d;
       const lines = r.buf.split("\n");
       r.buf = lines.pop() ?? "";
+      // A line that never ends (a broken server) isn't kept growing: past the cap the server is stopped, plainly.
+      if (r.buf.length > LINE_CAP) {
+        r.buf = "";
+        lines.length = 0;
+        fail(r, new Error(`the server sent over ${LINE_CAP / 1024 / 1024} MB without ending its line`));
+      }
       for (const line of lines) {
         if (!line.trim()) continue;
         let msg: { id?: number; result?: unknown; error?: { message?: string } };
@@ -207,8 +255,8 @@ async function start(name: string, def: McpServerDef): Promise<Running> {
         else p.resolve(msg.result);
       }
     });
-    await request(r, "initialize", { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: "bops", version: "1" } });
-    notify(r, "notifications/initialized");
+    r.ready = request(r, "initialize", { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: "bops", version: "1" } }).then(() => notify(r, "notifications/initialized"));
+    await r.ready;
   } catch (e) {
     stop(name);
     throw e;
@@ -242,9 +290,7 @@ function fail(r: Running, e: Error) {
   }
   r.pending.clear();
   for (const [name, x] of running) if (x === r) running.delete(name);
-  try {
-    r.proc.kill();
-  } catch {}
+  killServer(r.proc);
 }
 
 /** Stop a server now (its config changed, or it's done for). */
@@ -252,9 +298,7 @@ function stop(name: string) {
   const r = running.get(name);
   if (!r) return;
   running.delete(name);
-  try {
-    r.proc.kill();
-  } catch {}
+  killServer(r.proc);
 }
 
 /** Use a server: started if need be, and its idle clock pushed back while it's used. */

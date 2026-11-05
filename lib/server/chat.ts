@@ -46,7 +46,7 @@ import { createSkill, findSkill, readSkill, skillRefId, skillsNote, skillText, S
 import { linksFor } from "./channels";
 import { changeLookFromChat } from "./look";
 import { REPO_TOOL_NAMES, repoTool, repoToolSpecs } from "./repos";
-import { saveIdea, setGoal } from "./goals";
+import { saveIdea, setGoal, type GoalStep } from "./goals";
 import { botMcp, callMcp, mcpNote } from "./mcp";
 import { markSeen } from "./presence";
 import { chose, decide, yes, type Answer } from "./decide";
@@ -2073,14 +2073,16 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
               steps: {
                 type: "array",
                 description: "The agreed steps, in order. Each becomes a routine that runs on its schedule.",
+                // Strict mode (fn): every object at every depth says additionalProperties: false and requires all its fields.
                 items: {
                   type: "object",
+                  additionalProperties: false,
                   properties: {
                     what: { type: "string", description: "What each run does, as a complete instruction to you (the routine's job)." },
                     title: { type: ["string", "null"], description: "A short label for it (\"Morning stretch\"). Null: made from what." },
                     schedule: SCHEDULE_PARAMS,
                   },
-                  required: ["what", "schedule"],
+                  required: ["what", "title", "schedule"],
                 },
               },
             }),
@@ -2124,17 +2126,20 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
                 description: "In order. Word: each a headed part of the document. PowerPoint: each one slide. Excel: each a block on one sheet.",
                 items: {
                   type: "object",
+                  additionalProperties: false,
                   properties: {
                     heading: { type: ["string", "null"], description: "The section's heading (the slide's title). Null when it has none." },
                     bullets: { type: ["array", "null"], items: { type: "string" }, description: "Its points, each one line. Null when none." },
                     table: {
                       type: ["object", "null"],
                       description: "A table (on a slide, kept as lines). Null when none.",
+                      additionalProperties: false,
                       properties: { columns: { type: "array", items: { type: "string" } }, rows: { type: "array", items: { type: "array", items: { type: "string" } } } },
                       required: ["columns", "rows"],
                     },
                     notes: { type: ["string", "null"], description: "Speaker notes (a deck), or an aside in italics. Null when none." },
                   },
+                  required: ["heading", "bullets", "table", "notes"],
                 },
               },
             }),
@@ -2724,12 +2729,25 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       if (name === "set_goal") {
         const steps = Array.isArray(a.steps) ? a.steps : [];
         if (!steps.length || steps.length > 12) return "Not set: a goal takes 1 to 12 steps.";
-        const clean = steps.map((x) => {
+        // Each step's schedule as the tool gives it (day_of_month, from/to), made the shape Bops keeps, as the
+        // schedule tool does (toSchedule); and each step's job checked for addresses not seen, as schedule's goal is.
+        const clean: GoalStep[] = [];
+        const wrong: string[] = [];
+        steps.forEach((x, i) => {
           const o = (x && typeof x === "object" ? x : {}) as { what?: unknown; title?: unknown; schedule?: unknown };
-          return { what: String(o.what ?? ""), schedule: o.schedule as Schedule, ...(typeof o.title === "string" && o.title.trim() ? { title: o.title } : {}) };
-        }).filter((x) => x.what.trim() && x.schedule);
-        if (clean.length !== steps.length) return "Not set: every step needs what it does and its schedule.";
+          const what = String(o.what ?? "").trim();
+          const title = typeof o.title === "string" && o.title.trim() ? o.title : undefined;
+          const label = `step ${i + 1}${title ? ` ("${title.trim().slice(0, 80)}")` : ""}`;
+          if (!what || !o.schedule) return void wrong.push(`${label}: it needs what it does and its schedule.`);
+          const sch = toSchedule(o.schedule as RawSchedule);
+          if ("error" in sch) return void wrong.push(`${label}: ${sch.error}`);
+          const why = unseen(what);
+          if (why) return void wrong.push(`${label}: ${why} Or write it without the address.`);
+          clean.push({ what, schedule: sch.schedule, ...(title ? { title } : {}) });
+        });
+        if (wrong.length) return `Not set, nothing was made: ${wrong.join(" ")} Fix those and call set_goal again with every step.`;
         const made = setGoal(botId, String(a.title ?? ""), clean, typeof a.why === "string" ? a.why : undefined);
+        if ("error" in made) return `Not set, nothing was made: ${made.error}${made.failed.length ? " Fix those and call set_goal again with every step." : ""}`;
         notes.push(`Goal set: ${made.goal.title} (${made.said})`);
         return `Done. The goal "${made.goal.title}" is set with its routines: ${made.said}. They run on their schedules; ${owner} can stop any of them in Routines, and mark the goal done in the Ideas tab when they reach it.`;
       }

@@ -1,6 +1,6 @@
 import "server-only";
-import { id, update } from "./store";
-import { createRoutine, describeSchedule } from "./routines";
+import { bot, getState, id, update } from "./store";
+import { createRoutine, deleteRoutine, describeSchedule } from "./routines";
 import type { Goal, Idea, Schedule } from "../types";
 
 /**
@@ -18,17 +18,48 @@ export type GoalStep = { what: string; schedule: Schedule; title?: string };
 /** How often at most the feed keeps ideas: ninety days is a long parking lot. */
 const KEEP_IDEAS = 90;
 
-/** What making a goal says, for the bot to tell the owner: the goal and each routine in words. */
-export function setGoal(botId: string, title: string, steps: GoalStep[], why?: string): { goal: Goal; said: string } {
+/** At most this many goals are kept; the oldest settled (done or dropped) ones go first. */
+export const MAX_GOALS = 200;
+
+/** A step that couldn't be set up: which one (from 1), its label, and why, in words the bot can fix and call again with. */
+export type StepFailure = { step: number; title: string; error: string };
+
+/**
+ * Make a goal and its routines, all or nothing: when any step's routine can't be set up, the ones made
+ * for it are taken back and no goal is kept, so the bot is told which steps failed and why and can call
+ * again with every step (never a goal said to be set while some of its routines don't exist, and no
+ * doubles on the second try). What it says on success is the goal and each routine in words.
+ */
+export function setGoal(botId: string, title: string, steps: GoalStep[], why?: string): { goal: Goal; said: string } | { error: string; failed: StepFailure[] } {
+  if (!bot(botId)) return { error: "No such bot.", failed: [] };
+  const name = title.trim().slice(0, 160);
+  if (!name) return { error: "A goal needs its title.", failed: [] };
+  const settled = (getState().goals ?? []).filter((g) => g.status !== "active").length;
+  if ((getState().goals ?? []).length - settled >= MAX_GOALS) return { error: `There are already ${MAX_GOALS} goals in progress. Mark some done or dropped in the Ideas tab first.`, failed: [] };
   const made: { routineId: string; line: string }[] = [];
-  const goal: Goal = { id: id("goal"), botId, title: title.trim().slice(0, 160), ...(why?.trim() ? { why: why.trim().slice(0, 400) } : {}), createdAt: Date.now(), status: "active" };
-  for (const s of steps.slice(0, 12)) {
-    const r = createRoutine(botId, (s.title ?? s.what).replace(/\s+/g, " ").trim().slice(0, 80), s.what.trim().slice(0, 2000), s.schedule);
+  const failed: StepFailure[] = [];
+  steps.slice(0, 12).forEach((s, i) => {
+    const label = (s.title ?? s.what).replace(/\s+/g, " ").trim().slice(0, 80);
+    const r = createRoutine(botId, label, s.what.trim().slice(0, 2000), s.schedule);
     if (r.routine) made.push({ routineId: r.routine.id, line: `${r.routine.title} · ${describeSchedule(r.routine.schedule)}` });
+    else failed.push({ step: i + 1, title: label, error: r.error ?? "Bops couldn't set it up." });
+  });
+  if (failed.length) {
+    for (const m of made) deleteRoutine(m.routineId);
+    return { error: failed.map((f) => `step ${f.step} ("${f.title}"): ${f.error}`).join(" "), failed };
   }
-  goal.routineIds = made.map((m) => m.routineId);
+  const goal: Goal = { id: id("goal"), botId, title: name, ...(why?.trim() ? { why: why.trim().slice(0, 400) } : {}), createdAt: Date.now(), status: "active", routineIds: made.map((m) => m.routineId) };
   update((s) => {
-    (s.goals ??= []).push(goal);
+    const all = [...(s.goals ?? []), goal];
+    // Over the cap: the oldest settled goals go first (an active one is never dropped here; see the check above).
+    let over = all.length - MAX_GOALS;
+    const drop = new Set<string>();
+    for (const g of [...all].filter((x) => x.status !== "active").sort((a, b) => (a.doneAt ?? a.createdAt) - (b.doneAt ?? b.createdAt))) {
+      if (over <= 0) break;
+      drop.add(g.id);
+      over--;
+    }
+    s.goals = all.filter((g) => !drop.has(g.id));
   });
   const said = made.length ? made.map((m) => m.line).join("; ") : "no routines (it's a goal to keep in view)";
   return { goal, said };

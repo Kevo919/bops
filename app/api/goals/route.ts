@@ -1,5 +1,6 @@
 import { notReady } from "@/lib/server/ready";
 import { saveIdea, setGoal, settleGoal, takeIdea } from "@/lib/server/goals";
+import { bot } from "@/lib/server/store";
 import { fromThisMac } from "@/lib/server/owner-email";
 import { fromBopsWindow } from "@/lib/server/ui-token";
 import type { Schedule } from "@/lib/types";
@@ -51,7 +52,11 @@ export async function POST(request: Request) {
     case "idea-to-goal": {
       const steps = (b.steps ?? []).map((s) => ({ what: String(s.what ?? ""), schedule: s.schedule, ...(typeof s.title === "string" && s.title.trim() ? { title: s.title } : {}) })).filter((s) => s.what.trim() && s.schedule) as { what: string; schedule: Schedule; title?: string }[];
       if (!b.botId) return Response.json({ error: "Say which bot's goal it is." }, { status: 400 });
+      // Never a goal for a bot that isn't there (an orphan record nobody sees).
+      if (!bot(b.botId)) return Response.json({ error: "No such bot." }, { status: 404 });
       const made = setGoal(b.botId, (b.text ?? "").trim().slice(0, 160), steps.slice(0, 12));
+      // A step that couldn't be set up: nothing made, the idea kept, and which steps and why said back.
+      if ("error" in made) return Response.json({ error: made.error, failed: made.failed }, { status: 400 });
       void takeIdea(b.ideaId ?? "");
       return Response.json({ goal: made.goal, said: made.said });
     }
