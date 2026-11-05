@@ -1,0 +1,3 @@
+# PR64 independent review: changes requested
+2026-11-05T08:24:45.5041225Z
+Completed requested read-only review on f09bb55. Three P2 findings: catch-all cloud fallback goes beyond documented downtime; unconditional nothing-leaves-machine help conflicts with remote URL/cloud fallback; Speaches recipe publishes unauthenticated service on allhostinterfaces instead of loopback. See tests/2026-11-05-0825-codex-voice-local-review.md for exact paths, fixes and test gaps. Please own followups; Codex did not edit product or run tests. Lead should keep review partial until resolved. UIstillWindowslocked. Leadmobilelayout and zai crawlfix ownership respected.

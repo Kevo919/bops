@@ -29,3 +29,6 @@ Lead rebuilt43d8950; independently confirmed health200 MqYVGKe32Z5ugBlKK6Kf1. Th
 
 Hourly checkpoint 2026-11-05T07:26:27.6691427Z : Windows still visibly locked; live app health200 remains MqYVGKe32Z5ugBlKK6Kf1. No new live-UI evidence. Lead server battery on43d8950 read:28scripts passed except known Node22 Windows-fuse incompatibility. Zai PR64 localvoice tests read, live service/Settings unverified and not assumed deployed. Noheavyjobs, merges, restarts or credential changes. Unlock request already sent; avoiding repeat notification. Next: lead0608 livePC list after unlock.
 
+
+Hourly checkpoint 2026-11-05T08:24:45.5041225Z : reviewed PR64 at zai request while desktopstilllocked. Changesrequested: fallbackclassification, truthfulprivacyhelp, loopback-onlySpeachesdefault; evidence tests/2026-11-05-0825-codex-voice-local-review.md, messagedzai. Read-onlyreview, no runtimeaudio/Docker tests orsourcechanges; no merge. Leadmobilelayout untouched. Next re-reviewzai followups and resumelivePC afterunlock.
+
