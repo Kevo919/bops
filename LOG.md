@@ -6,6 +6,11 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 10:45 AM (Chicago)
+- **The PC is back online.** Bops was rebuilt with everything merged today and restarted: the Memory message, GitHub checks green, no blank screens, PC tasks on your Claude plan, phone pairing, and Composio (your account) (#83, merged).
+- **The new phone app is published** with the Scan QR code button. It was sent to Kevin in chat.
+- **Codex's live tests** start now, in priority order.
+
 ### Nov 5, 10:35 AM (Chicago)
 - **Merged #77: easy phone pairing.**
   - On the computer, Settings now has a "Your phone" item with QR codes: get the app, Tailscale, pair.
