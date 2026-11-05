@@ -63,7 +63,7 @@ import { watching } from "./presence";
 import { computerOutOfCredit, freeHoursUsed, sayInUse, START_SAY_MS, wakeForUser } from "./free-hours";
 import { brainById, ensureBrainTools, signInStatus } from "./brains";
 import { alsoSpec, brainName, BrainStopped, claudeDriver, cliCompact, cliDriver, cliTurn, closeCli, closeTerminal, limitPick, openRun, openShell, openTerminal, pcClaudeThreads, signInWords, stoppedWords } from "./cli-agents";
-import { claudeMcpConfig, claudeTaskCommand, executorWords, PC_WORDS, runClaudeTurn } from "./pc-task-runner";
+import { claudeMcpConfig, claudeSupportsTasks, claudeTaskCommand, executorWords, PC_WORDS, runClaudeTurn } from "./pc-task-runner";
 import { pcRunnerNow } from "./pc-task-setting";
 import { localSubscriptionRuntime } from "./local-subscriptions";
 import { aiOf, hasProfile, hasTerminal, isCli, pickAgent, threadAgent, type AgentRun } from "@/lib/agents";
@@ -2232,9 +2232,17 @@ function agentBrief(
  * cloud brain's do (cli-agents.ts claudeDriver). What it can't do here (the owner's other apps, the desktop) it's told,
  * and says. Nothing of it is on AI credit, and no key goes to it: it runs on the plan's own sign in.
  */
+/** An executor's own failure (executor-lifecycle.ts: "Local executor ...") in words that say what to do; any other error as it was, its class kept. */
+function withExecutorWords(e: unknown) {
+  if (e instanceof Error && /^Local executor/.test(e.message)) e.message = executorWords(e.message);
+  return e;
+}
+
 async function pcClaudeTurns(sessionId: string, o: { s: Session; b: Bot; folder: string; port: number; display: number; full: boolean; onMac: boolean; outside: boolean }) {
   const claude = localSubscriptionRuntime("claude");
   if (!claude.file) throw new Error(PC_WORDS.noClaude);
+  // An older Claude Code without the flags that keep a task to its folder and its asks isn't run at all.
+  if (!claudeSupportsTasks(claude.file, claude.env)) throw new Error(PC_WORDS.update);
   prepareTaskDir(sessionId, o.folder, false);
   try {
     writeSkillFiles(o.b.id, join(/*turbopackIgnore: true*/ o.folder, "workspace/capabilities/skills"));
@@ -2265,12 +2273,12 @@ async function pcClaudeTurns(sessionId: string, o: { s: Session; b: Bot; folder:
   const brief = agentBrief(o.s, o.b, { mac: true, display: o.display, apps: false, appTools: false, dataTools: false, full: o.full, onMac: o.onMac, vaultTool: false, ui: false, outside: o.outside, memory: "", count: true, brain: true });
   writeFileSync(
     /*turbopackIgnore: true*/ promptFile,
-    `${brief}\n\nYou run as Claude Code on ${owner}'s PC, for Bops, on ${owner}'s Claude plan. Your working folder is this task's own: keep your files there. Read, Edit and Write work there by themselves; the shell (Bash), a file anywhere else, and a click, typing or a form in the browser ask ${owner} in Bops first and wait for their answer; if they say no, don't do it another way. Your browser tools (mcp__browser__*) drive the bot's own Chrome on this PC. You can't see or control ${owner}'s other apps or the desktop here: if the task needs that, say so plainly in your answer and don't pretend it was done.`,
+    `${brief}\n\nYou run as Claude Code on ${owner}'s PC, for Bops, on ${owner}'s Claude plan. Your working folder is this task's own: keep your files there. Read, Edit and Write work there by themselves, and can't change files anywhere else; the shell (Bash), reading a file elsewhere, WebFetch or opening a new website, and a click, typing or a form in the browser ask ${owner} in Bops first and wait for their answer; if they say no, don't do it another way. Your browser tools (mcp__browser__*) drive the bot's own Chrome on this PC. You can't see or control ${owner}'s other apps or the desktop here: if the task needs that, say so plainly in your answer and don't pretend it was done.`,
     { mode: 0o600 },
   );
   const cli = randomUUID();
   let began = false;
-  pcClaudeThreads.add(sessionId);
+  pcClaudeThreads.set(sessionId, { workspace, origins: new Set(), note: (text) => step(sessionId, "note", text) });
   return {
     close: () => void pcClaudeThreads.delete(sessionId),
     turn: async (input: string) => {
@@ -2283,6 +2291,7 @@ async function pcClaudeTurns(sessionId: string, o: { s: Session; b: Bot; folder:
           input,
           parse: claudeDriver.parse,
           signal: ac.signal,
+          onDenied: (tools) => step(sessionId, "note", `Not approved, so not done: ${tools.join(", ")}`),
           onEvent: (ev) => {
             if (ev.type === "started") {
               began = true;
@@ -3330,8 +3339,8 @@ async function run(sessionId: string) {
       if (folder) {
         // Its skills go in its skills folder as the executor makes the folders fresh; one going on in the same agent
         // session (picked up again after a pause for the user's OK) keeps what it made there.
-        executor = await startExecutor(sessionId, env.id, env.remoteUrl, port, folder, full, b.id, resuming).catch((e: Error) => {
-          throw new Error(executorWords(e.message));
+        executor = await startExecutor(sessionId, env.id, env.remoteUrl, port, folder, full, b.id, resuming).catch((e: unknown) => {
+          throw withExecutorWords(e);
         });
       }
       else {
@@ -3350,8 +3359,8 @@ async function run(sessionId: string) {
       }, () => {
         interrupts.get(sessionId)?.();
         void cancelTurn(agentSessionId);
-      }).catch((e: Error) => {
-        throw folder && e instanceof Error && /^Local executor/.test(e.message) ? new Error(executorWords(e.message)) : e;
+      }).catch((e: unknown) => {
+        throw folder ? withExecutorWords(e) : e;
       });
     }
     step(sessionId, "setup", "At the computer");

@@ -1,7 +1,7 @@
 import "server-only";
-import { spawn, execFile, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { spawn, execFile, execFileSync, type ChildProcess } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { redactDeep } from "@/lib/secret-patterns";
 import { stopOf, type CliEvent } from "./cli-agents";
 
@@ -28,6 +28,7 @@ export const PC_WORDS = {
   down: "Claude isn't answering right now. Try again in a few minutes.",
   model: "Your Claude plan can't use the model Claude Code picked. Check Claude Code's model setting, then try again.",
   openaiRejected: "OpenAI turned down the key for bot tasks on this PC. Check the OpenAI key in Settings, Bot tasks on this PC, and add credit to your OpenAI account, or switch to Your Claude plan (signed in).",
+  update: "Claude Code on this PC is too old for bot tasks. Update it (run claude update), then try again.",
   noScreen: "On Your Claude plan, bot tasks on this PC can use files and the bot's own Chrome. They can't control other apps on this PC yet: for that, switch Bot tasks on this PC to OpenAI key.",
 } as const;
 
@@ -93,42 +94,101 @@ export function saveExecutorKey(file: string, value: string, env: NodeJS.Process
   if (value) kept.push(`${EXECUTOR_KEY}=${value}`);
   mkdirSync(/*turbopackIgnore: true*/ dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(/*turbopackIgnore: true*/ tmp, kept.length ? `${kept.join("\n")}\n` : "", { mode: 0o600 });
-  renameSync(/*turbopackIgnore: true*/ tmp, file);
+  try {
+    writeFileSync(/*turbopackIgnore: true*/ tmp, kept.length ? `${kept.join("\n")}\n` : "", { mode: 0o600 });
+    renameSync(/*turbopackIgnore: true*/ tmp, file);
+  } finally {
+    // A rename that failed leaves no copy of the key behind.
+    rmSync(/*turbopackIgnore: true*/ tmp, { force: true });
+  }
   if (value) env[EXECUTOR_KEY] = value;
   else delete env[EXECUTOR_KEY];
 }
 
 /* ---------------- Claude Code for one task ---------------- */
 
-/** Browser tools that only look or move between pages: they run without asking. */
-export const BROWSER_LOOK_TOOLS = ["browser_navigate", "browser_navigate_back", "browser_snapshot", "browser_find", "browser_tabs", "browser_wait_for", "browser_take_screenshot", "browser_console_messages", "browser_hover"];
 /**
- * What Claude Code may do by itself: read and change files in the task's workspace folder only (paths relative to
- * its working folder), its to do list, web search and reading pages, and the looking browser tools. Everything
- * else (the shell, a file outside the folder, a click, typing, a form, a download, an upload) asks the owner in
- * Bops through the approve tool, and a no, or no answer, is a no.
+ * Browser tools that only look at the page already open: they run without asking. Going to a page (navigate, a new
+ * tab) asks through the approve tool, which lets an origin this task was already allowed through without a card
+ * (pcDecision). A click, typing, a form, a download or an upload always asks.
  */
-export const CLAUDE_AUTO_TOOLS = ["Read(./**)", "Edit(./**)", "MultiEdit(./**)", "Write(./**)", "TodoWrite", "WebSearch", "WebFetch", ...BROWSER_LOOK_TOOLS.map((t) => `mcp__browser__${t}`)];
-/** Never, even with a yes: running a page's own code, and Bops' approve tool called by the model itself. */
+export const BROWSER_LOOK_TOOLS = ["browser_snapshot", "browser_find", "browser_wait_for", "browser_take_screenshot", "browser_console_messages", "browser_hover", "browser_navigate_back"];
+/** Claude Code's own tools a task may have at all (--tools): anything else it has (helpers, worktrees, cron, skills) isn't there. */
+export const CLAUDE_TOOLS = ["Read", "Edit", "MultiEdit", "Write", "Glob", "Grep", "Bash", "WebSearch", "WebFetch", "TodoWrite"];
+/**
+ * What Claude Code may do by itself: web search and the looking browser tools. Everything else goes through the
+ * approve tool: a file tool is let through there only when its target's real path (junctions and links followed)
+ * is inside the task's workspace, a write outside it is refused, a read outside it asks the owner; the shell,
+ * WebFetch and going to a new site ask the owner. A no, or no answer, is a no.
+ */
+export const CLAUDE_AUTO_TOOLS = ["WebSearch", ...BROWSER_LOOK_TOOLS.map((t) => `mcp__browser__${t}`)];
+/**
+ * Never, even with a yes: running a page's own code, and Bops' approve tool called by the model itself (listing it
+ * here hides it from the model; Claude Code still asks through it as its --permission-prompt-tool, checked with the
+ * real CLI 2.1.318).
+ */
 export const CLAUDE_NEVER_TOOLS = ["mcp__browser__browser_run_code_unsafe", "mcp__browser__browser_evaluate", "mcp__bops__approve"];
 /** The approve tool Claude Code asks through (vm/pc-approve-mcp.mjs, as the "bops" server). */
 export const APPROVE_TOOL = "mcp__bops__approve";
+/**
+ * The only settings Claude Code runs with (--settings): no hooks, and the same rules again as permission rules, so
+ * nothing the user's own settings or a plugin could add applies (no setting files are read: --setting-sources "").
+ */
+export const CLAUDE_SETTINGS = {
+  disableAllHooks: true,
+  enableAllProjectMcpServers: false,
+  permissions: {
+    defaultMode: "default",
+    allow: CLAUDE_AUTO_TOOLS,
+    // Read, Glob and Grep too: Claude Code lets them run by itself in its folder, and they go through pcDecision's real path check instead.
+    ask: ["Bash", "WebFetch", "Read", "Edit", "MultiEdit", "Write", "Glob", "Grep"],
+    deny: CLAUDE_NEVER_TOOLS,
+  },
+};
+/** The flags the CLI must know for a task to run on it safely; one that doesn't (an older Claude Code) isn't used. */
+export const REQUIRED_FLAGS = ["--restricted", "--setting-sources", "--settings", "--tools", "--permission-prompt-tool", "--strict-mcp-config", "--disallowedTools"];
+
+const helpChecked = new Map<string, boolean>();
+/** Whether this claude knows every flag in REQUIRED_FLAGS (its --help, once per binary and its change). */
+export function claudeSupportsTasks(claude: string, env: NodeJS.ProcessEnv): boolean {
+  let stamp = claude;
+  try {
+    stamp = `${claude}:${statSync(/*turbopackIgnore: true*/ claude).mtimeMs}`;
+  } catch {
+    return false;
+  }
+  const known = helpChecked.get(stamp);
+  if (known !== undefined) return known;
+  let ok = false;
+  try {
+    const help = execFileSync(claude, ["--help"], { env, encoding: "utf8", timeout: 15_000, windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+    ok = REQUIRED_FLAGS.every((f) => help.includes(f));
+  } catch {
+    ok = false;
+  }
+  helpChecked.set(stamp, ok);
+  return ok;
+}
 
 /**
  * The command for one turn: `claude -p` reading its prompt from stdin, its events as stream-json, in the task's
- * workspace folder, with only the user's own settings (never a project's: a .claude folder the task wrote in its
- * workspace can't loosen this), only Bops' MCP servers, Bops' briefing after its own, and the permission flags.
- * `resume`: its session from this run's earlier turn. The environment is the allowlist local-subscriptions.ts
- * signs in with: no key of Bops', OpenAI's or Anthropic's, so it runs on the signed in plan alone.
+ * workspace folder. --restricted, --setting-sources "" and --settings: no user, project or local settings file is
+ * read (so nothing there can allow a tool, add a hook or a plugin, or set a key in its environment), only these
+ * settings; --tools: only the tools named; only Bops' MCP servers, Bops' briefing after its own, the permission flags.
+ * `resume`: its session from this run's earlier turn. The environment is the allowlist local-subscriptions.ts signs
+ * in with, and nothing named like a key or token: it runs on the signed in plan alone.
  */
 export function claudeTaskCommand(o: { claude: string; env: NodeJS.ProcessEnv; workspace: string; mcpConfig: string; promptFile: string; session: string; resume: boolean }) {
   const args = [
     "-p",
     "--output-format", "stream-json",
     "--verbose",
+    "--restricted",
+    "--setting-sources", "",
+    "--settings", JSON.stringify(CLAUDE_SETTINGS),
+    "--tools", CLAUDE_TOOLS.join(","),
+    "--disable-slash-commands",
     "--permission-mode", "default",
-    "--setting-sources", "user",
     "--strict-mcp-config",
     "--mcp-config", o.mcpConfig,
     "--append-system-prompt-file", o.promptFile,
@@ -138,8 +198,85 @@ export function claudeTaskCommand(o: { claude: string; env: NodeJS.ProcessEnv; w
     ...(o.resume ? ["--resume", o.session] : ["--session-id", o.session]),
   ];
   const env = {} as NodeJS.ProcessEnv;
-  for (const [k, v] of Object.entries(o.env)) if (v !== undefined && !/KEY|TOKEN|SECRET|PASSWORD/i.test(k)) env[k] = v;
+  for (const [k, v] of Object.entries(o.env)) if (v !== undefined && !/KEY|TOKEN|SECRET|PASSWORD|^ANTHROPIC_|^CLAUDE_CODE_/i.test(k)) env[k] = v;
   return { file: o.claude, args, cwd: o.workspace, env };
+}
+
+/* ---------------- What the approve tool decides before asking the owner ---------------- */
+
+/** One running task on Claude Code, as its approve path knows it: its workspace, and the sites the owner allowed it. */
+export type PcThread = { workspace: string; origins: Set<string>; note: (text: string) => void };
+
+const FILE_TOOLS: Record<string, { key: string; writes: boolean }> = {
+  Read: { key: "file_path", writes: false },
+  Glob: { key: "path", writes: false },
+  Grep: { key: "path", writes: false },
+  Edit: { key: "file_path", writes: true },
+  MultiEdit: { key: "file_path", writes: true },
+  Write: { key: "file_path", writes: true },
+  NotebookEdit: { key: "notebook_path", writes: true },
+};
+
+const same = (a: string) => (process.platform === "win32" ? a.toLowerCase() : a);
+/**
+ * Whether `target` (as a file tool named it, relative to the workspace or not) really is inside `workspace`: its
+ * nearest folder that exists, with every link and junction followed (realpath), then the rest of its path, which
+ * doesn't exist yet and so can't be a link. Anything that can't be checked is outside.
+ */
+export function insideWorkspace(workspace: string, target: string): boolean {
+  try {
+    const root = realpathSync.native(/*turbopackIgnore: true*/ workspace);
+    let at = resolve(root, target);
+    const rest: string[] = [];
+    while (!existsSync(/*turbopackIgnore: true*/ at)) {
+      const up = dirname(at);
+      if (up === at) return false;
+      rest.unshift(basename(at));
+      at = up;
+    }
+    const real = join(realpathSync.native(/*turbopackIgnore: true*/ at), ...rest);
+    const rel = relative(same(root), same(real));
+    return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+  } catch {
+    return false;
+  }
+}
+
+const originOf = (u: unknown) => {
+  try {
+    const url = new URL(String(u));
+    return url.protocol === "https:" || url.protocol === "http:" ? url.origin : undefined;
+  } catch {
+    return undefined;
+  }
+};
+/** The site a tool would go to: WebFetch's url, the browser's navigate (or a new tab with one). */
+export const siteOf = (tool: string, input: Record<string, unknown>) =>
+  tool === "WebFetch" || tool === "mcp__browser__browser_navigate" || tool === "mcp__browser__browser_tabs" ? originOf(input.url) : undefined;
+
+/**
+ * What the approve path does for a task's tool before any card: "allow" (a file inside its workspace, a site the
+ * owner already allowed in this task), "deny" with why (a write outside its workspace, a site that isn't a web
+ * page), or "ask" the owner.
+ */
+export function pcDecision(t: Pick<PcThread, "workspace" | "origins">, tool: string, input: Record<string, unknown>): { behavior: "allow" } | { behavior: "deny"; message: string } | { behavior: "ask" } {
+  const file = FILE_TOOLS[tool];
+  if (file) {
+    const target = typeof input[file.key] === "string" && input[file.key] ? String(input[file.key]) : ".";
+    if (insideWorkspace(t.workspace, target)) return { behavior: "allow" };
+    return file.writes ? { behavior: "deny", message: "Files outside this task's folder can't be changed. Keep your work in your working folder." } : { behavior: "ask" };
+  }
+  if (tool === "WebFetch" || tool === "mcp__browser__browser_navigate") {
+    const site = siteOf(tool, input);
+    if (!site) return { behavior: "deny", message: "Only web pages (http or https) can be opened." };
+    return t.origins.has(site) ? { behavior: "allow" } : { behavior: "ask" };
+  }
+  if (tool === "mcp__browser__browser_tabs") {
+    const site = siteOf(tool, input);
+    if (input.action !== "new" && !site) return { behavior: "allow" };
+    return site && t.origins.has(site) ? { behavior: "allow" } : { behavior: "ask" };
+  }
+  return { behavior: "ask" };
 }
 
 /** The MCP servers a task's Claude Code has: Bops' browser tools for the bot's Chrome, and the approve tool. */
@@ -171,13 +308,24 @@ export function claudeFailure(text: string): string {
 /** Stop a turn's Claude Code and whatever it started (on Windows its whole tree: its MCP servers too). */
 export function stopClaude(child: ChildProcess) {
   if (child.exitCode !== null || child.signalCode !== null) return;
-  if (process.platform === "win32" && child.pid) execFile("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true }, () => {});
-  else {
-    const kill = setTimeout(() => child.kill("SIGKILL"), 5000);
-    kill.unref?.();
-    child.once("exit", () => clearTimeout(kill));
-    child.kill();
-  }
+  if (process.platform === "win32" && child.pid) return void execFile("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true }, () => {});
+  // Elsewhere its own process group (spawned detached): Claude Code, its MCP servers and whatever its shell started.
+  const group = (sig: NodeJS.Signals) => {
+    try {
+      if (child.pid) process.kill(-child.pid, sig);
+      else child.kill(sig);
+    } catch {
+      try {
+        child.kill(sig);
+      } catch {
+        /* gone */
+      }
+    }
+  };
+  const kill = setTimeout(() => group("SIGKILL"), 5000);
+  kill.unref?.();
+  child.once("exit", () => clearTimeout(kill));
+  group("SIGTERM");
 }
 
 /** The most a line of Claude Code's output may be, and how long a turn may run at all. */
@@ -193,6 +341,8 @@ export function runClaudeTurn(o: {
   input: string;
   parse: (e: Record<string, unknown>) => CliEvent[];
   onEvent: (e: CliEvent) => void;
+  /** The tools a turn wasn't let use (its result's permission_denials), by name, for the thread to say. */
+  onDenied?: (tools: string[]) => void;
   signal?: AbortSignal;
   timeoutMs?: number;
 }): Promise<{ text: string; session?: string }> {
@@ -201,7 +351,7 @@ export function runClaudeTurn(o: {
     if (!existsSync(o.cmd.cwd)) return reject(new PcTaskError("The task's folder on this PC is missing. Try again."));
     let child: ChildProcess;
     try {
-      child = spawn(o.cmd.file, o.cmd.args, { cwd: o.cmd.cwd, env: o.cmd.env, shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+      child = spawn(o.cmd.file, o.cmd.args, { cwd: o.cmd.cwd, env: o.cmd.env, shell: false, windowsHide: true, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] });
     } catch {
       return reject(new PcTaskError(PC_WORDS.noClaude));
     }
@@ -238,6 +388,8 @@ export function runClaudeTurn(o: {
       } catch {
         return;
       }
+      if (event.type === "result" && Array.isArray(event.permission_denials) && event.permission_denials.length)
+        o.onDenied?.([...new Set(event.permission_denials.map((d) => String((d as { tool_name?: unknown })?.tool_name ?? "a tool").slice(0, 80)))]);
       for (const ev of o.parse(event)) {
         if (ev.type === "started" && ev.session) session = ev.session;
         if (ev.type === "text" && !ev.parent) said = ev.text;

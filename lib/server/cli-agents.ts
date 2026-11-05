@@ -6,6 +6,7 @@ import { BRAINS_ON, CLI_NAMES, live, planName, workspaceOf, type Bot, type Brain
 import { requireCodexPlan, ensureBrainTools, ensureClaudeCode, ensureCodex, ensureDsh, ensureOpenCode, revealBrainKey, revealNamedKey } from "./brains";
 import { KeysError } from "./keys";
 import { heldAsk } from "./permission";
+import { pcDecision, siteOf, type PcThread } from "./pc-task-runner";
 import { orgo } from "./orgo";
 import { bot, getState, ownerName, session } from "./store";
 
@@ -731,8 +732,11 @@ export class BrainStopped extends Error {
   }
 }
 
-/** Threads running now on the owner's Claude plan on this PC (pc-task-runner.ts, sessions.ts pcClaudeTurns): theirs ask through approveTool. */
-export const pcClaudeThreads = new Set<string>();
+/**
+ * Threads running now on the owner's Claude plan on this PC (pc-task-runner.ts, sessions.ts pcClaudeTurns): theirs ask
+ * through approveTool, which checks a file tool's real path and a site against what the owner allowed first (pcDecision).
+ */
+export const pcClaudeThreads = new Map<string, PcThread>();
 
 /** Approvals a thread's CLI is waiting on, by thread: its turn isn't stuck while the user decides. */
 const asking = new Map<string, number>();
@@ -982,7 +986,8 @@ export async function approveTool(botId: string, sessionId: string, args: Record
   const input = args.input && typeof args.input === "object" && !Array.isArray(args.input) ? (args.input as Record<string, unknown>) : {};
   const owner = ownerName();
   // A task on this PC on the owner's Claude plan (pc-task-runner.ts) asks this way too, in any build.
-  const onPc = pcClaudeThreads.has(sessionId);
+  const pc = pcClaudeThreads.get(sessionId);
+  const onPc = !!pc;
   if (!onPc && (!BRAINS_ON || !session(sessionId)?.brainRun)) return JSON.stringify({ behavior: "deny", message: "Only a thread a brain runs asks this way." });
   // Claude Code asks about one of its own tools by its name (NotebookEdit), never Bops' screen and browser
   // ones (it uses those by itself) or words of its own: anything else isn't its question (the approve tool is
@@ -990,6 +995,15 @@ export async function approveTool(botId: string, sessionId: string, args: Record
   // On this PC the browser tools that act (a click, typing, a form) are its to ask about; never the approve tool itself.
   if (!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(tool) || /^mcp__(screen|bops)__/.test(tool) || (!onPc && /^mcp__browser__/.test(tool)))
     return JSON.stringify({ behavior: "deny", message: "That isn't a tool Claude Code asks about. Don't call approve yourself." });
+  // On this PC: a file in its folder, or a site the owner already allowed in this task, goes on; a write outside its folder doesn't.
+  if (pc) {
+    const first = pcDecision(pc, tool, input);
+    if (first.behavior === "allow") return JSON.stringify({ behavior: "allow" });
+    if (first.behavior === "deny") {
+      pc.note(`Not allowed: ${first.message}`);
+      return JSON.stringify(first);
+    }
+  }
   asking.set(sessionId, (asking.get(sessionId) ?? 0) + 1);
   try {
     const name = /^mcp__.+?__(.+)$/.exec(tool)?.[1] ?? tool;
@@ -1005,7 +1019,14 @@ export async function approveTool(botId: string, sessionId: string, args: Record
         },
       },
     );
-    if (typeof answer !== "string" && answer.reply !== "reject") return JSON.stringify({ behavior: "allow" });
+    if (typeof answer !== "string" && answer.reply !== "reject") {
+      const site = pc && siteOf(tool, input);
+      if (site) pc.origins.add(site);
+      return JSON.stringify({ behavior: "allow" });
+    }
+    // Said in the thread too, plainly: an ask nobody answered isn't a quiet no.
+    if (pc && answer === "late") pc.note(`No answer in time, so approval for ${name} failed and it wasn't done.`);
+    if (pc && answer === "gone") pc.note(`Approval for ${name} failed: the request went away before an answer.`);
     const why =
       typeof answer !== "string"
         ? answer.message

