@@ -18,7 +18,7 @@
 // Usage: node --conditions=react-server scripts/test-repos.mjs
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -215,9 +215,12 @@ const decodeB64Args = (cmd) => [...cmd.matchAll(/\b([A-Za-z0-9+/]{8,}={0,2})(?=\
 
 /* ---------------- Recipes ---------------- */
 
+// How many recipes ship (config/repos/*.yaml): counted, so adding one (task 39 added speaches) doesn't break these checks.
+const SHIPPED = readdirSync(join(rootPath, "config", "repos")).filter((f) => f.endsWith(".yaml")).length;
+
 await check("recipes: every config/repos recipe loads checked; a broken folder's bad ones are left out with why", () => {
   const all = R.recipes({ fresh: true });
-  assert.equal(all.recipes.length, 16);
+  assert.equal(all.recipes.length, SHIPPED);
   assert.deepEqual(all.problems, []);
   const bad = join(scratch, "badroot", "config", "repos");
   mkdirSync(bad, { recursive: true });
@@ -650,7 +653,7 @@ await check("the window's Run: only the very plan the owner saw (a changed one i
   assert.equal(ok.run.by, "window");
   await settle();
   const answer = R.reposAnswer(main.workspaceId ?? "ws_main");
-  assert.equal(answer.recipes.length, 16);
+  assert.equal(answer.recipes.length, SHIPPED);
   assert.ok(answer.recipes.find((c) => c.id === "n8n").blocked, "Docker ones say why they can't run");
   assert.ok(answer.runs.some((r) => r.repoId === "rea"));
 });
@@ -707,7 +710,7 @@ await check("a stranger's text and a routine's run never get run_repo, and a cal
 await check("the briefing line is in the bot's computer briefing", async () => {
   const B = await import(`${rootUrl}/lib/server/briefing.ts`);
   const text = await B.computerBriefing(MAIN);
-  assert.match(text, /Repos \(list_repos, open_repo, run_repo, repo_status\): 16 ready-to-run GitHub repos/);
+  assert.match(text, new RegExp(`Repos \\(list_repos, open_repo, run_repo, repo_status\\): ${SHIPPED} ready-to-run GitHub repos`));
 });
 
 process.chdir(tmpdir());
