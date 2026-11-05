@@ -169,7 +169,7 @@ function ExpandButton({ onClick }: { onClick: () => void }) {
       aria-label={SETTINGS_WORDS.openFull}
       data-tip={SETTINGS_WORDS.openFull}
       data-open-full
-      className="absolute left-4 top-4 flex size-8 shrink-0 items-center justify-center rounded-full bg-white/60 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6]"
+      className="absolute left-4 top-4 flex size-8 shrink-0 items-center justify-center rounded-full bg-white/60 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6] max-md:size-10"
     >
       <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden>
         <path d="M8.5 1.5h4v4M12.5 1.5L8 6M5.5 12.5h-4v-4M1.5 12.5L6 8" fill="none" stroke="#0A0A0A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
