@@ -72,10 +72,14 @@ const READS = new Set(["GET", "HEAD"]);
  * Reads anyone on this Mac's loopback may make: the app's health, bots' pages, the page of an app a bot
  * made (its code, which may hold what the chat gave it to start with, but never what it keeps: an id of
  * 128 random bits, made-apps.ts; it loads in a session of its own that has no window token,
- * desktop/app-frames.cjs), and files bots linked once the user opened them (unguessable ids).
+ * desktop/app-frames.cjs), files bots linked once the user opened them (unguessable ids), and documents a
+ * bot made for the owner (docs.ts: plain Office files built by Bops' own code, served as attachments
+ * with nosniff; their ids are 64 random bits, and the route itself answers 404 for anything but
+ * /^docs_[a-f0-9]{16}$/). A download link is clicked as a navigation, which the shell's download
+ * handler or a new tab may make without the window's cookie - same as pages and files, it must not 403.
  */
 const OPEN_READS = (path: string) =>
-  path === "/api/health" || path.startsWith("/api/pages/") || path.startsWith("/api/files/") || /^\/api\/made-apps\/[^/]+\/view$/.test(path);
+  path === "/api/health" || path.startsWith("/api/pages/") || path.startsWith("/api/files/") || path.startsWith("/api/docs/") || /^\/api\/made-apps\/[^/]+\/view$/.test(path);
 
 /** The window's token, from its cookie or (desktop/main.cjs's own calls) its header, the same in constant time. */
 function fromWindow(request: NextRequest, want: string) {
