@@ -17,6 +17,7 @@ import { ModelsCard } from "./models-card";
 import { ConnectionsCard } from "./connections-card";
 import { HandyCard } from "./handy-card";
 import { checkVoiceAddress } from "@/lib/voice-address";
+import { APP_URL, TAILSCALE_ANDROID_URL, TAILSCALE_WINDOWS_URL } from "@/lib/remote-links";
 
 /*
  * Everything Bops needs on this Mac, in one place: Settings → This Mac. It never stands in the way: signing in
@@ -738,12 +739,42 @@ function FullAccessCard({ items }: { items: Items }) {
   );
 }
 
-type Remote = { paired: boolean; created: number | null; code?: string; qr?: string | null; addresses: { tailnet: string[]; home: string[]; public: string | null } };
+type Remote = {
+  paired: boolean;
+  created: number | null;
+  code?: string;
+  qr?: string | null;
+  addresses: { tailnet: string[]; home: string[]; public: string | null };
+  // QR codes of APP_URL and TAILSCALE_ANDROID_URL, made by the server (app/api/remote/route.ts).
+  help?: { app: string; tailscale: string };
+};
+
+/** A QR code the server made itself (qrcode), never anything from outside, on white with its quiet zone. */
+function Qr({ svg, px, label }: { svg: string; px: number; label: string }) {
+  return <div role="img" aria-label={label} data-qr={label} className="shrink-0 rounded-[10px] bg-white shadow-[0_0_0_1px_#E6E6E3] [&>svg]:block [&>svg]:size-full" style={{ width: px, height: px }} dangerouslySetInnerHTML={{ __html: svg }} />;
+}
+
+function Step({ n, title, done, children }: { n: number; title: string; done?: boolean; children: React.ReactNode }) {
+  return (
+    <li data-step={n} className="flex gap-2.5">
+      <span className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${done ? "bg-ink text-highlighter" : "bg-[#F2F2F0] text-ink"}`}>{done ? "✓" : n}</span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <span className="text-[13px] font-semibold leading-5">
+          Step {n}: {title}
+        </span>
+        {children}
+      </div>
+    </li>
+  );
+}
+
+const link = "break-all font-medium text-ink underline underline-offset-2";
 
 /**
- * The Bops Android app (lib/server/remote.ts): pair it here, and it reaches this Bops from the phone over
- * Tailscale (or the home wifi, or a public address). The code is shown once, right after pairing; pairing
- * again makes a new one and the phone paired before stops working, and so does Unpair.
+ * The Bops Android app (lib/server/remote.ts), set up in three steps on one screen: get the app, get
+ * Tailscale on both, pair. Pairing shows a big QR code the Bops app scans (Scan QR code) or the phone's
+ * camera opens. The code is shown once, right after pairing; pairing again makes a new one and the phone
+ * paired before stops working, and so does Unpair (each asked first). Never a home-network address.
  */
 export function PhoneCard() {
   const [r, setR] = useState<Remote | null>(null);
@@ -769,6 +800,81 @@ export function PhoneCard() {
     setQr(null);
     load();
   };
+  const noAddress = "This computer has no Tailscale address yet, so there is nothing safe for your phone to connect to. Do step 2, then press Pair again.";
+  const guide = (
+    <ol aria-label="Set up your phone" className="flex flex-col gap-4 text-[12.5px] leading-5">
+      <Step n={1} title="Get the app">
+        <span className="text-pencil">On your phone, scan this with the camera to download the Bops app, then open the download to install it.</span>
+        <div className="flex flex-wrap items-center gap-3">
+          {r.help?.app && <Qr svg={r.help.app} px={176} label="Download the Bops app" />}
+          <a href={APP_URL} target="_blank" rel="noreferrer" className={link}>
+            {APP_URL}
+          </a>
+        </div>
+      </Step>
+      <Step n={2} title="Tailscale" done={!!where}>
+        {r.addresses.tailnet.length ? (
+          <span data-tailscale="ready">
+            Ready. This computer&apos;s Tailscale address is <code className="select-all font-mono">{r.addresses.tailnet[0]}</code>. Turn on Tailscale on your phone too, signed in to the same account.
+          </span>
+        ) : r.addresses.public ? (
+          <span data-tailscale="public">
+            Not needed. This Bops has a secure public address, <code className="select-all font-mono">{r.addresses.public}</code>.
+          </span>
+        ) : (
+          <div data-tailscale="missing" className="flex flex-col gap-1.5">
+            <span>
+              This computer has no Tailscale address yet. Install Tailscale here from{" "}
+              <a href={TAILSCALE_WINDOWS_URL} target="_blank" rel="noreferrer" className={link}>
+                {TAILSCALE_WINDOWS_URL}
+              </a>{" "}
+              and sign in. Then scan this on your phone to get Tailscale from Google Play, and sign in with the same account.
+            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              {r.help?.tailscale && <Qr svg={r.help.tailscale} px={176} label="Tailscale on Google Play" />}
+              <a href={TAILSCALE_ANDROID_URL} target="_blank" rel="noreferrer" className={link}>
+                {TAILSCALE_ANDROID_URL}
+              </a>
+            </div>
+            {r.addresses.home.length > 0 && <span className="text-pencil">Your home wifi address is not used: it would send your pairing code unencrypted.</span>}
+            <div>
+              <button onClick={load} className={light}>
+                Check again
+              </button>
+            </div>
+          </div>
+        )}
+      </Step>
+      <Step n={3} title="Pair" done={r.paired && !code}>
+        {code ? (
+          <div className="flex flex-col gap-1.5">
+            {qr ? (
+              <>
+                <span>In the Bops app on your phone, press Scan QR code and point it at this. Your phone&apos;s camera app works too.</span>
+                <Qr svg={qr} px={264} label="Pairing QR code" />
+                <span className="text-pencil">Or type these into the Bops app:</span>
+              </>
+            ) : (
+              <span data-no-address>{noAddress}</span>
+            )}
+            <span>
+              Address: <code className="select-all font-mono">{where ?? "none yet (see step 2)"}</code>
+            </span>
+            <span>
+              Pairing code: <code className="select-all break-all font-mono">{code}</code>
+            </span>
+            <span className="text-pencil">This code is shown only now. Anyone with it can use your bots, so keep it to yourself.</span>
+          </div>
+        ) : r.paired ? (
+          <span>Your phone is paired. To use a different phone, press Pair again.</span>
+        ) : where ? (
+          <span>Press Pair a phone. A big QR code shows here for the Bops app to scan.</span>
+        ) : (
+          <span data-no-address>Finish step 2 first. Then press Pair a phone, and a QR code shows here for the Bops app to scan.</span>
+        )}
+      </Step>
+    </ol>
+  );
   return (
     <Card
       icon={ICONS.phone}
@@ -779,31 +885,12 @@ export function PhoneCard() {
       status={
         r.paired
           ? `Paired ${r.created ? new Date(r.created).toLocaleDateString() : ""}`.trim()
-          : r.addresses.tailnet.length || r.addresses.public
-            ? "Not paired"
-            : "Not paired. Install Tailscale on this computer and your phone so the phone can reach Bops away from home."
+          : where
+            ? "Not paired. Three steps below."
+            : "Not paired. Install Tailscale on this computer and your phone first (step 2)."
       }
-      below={
-        code ? (
-          <div className="flex flex-col gap-1.5 text-[12.5px] leading-5">
-            {qr && (
-              <>
-                <span className="text-pencil">Scan this with your phone&apos;s camera (with the Bops app installed):</span>
-                {/* The QR code is an SVG this server made itself (qrcode), never anything from outside. */}
-                <div className="size-40 rounded bg-white p-1" dangerouslySetInnerHTML={{ __html: qr }} />
-              </>
-            )}
-            <span className="text-pencil">{qr ? "Or" : "In the Bops app on your phone,"} enter:</span>
-            <span>
-              Address: <code className="select-all font-mono">{where ?? "none yet: turn on Tailscale on this computer"}</code>
-            </span>
-            <span>
-              Pairing code: <code className="select-all break-all font-mono">{code}</code>
-            </span>
-            <span className="text-pencil">This code is shown only now. Anyone with it can use your bots, so keep it to yourself.</span>
-          </div>
-        ) : undefined
-      }
+      // Paired with nothing new to show: the steps stay out of the way until Pair again.
+      below={!r.paired || code ? guide : undefined}
     >
       {asking && r.paired ? (
         <div role="alertdialog" aria-label={asking === "unpair" ? "Unpair your phone" : "Pair a new phone"} className="flex flex-col gap-1.5 text-[12.5px] leading-5">
