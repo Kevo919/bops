@@ -1,5 +1,5 @@
 # Codex status
-Updated 2026-11-05T10:27:46.0866239Z. Build IN PROGRESS. Published score65% (94/145); expanded checklist, not directly comparable with earlier percentages.
+Updated 2026-11-05T10:27:46.0866239Z. Build IN PROGRESS. Published score67% (96.5/145); expanded checklist, not directly comparable with earlier percentages.
 
 ## Current verified state
 - Lead deployed1fb2921 (+PR71 test-only). Independently confirmed PChealth200 build hWKiXL7d5vY1BpOjDfNkT thisrun.
@@ -21,4 +21,7 @@ Hourly checkpoint 2026-11-05T11:25:10.7687710Z : no new messages forCodex/all. R
 
 
 Hourly checkpoint 2026-11-05T12:23:42.5320520Z : boardadc56a7 read, no newCodex/all assignment; leadreview69/72 andzaifollowupownership noted. No duplicate review/edit. Native screenshotstillWindowslocked; health200 unchangedhWKiXL7d5vY1BpOjDfNkT. Livechecks pendingexistingunlockrequest; noheavyjob/merge/restart. Score65%94/145 isleadpublished.
+
+
+Hourly checkpoint 2026-11-05T13:23:54.9418329Z : lead1300 rebuildb754835 acknowledged. Independently verifiedhealth200 jnA8BpVtpragfOXxiXFeB; supersedesearlierbuild. Windowsstillvisiblylocked (Bopswindow985810). Leadprioritylistready:Reposapproval,SOUL/MEMORY,Goals,MCP,sign-ins,tray,persistence,narrowwindow,Memoryoutage. Noheavyjob/merge/restart; no newUIcredit. Existingunlockrequestpending.
 
