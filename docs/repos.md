@@ -65,15 +65,15 @@ On the bot's computer each repo runs as its own Linux user (`repo-<id>`), never 
   the language, its home folder and the recipe's plain settings);
 - limits on processes, open files and file sizes, and a time limit on every step (installs 25 minutes each, a server
   4 hours);
-- a firewall for that user: it can reach the internet, DNS and its own ports, but not other programs' ports on the
-  computer (the bots' Chrome, Bops' own services, other repos), private networks or your tailnet;
+- a firewall for that user, deny by default: it can reach the internet, DNS and the ports its plan declares, and
+  nothing else on the computer (the bots' Chrome, Bops' own services, other repos, anything that starts listening
+  later), private networks or your tailnet;
 - before anything of the repo runs, a check **as that user** confirms it can't read the bots' folders (`/root`,
   `/root/.bops`, the Chrome profiles, `/workspace`), open the screens' X displays or Docker, or connect to those ports.
   If any check fails, the run stops there and says why.
 
 Known limits of this version: a repo can't use your keys (a recipe that needs one says so), Docker repos can't run on a
-bot's computer, a program a bot starts on a new port after the repo started isn't added to the firewall until the next
-run, and other users' process names are visible to it (as on any Linux computer).
+bot's computer, and other users' process names are visible to it (as on any Linux computer).
 
 ## Recipes
 
