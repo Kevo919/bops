@@ -17,7 +17,7 @@ globalThis.__sshSpawn = (binary, args, options) => {
   assert.ok(args.includes('-W')); assert.ok(!args.includes('-L'));
   assert.ok(!('OPENAI_API_KEY' in options.env));
   const code = behavior === 'fail' ? 'process.stderr.write("SECRET diagnostic");process.exit(255)' : behavior === 'empty' ? 'process.exit(0)' : behavior === 'hang' ? 'setInterval(()=>{},1000)' : 'process.stdin.once("data",()=>{process.stdout.write("HTTP/1.1 200 OK\\r\\nContent-Length: 2\\r\\nConnection: close\\r\\n\\r\\nOK",()=>process.exit(0))})';
-  const child = spawn(process.execPath, ['-e', code], { ...options });
+  const child = spawn(behavior === 'spawn-error' ? process.execPath + '.missing' : process.execPath, ['-e', code], { ...options });
   children.push(child);
   return child;
 };
@@ -69,6 +69,7 @@ try {
   await preview.openForward({ key: 'test', app: 'test', macPort: port, host: at.host, port: 3000, carrier });
   assert.match(await request('evil.example'), /^HTTP\/1.1 403/); assert.equal(children.length, 0); console.log('PASS Host gate before SSH spawn');
   assert.match(await request(), /^HTTP\/1.1 200[\s\S]*OK$/); await waitGone(children.at(-1)); console.log('PASS response and completed-child cleanup');
+  behavior = 'spawn-error'; const notStarted = await request(); assert.match(notStarted, /^HTTP\/1.1 502/); assert.equal(children.at(-1).pid, undefined); console.log('PASS process start error returns fixed 502');
   behavior = 'fail'; const failed = await request(); assert.match(failed, /^HTTP\/1.1 502/); assert.ok(!failed.includes('SECRET')); await waitGone(children.at(-1)); console.log('PASS fixed redacted 502 after spawn/auth failure');
   behavior = 'empty'; assert.match(await request(), /^HTTP\/1.1 502/); await waitGone(children.at(-1)); console.log('PASS empty successful exit is not readiness');
   behavior = 'hang'; const began = Date.now(); const timed = await request(); assert.match(timed, /^HTTP\/1.1 502/); assert.ok(Date.now() - began >= 18000 && Date.now() - began < 23000); await waitGone(children.at(-1)); console.log('PASS first-byte deadline survives connect and clears child');
@@ -76,5 +77,5 @@ try {
   await new Promise(r => setTimeout(r, 50)); preview.sweepForwards(Date.now() + preview.IDLE_MS + 1); assert.equal(preview.forwardOn(port), undefined); assert.equal(closed, 1); console.log('PASS idle expiry closes carrier');
   const before = children.length; const ended = nativeCarrier.connect(); ended.on('error', () => {}); await new Promise(r => ended.once('close', r)); assert.equal(children.length, before); console.log('PASS closed carrier refuses without spawning');
   const activeCarrier = stdioCarrier(at, 3000); const active = activeCarrier.connect(); active.on('error', () => {}); await once(active, 'connect'); const owned = children.at(-1); activeCarrier.close(); await waitGone(owned); assert.equal(active.destroyed, true); console.log('PASS active carrier close kills child');
-  console.log(`${process.platform === 'win32' ? 10 : 9} passed, 0 failed`);
+  console.log(`${process.platform === 'win32' ? 11 : 10} passed, 0 failed`);
 } finally { preview.closeForward('test'); for (const child of children) if (child.exitCode === null && child.signalCode === null) child.kill(); rmSync(scratch, { recursive: true, force: true }); }
