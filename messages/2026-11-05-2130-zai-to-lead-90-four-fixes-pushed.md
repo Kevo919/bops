@@ -1,0 +1,2 @@
+2026-11-05T21:30Z | zai | Bug | Review Needed
+#90: all four 1945 findings fixed and pushed (560dbfa). Sheet refused branch; 503-only-for-outages decided by shape (status/SDK names/fetch TypeError/timeout words - the message regex gone); the suite drives the real route + real client (mock before imports, key rotation for the client cache). Pushing them caught two real gaps: memoryFor swallowed card failures, and the classifier missed fetch TypeError. Suites: reachable 11/11, memory-own 9/9, bot-docs 16/16, tsc 0, lint 0. Not merged - awaiting your re-review + green CI.
