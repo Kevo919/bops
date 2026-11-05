@@ -29,7 +29,7 @@ type Update = {
 };
 const bridge = () => (window as unknown as { bopsMac?: { update?: Update } }).bopsMac?.update;
 
-const button = "shrink-0 rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white hover:bg-[#2A2A28]";
+const button = "shrink-0 rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)] hover:bg-[color:var(--hb-2a2a28)]";
 
 /** One calm line above the sidebar's bottom row while a newer release is out, and what's new in it under that. */
 export function UpdateNotice() {
@@ -61,12 +61,12 @@ export function UpdateButton({ onOpen }: { onOpen: () => void }) {
     <button
       onClick={onOpen}
       aria-label={tip}
-      className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#FCFCFB] active:scale-[.96]"
+      className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-fcfcfb)] active:scale-[.96]"
     >
       <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
         <path d="M7 11.5V2.8M3.2 6.4L7 2.6l3.8 3.8" fill="none" stroke="#0A0A0A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <span aria-hidden className="absolute -right-px -top-px size-2.5 rounded-full bg-[#2F7BFF] shadow-[0_0_0_2px_#F9F9F8]" />
+      <span aria-hidden className="absolute -right-px -top-px size-2.5 rounded-full bg-[color:var(--hb-2f7bff)] shadow-[0_0_0_2px_var(--h-f9f9f8)]" />
     </button>
   );
 }
@@ -102,10 +102,10 @@ export function UpdateCard({ info, late, onDismiss }: { info: UpdateInfo; late: 
   // Without notes (an older latest.json, or a release before them) the notice is the one line alone.
   const notes = Array.isArray(info.notes) ? info.notes : [];
   return (
-    <div className={`mx-1 mt-3 rounded-[12px] bg-white py-2 pl-3 pr-1.5 shadow-[0_0_0_1px_#E6E6E3] ${late ? "motion-rise-in" : ""}`}>
+    <div className={`mx-1 mt-3 rounded-[12px] bg-white py-2 pl-3 pr-1.5 shadow-[0_0_0_1px_var(--h-e6e6e3)] ${late ? "motion-rise-in" : ""}`}>
       <div className="flex items-center gap-2">
         {/* Read out as it changes (ready, or the download didn't finish), without taking focus. */}
-        <span role="status" className="min-w-0 flex-1 text-[12.5px] leading-[17px] text-[#6B6B6B]">
+        <span role="status" className="min-w-0 flex-1 text-[12.5px] leading-[17px] text-[color:var(--ht-6b6b6b)]">
           {phase === "ready" ? (
             <span className="font-medium text-ink">Bops {info.version} is ready.</span>
           ) : phase === "downloading" ? (
@@ -140,7 +140,7 @@ export function UpdateCard({ info, late, onDismiss }: { info: UpdateInfo; late: 
           }}
           aria-label="Hide until the next version"
           title="Hide until the next version"
-          className="flex size-6 shrink-0 items-center justify-center rounded-md text-[#9A9A98] hover:bg-black/[0.06] hover:text-ink"
+          className="flex size-6 shrink-0 items-center justify-center rounded-md text-[color:var(--ht-9a9a98)] hover:bg-[color:var(--bops-tint)]/[0.06] hover:text-ink"
         >
           <svg width="9" height="9" viewBox="0 0 12 12" aria-hidden="true">
             <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -149,11 +149,11 @@ export function UpdateCard({ info, late, onDismiss }: { info: UpdateInfo; late: 
       </div>
       {notes.length > 0 && (
         <div className="mt-1.5 pb-0.5 pr-1.5">
-          <span className="text-[11.5px] font-medium leading-4 text-[#9A9A98]">What&apos;s new</span>
+          <span className="text-[11.5px] font-medium leading-4 text-[color:var(--ht-9a9a98)]">What&apos;s new</span>
           <ul aria-label={`What's new in Bops ${info.version}`} className="mt-0.5 flex flex-col gap-0.5">
             {notes.map((note, i) => (
-              <li key={i} className="flex gap-1.5 text-[12px] leading-4 text-[#6B6B6B]">
-                <span aria-hidden="true" className="mt-[7px] size-[3px] shrink-0 rounded-full bg-[#9A9A98]" />
+              <li key={i} className="flex gap-1.5 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
+                <span aria-hidden="true" className="mt-[7px] size-[3px] shrink-0 rounded-full bg-[color:var(--hb-9a9a98)]" />
                 <span className="min-w-0">{note}</span>
               </li>
             ))}
@@ -190,10 +190,10 @@ export function UpdateSettings() {
     }
   };
   return (
-    <div className="flex items-center gap-3 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+    <div className="flex items-center gap-3 rounded-[14px] p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
       <div className="flex flex-1 flex-col gap-0.5">
         <span className="text-[13px] font-medium">Download updates automatically</span>
-        <span className="text-[12px] leading-4 text-[#6B6B6B]">New versions download in the background. Restart Bops to use one.</span>
+        <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">New versions download in the background. Restart Bops to use one.</span>
       </div>
       <button
         type="button"
@@ -202,9 +202,9 @@ export function UpdateSettings() {
         aria-label="Download updates automatically"
         disabled={busy}
         onClick={() => void toggle()}
-        className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors disabled:opacity-60 ${info.auto ? "bg-ink" : "bg-[#E6E6E3]"}`}
+        className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors disabled:opacity-60 ${info.auto ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-e6e6e3)]"}`}
       >
-        <span className={`absolute top-[3px] size-4 rounded-full bg-white shadow-[0_1px_2px_#00000033] transition-[left] ${info.auto ? "left-[19px]" : "left-[3px]"}`} />
+        <span className={`absolute top-[3px] size-4 rounded-full bg-white shadow-[0_1px_2px_var(--h-00000033)] transition-[left] ${info.auto ? "left-[19px]" : "left-[3px]"}`} />
       </button>
     </div>
   );

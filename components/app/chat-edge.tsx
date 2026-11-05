@@ -118,7 +118,7 @@ export function ChatEdge({
           keep(chatWidthIn(chatWidthIn(width, room()) + (e.key === "ArrowLeft" ? -STEP : STEP), room()));
         }}
       >
-        <div className={`h-full w-[2px] transition-colors ${dragging ? "bg-[#C9C9C6]" : "group-hover:bg-[#DCDCD9] group-focus-visible:bg-[#C9C9C6]"}`} />
+        <div className={`h-full w-[2px] transition-colors ${dragging ? "bg-[color:var(--hb-c9c9c6)]" : "group-hover:bg-[color:var(--hb-dcdcd9)] group-focus-visible:bg-[color:var(--hb-c9c9c6)]"}`} />
       </div>
       {dragging && <div aria-hidden className="fixed inset-0 z-[100] cursor-col-resize" />}
     </>

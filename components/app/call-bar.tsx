@@ -372,7 +372,7 @@ export function CallBar({
   return (
     <div className="relative z-30 flex animate-[call-in_220ms_ease-out] flex-col items-center">
       <audio ref={audio} autoPlay />
-      <div className="flex items-center gap-1.5 rounded-full bg-white p-1.5 shadow-[0_0_0_1px_#E6E6E3,0_10px_28px_-14px_#00000059]">
+      <div className="flex items-center gap-1.5 rounded-full bg-white p-1.5 shadow-[0_0_0_1px_var(--h-e6e6e3),0_10px_28px_-14px_var(--h-00000059)]">
         <button
           onClick={onOpen}
           disabled={!compact}
@@ -384,14 +384,14 @@ export function CallBar({
         </button>
         <div className="flex w-[74px] shrink-0 flex-col pl-1">
           <span className="truncate text-[14px] font-semibold leading-[18px]">{b.name}</span>
-          <span className={`font-mono text-[12px] leading-[15px] ${phase === "failed" ? "text-[#B42318]" : "text-[#6B6B6B]"}`}>{status}</span>
+          <span className={`font-mono text-[12px] leading-[15px] ${phase === "failed" ? "text-[color:var(--ht-b42318)]" : "text-[color:var(--ht-6b6b6b)]"}`}>{status}</span>
         </div>
 
         <div className={`h-10 w-[104px] items-center justify-between px-1.5 ${compact ? "hidden" : "flex"}`} aria-hidden>
           {levels.map((l, i) => (
             <span
               key={i}
-              className={`w-[3px] rounded-full transition-[height,background-color] duration-100 ${phase === "connecting" ? "animate-pulse bg-[#D4D4D1]" : l > 0.08 ? "bg-ink" : "bg-[#D4D4D1]"}`}
+              className={`w-[3px] rounded-full transition-[height,background-color] duration-100 ${phase === "connecting" ? "animate-pulse bg-[color:var(--hb-d4d4d1)]" : l > 0.08 ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-d4d4d1)]"}`}
               style={{ height: `${3 + Math.round(l * 20)}px`, animationDelay: phase === "connecting" ? `${i * 70}ms` : undefined }}
             />
           ))}
@@ -408,7 +408,7 @@ export function CallBar({
           <path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5" />
           {muted && <path d="M3 3l14 14" />}
         </RoundButton>
-        <button onClick={hangUp} aria-label="Hang up" title="Hang up" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#E5484D] hover:bg-[#D93D42]">
+        <button onClick={hangUp} aria-label="Hang up" title="Hang up" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--hb-e5484d)] hover:bg-[color:var(--hb-d93d42)]">
           <svg width="15" height="15" viewBox="0 0 16 16" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round">
             <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
           </svg>
@@ -418,8 +418,8 @@ export function CallBar({
       {/* Captions hang under the bar, over the chat, so turning them on never moves the conversation. */}
       {(error || (captions && caption && !compact)) && (
         <p
-          className={`absolute ${compact ? "bottom-full mb-2" : "top-full mt-2"} line-clamp-3 w-max max-w-[400px] rounded-2xl bg-white/95 px-3.5 py-2 text-center text-[13px] leading-[19px] shadow-[0_0_0_1px_#0000000D,0_6px_16px_-8px_#00000040] ${
-            error ? "text-[#B42318]" : caption?.who === "you" ? "italic text-[#6B6B6B]" : "text-ink"
+          className={`absolute ${compact ? "bottom-full mb-2" : "top-full mt-2"} line-clamp-3 w-max max-w-[400px] rounded-2xl bg-white/95 px-3.5 py-2 text-center text-[13px] leading-[19px] shadow-[0_0_0_1px_var(--h-0000000d),0_6px_16px_-8px_var(--h-00000040)] ${
+            error ? "text-[color:var(--ht-b42318)]" : caption?.who === "you" ? "italic text-[color:var(--ht-6b6b6b)]" : "text-ink"
           }`}
         >
           {error ?? caption?.text}
@@ -437,7 +437,7 @@ function RoundButton({ label, on, disabled, hidden, onClick, children }: { label
       disabled={disabled}
       aria-label={label}
       title={label}
-      className={`flex size-10 shrink-0 items-center justify-center rounded-full disabled:opacity-40 ${on ? "bg-ink text-white" : "bg-[#F2F2F0] text-[#3A3A38] hover:bg-[#E9E9E6]"}`}
+      className={`flex size-10 shrink-0 items-center justify-center rounded-full disabled:opacity-40 ${on ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "bg-[color:var(--hb-f2f2f0)] text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-e9e9e6)]"}`}
     >
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
         {children}

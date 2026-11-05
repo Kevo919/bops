@@ -1,4 +1,5 @@
 import "server-only";
+import { createRequire } from "node:module";
 import { setLlms } from "@/lib/agents";
 
 /**
@@ -7,8 +8,10 @@ import { setLlms } from "@/lib/agents";
  */
 try {
   // A build without config/ (the Mac release) has none: Bops agent only, as before.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const file = require(/* turbopackIgnore: true */ `${process.cwd()}/config/llms.cjs`) as { read: (root: string) => unknown[] };
+  // A require of its own, not the global one: Next's server bundle has a CommonJS require, but this file run as
+  // plain ESM (node scripts/*.mjs, which strip its types) has none, so the list was never read there.
+  const load = createRequire(import.meta.url);
+  const file = load(/* turbopackIgnore: true */ `${process.cwd()}/config/llms.cjs`) as { read: (root: string) => unknown[] };
   const list = file.read(process.cwd());
   setLlms(list);
   if (list.length) console.log(`[llms] ${list.length} from config/llms.yaml`);

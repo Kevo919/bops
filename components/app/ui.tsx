@@ -26,14 +26,14 @@ export const post = async (url: string, body: unknown = {}, method = "POST") => 
 export const screenNo = (display?: number) => (display === undefined ? undefined : screenNumber(display));
 
 /** A choice card in Settings (Where your bots work, Where routines run): picked, or not; and its radio. */
-export const option = (on: boolean) => (on ? "bg-[#FBFFE0] shadow-[0_0_0_1.5px_#0A0A0A]" : "shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#FCFCFB]");
+export const option = (on: boolean) => (on ? "bg-[color:var(--hb-fbffe0)] shadow-[0_0_0_1.5px_var(--h-0a0a0a)]" : "shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-fcfcfb)]");
 export const radio = (on: boolean) =>
   on ? (
-    <span className="flex size-4 items-center justify-center rounded-full bg-ink">
+    <span className="flex size-4 items-center justify-center rounded-full bg-[color:var(--hb-0a0a0a)]">
       <span className="size-1.5 rounded-full bg-highlighter" />
     </span>
   ) : (
-    <span className="size-4 rounded-full shadow-[inset_0_0_0_1.5px_#C9C9C6]" />
+    <span className="size-4 rounded-full shadow-[inset_0_0_0_1.5px_var(--h-c9c9c6)]" />
   );
 
 export function ago(t: number) {
@@ -191,7 +191,7 @@ export function StatusIcon({ session: s, size = 13, dark, owner, member, okWait 
   const icon = live(s) && !waits ? (
     <Spinner size={size} color={dark ? "#0A0A0A" : "#3A3A38"} />
   ) : needsYou(s) || waits ? (
-    <span className="block rounded-full bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A]" style={{ width: size - 3, height: size - 3 }} />
+    <span className="block rounded-full bg-highlighter shadow-[0_0_0_1.5px_var(--h-0a0a0a)]" style={{ width: size - 3, height: size - 3 }} />
   ) : s.status === "done" ? (
     <svg width={size} height={size} viewBox="0 0 14 14" className="block">
       <path d="M3 7.5l2.5 2.5L11 4.5" fill="none" stroke="#2BB673" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -253,7 +253,7 @@ export function RoundButton({ label, onClick, children, active }: { label: strin
       title={label}
       aria-label={label}
       onClick={onClick}
-      className={`flex size-[34px] shrink-0 items-center justify-center rounded-full shadow-[0_0_0_1px_#E6E6E3] max-md:size-10 ${active ? "bg-[#EEEEEC]" : "bg-white hover:bg-[#FCFCFB]"}`}
+      className={`flex size-[34px] shrink-0 items-center justify-center rounded-full shadow-[0_0_0_1px_var(--h-e6e6e3)] max-md:size-10 ${active ? "bg-[color:var(--hb-eeeeec)]" : "bg-white hover:bg-[color:var(--hb-fcfcfb)]"}`}
     >
       <svg width="15" height="15" viewBox="0 0 16 16">
         {children}
@@ -268,7 +268,7 @@ export function RoundButton({ label, onClick, children, active }: { label: strin
  */
 export function NeedsYouDot({ className = "" }: { className?: string }) {
   return (
-    <span className={`flex size-4 shrink-0 items-center justify-center rounded-full bg-[#E59A0B] ${className}`}>
+    <span className={`flex size-4 shrink-0 items-center justify-center rounded-full bg-[color:var(--hb-e59a0b)] ${className}`}>
       <svg width="8" height="8" viewBox="0 0 8 8">
         <path d="M4 1.3v3.1" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" />
         <circle cx="4" cy="6.3" r="0.85" fill="#FFFFFF" />
@@ -280,7 +280,7 @@ export function NeedsYouDot({ className = "" }: { className?: string }) {
 /** The round X the Account sheet closes with, for a tab on the right that reads as a page (the Vault, a bot's profile). */
 export function CloseButton({ onClick, className = "" }: { onClick: () => void; className?: string }) {
   return (
-    <button onClick={onClick} aria-label="Close" className={`flex size-8 shrink-0 items-center justify-center rounded-full shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6] max-md:size-10 ${className}`}>
+    <button onClick={onClick} aria-label="Close" className={`flex size-8 shrink-0 items-center justify-center rounded-full shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f7f7f6)] max-md:size-10 ${className}`}>
       <svg width="12" height="12" viewBox="0 0 12 12">
         <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="#0A0A0A" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
@@ -297,13 +297,13 @@ export function BrandTile({ item, size }: { item: { name: string; color: string;
     return <img src={item.logo.src} alt={item.name} width={size} height={size} className="shrink-0" style={{ borderRadius: radius }} />;
   if (item.logo)
     return (
-      <span className="flex shrink-0 items-center justify-center bg-white shadow-[0_0_0_1px_#0000001A]" style={{ width: size, height: size, borderRadius: radius }}>
+      <span className="flex shrink-0 items-center justify-center bg-white shadow-[0_0_0_1px_var(--h-0000001a)]" style={{ width: size, height: size, borderRadius: radius }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={item.logo.src} alt={item.name} width={Math.round(size * 0.66)} height={Math.round(size * 0.66)} className="object-contain" />
       </span>
     );
   return (
-    <span className="flex shrink-0 items-center justify-center font-bold text-white" style={{ width: size, height: size, borderRadius: radius, background: item.color, fontSize: Math.round(size * 0.4) }}>
+    <span className="flex shrink-0 items-center justify-center font-bold text-[color:var(--bops-on-fill)]" style={{ width: size, height: size, borderRadius: radius, background: item.color, fontSize: Math.round(size * 0.4) }}>
       {item.glyph}
     </span>
   );
@@ -318,7 +318,7 @@ export function BrandTile({ item, size }: { item: { name: string; color: string;
 export function ReadOnlyLine({ state, botIds = [], className = "" }: { state: AppState; botIds?: readonly string[]; className?: string }) {
   if (!state.shared) return null;
   return (
-    <div data-read-only className={`rounded-[14px] bg-[#F7F7F5] px-3.5 py-2.5 text-center text-[13px] leading-[18px] text-[#6B6B6B] ${className}`}>
+    <div data-read-only className={`rounded-[14px] bg-[color:var(--hb-f7f7f5)] px-3.5 py-2.5 text-center text-[13px] leading-[18px] text-[color:var(--ht-6b6b6b)] ${className}`}>
       {readOnlyLine(botIds, state.shared.levels)}
     </div>
   );
@@ -402,25 +402,25 @@ export function AskInPlace({
       aria-label={title}
       data-ask-in-place
       onClick={(e) => e.stopPropagation()}
-      className={`motion-rise-in flex w-full flex-col ${compact ? "gap-2 rounded-[12px] px-3 py-2.5" : "gap-2.5 rounded-2xl px-4 py-3"} ${danger ? "bg-[#FEF3F2] shadow-[0_0_0_1px_#FECDCA]" : "bg-[#F7F7F6] shadow-[0_0_0_1px_#E6E6E3]"}`}
+      className={`motion-rise-in flex w-full flex-col ${compact ? "gap-2 rounded-[12px] px-3 py-2.5" : "gap-2.5 rounded-2xl px-4 py-3"} ${danger ? "bg-[color:var(--hb-fef3f2)] shadow-[0_0_0_1px_var(--h-fecdca)]" : "bg-[color:var(--hb-f7f7f6)] shadow-[0_0_0_1px_var(--h-e6e6e3)]"}`}
     >
       <div className="flex flex-col gap-0.5">
         <span className={`font-semibold text-ink ${compact ? "text-[13px] leading-[18px]" : "text-[14px] leading-5"}`}>{title}</span>
-        {line && <span className={`text-[#3A3A38] ${compact ? "text-[12px] leading-4" : "text-[13px] leading-[18px]"}`}>{line}</span>}
+        {line && <span className={`text-[color:var(--ht-3a3a38)] ${compact ? "text-[12px] leading-4" : "text-[13px] leading-[18px]"}`}>{line}</span>}
       </div>
       {children}
       {error && (
-        <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}
       <div className="flex flex-wrap items-center gap-2">
         {other}
         <span className="flex-1" />
-        <button ref={cancel} type="button" disabled={busy} onClick={onCancel} className={`${pill} bg-white shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#FCFCFB]`}>
+        <button ref={cancel} type="button" disabled={busy} onClick={onCancel} className={`${pill} bg-white shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-fcfcfb)]`}>
           {cancelLabel}
         </button>
-        <button ref={first} type="button" disabled={busy} onClick={onConfirm} className={`${pill} flex min-w-[72px] items-center justify-center text-white ${danger ? "bg-[#B42318]" : "bg-ink"}`}>
+        <button ref={first} type="button" disabled={busy} onClick={onConfirm} className={`${pill} flex min-w-[72px] items-center justify-center text-[color:var(--bops-on-fill)] ${danger ? "bg-[color:var(--hb-b42318)]" : "bg-[color:var(--hb-0a0a0a)]"}`}>
           {busy ? <Spinner size={12} color="#FFFFFF" /> : action}
         </button>
       </div>

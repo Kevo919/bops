@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { touchState } from "@/lib/server/store";
 import "@/lib/server/llms";
 import { fromThisMac } from "@/lib/server/owner-email";
@@ -18,8 +19,9 @@ export const dynamic = "force-dynamic";
  */
 type Entry = { name: string; provider: string; model: string; account?: string; starter?: boolean; useFor?: string[]; runBy?: string; chatDefault?: boolean; from?: string };
 type Change = { list?: Entry[]; removed?: string[]; moved?: { job: string; from: string }[]; error?: string };
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const file = () => require(/* turbopackIgnore: true */ `${process.cwd()}/config/llms.cjs`) as {
+// Its own require (node:module), so this also loads as plain ESM, where there is no global require.
+const load = createRequire(import.meta.url);
+const file = () => load(/* turbopackIgnore: true */ `${process.cwd()}/config/llms.cjs`) as {
   PROVIDERS: string[];
   CHAT_ONLY?: string[];
   RUN_BY: Record<string, { name: string; providers: string[] | null }>;

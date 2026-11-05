@@ -1,11 +1,24 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { post } from "./ui";
 import { Segmented } from "./segmented";
 import { InProgress } from "./in-progress";
 import { FONT_SCALE_MAX, FONT_SCALE_MIN, LOOK_CSS_LIMIT, LOOK_HISTORY, normalizeLook } from "@/lib/look-theme";
-import type { AppState, LookDensity, LookTheme } from "@/lib/types";
+import type { AppState, LookDensity, LookTheme, MotionLevel, MotionSpeed } from "@/lib/types";
+
+/** Whether this computer asks for less motion (its accessibility settings): then nothing moves, whatever Animations says. */
+function useReducedMotion() {
+  return useSyncExternalStore(
+    (on) => {
+      const q = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+      q?.addEventListener("change", on);
+      return () => q?.removeEventListener("change", on);
+    },
+    () => !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+    () => false,
+  );
+}
 
 /**
  * The Look card in Settings (the "look" pane): the same controls a bot changes the look with in the
@@ -15,6 +28,7 @@ import type { AppState, LookDensity, LookTheme } from "@/lib/types";
  */
 export function LookSettings({ state }: { state: AppState }) {
   const look = normalizeLook(state.look?.current);
+  const reduced = useReducedMotion();
   const canUndo = (state.look?.history?.length ?? 0) > 0;
   const [error, setError] = useState("");
   // Reset goes back to Bops' own look at once (crawl L7): the first press asks, the second does it.
@@ -32,16 +46,16 @@ export function LookSettings({ state }: { state: AppState }) {
     if (settle.current) clearTimeout(settle.current);
     settle.current = setTimeout(() => send(change), 250);
   };
-  const rows = "flex w-full items-center gap-3 border-t border-[#ECECEA] py-2.5 first:border-t-0 first:pt-1";
+  const rows = "flex w-full items-center gap-3 border-t border-[color:var(--h-ececea)] py-2.5 first:border-t-0 first:pt-1";
   const line = (title: string, hint?: string) => (
     <div className="min-w-0 flex-1">
       <div className="text-[13px] font-semibold leading-4">{title}</div>
-      {hint && <div className="text-[12px] leading-4 text-[#6B6B6B]">{hint}</div>}
+      {hint && <div className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{hint}</div>}
     </div>
   );
   return (
     <div className="flex flex-col gap-3" data-look-settings>
-      <div className="rounded-[14px] bg-white px-3.5 py-1 shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="rounded-[14px] bg-white px-3.5 py-1 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         <div className={rows}>
           <Segmented<LookTheme> title="Theme" hint="The window's colors, or following this computer's." value={look.theme ?? "light"} options={[["light", "Light"], ["system", "System"], ["dark", "Dark"]]} onPick={(theme) => send({ theme })} />
         </div>
@@ -53,10 +67,10 @@ export function LookSettings({ state }: { state: AppState }) {
             aria-label="Accent color"
             value={look.accent ?? "#E9FF3B"}
             onChange={(e) => sendSettled({ accent: e.target.value })}
-            className="size-7 cursor-pointer rounded-full border border-[#E6E6E3] bg-transparent p-0"
+            className="size-7 cursor-pointer rounded-full border border-[color:var(--h-e6e6e3)] bg-transparent p-0"
           />
           {look.accent && (
-            <button onClick={() => send({ accent: "" })} className="rounded-full px-2 py-0.5 text-[12px] font-medium leading-4 text-ink hover:bg-black/[0.05]">
+            <button onClick={() => send({ accent: "" })} className="rounded-full px-2 py-0.5 text-[12px] font-medium leading-4 text-ink hover:bg-[color:var(--bops-tint)]/[0.05]">
               Default
             </button>
           )}
@@ -71,20 +85,35 @@ export function LookSettings({ state }: { state: AppState }) {
             step={0.05}
             value={look.fontScale ?? 1}
             onChange={(e) => sendSettled({ font_scale: Number(e.target.value) })}
-            className="w-40 accent-[#0A0A0A]"
+            className="w-40 accent-[color:var(--ht-0a0a0a)]"
           />
         </div>
         <div className={rows}>
           <Segmented<LookDensity> title="Spacing" hint="How much room the window's parts keep." value={look.density ?? "normal"} options={[["compact", "Compact"], ["normal", "Normal"], ["roomy", "Roomy"]]} onPick={(density) => send({ density })} />
         </div>
-        {/* Being built (lib/feature-status.ts): a placeholder, grayed with its percent, until the setting lands. */}
-        <InProgress id="animations-setting" className="-mx-1.5 border-t border-rule px-1.5 pt-1">
-          <div className="flex w-full items-center gap-3 py-2.5 pr-12">
-            {line("Animations", "How much the window moves: full, calm or off.")}
-          </div>
+        <InProgress id="animations-setting">
+        <div className={rows} data-animations>
+          <Segmented<MotionLevel>
+            title="Animations"
+            hint={reduced ? "Off for now: this computer asks for less motion." : "How much things move as they come and go."}
+            value={look.motion ?? "normal"}
+            options={[["off", "Off"], ["subtle", "Subtle"], ["normal", "Normal"], ["lively", "Lively"]]}
+            onPick={(motion) => send({ motion })}
+          />
+        </div>
+        <div className={rows} data-animation-speed>
+          <Segmented<MotionSpeed>
+            title="Speed"
+            hint="How fast animations play."
+            value={look.motionSpeed ?? "normal"}
+            options={[["slow", "Slow"], ["normal", "Normal"], ["fast", "Fast"]]}
+            onPick={(motion_speed) => send({ motion_speed })}
+            disabled={look.motion === "off"}
+          />
+        </div>
         </InProgress>
       </div>
-      <div className="rounded-[14px] bg-white px-3.5 py-2.5 shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="rounded-[14px] bg-white px-3.5 py-2.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         {line(`Custom CSS`, `Plain styles only, at most ${LOOK_CSS_LIMIT.toLocaleString("en-US")} characters. Nothing that loads or runs anything is kept.`)}
         <textarea
           aria-label="Custom CSS"
@@ -95,13 +124,13 @@ export function LookSettings({ state }: { state: AppState }) {
           onBlur={(e) => {
             if (e.target.value !== (look.css ?? "")) send({ css: e.target.value });
           }}
-          className="mt-2 w-full resize-y rounded-[10px] bg-[#F7F7F6] p-2 font-mono text-[12px] leading-4 outline-none"
+          className="mt-2 w-full resize-y rounded-[10px] bg-[color:var(--hb-f7f7f6)] p-2 font-mono text-[12px] leading-4 outline-none"
         />
-        {error && <div className="mt-1.5 text-[12px] leading-4 text-[#B42318]">{error}</div>}
+        {error && <div className="mt-1.5 text-[12px] leading-4 text-[color:var(--ht-b42318)]">{error}</div>}
       </div>
       <div className="flex items-center gap-3">
-        <span className="min-w-0 flex-1 text-[12px] leading-4 text-[#6B6B6B]">
-          Undo takes back the last change, made here or in the chat (up to {LOOK_HISTORY}). Reset goes back to Bops&apos; own look, and can be undone too.
+        <span className="min-w-0 flex-1 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
+          Undo takes back the last change, made here or in the chat (up to {LOOK_HISTORY}). Reset goes back to Bops&apos; own look and keeps your widgets; it can be undone too.
         </span>
         {canUndo && (
           <button
@@ -109,7 +138,7 @@ export function LookSettings({ state }: { state: AppState }) {
               setError("");
               void post("/api/look", { action: "undo" });
             }}
-            className="rounded-full px-3 py-1 text-[12px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_#D9D9D6] hover:bg-black/[0.04]"
+            className="rounded-full px-3 py-1 text-[12px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_var(--h-d9d9d6)] hover:bg-[color:var(--bops-tint)]/[0.04]"
           >
             Undo
           </button>
@@ -122,7 +151,7 @@ export function LookSettings({ state }: { state: AppState }) {
             void post("/api/look", { action: "reset" });
           }}
           onBlur={() => setConfirmReset(false)}
-          className={`rounded-full px-3 py-1 text-[12px] font-semibold leading-4 shadow-[0_0_0_1px_#D9D9D6] ${confirmReset ? "bg-[#B42318] text-white" : "text-ink hover:bg-black/[0.04]"}`}
+          className={`rounded-full px-3 py-1 text-[12px] font-semibold leading-4 shadow-[0_0_0_1px_var(--h-d9d9d6)] ${confirmReset ? "bg-[color:var(--hb-b42318)] text-[color:var(--bops-on-fill)]" : "text-ink hover:bg-[color:var(--bops-tint)]/[0.04]"}`}
         >
           {confirmReset ? "Reset for sure?" : "Reset"}
         </button>

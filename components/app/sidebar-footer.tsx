@@ -216,7 +216,7 @@ export function FooterButton({
         title={expanded ? undefined : tip}
         aria-label={ariaLabel ?? label}
         aria-pressed={pressed}
-        className="flex h-9 w-full min-w-0 items-center justify-center overflow-hidden rounded-full bg-white px-2.5 max-md:h-11 text-[13.5px] font-medium text-[#3A3A38] shadow-[0_0_0_1px_#E6E6E3] transition-transform duration-100 ease-out hover:bg-[#FCFCFB] outline-none focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] active:scale-[.96] motion-reduce:transition-none"
+        className="flex h-9 w-full min-w-0 items-center justify-center overflow-hidden rounded-full bg-white px-2.5 max-md:h-11 text-[13.5px] font-medium text-[color:var(--ht-3a3a38)] shadow-[0_0_0_1px_var(--h-e6e6e3)] transition-transform duration-100 ease-out hover:bg-[color:var(--hb-fcfcfb)] outline-none focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] active:scale-[.96] motion-reduce:transition-none"
       >
         {icon}
         <span

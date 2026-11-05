@@ -32,7 +32,7 @@ const COLORS = {
 const DOT: Record<ServiceView["status"], string> = { on: "bg-[var(--svc-ok-dot)]", restart: "bg-[var(--svc-wait-dot)]", broken: "bg-destructive", off: "bg-pencil/40" };
 const STATUS: Record<ServiceView["status"], string> = { on: "Set up", restart: "Saved, not in use yet", broken: "Key saved but not working", off: "Not set up" };
 const pill = "rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 disabled:opacity-40";
-const dark = `${pill} bg-ink text-white`;
+const dark = `${pill} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]`;
 const light = `${pill} bg-desk hover:bg-rule`;
 
 /** The pane: every service, then what isn't built yet. `focus`: the row a note asked for (scrolled to, its box focused). */

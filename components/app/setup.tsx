@@ -55,25 +55,25 @@ export function AiSubscriptionsCard({ state, onShowScreen, onOpenVault }: { stat
   const keys = useVaultKeyNames(b ? workspaceOf(b) : "", !localSelected && BRAINS_ON && !!b && !state.shared);
   if (state.shared) return null;
   return (
-    <section aria-label="AI subscriptions" className="mx-[22px] mt-4 flex shrink-0 flex-col gap-3 rounded-2xl bg-[#FAFAF9] p-4 shadow-[0_0_0_1px_#E6E6E3]">
+    <section aria-label="AI subscriptions" className="mx-[22px] mt-4 flex shrink-0 flex-col gap-3 rounded-2xl bg-[color:var(--hb-fafaf9)] p-4 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
       <h2 className="text-[15px] font-semibold">AI subscriptions</h2>
       <div role="group" aria-label="Where to connect subscriptions" className="flex flex-wrap gap-2">
         {localAvailable && <button type="button" aria-pressed={localSelected} onClick={() => setTarget("pc")} className={localSelected ? dark : light}>This PC</button>}
         <button type="button" aria-pressed={!localSelected} onClick={() => setTarget("cloud")} className={!localSelected ? dark : light}>Bot cloud computer</button>
       </div>
       {localSelected ? <>
-        <p className="text-[12px] leading-5 text-[#6B6B6B]">Sign in through the official CLI in your normal browser. Its login stays on this PC across restarts. No bot computer or AI profile is needed to connect. Once Claude is signed in here, bot tasks on this PC can run on your Claude plan: choose that below.</p>
+        <p className="text-[12px] leading-5 text-[color:var(--ht-6b6b6b)]">Sign in through the official CLI in your normal browser. Its login stays on this PC across restarts. No bot computer or AI profile is needed to connect. Once Claude is signed in here, bot tasks on this PC can run on your Claude plan: choose that below.</p>
         <LocalSubscriptions runner={pcView?.runner} />
         {/* Being tested (lib/feature-status.ts): usable, marked with its percent until its live test passes. */}
         <InProgress id="pc-tasks-claude-plan">
           <PcTaskRunnerCard onView={setPcView} />
         </InProgress>
-        <div className="rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]"><h3 className="font-semibold">z.ai GLM Coding Plan</h3><p className="my-2">Connect with a key from your Coding Plan account in Keys. This is not a browser sign-in; a saved Z.ai key alone does not verify a subscription.</p><button type="button" onClick={onOpenVault} className={light}>Manage Coding Plan key</button></div>
+        <div className="rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_var(--h-e6e6e3)]"><h3 className="font-semibold">z.ai GLM Coding Plan</h3><p className="my-2">Connect with a key from your Coding Plan account in Keys. This is not a browser sign-in; a saved Z.ai key alone does not verify a subscription.</p><button type="button" onClick={onOpenVault} className={light}>Manage Coding Plan key</button></div>
       </> : <>
-        <p className="text-[12px] leading-5 text-[#6B6B6B]">Cloud subscriptions power tasks on the selected bot&apos;s computer. Sign-in opens on that computer&apos;s screen. This does not connect the subscription on your PC.</p>
+        <p className="text-[12px] leading-5 text-[color:var(--ht-6b6b6b)]">Cloud subscriptions power tasks on the selected bot&apos;s computer. Sign-in opens on that computer&apos;s screen. This does not connect the subscription on your PC.</p>
         {!BRAINS_ON ? <p role="status" className="text-[12px]">{computerWords("Cloud agent harnesses are off in this build. Enable Agent harnesses in Settings → This Mac → Modules, then rebuild Bops.")} {localAvailable ? "Local subscription sign-in is available on the This PC tab." : "Local subscription sign-in is available in the self-hosted desktop app."}</p> : <>
           <label className="flex flex-wrap items-center gap-2 text-[12px]">Connect on
-            <select aria-label="Subscription bot and computer" value={b?.id ?? ""} disabled={!b} onChange={(e) => setSelected(e.target.value)} className="min-w-0 max-w-full rounded-lg border border-[#E6E6E3] bg-white p-2">
+            <select aria-label="Subscription bot and computer" value={b?.id ?? ""} disabled={!b} onChange={(e) => setSelected(e.target.value)} className="min-w-0 max-w-full rounded-lg border border-[color:var(--h-e6e6e3)] bg-white p-2">
               {!b && <option value="">No cloud bot available</option>}
               {bots.map((bot) => <option key={bot.id} value={bot.id}>{bot.name} · {workBot(bot, state.bots).computerId ? `${workBot(bot, state.bots).name}'s computer` : "computer will be set up when you sign in"}</option>)}
             </select>
@@ -121,26 +121,26 @@ export function PcTaskRunnerCard({ onView }: { /** Each answer, for the Claude c
   }, [send]);
   const picked = view?.choice ?? view?.runner ?? null;
   return (
-    <div role="group" aria-label="Bot tasks on this PC" className="rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]">
+    <div role="group" aria-label="Bot tasks on this PC" className="rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_var(--h-e6e6e3)]">
       <h3 className="font-semibold">Bot tasks on this PC</h3>
-      <p className="my-2 text-[#6B6B6B]">Who does the work when a bot runs a task here. Your Claude plan uses the Claude Code sign in above and the bot&apos;s own Chrome; it asks you before running commands, opening a new website, clicking or typing in the browser, or reading files outside the task&apos;s folder, and it can&apos;t change files outside that folder. It can&apos;t control your other apps yet. We recommend it.</p>
-      <p className="mb-2 text-[#6B6B6B]">OpenAI key: tasks run on OpenAI instead, which needs an OpenAI <strong>environment key</strong>, not an ordinary API key. Make one in OpenAI Platform under Agents, Environments, Keys, and select Create. Use the same project as your OPENAI_API_KEY, and make sure that project has credit.</p>
+      <p className="my-2 text-[color:var(--ht-6b6b6b)]">Who does the work when a bot runs a task here. Your Claude plan uses the Claude Code sign in above and the bot&apos;s own Chrome; it asks you before running commands, opening a new website, clicking or typing in the browser, or reading files outside the task&apos;s folder, and it can&apos;t change files outside that folder. It can&apos;t control your other apps yet. We recommend it.</p>
+      <p className="mb-2 text-[color:var(--ht-6b6b6b)]">OpenAI key: tasks run on OpenAI instead, which needs an OpenAI <strong>environment key</strong>, not an ordinary API key. Make one in OpenAI Platform under Agents, Environments, Keys, and select Create. Use the same project as your OPENAI_API_KEY, and make sure that project has credit.</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={busy || !view} aria-pressed={picked === "claude"} onClick={() => void send({ choice: "claude" })} className={picked === "claude" ? dark : light}>Your Claude plan (signed in)</button>
         <button type="button" disabled={busy || !view} aria-pressed={picked === "openai"} onClick={() => void send({ choice: "openai" })} className={picked === "openai" ? dark : light}>OpenAI key</button>
       </div>
-      {view && !view.choice && view.runner && <p className="mt-2 text-[#6B6B6B]">Not chosen yet, so tasks use {view.runner === "claude" ? "your Claude plan" : "the OpenAI key"} for now.</p>}
-      {view?.problem && <p role="status" className="mt-2 text-[#B42318]">{view.problem}</p>}
+      {view && !view.choice && view.runner && <p className="mt-2 text-[color:var(--ht-6b6b6b)]">Not chosen yet, so tasks use {view.runner === "claude" ? "your Claude plan" : "the OpenAI key"} for now.</p>}
+      {view?.problem && <p role="status" className="mt-2 text-[color:var(--ht-b42318)]">{view.problem}</p>}
       <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); const k = key.trim(); if (!k || busy) return; setKey(""); void send({ key: k }); }}>
         <label className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="font-medium">OpenAI environment key for bot tasks</span>
-          <input type="password" autoComplete="off" spellCheck={false} value={key} onChange={(e) => setKey(e.target.value)} placeholder={view?.openaiKey.set ? `Saved, ${view.openaiKey.masked}` : "Paste the environment key"} aria-label="OpenAI key for bot tasks" className="min-w-0 rounded-lg border border-[#E6E6E3] bg-white p-2" />
+          <input type="password" autoComplete="off" spellCheck={false} value={key} onChange={(e) => setKey(e.target.value)} placeholder={view?.openaiKey.set ? `Saved, ${view.openaiKey.masked}` : "Paste the environment key"} aria-label="OpenAI key for bot tasks" className="min-w-0 rounded-lg border border-[color:var(--h-e6e6e3)] bg-white p-2" />
         </label>
         <button type="submit" disabled={busy || !key.trim()} className={dark}>Save key</button>
         {view?.openaiKey.set && <button type="button" disabled={busy} onClick={() => void send({ key: "" })} className={light}>Remove key</button>}
       </form>
-      {view?.openaiKey.set && <p className="mt-1 text-[#6B6B6B]">Saved on this PC ({view.openaiKey.masked}). Bops never shows it again. Run a small task to check it connects.</p>}
-      {error && <p role="alert" className="mt-2 text-[#B42318]">{error}</p>}
+      {view?.openaiKey.set && <p className="mt-1 text-[color:var(--ht-6b6b6b)]">Saved on this PC ({view.openaiKey.masked}). Bops never shows it again. Run a small task to check it connects.</p>}
+      {error && <p role="alert" className="mt-2 text-[color:var(--ht-b42318)]">{error}</p>}
     </div>
   );
 }
@@ -216,24 +216,24 @@ export function LocalSubscriptions({ runner }: { /** Who runs bot tasks on this 
       const rawPlan = typeof s?.plan === "string" ? s.plan.trim() : "";
       const knownPlan = rawPlan ? rawPlan.charAt(0).toUpperCase() + rawPlan.slice(1) : "";
       const link = kind === "codex" && s?.state === "connecting" ? loginLink(s.loginUrl) : undefined;
-      return <div key={kind} className="flex flex-col gap-2 rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]">
+      return <div key={kind} className="flex flex-col gap-2 rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         <h3 className="text-[13px] font-semibold">{kind === "codex" ? "ChatGPT Plus/Pro" : "Claude Pro/Max"} · This PC</h3>
         <p>{kind === "codex" ? "Connect the official Codex account on this PC. ChatGPT subscription chat and local subscription tasks are not enabled yet." : claudeLocalLine(!!s?.connected, runner)}</p>
         <p role="status">{!s ? "Status not checked yet." : s.state === "missing" ? `${kind === "codex" ? "Codex" : "Claude Code"} CLI was not found on this PC.` : s.state === "connecting" ? "Finish signing in in your normal browser. Bops will check automatically." : s.state === "error" ? "The subscription could not be confirmed." : s.connected ? `Connected: your ${provider}${knownPlan ? ` ${knownPlan}` : ""} subscription` : "Not signed in on this PC."}</p>
-        {s?.error && <p role="alert" className="text-[#B00020]">{s.error}</p>}
+        {s?.error && <p role="alert" className="text-[color:var(--ht-b00020)]">{s.error}</p>}
         {s?.state === "missing" && <p>{kind === "codex" ? "Install the official Codex CLI on this PC" : "Install Claude Code using its official native installer (the npm claude.cmd launcher is not used)"}, then check the connection again.</p>}
         {kind === "claude" && <p>Complete sign-in only in the browser opened automatically by Claude Code. Bops cannot accept a pasted authorization code. If no browser opens, cancel and try the native CLI directly.</p>}
-        {s?.connected && <p className="text-[#6B6B6B]">{typeof s.account === "string" && s.account ? s.account : "Account details unavailable"}{!knownPlan ? ". The CLI did not report the plan tier." : ""}</p>}
-        {typeof s?.checkedAt === "number" && Number.isFinite(s.checkedAt) && <p className="text-[#6B6B6B]">Last checked: {new Date(s.checkedAt).toLocaleString()}</p>}
+        {s?.connected && <p className="text-[color:var(--ht-6b6b6b)]">{typeof s.account === "string" && s.account ? s.account : "Account details unavailable"}{!knownPlan ? ". The CLI did not report the plan tier." : ""}</p>}
+        {typeof s?.checkedAt === "number" && Number.isFinite(s.checkedAt) && <p className="text-[color:var(--ht-6b6b6b)]">Last checked: {new Date(s.checkedAt).toLocaleString()}</p>}
         {link && <a href={link} target="_blank" rel="noopener noreferrer" className="underline">Open official sign-in page</a>}
         <div className="flex flex-wrap gap-2">
           {s?.state === "connecting" ? <button type="button" disabled={!!busy} onClick={() => void action(kind, "cancel")} className={light}>Cancel {provider} sign-in</button> : s?.connected ? <button type="button" disabled={!!busy} onClick={() => setLogout(kind)} className={light}>Sign out of {provider} on this PC</button> : <button type="button" disabled={!s?.available || !!busy} onClick={() => void action(kind, "login")} className={dark}>{busy === kind ? "Opening sign-in…" : `Sign in with your ${provider} subscription`}</button>}
           <button type="button" disabled={!!busy} onClick={() => void refresh(kind)} className={light}>Check {provider} connection</button>
         </div>
-        {logout === kind && <div role="alertdialog" aria-label={`Sign out of ${provider}`} className="rounded-lg bg-[#FFF8EB] p-3"><p>This signs the official {kind === "codex" ? "Codex" : "Claude Code"} CLI out on this PC, including its use outside Bops. Existing tasks may lose access.</p><div className="mt-2 flex gap-2"><button type="button" disabled={!!busy} onClick={() => void action(kind, "logout")} className={dark}>Confirm sign out</button><button type="button" disabled={!!busy} onClick={() => setLogout(null)} className={light}>Keep signed in</button></div></div>}
+        {logout === kind && <div role="alertdialog" aria-label={`Sign out of ${provider}`} className="rounded-lg bg-[color:var(--hb-fff8eb)] p-3"><p>This signs the official {kind === "codex" ? "Codex" : "Claude Code"} CLI out on this PC, including its use outside Bops. Existing tasks may lose access.</p><div className="mt-2 flex gap-2"><button type="button" disabled={!!busy} onClick={() => void action(kind, "logout")} className={dark}>Confirm sign out</button><button type="button" disabled={!!busy} onClick={() => setLogout(null)} className={light}>Keep signed in</button></div></div>}
       </div>;
     })}
-    {error && <p role="alert" className="text-[12px] text-[#B00020]">{error}</p>}
+    {error && <p role="alert" className="text-[12px] text-[color:var(--ht-b00020)]">{error}</p>}
   </div>;
 }
 
@@ -286,7 +286,7 @@ export function SubscriptionRow({ kind, state, bot: b, keys, selfHosted, onShowS
     } catch (e) { setError(e instanceof Error ? e.message : "Couldn't reach Bops. Try again."); }
     finally { setBusy(false); }
   };
-  return <div className="flex flex-col gap-2 rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]">
+  return <div className="flex flex-col gap-2 rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_var(--h-e6e6e3)]">
     <h3 className="text-[13px] font-semibold">{name}</h3>
     {candidates.length > 1 && <label>Account <select aria-label={`${name} account`} value={agent?.id} disabled={busy} onChange={(e) => { setChosen(e.target.value); setError(null); }}>{candidates.map((a) => <option key={a.id} value={a.id}>{accountOf(a, state)?.name ?? a.model}</option>)}</select></label>}
     {kind === "zai" ? <>
@@ -294,7 +294,7 @@ export function SubscriptionRow({ kind, state, bot: b, keys, selfHosted, onShowS
       <p role="status">{agent ? keys === undefined ? "Coding Plan route configured; key status unavailable." : keys.has("ZAI_API_KEY") ? "Coding Plan route configured; key saved. Subscription entitlement is not verified." : "Coding Plan route configured; add your plan account's key." : "Not configured. A regular Z.ai API key alone does not confirm a Coding Plan subscription."}</p>
     </> : <>
       <p role="status">{pending ? "Signing in on this computer…" : signing?.failed ? `Sign-in failed: ${signing.failed}` : connected ? `Connected: ${connected}` : "Not signed in on this computer."}</p>
-      {signed && <p className="text-[#6B6B6B]">{signed.account?.email ?? "Account email unavailable"}{signed.account?.orgName ? ` · ${signed.account.orgName}` : ""} · Last confirmed: {new Date(signed.at).toLocaleString()}{kind === "codex" && !signed.account?.plan ? ". ChatGPT did not report the subscription tier." : ""}</p>}
+      {signed && <p className="text-[color:var(--ht-6b6b6b)]">{signed.account?.email ?? "Account email unavailable"}{signed.account?.orgName ? ` · ${signed.account.orgName}` : ""} · Last confirmed: {new Date(signed.at).toLocaleString()}{kind === "codex" && !signed.account?.plan ? ". ChatGPT did not report the subscription tier." : ""}</p>}
       {kind === "codex" && !selfHosted && <p>ChatGPT subscriptions are available only to the self-hosted owner.</p>}
     </>}
     <div className="flex flex-wrap gap-2">
@@ -302,8 +302,8 @@ export function SubscriptionRow({ kind, state, bot: b, keys, selfHosted, onShowS
       {signed && <><button type="button" disabled={!allowed || busy} onClick={() => void perform("refresh")} className={light}>Check connection</button><button type="button" disabled={!allowed || busy} onClick={() => void perform("out")} className={light}>Sign out on this computer</button></>}
       {kind === "zai" && agent && <button type="button" disabled={!allowed || busy} onClick={() => setDisconnecting(true)} className={light}>Disconnect Coding Plan tasks</button>}
     </div>
-    {disconnecting && <div role="alertdialog" aria-label="Disconnect Coding Plan tasks" className="rounded-lg bg-[#FFF8EB] p-3"><p>This removes the selected Coding Plan agent and stops its running tasks. Your saved Z.ai key stays available to other agents.</p><div className="mt-2 flex gap-2"><button type="button" disabled={busy} className={dark} onClick={() => void perform("out")}>Disconnect</button><button type="button" disabled={busy} className={light} onClick={() => setDisconnecting(false)}>Cancel</button></div></div>}
-    {error && <p role="alert" className="text-[#B00020]">{error}</p>}
+    {disconnecting && <div role="alertdialog" aria-label="Disconnect Coding Plan tasks" className="rounded-lg bg-[color:var(--hb-fff8eb)] p-3"><p>This removes the selected Coding Plan agent and stops its running tasks. Your saved Z.ai key stays available to other agents.</p><div className="mt-2 flex gap-2"><button type="button" disabled={busy} className={dark} onClick={() => void perform("out")}>Disconnect</button><button type="button" disabled={busy} className={light} onClick={() => setDisconnecting(false)}>Cancel</button></div></div>}
+    {error && <p role="alert" className="text-[color:var(--ht-b00020)]">{error}</p>}
   </div>;
 }
 
@@ -451,10 +451,10 @@ type Items = ReturnType<typeof useSetupItems>;
 /* ---------------- The cards ---------------- */
 
 type Tone = "ok" | "todo" | "off" | "none";
-const DOT: Record<Tone, string> = { ok: "bg-[#2BB673]", todo: "bg-[#E59A0B]", off: "bg-[#C9C9C6]", none: "bg-[#C9C9C6]" };
+const DOT: Record<Tone, string> = { ok: "bg-[color:var(--hb-2bb673)]", todo: "bg-[color:var(--hb-e59a0b)]", off: "bg-[color:var(--hb-c9c9c6)]", none: "bg-[color:var(--hb-c9c9c6)]" };
 const pill = "shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 disabled:opacity-50";
-const dark = `${pill} bg-ink text-white`;
-const light = `${pill} bg-[#F2F2F0] hover:bg-[#EAEAE7]`;
+const dark = `${pill} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]`;
+const light = `${pill} bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)]`;
 
 /** One thing to set up: what it is, where it stands, its buttons (`children`), and anything that goes under it (`below`, lined up with the title). */
 function Card({
@@ -477,16 +477,16 @@ function Card({
   below?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col rounded-[14px] bg-white p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+    <div className="flex flex-col rounded-[14px] bg-white p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
       <div className="flex items-center gap-3">
-        <span className={`flex size-9 shrink-0 items-center justify-center rounded-[11px] ${tone === "ok" ? "bg-ink text-highlighter" : "bg-[#F2F2F0] text-ink"}`}>{icon}</span>
+        <span className={`flex size-9 shrink-0 items-center justify-center rounded-[11px] ${tone === "ok" ? "bg-[color:var(--hb-0a0a0a)] text-highlighter" : "bg-[color:var(--hb-f2f2f0)] text-ink"}`}>{icon}</span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex items-center gap-1.5">
             <span className="text-[13.5px] font-semibold leading-[18px]">{title}</span>
-            {chip && <span className="rounded-full bg-[#F2F2F0] px-2 py-px text-[11px] font-medium leading-4 text-[#3A3A38]">{chip}</span>}
+            {chip && <span className="rounded-full bg-[color:var(--hb-f2f2f0)] px-2 py-px text-[11px] font-medium leading-4 text-[color:var(--ht-3a3a38)]">{chip}</span>}
           </span>
           <span className="text-[12px] leading-4 text-pencil">{line}</span>
-          <span className="flex items-center gap-1.5 pt-0.5 text-[12px] leading-4 text-[#3A3A38]">
+          <span className="flex items-center gap-1.5 pt-0.5 text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">
             <span className={`size-[7px] shrink-0 rounded-full ${DOT[tone]}`} />
             {status}
           </span>
@@ -820,13 +820,13 @@ type Remote = {
  * SVG, so it scales with it). `px` wide where there's room; on a narrow window it shrinks to the width, never cut off.
  */
 function Qr({ svg, px, label }: { svg: string; px: number; label: string }) {
-  return <div role="img" aria-label={label} data-qr={label} data-size={px} className="aspect-square w-full shrink-0 overflow-hidden rounded-[10px] bg-white shadow-[0_0_0_1px_#E6E6E3] [&>svg]:block [&>svg]:h-full [&>svg]:w-full" style={{ maxWidth: px }} dangerouslySetInnerHTML={{ __html: svg }} />;
+  return <div role="img" aria-label={label} data-qr={label} data-size={px} className="aspect-square w-full shrink-0 overflow-hidden rounded-[10px] bg-white shadow-[0_0_0_1px_var(--h-e6e6e3)] [&>svg]:block [&>svg]:h-full [&>svg]:w-full" style={{ maxWidth: px }} dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
 function Step({ n, title, done, children }: { n: number; title: string; done?: boolean; children: React.ReactNode }) {
   return (
     <li data-step={n} className="flex gap-2.5">
-      <span className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${done ? "bg-ink text-highlighter" : "bg-[#F2F2F0] text-ink"}`}>{done ? "✓" : n}</span>
+      <span className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${done ? "bg-[color:var(--hb-0a0a0a)] text-highlighter" : "bg-[color:var(--hb-f2f2f0)] text-ink"}`}>{done ? "✓" : n}</span>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <span className="text-[13px] font-semibold leading-5">
           Step {n}: {title}
@@ -966,7 +966,7 @@ export function PhoneCard() {
           <span>Press Pair a phone. A big QR code shows here for the Bops app to scan.</span>
         )}
         {refused && !code && (
-          <span role="alert" className="text-[#B00020]">
+          <span role="alert" className="text-[color:var(--ht-b00020)]">
             {refused}
           </span>
         )}
@@ -1082,9 +1082,9 @@ export function KeysCard() {
       status={busy === "refresh" ? "Reading key status…" : keys ? `${set} of ${keys.length} set` : "Key status unavailable"}
       below={
         <div className="flex flex-col gap-2" aria-live="polite">
-          {error && <p role="alert" className="text-[12px] text-[#B00020]">{error}</p>}
+          {error && <p role="alert" className="text-[12px] text-[color:var(--ht-b00020)]">{error}</p>}
           {keys?.map((row) => (
-            <div key={row.key} className="flex items-center gap-2 rounded-md px-2 py-1.5 shadow-[0_0_0_1px_#E6E6E3]">
+            <div key={row.key} className="flex items-center gap-2 rounded-md px-2 py-1.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
               <div className="min-w-0 flex-1 text-[12px]">
                 <div className="font-medium">{row.label}: {busy === row.key ? "Checking…" : row.status}</div>
                 <div className="break-all font-mono text-[11px] text-pencil">{row.key}</div>
@@ -1145,7 +1145,7 @@ function ModulesCard() {
           {mods.map((m) => {
             const enabled = Boolean(value(m, "enabled", m.enabled));
             return (
-              <div key={m.id} className="rounded-md px-2 py-1.5 shadow-[0_0_0_1px_#E6E6E3]">
+              <div key={m.id} className="rounded-md px-2 py-1.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
                 <div className="flex items-center gap-2">
                   <button onClick={() => setOpen(open === m.id ? null : m.id)} className="flex min-w-0 flex-1 flex-col text-left">
                     <span className="text-[12.5px] font-medium leading-4">{m.name}</span>
@@ -1159,7 +1159,7 @@ function ModulesCard() {
                   )}
                 </div>
                 {open === m.id && m.settings.length > 0 && (
-                  <div className="mt-1.5 flex flex-col gap-1.5 border-t border-[#EEEEEC] pt-1.5">
+                  <div className="mt-1.5 flex flex-col gap-1.5 border-t border-[color:var(--h-eeeeec)] pt-1.5">
                     {m.settings
                       .filter((st) => st.key !== "enabled")
                       .map((st) => (
@@ -1168,7 +1168,7 @@ function ModulesCard() {
                           {st.type === "toggle" ? (
                             <input type="checkbox" className="self-start" checked={Boolean(value(m, st.key, st.value))} onChange={(e) => change(m.id, st.key, e.target.checked)} />
                           ) : Array.isArray(st.type) ? (
-                            <select className="rounded border border-[#E6E6E3] px-1.5 py-1" value={String(value(m, st.key, st.value) ?? "")} onChange={(e) => change(m.id, st.key, e.target.value)}>
+                            <select className="rounded border border-[color:var(--h-e6e6e3)] px-1.5 py-1" value={String(value(m, st.key, st.value) ?? "")} onChange={(e) => change(m.id, st.key, e.target.value)}>
                               <option value="">Default</option>
                               {st.type.map((o) => (
                                 <option key={o} value={o}>
@@ -1177,7 +1177,7 @@ function ModulesCard() {
                               ))}
                             </select>
                           ) : (
-                            <input className="rounded border border-[#E6E6E3] px-1.5 py-1 font-mono" placeholder={st.placeholder ?? "Default"} value={String(value(m, st.key, st.value) ?? "")} onChange={(e) => change(m.id, st.key, e.target.value)} />
+                            <input className="rounded border border-[color:var(--h-e6e6e3)] px-1.5 py-1 font-mono" placeholder={st.placeholder ?? "Default"} value={String(value(m, st.key, st.value) ?? "")} onChange={(e) => change(m.id, st.key, e.target.value)} />
                           )}
                           {st.help && <span className="text-pencil">{st.help}</span>}
                           {st.check === "local-address" &&
@@ -1185,7 +1185,7 @@ function ModulesCard() {
                               const checked = checkVoiceAddress(String(value(m, st.key, st.value) ?? ""));
                               const words = checked.ok ? checked.warning : checked.error;
                               return words ? (
-                                <span data-address-warning className="text-[#B54708]">
+                                <span data-address-warning className="text-[color:var(--ht-b54708)]">
                                   {words}
                                 </span>
                               ) : null;
@@ -1197,7 +1197,7 @@ function ModulesCard() {
               </div>
             );
           })}
-          {error && <span className="text-[12px] text-[#B00020]">{error}</span>}
+          {error && <span className="text-[12px] text-[color:var(--ht-b00020)]">{error}</span>}
           {saved && <RestartAsk compact onCancel={() => setSaved(false)} />}
         </div>
       }

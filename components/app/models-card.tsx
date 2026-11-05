@@ -72,12 +72,12 @@ const PRESETS_PAGE = "https://openrouter.ai/settings/presets";
 type OrPreset = { slug: string; name: string; description?: string };
 const pill =
   "shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 disabled:opacity-50";
-const dark = `${pill} bg-ink text-white`;
-const light = `${pill} bg-[#F2F2F0] hover:bg-[#EAEAE7]`;
+const dark = `${pill} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]`;
+const light = `${pill} bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)]`;
 const chip =
   "rounded-full px-2.5 py-1 text-[12px] leading-4 disabled:opacity-50";
 const field =
-  "rounded border border-[#E6E6E3] bg-white px-1.5 py-1 text-[12px]";
+  "rounded border border-[color:var(--h-e6e6e3)] bg-white px-1.5 py-1 text-[12px]";
 
 const ICON = (
   <svg
@@ -169,10 +169,10 @@ export function ModelsCard() {
   return (
     <div
       data-models-card
-      className="flex flex-col rounded-[14px] bg-white p-3.5 shadow-[0_0_0_1px_#E6E6E3]"
+      className="flex flex-col rounded-[14px] bg-white p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]"
     >
       <div className="flex items-center gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-ink text-highlighter">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-[color:var(--hb-0a0a0a)] text-highlighter">
           {ICON}
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -183,9 +183,9 @@ export function ModelsCard() {
             The AI models your bots and chats use, and what each one is for.
             Changes save and apply right away.
           </span>
-          <span className="flex items-center gap-1.5 pt-0.5 text-[12px] leading-4 text-[#3A3A38]">
+          <span className="flex items-center gap-1.5 pt-0.5 text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">
             <span
-              className={`size-[7px] shrink-0 rounded-full ${info.llms.length ? "bg-[#2BB673]" : "bg-[#C9C9C6]"}`}
+              className={`size-[7px] shrink-0 rounded-full ${info.llms.length ? "bg-[color:var(--hb-2bb673)]" : "bg-[color:var(--hb-c9c9c6)]"}`}
             />
             {info.llms.length
               ? `${info.llms.length} model${info.llms.length === 1 ? "" : "s"} · New chats start on ${chat ? chat.name : "Auto (OpenAI)"}`
@@ -204,17 +204,17 @@ export function ModelsCard() {
       </div>
       <div className="flex flex-col gap-2 pl-12 pt-3" aria-live="polite">
         {error && (
-          <p role="alert" className="text-[12px] text-[#B00020]">
+          <p role="alert" className="text-[12px] text-[color:var(--ht-b00020)]">
             {error}
           </p>
         )}
         {note && (
-          <p data-models-note className="text-[12px] text-[#3A3A38]">
+          <p data-models-note className="text-[12px] text-[color:var(--ht-3a3a38)]">
             {note}
           </p>
         )}
         {warning && (
-          <p data-models-warning className="text-[12px] text-[#9A5B00]">
+          <p data-models-warning className="text-[12px] text-[color:var(--ht-9a5b00)]">
             {warning}
           </p>
         )}
@@ -269,18 +269,18 @@ function KeyDot({ provider }: { provider?: Provider }) {
   return provider.keySet ? (
     <span
       data-key="set"
-      className="flex items-center gap-1 text-[12px] text-[#3A3A38]"
+      className="flex items-center gap-1 text-[12px] text-[color:var(--ht-3a3a38)]"
       title={`${provider.keyName} is set on this server`}
     >
-      <span className="size-[7px] rounded-full bg-[#2BB673]" />
+      <span className="size-[7px] rounded-full bg-[color:var(--hb-2bb673)]" />
       Key set
     </span>
   ) : (
     <span
       data-key="missing"
-      className="flex items-center gap-1 text-[12px] text-[#3A3A38]"
+      className="flex items-center gap-1 text-[12px] text-[color:var(--ht-3a3a38)]"
     >
-      <span className="size-[7px] rounded-full bg-[#E59A0B]" />
+      <span className="size-[7px] rounded-full bg-[color:var(--hb-e59a0b)]" />
       {provider.keyName.endsWith("_KEY")
         ? "No key yet:"
         : "Not set up yet:"}{" "}
@@ -323,7 +323,7 @@ function Jobs({
             onClick={() =>
               onPick(on ? mine.filter((k) => k !== j.id) : [...mine, j.id])
             }
-            className={`${chip} ${on ? "bg-ink text-white" : "bg-black/[0.05] text-[#6B6B6B] hover:text-ink"} ${other ? "opacity-60" : ""}`}
+            className={`${chip} ${on ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "bg-[color:var(--bops-tint)]/[0.05] text-[color:var(--ht-6b6b6b)] hover:text-ink"} ${other ? "opacity-60" : ""}`}
           >
             {j.name}
           </button>
@@ -381,7 +381,7 @@ function AccountSelect({
         )}
       </select>
       {missing && (
-        <span data-account-missing className="text-[#9A5B00]">
+        <span data-account-missing className="text-[color:var(--ht-9a5b00)]">
           Account not found: add {provider.keyName}__{value} to .env.local, then
           restart Bops.
         </span>
@@ -459,7 +459,7 @@ function ModelRow({
   return (
     <div
       data-model={l.id}
-      className="flex flex-col gap-1.5 rounded-md px-2 py-2 shadow-[0_0_0_1px_#E6E6E3]"
+      className="flex flex-col gap-1.5 rounded-md px-2 py-2 shadow-[0_0_0_1px_var(--h-e6e6e3)]"
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-[12.5px] font-medium leading-4">{l.name}</span>
@@ -467,7 +467,7 @@ function ModelRow({
         {isPreset(l.provider, l.model) && (
           <span
             data-preset-tag
-            className="rounded-full bg-black/[0.05] px-1.5 text-[11px] text-[#3A3A38]"
+            className="rounded-full bg-[color:var(--bops-tint)]/[0.05] px-1.5 text-[11px] text-[color:var(--ht-3a3a38)]"
           >
             Preset
           </span>
@@ -829,7 +829,7 @@ function AddModel({
         setSlug("");
         if (!named) setName("");
       }}
-      className={`${chip} ${mode === m ? "bg-ink text-white" : "bg-black/[0.05] text-[#3A3A38] hover:text-ink"}`}
+      className={`${chip} ${mode === m ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "bg-[color:var(--bops-tint)]/[0.05] text-[color:var(--ht-3a3a38)] hover:text-ink"}`}
     >
       {label}
     </button>
@@ -837,7 +837,7 @@ function AddModel({
   return (
     <div
       data-add-model
-      className="flex flex-col gap-2 rounded-md bg-[#FAFAF9] px-2.5 py-2.5 shadow-[0_0_0_1px_#E6E6E3]"
+      className="flex flex-col gap-2 rounded-md bg-[color:var(--hb-fafaf9)] px-2.5 py-2.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]"
     >
       <label className="flex flex-col gap-0.5 text-[12px]">
         <span className="font-medium">1. Provider</span>
@@ -887,7 +887,7 @@ function AddModel({
                   setSlug("");
                   pickModel(AUTO_ROUTER, "Auto Router");
                 }}
-                className={`${chip} ${model === AUTO_ROUTER ? "bg-ink text-white" : "bg-black/[0.05] text-[#3A3A38] hover:text-ink"}`}
+                className={`${chip} ${model === AUTO_ROUTER ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "bg-[color:var(--bops-tint)]/[0.05] text-[color:var(--ht-3a3a38)] hover:text-ink"}`}
               >
                 Auto Router
               </button>
@@ -920,7 +920,7 @@ function AddModel({
                   <div
                     role="listbox"
                     aria-label="OpenRouter models"
-                    className="flex max-h-[220px] flex-col overflow-y-auto rounded border border-[#E6E6E3] bg-white"
+                    className="flex max-h-[220px] flex-col overflow-y-auto rounded border border-[color:var(--h-e6e6e3)] bg-white"
                   >
                     {found.map((m) => (
                       <button
@@ -932,13 +932,13 @@ function AddModel({
                         onClick={() =>
                           pickModel(m.id, nameFromOpenRouter(m.name))
                         }
-                        className={`flex flex-col px-2 py-1 text-left ${model === m.id ? "bg-ink text-white" : "hover:bg-[#F2F2F0]"}`}
+                        className={`flex flex-col px-2 py-1 text-left ${model === m.id ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "hover:bg-[color:var(--hb-f2f2f0)]"}`}
                       >
                         <span className="text-[12px] font-medium">
                           {m.name}
                         </span>
                         <span
-                          className={`font-mono text-[11px] ${model === m.id ? "text-white/80" : "text-pencil"}`}
+                          className={`font-mono text-[11px] ${model === m.id ? "text-[color:var(--bops-on-fill)]/80" : "text-pencil"}`}
                         >
                           {m.id}
                           {price(m) ? ` · ${price(m)}` : ""}
@@ -1005,7 +1005,7 @@ function AddModel({
                 <div
                   role="listbox"
                   aria-label="Your OpenRouter presets"
-                  className="flex max-h-[180px] flex-col overflow-y-auto rounded border border-[#E6E6E3] bg-white"
+                  className="flex max-h-[180px] flex-col overflow-y-auto rounded border border-[color:var(--h-e6e6e3)] bg-white"
                 >
                   {presets.presets.map((x) => (
                     <button
@@ -1015,11 +1015,11 @@ function AddModel({
                       aria-selected={slug === x.slug}
                       data-or-preset={x.slug}
                       onClick={() => pickPreset(x.slug, x.name)}
-                      className={`flex flex-col px-2 py-1 text-left ${slug === x.slug ? "bg-ink text-white" : "hover:bg-[#F2F2F0]"}`}
+                      className={`flex flex-col px-2 py-1 text-left ${slug === x.slug ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "hover:bg-[color:var(--hb-f2f2f0)]"}`}
                     >
                       <span className="text-[12px] font-medium">{x.name}</span>
                       <span
-                        className={`font-mono text-[11px] ${slug === x.slug ? "text-white/80" : "text-pencil"}`}
+                        className={`font-mono text-[11px] ${slug === x.slug ? "text-[color:var(--bops-on-fill)]/80" : "text-pencil"}`}
                       >
                         @preset/{x.slug}
                         {x.description ? ` · ${x.description}` : ""}
@@ -1047,7 +1047,7 @@ function AddModel({
                     />
                   </label>
                   {slug && !PRESET_ID.test(`@preset/${slug}`) && (
-                    <span className="text-[#B00020]">
+                    <span className="text-[color:var(--ht-b00020)]">
                       A preset&apos;s slug is letters, numbers, - and _ only.
                     </span>
                   )}
@@ -1102,18 +1102,18 @@ function AddModel({
             </datalist>
           )}
           {model && !preset && !modelOk(provider, model) && (
-            <span className="text-[#B00020]">
+            <span className="text-[color:var(--ht-b00020)]">
               A model id is letters, numbers and . _ : / - only, with no spaces.
             </span>
           )}
           {unknown && (
-            <span data-unknown-id className="text-[#9A5B00]">
+            <span data-unknown-id className="text-[color:var(--ht-9a5b00)]">
               OpenRouter&apos;s list doesn&apos;t have {model}. You can still
               save it: check the id if chats on it fail.
             </span>
           )}
           {dup && (
-            <span className="text-[#B00020]">
+            <span className="text-[color:var(--ht-b00020)]">
               That model is in the list already.
             </span>
           )}
@@ -1143,7 +1143,7 @@ function AddModel({
             <>
               <Jobs info={info} mine={jobs} onPick={setJobs} />
               {moving.length > 0 && (
-                <span data-moves className="text-[#3A3A38]">
+                <span data-moves className="text-[color:var(--ht-3a3a38)]">
                   {moving
                     .map(
                       (x) =>

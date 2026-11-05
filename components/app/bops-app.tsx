@@ -17,6 +17,7 @@ import { BotBrowser, WatchChip } from "./bot-browser";
 import { ChatEdge, gridColumns, storedChatWidth } from "./chat-edge";
 import { LookStyle } from "./look-style";
 import { LookSettings } from "./look-settings";
+import { layoutOf, WidgetPageView, WidgetTab } from "./widgets";
 import { ReposSection } from "./repos";
 import { BotComputers } from "./bot-computers";
 import { BrainSettings } from "./brains";
@@ -250,6 +251,8 @@ function Bops({ state }: { state: AppState | null }) {
   // place again, even the one it's at. Only here, in this window: nothing of it is saved.
   const [settings, setSettings] = useState<false | { at?: SettingsPane; keysFor?: string; chartBot?: string; service?: ServiceRow; atAt: number }>(false);
   const openSettings = (at?: SettingsPane, more: { keysFor?: string; chartBot?: string; service?: ServiceRow } = {}) => setSettings({ ...(at ? { at } : {}), ...more, atAt: Date.now() });
+  // A page of the owner's widgets (widgets.tsx), over the chat like Settings: Home or one of theirs, by its id.
+  const [widgetPage, setWidgetPage] = useState<string | null>(null);
   // A bot's full settings page (bot-settings.tsx), over the whole window, at a section; `atAt` makes each opening a new page.
   const [botPage, setBotPage] = useState<{ botId: string; at?: SettingsSection; atAt: number } | null>(null);
   // What had focus as the page opened (the panel's Open full settings, or one of its rows), and whether closing gives it
@@ -465,7 +468,10 @@ function Bops({ state }: { state: AppState | null }) {
   const apps = appsShown(state);
   // The apps the bots made stay the owner's, in a workspace shared with Your Apps too.
   const ownApps = appsOwnShown(state);
-  const tabs = tabsShown(openTabs, state, { chatBotId, ws: currentWorkspace(state), crm, memory, apps });
+  // The tabs the owner pinned (Look.layout, widgets.tsx) come after the rest, from the layout itself, so they're
+  // there after a restart; none in a workspace shared with them.
+  const pinnedTabs: PanelTab[] = state.shared ? [] : layoutOf(state).tabs.map((t) => ({ id: `pin_${t.id}`, kind: "widgets", page: t.page, widget: t.widget, label: t.label, pinned: t.id }));
+  const tabs = [...tabsShown(openTabs.filter((t) => t.kind !== "widgets"), state, { chatBotId, ws: currentWorkspace(state), crm, memory, apps }), ...pinnedTabs];
   // The owner's browser tab beside the first (the chat's bot's browser), when that bot has a computer up.
   const browserTab = browserTabOf(state, chatBotId);
   if (active === BROWSER_TAB && !browserTab) setActive(CHAT_TAB);
@@ -805,6 +811,7 @@ function Bops({ state }: { state: AppState | null }) {
       if (settings && settingsHeld.current) return;
       setSettings(false);
       setBotPage(null);
+      setWidgetPage(null);
       fn(...a);
     };
   const pickTab = (id: string) => {
@@ -1000,7 +1007,9 @@ function Bops({ state }: { state: AppState | null }) {
   const wide = focus || !panelOpen;
   // A page in the main area (Settings, a bot's settings page): it covers the columns past the sidebar, as wide as the
   // sidebar is now (its rail, or itself), sliding with it.
-  const covered = !!settings || !!pageBot;
+  // A page of widgets: the owner's own, never over a shared workspace.
+  const widgetPageOn = !!widgetPage && !state.shared;
+  const covered = !!settings || !!pageBot || widgetPageOn;
   const sidebarWidth = sidebarOpen ? 340 : 72;
   // The chat's column, when the panel is beside it, as wide as its edge was dragged (chat-edge.tsx).
   const columns = { gridTemplateColumns: gridColumns(sidebarWidth, wide ? null : chatWidth) };
@@ -1078,13 +1087,13 @@ function Bops({ state }: { state: AppState | null }) {
           // Narrow, the side panel has a bar of its own over it: back to the chat, and its tabs (they scroll sideways).
           mShow === "panel" &&
           !covered && (
-            <div data-panel-bar className="flex h-12 shrink-0 items-center gap-1 border-b border-[#ECECEA] bg-[#F7F7F6] pl-1 pr-2">
+            <div data-panel-bar className="flex h-12 shrink-0 items-center gap-1 border-b border-[color:var(--h-ececea)] bg-[color:var(--hb-f7f7f6)] pl-1 pr-2">
               <button
                 onClick={() => setMView(panelBack)}
                 aria-label={panelBack === "list" ? "Back to chats" : "Back to the chat"}
                 title={panelBack === "list" ? "Back to chats" : "Back to the chat"}
                 data-narrow-back
-                className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-[#EEEEEC]"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-[color:var(--hb-eeeeec)]"
               >
                 <svg width="9" height="15" viewBox="0 0 8 12" aria-hidden>
                   <path d="M6 1.5L1.5 6 6 10.5" fill="none" stroke="#0A0A0A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -1095,7 +1104,7 @@ function Bops({ state }: { state: AppState | null }) {
           )
         ) : (
         <TitleBar
-          bare={!!pageBot || !!settings}
+          bare={!!pageBot || !!settings || widgetPageOn}
           columns={columns}
           slide={slide}
           wide={focus || !panelOpen}
@@ -1116,7 +1125,7 @@ function Bops({ state }: { state: AppState | null }) {
         <div className="relative flex min-h-0 flex-1 flex-col">
         <div className={narrow ? "grid min-h-0 flex-1" : `grid min-h-0 flex-1 ${slide}`} style={narrow ? NARROW_COLUMNS : columns}>
           {/* The sidebar's column, its color and edge whichever it shows (an inset edge, so the sidebar's 340px fit). Narrow, the whole window, as a list. */}
-          <div className={narrow ? `min-h-0 min-w-0 bg-[#F9F9F8] ${mShow === "list" ? "flex" : "hidden"}` : `flex min-h-0 min-w-0 bg-[#F9F9F8] shadow-[inset_-1px_0_0_#ECECEA] ${sliding ? "overflow-clip" : ""}`}
+          <div className={narrow ? `min-h-0 min-w-0 bg-[color:var(--hb-f9f9f8)] ${mShow === "list" ? "flex" : "hidden"}` : `flex min-h-0 min-w-0 bg-[color:var(--hb-f9f9f8)] shadow-[inset_-1px_0_0_var(--h-ececea)] ${sliding ? "overflow-clip" : ""}`}
             // Narrow, a page over the list (Settings, a bot's page) has the window: the list waits under it, out of reach.
             inert={narrow && covered}
           >
@@ -1162,6 +1171,17 @@ function Bops({ state }: { state: AppState | null }) {
             onOpenAutopilot={leavePages(({ section, focus: item }: AutopilotOpen) => openAutopilot(section, item, null))}
             footer={footer}
             menuActions={pageMenuActions}
+            pageOpen={widgetPageOn ? widgetPage : null}
+            onOpenPage={
+              state.shared
+                ? undefined
+                : (id: string) => {
+                    if (settings && settingsHeld.current) return;
+                    setSettings(false);
+                    setBotPage(null);
+                    setWidgetPage(id);
+                  }
+            }
           />
           )}
           </div>
@@ -1211,7 +1231,7 @@ function Bops({ state }: { state: AppState | null }) {
                 <section ref={panelRef} data-panel className={`relative ${narrow && mShow !== "panel" ? "hidden" : "flex"} min-h-0 min-w-0 flex-col bg-white`}>
                   {!narrow && <ChatEdge from={sidebarWidth} width={chatWidth} onWidth={setChatWidth} onDragging={setEdgeDragged} />}
                   {cutBack && (
-                    <div className="absolute left-1/2 top-3 z-40 flex -translate-x-1/2 animate-[screen-in_300ms_ease-out] items-center gap-2 rounded-full bg-ink py-1 pl-3 pr-1 text-[12.5px] leading-4 text-white shadow-[0_10px_24px_-10px_#00000080]">
+                    <div className="absolute left-1/2 top-3 z-40 flex -translate-x-1/2 animate-[screen-in_300ms_ease-out] items-center gap-2 rounded-full bg-[color:var(--hb-0a0a0a)] py-1 pl-3 pr-1 text-[12.5px] leading-4 text-[color:var(--bops-on-fill)] shadow-[0_10px_24px_-10px_var(--h-00000080)]">
                       <span className="max-w-[260px] truncate">New from {cutBack.name}</span>
                       <button
                         onClick={() => {
@@ -1384,6 +1404,16 @@ function Bops({ state }: { state: AppState | null }) {
                         onClose={() => leaveTab(tab.id)}
                       />
                     </div>
+                  ) : tab?.kind === "widgets" ? (
+                    <WidgetTab
+                      key={tab.id}
+                      state={state}
+                      pageId={tab.page}
+                      widgetId={tab.widget}
+                      links={{ onOpenChat: openChat, onOpenLink: (url) => openWeb(url) }}
+                      onOpenPage={(id) => setWidgetPage(id)}
+                      onUnpin={() => void post("/api/widgets", { changes: [{ action: "unpin_tab", tab: tab.pinned }] })}
+                    />
                   ) : tab?.kind === "autopilot" ? (
                     <div key={tab.id} className="motion-fade-in flex min-h-0 flex-1 flex-col">
                       <AutopilotPage
@@ -1471,6 +1501,19 @@ function Bops({ state }: { state: AppState | null }) {
             />
           </div>
         )}
+        {widgetPageOn && widgetPage && (
+          <div className={`absolute inset-y-0 right-0 z-30 flex bg-desk ${PAGE_SLIDE}`} style={{ left: narrow ? 0 : sidebarWidth }} inert={!!settings || !!pageBot}>
+            <WidgetPageView
+              key={widgetPage}
+              state={state}
+              pageId={widgetPage}
+              onClose={() => setWidgetPage(null)}
+              onGone={() => setWidgetPage(null)}
+              covered={!!settings || !!pageBot}
+              links={{ onOpenChat: leavePages(openChat), onOpenLink: leavePages((url: string) => openWeb(url)) }}
+            />
+          </div>
+        )}
         {settings && (
           // Over a bot's settings page when it opened from there (its Plan and credit, its Org chart): Back goes back to it.
           <div className={`absolute inset-y-0 right-0 z-30 flex bg-white ${PAGE_SLIDE}`} style={{ left: narrow ? 0 : sidebarWidth }}>
@@ -1499,6 +1542,10 @@ function Bops({ state }: { state: AppState | null }) {
                 onHold={holdSettings}
                 onShowScreen={leavePages(showScreen)}
                 onOpenVault={() => openVault()}
+                onOpenPages={() => {
+                  setSettings(false);
+                  setWidgetPage("home");
+                }}
               />
             </OpenAppTask.Provider>
             </OpenHostedApp.Provider>
@@ -1572,7 +1619,7 @@ function TitleBar({
 }) {
   const desktop = typeof navigator !== "undefined" && navigator.userAgent.includes("Electron");
   return (
-    <div className={`grid h-11 shrink-0 border-b border-[#ECECEA] bg-[#F7F7F6] [-webkit-app-region:drag] ${slide}`} style={columns}>
+    <div className={`grid h-11 shrink-0 border-b border-[color:var(--h-ececea)] bg-[color:var(--hb-f7f7f6)] [-webkit-app-region:drag] ${slide}`} style={columns}>
       <div className="flex items-center gap-3 px-3.5">
         {/* Room for the window's buttons (the sidebar's toggle is in its header, or at the top of its rail). */}
         {desktop && <div className="w-[56px] shrink-0" />}
@@ -1585,7 +1632,7 @@ function TitleBar({
         <button
           onClick={onTogglePanel}
           title={panelOpen ? "Hide the side panel" : "Show the side panel"}
-          className={`flex size-7 shrink-0 items-center justify-center rounded-lg [-webkit-app-region:no-drag] ${panelOpen ? "bg-[#EEEEEC]" : "shadow-[0_0_0_1px_#E2E2DF]"}`}
+          className={`flex size-7 shrink-0 items-center justify-center rounded-lg [-webkit-app-region:no-drag] ${panelOpen ? "bg-[color:var(--hb-eeeeec)]" : "shadow-[0_0_0_1px_var(--h-e2e2df)]"}`}
         >
           <SideToggleIcon side="right" open={panelOpen} />
         </button>
@@ -1630,13 +1677,13 @@ function MailSettings() {
   return (
     <div className="flex flex-col gap-2 px-[22px] pt-4">
       <span className="text-[13px] font-semibold">Email</span>
-      <div className="flex flex-col gap-2.5 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="flex flex-col gap-2.5 rounded-[14px] p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         {!info.on ? (
           <SetUpHere service="mail" line="Off. Add an AgentMail key and every bot gets its own email address." button="Set up email" />
         ) : (
           <>
-            <span className="flex items-center gap-1.5 text-[12.5px] leading-[18px] text-[#3A3A38]">
-              <span className={`size-[7px] rounded-full ${ready ? "bg-[#2BB673]" : info.status === "NOT_ADDED" ? "bg-[#C9C9C6]" : "bg-[#E59A0B]"}`} />
+            <span className="flex items-center gap-1.5 text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">
+              <span className={`size-[7px] rounded-full ${ready ? "bg-[color:var(--hb-2bb673)]" : info.status === "NOT_ADDED" ? "bg-[color:var(--hb-c9c9c6)]" : "bg-[color:var(--hb-e59a0b)]"}`} />
               {ready
                 ? `Bots have ${info.domain} addresses.`
                 : info.status === "NOT_ADDED"
@@ -1644,32 +1691,32 @@ function MailSettings() {
                   : `${info.domain} is ${info.status?.toLowerCase().replace("_", " ")}. Add these records at your DNS host, then check again. Bots move to it on their own once it's verified.`}
             </span>
             {!ready && !!info.records?.length && (
-              <div className="flex flex-col overflow-hidden rounded-[10px] shadow-[0_0_0_1px_#ECECEA]">
+              <div className="flex flex-col overflow-hidden rounded-[10px] shadow-[0_0_0_1px_var(--h-ececea)]">
                 {info.records.map((r, i) => (
-                  <div key={i} className="flex items-start gap-3 border-b border-[#F0F0EE] px-3 py-2 font-mono text-[11.5px] leading-4 last:border-0">
+                  <div key={i} className="flex items-start gap-3 border-b border-[color:var(--h-f0f0ee)] px-3 py-2 font-mono text-[11.5px] leading-4 last:border-0">
                     <span className="w-9 shrink-0 font-semibold">{r.type}</span>
                     <span className="w-[150px] shrink-0 truncate" title={r.name}>{r.name}</span>
-                    <span className="min-w-0 flex-1 select-all break-all text-[#3A3A38]">
+                    <span className="min-w-0 flex-1 select-all break-all text-[color:var(--ht-3a3a38)]">
                       {r.priority !== undefined ? `${r.priority} ` : ""}
                       {r.value}
                     </span>
-                    <span className={`shrink-0 font-sans ${r.status === "VERIFIED" ? "text-[#2BB673]" : "text-[#9A9A98]"}`}>{r.status.toLowerCase()}</span>
+                    <span className={`shrink-0 font-sans ${r.status === "VERIFIED" ? "text-[color:var(--ht-2bb673)]" : "text-[color:var(--ht-9a9a98)]"}`}>{r.status.toLowerCase()}</span>
                   </div>
                 ))}
               </div>
             )}
             {!!info.inboxes?.length && (
-              <span className="text-[12px] leading-4 text-[#6B6B6B]">{info.inboxes.map((x) => `${x.bot}: ${x.email}`).join(" · ")}</span>
+              <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{info.inboxes.map((x) => `${x.bot}: ${x.email}`).join(" · ")}</span>
             )}
-            {info.error && <span className="text-[12px] leading-4 text-[#B42318]">{info.error}</span>}
+            {info.error && <span className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">{info.error}</span>}
             <div className="flex gap-1.5">
               {info.status === "NOT_ADDED" && (
-                <button disabled={busy} onClick={() => load({ action: "setup" })} className={`${btn} bg-ink text-white`} data-tip="Adds it to AgentMail and shows the DNS records to add. Changes no DNS.">
+                <button disabled={busy} onClick={() => load({ action: "setup" })} className={`${btn} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]`} data-tip="Adds it to AgentMail and shows the DNS records to add. Changes no DNS.">
                   Set up {info.domain}
                 </button>
               )}
               {!ready && info.status !== "NOT_ADDED" && (
-                <button disabled={busy} onClick={() => load({ action: "verify" })} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
+                <button disabled={busy} onClick={() => load({ action: "verify" })} className={`${btn} bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)]`}>
                   Check DNS again
                 </button>
               )}
@@ -1702,7 +1749,7 @@ function ReachNote({ label, line, retry }: { label: string; line: string; retry?
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-[13px] font-medium leading-4">{label}</span>
-      <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-[#6B6B6B]">
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
         <span role={retry ? "alert" : undefined}>{line}</span>
         {retry && (
           <button onClick={retry} className="font-medium text-ink underline-offset-2 hover:underline">
@@ -1727,16 +1774,16 @@ function MobileRows({ info, onInfo }: { info: PhoneInfo; onInfo: (p: PhoneInfo) 
       <ReachBanner info={info} phone={phone} />
       <OwnerPhone info={info} phone={phone} recommended collapseWhenSaved bannerFor={bannerNumber(info, phone)?.number} />
       {!!reach.length && (
-        <div className="flex flex-col gap-1 border-t border-[#F0F0EE] pt-2.5 text-[12.5px] leading-[18px] text-[#3A3A38]">
+        <div className="flex flex-col gap-1 border-t border-[color:var(--h-f0f0ee)] pt-2.5 text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">
           {reach.map((w) => {
             const who = w.main ?? "your main bot";
             const text = w.line?.phone ?? w.call;
             return (
               <div key={w.id} className="flex flex-col gap-1">
                 <span>
-                  {reach.length > 1 && <span className="text-[#9A9A98]">{w.name}: </span>}
+                  {reach.length > 1 && <span className="text-[color:var(--ht-9a9a98)]">{w.name}: </span>}
                   {w.call && w.call !== text ? `Text ${who} at ${text} · call at ${w.call}` : `Text or call ${who} at ${text}`}
-                  <span className="text-[#9A9A98]"> ({who} hands work to the team)</span>
+                  <span className="text-[color:var(--ht-9a9a98)]"> ({who} hands work to the team)</span>
                 </span>
                 {text && <LineLink phone={text} />}
               </div>
@@ -1780,16 +1827,16 @@ function ReachNotSetUp({ title = "How your bots reach you", intro }: { title?: s
     <div data-reach-off className="flex flex-col gap-2 px-[22px] pt-4">
       <div className="flex flex-col gap-0.5">
         <span className="text-[13px] font-semibold">{title}</span>
-        <span className="text-[12px] leading-4 text-[#6B6B6B]">{intro}</span>
+        <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{intro}</span>
       </div>
-      <div className="flex flex-col gap-2 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="flex flex-col gap-2 rounded-[14px] p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         <span className="text-[13px] font-medium leading-4">Texting and email to your bots aren&apos;t set up on this computer yet.</span>
-        <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">
+        <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">
           {selfHosted
             ? "Texts and calls need an AgentPhone key and a public web address for texts to arrive at. Email needs an AgentMail key. Paste each one in Settings, Services, then restart Bops."
             : "Bops Cloud runs texting and email for you while you're signed in with Orgo, and they aren't on for your account right now. There's nothing to add here."}
         </span>
-        <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">Until then, your bots reach you here in the app.</span>
+        <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-6b6b6b)]">Until then, your bots reach you here in the app.</span>
         {openSettings && (
           <div className="flex flex-wrap gap-1.5">
             {selfHosted ? (
@@ -1838,9 +1885,9 @@ function ReachSettings() {
     <div className="flex flex-col gap-2 px-[22px] pt-4">
       <div className="flex flex-col gap-0.5">
         <span className="text-[13px] font-semibold">How your bots reach you</span>
-        <span className="text-[12px] leading-4 text-[#6B6B6B]">{intro}</span>
+        <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{intro}</span>
       </div>
-      <div className="flex flex-col gap-3 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="flex flex-col gap-3 rounded-[14px] p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         {!phone ? (
           <ReachNote label="Your mobile" {...(phoneRead.failed ? { line: unreachable, retry: phoneRead.retry } : { line: "Checking" })} />
         ) : !phone.on ? (
@@ -1849,7 +1896,7 @@ function ReachSettings() {
           <MobileRows info={phone} onInfo={setPhone} />
         )}
         {mailing && (
-          <div className="border-t border-[#F0F0EE] pt-3">
+          <div className="border-t border-[color:var(--h-f0f0ee)] pt-3">
             {email ? (
               <OwnerEmail info={email} onInfo={setEmail} />
             ) : (
@@ -1870,7 +1917,7 @@ function PhoneService() {
     return (
       <div className="flex flex-col gap-2 px-[22px] pt-4">
         <span className="text-[13px] font-semibold">Phone</span>
-        <div className="flex flex-col gap-2.5 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+        <div className="flex flex-col gap-2.5 rounded-[14px] p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
           <SetUpHere service="phone" line="Off. Add an AgentPhone key and the public address texts arrive at, and you can text and call your bots." button="Set up texting" />
         </div>
       </div>
@@ -1879,20 +1926,20 @@ function PhoneService() {
   return (
     <div className="flex flex-col gap-2 px-[22px] pt-4">
       <span className="text-[13px] font-semibold">Phone service (AgentPhone)</span>
-      <div className="flex flex-col gap-1 rounded-[14px] p-3.5 text-[12.5px] leading-[18px] text-[#3A3A38] shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="flex flex-col gap-1 rounded-[14px] p-3.5 text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)] shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         <span>
-          <span className="text-[#9A9A98]">Texting back:</span> {texting}
+          <span className="text-[color:var(--ht-9a9a98)]">Texting back:</span> {texting}
           {info.texting === "none" ? " (carriers approve business texting first (A2P 10DLC), about 7 to 10 business days)" : ""}
         </span>
         <span>
-          <span className="text-[#9A9A98]">Calls to the bots&apos; numbers:</span> {info.calls === "agent" ? "on (each number's agent passes every turn to Bops)" : (info.calls ?? "unknown")}
+          <span className="text-[color:var(--ht-9a9a98)]">Calls to the bots&apos; numbers:</span> {info.calls === "agent" ? "on (each number's agent passes every turn to Bops)" : (info.calls ?? "unknown")}
         </span>
         {info.workspaces?.map((w) => (
           <span key={w.id}>
-            <span className="text-[#9A9A98]">{w.name}:</span> {w.line ? `${w.line.phone} (${w.line.type === "imessage" ? "iMessage" : "SMS"})` : "no workspace number"}
+            <span className="text-[color:var(--ht-9a9a98)]">{w.name}:</span> {w.line ? `${w.line.phone} (${w.line.type === "imessage" ? "iMessage" : "SMS"})` : "no workspace number"}
           </span>
         ))}
-        {!!info.lines?.length && <span className="text-[#6B6B6B]">Bots&apos; own numbers: {info.lines.map((l) => `${l.bot} ${l.phone}`).join(" · ")}</span>}
+        {!!info.lines?.length && <span className="text-[color:var(--ht-6b6b6b)]">Bots&apos; own numbers: {info.lines.map((l) => `${l.bot} ${l.phone}`).join(" · ")}</span>}
       </div>
     </div>
   );
@@ -1912,14 +1959,14 @@ function OwnerSettings({ owner }: { owner: AppState["owner"] }) {
   return (
     <div className="flex flex-col gap-2 px-[22px] pt-[18px]">
       <span className="text-[13px] font-semibold">You</span>
-      <div className="flex flex-col gap-2.5 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="flex flex-col gap-2.5 rounded-[14px] p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         <label className="flex items-center gap-3">
           <span className="w-[120px] text-[13px] font-medium">Your name</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="What your bots call you"
-            className="h-8 w-[260px] rounded-full bg-[#F7F7F6] px-3 text-[13px] outline-none shadow-[0_0_0_1px_#E6E6E3] focus:shadow-[0_0_0_1.5px_#0A0A0A]"
+            className="h-8 w-[260px] rounded-full bg-[color:var(--hb-f7f7f6)] px-3 text-[13px] outline-none shadow-[0_0_0_1px_var(--h-e6e6e3)] focus:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
           />
         </label>
         <label className="flex items-start gap-3">
@@ -1929,14 +1976,14 @@ function OwnerSettings({ owner }: { owner: AppState["owner"] }) {
             onChange={(e) => setAbout(e.target.value)}
             rows={2}
             placeholder="What every bot should know, like your role and company"
-            className="flex-1 resize-none rounded-[12px] bg-[#F7F7F6] px-3 py-1.5 text-[13px] leading-[18px] outline-none shadow-[0_0_0_1px_#E6E6E3] focus:shadow-[0_0_0_1.5px_#0A0A0A]"
+            className="flex-1 resize-none rounded-[12px] bg-[color:var(--hb-f7f7f6)] px-3 py-1.5 text-[13px] leading-[18px] outline-none shadow-[0_0_0_1px_var(--h-e6e6e3)] focus:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
           />
         </label>
         <div className="flex items-center gap-2 pl-[132px]">
-          <button disabled={!changed || !name.trim()} onClick={() => void save()} className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white disabled:opacity-40">
+          <button disabled={!changed || !name.trim()} onClick={() => void save()} className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-40">
             Save
           </button>
-          {saved && <span className="text-[12px] text-[#6B6B6B]">Saved</span>}
+          {saved && <span className="text-[12px] text-[color:var(--ht-6b6b6b)]">Saved</span>}
         </div>
       </div>
     </div>
@@ -1952,10 +1999,10 @@ function SelfHosting({ state }: { state: AppState }) {
   const joined = state.bots.filter((b) => b.tailnet);
   const tailnet = state.host === "orgo" && joined.length > 0;
   return (
-    <div className="mt-5 flex flex-col border-t border-[#F0F0EE] pb-5">
+    <div className="mt-5 flex flex-col border-t border-[color:var(--h-f0f0ee)] pb-5">
       <div className="flex flex-col gap-0.5 px-[22px] pt-4">
         <span className="text-[15px] font-semibold">Self-hosting</span>
-        <span className="text-[12.5px] leading-[17px] text-[#6B6B6B]">Your own provider accounts, set in .env.local. The hosted Bops runs these for its users.</span>
+        <span className="text-[12.5px] leading-[17px] text-[color:var(--ht-6b6b6b)]">Your own provider accounts, set in .env.local. The hosted Bops runs these for its users.</span>
       </div>
 
       <div className="flex flex-col gap-2 px-[22px] pt-4">
@@ -1966,7 +2013,7 @@ function SelfHosting({ state }: { state: AppState }) {
               <span className="text-[14px] font-semibold">{state.host === "mac" ? computerWords("Direct on this Mac") : "Through Orgo"}</span>
               {radio(!tailnet)}
             </span>
-            <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">
+            <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">
               {state.host === "mac" ? "Screens are mirrored as live pages straight from the browsers here." : "Screenshots and input go through Orgo's API. Works everywhere."}
             </span>
           </div>
@@ -1975,7 +2022,7 @@ function SelfHosting({ state }: { state: AppState }) {
               <span className="text-[14px] font-semibold">Your Tailscale tailnet</span>
               {radio(tailnet)}
             </span>
-            <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">
+            <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">
               {joined.length
                 ? `${joined.length} computer${joined.length === 1 ? "" : "s"} on your tailnet. Orgo screens are mirrored as live pages, directly and privately.`
                 : "Computers join your tailnet when they start a task, for a direct, private mirror."}
@@ -1990,9 +2037,9 @@ function SelfHosting({ state }: { state: AppState }) {
       <div className="flex flex-col px-[22px] pt-4">
         <span className="pb-1 text-[13px] font-semibold">Computers (Orgo)</span>
         {state.bots.map((b) => (
-          <div key={b.id} className="flex items-center border-b border-[#F0F0EE] py-2 last:border-0">
+          <div key={b.id} className="flex items-center border-b border-[color:var(--h-f0f0ee)] py-2 last:border-0">
             <span className="w-[200px] text-[13px] font-medium">{b.name}</span>
-            <span className="font-mono text-[12px] text-[#3A3A38]">{!state.shared && state.host === "mac" ? computerWords("this Mac") : b.computerId ? `${b.computerId}${b.tailnet ? ` · ${b.tailnet.ip}` : ""}` : sharesComputer(b) ? `shares ${workBot(b, state.bots).name}'s` : "none yet"}</span>
+            <span className="font-mono text-[12px] text-[color:var(--ht-3a3a38)]">{!state.shared && state.host === "mac" ? computerWords("this Mac") : b.computerId ? `${b.computerId}${b.tailnet ? ` · ${b.tailnet.ip}` : ""}` : sharesComputer(b) ? `shares ${workBot(b, state.bots).name}'s` : "none yet"}</span>
           </div>
         ))}
       </div>
@@ -2014,7 +2061,7 @@ function WhereBotsWork({ state }: { state: AppState }) {
               <span className="text-[14px] font-semibold">{h === "orgo" ? "Their own cloud computers" : computerWords("This Mac")}</span>
               {radio(state.host === h)}
             </span>
-            <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">
+            <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-6b6b6b)]">
               {h === "orgo" ? computerWords("Recommended. Your bots work on a computer in the cloud, with 4 screens, and keep working when your Mac is closed. A bot can have one of its own.") : computerWords("Bots work in background browsers on this Mac, from your own internet connection.")}
             </span>
           </button>
@@ -2066,7 +2113,7 @@ function PaneHead({ title, sub }: { title: string; sub?: string }) {
   return (
     <div data-pane-head className="flex flex-col gap-0.5 px-[22px] pt-6">
       <span className="text-[22px] font-bold leading-7 tracking-[-0.02em]">{title}</span>
-      {sub && <span className="text-[13px] leading-[19px] text-[#6B6B6B]">{sub}</span>}
+      {sub && <span className="text-[13px] leading-[19px] text-[color:var(--ht-6b6b6b)]">{sub}</span>}
     </div>
   );
 }
@@ -2095,7 +2142,7 @@ function WorkspaceGeneral({ state }: { state: AppState }) {
   return (
     <div className="flex flex-col gap-2 px-[22px] pt-[18px]">
       <span className="text-[13px] font-semibold">Name</span>
-      <div className="flex items-center gap-3 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="flex items-center gap-3 rounded-[14px] p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         {naming !== null ? (
           <div className="min-w-0 flex-1">
             <NameInput value={naming} onChange={setNaming} onSave={() => void save()} onCancel={() => setNaming(null)} />
@@ -2104,7 +2151,7 @@ function WorkspaceGeneral({ state }: { state: AppState }) {
           <>
             <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{name}</span>
             {((!state.shared && w) || adminRenames) && (
-              <button onClick={() => setNaming(adminRenames ? name : w!.name)} className="shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6]">
+              <button onClick={() => setNaming(adminRenames ? name : w!.name)} className="shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f7f7f6)]">
                 Rename
               </button>
             )}
@@ -2112,7 +2159,7 @@ function WorkspaceGeneral({ state }: { state: AppState }) {
         )}
       </div>
       {error && (
-        <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}
@@ -2120,13 +2167,13 @@ function WorkspaceGeneral({ state }: { state: AppState }) {
       {!state.shared && (
         <>
           <span className="mt-2 text-[13px] font-semibold">While you&apos;re away</span>
-          <div className="flex items-center gap-3 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+          <div className="flex items-center gap-3 rounded-[14px] p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
             <span className="min-w-0 flex-1 text-[13px] leading-4">After this many days without you looking in, routines that would speak up wait quietly (their runs are marked away) until you&apos;re back. Check-in routines that have nothing to say run anyway, and Run now always runs.</span>
             <select
               aria-label="Days before routines wait"
               value={String(state.routineAwayDays ?? 7)}
               onChange={(e) => void post("/api/workspaces", { routineAwayDays: Number(e.target.value) }, "PATCH")}
-              className="shrink-0 cursor-pointer rounded-full bg-white px-3 py-1 text-[12.5px] font-medium shadow-[0_0_0_1px_#E6E6E3] outline-none"
+              className="shrink-0 cursor-pointer rounded-full bg-white px-3 py-1 text-[12.5px] font-medium shadow-[0_0_0_1px_var(--h-e6e6e3)] outline-none"
             >
               {[3, 7, 14, 30].map((d) => (
                 <option key={d} value={d}>
@@ -2138,7 +2185,7 @@ function WorkspaceGeneral({ state }: { state: AppState }) {
           </div>
         </>
       )}
-      <span className="text-[12px] leading-4 text-[#9A9A98]">{state.shared ? `Shared with you by ${state.shared.owner || "its owner"}.` : "Make another workspace, or delete this one, from the workspace menu in the sidebar."}</span>
+      <span className="text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{state.shared ? `Shared with you by ${state.shared.owner || "its owner"}.` : "Make another workspace, or delete this one, from the workspace menu in the sidebar."}</span>
     </div>
   );
 }
@@ -2148,22 +2195,22 @@ function WorkspaceBots({ state, onOpenBot }: { state: AppState; onOpenBot?: (bot
   const team = teamOf(state);
   return (
     <div className="flex flex-col gap-2 px-[22px] pt-[18px]">
-      <div className="flex flex-col rounded-[14px] shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="flex flex-col rounded-[14px] shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         {team.map((b) => (
-          <div key={b.id} className="flex items-center gap-3 border-b border-[#F0F0EE] px-3.5 py-2.5 last:border-0">
+          <div key={b.id} className="flex items-center gap-3 border-b border-[color:var(--h-f0f0ee)] px-3.5 py-2.5 last:border-0">
             <Mascot botId={b.id} color={b.color} size={26} />
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-[13.5px] font-medium leading-[18px]">{b.name}</span>
-              <span className="truncate text-[12px] leading-4 text-[#6B6B6B]">{b.role}</span>
+              <span className="truncate text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{b.role}</span>
             </span>
             {onOpenBot && (
-              <button onClick={() => onOpenBot(b.id)} className="shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6]">
+              <button onClick={() => onOpenBot(b.id)} className="shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f7f7f6)]">
                 Open settings
               </button>
             )}
           </div>
         ))}
-        {!team.length && <span className="px-3.5 py-3 text-[12.5px] text-[#6B6B6B]">No bots here yet.</span>}
+        {!team.length && <span className="px-3.5 py-3 text-[12.5px] text-[color:var(--ht-6b6b6b)]">No bots here yet.</span>}
       </div>
     </div>
   );
@@ -2185,17 +2232,17 @@ function WorkspaceReach({ state }: { state: AppState }) {
       <EmailAddresses state={state} only={ws} />
       <div className="flex flex-col gap-2 px-[22px] pt-4">
         <span className="text-[13px] font-semibold">Phone</span>
-        <div className="rounded-[14px] px-3.5 py-3 text-[13px] shadow-[0_0_0_1px_#E6E6E3]">
+        <div className="rounded-[14px] px-3.5 py-3 text-[13px] shadow-[0_0_0_1px_var(--h-e6e6e3)]">
           {w?.line?.phone ? (
             <span>
               Text or call {main?.name ?? "its main bot"} at <span className="font-mono text-[12.5px]">{w.line.phone}</span>
             </span>
           ) : (
-            <span className="text-[#6B6B6B]">No number yet. A workspace gets one to text and call its main bot.</span>
+            <span className="text-[color:var(--ht-6b6b6b)]">No number yet. A workspace gets one to text and call its main bot.</span>
           )}
         </div>
       </div>
-      {!has && <span className="block px-[22px] pt-3 text-[12px] text-[#9A9A98]">Its bots get an address when they first need one.</span>}
+      {!has && <span className="block px-[22px] pt-3 text-[12px] text-[color:var(--ht-9a9a98)]">Its bots get an address when they first need one.</span>}
     </>
   );
 }
@@ -2228,6 +2275,7 @@ export function Settings({
   onOpenBot,
   onMakeBot,
   onOpenWatch = () => {},
+  onOpenPages,
 }: {
   state: AppState;
   onClose: () => void;
@@ -2248,6 +2296,8 @@ export function Settings({
   onOpenBot?: (botId: string) => void;
   onMakeBot?: () => void;
   onOpenWatch?: (w: Watch) => void;
+  /** Your widgets' Home page (widgets.tsx), from the nav: Settings gives way to it. */
+  onOpenPages?: () => void;
 }) {
   const computerWords = useComputerWords();
   const selfHosted = useSelfHosted();
@@ -2328,24 +2378,24 @@ export function Settings({
       data-settings-nav={x.id}
       onClick={() => go(x.id)}
       aria-current={pane === x.id ? "page" : undefined}
-      className={`flex h-[30px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] max-md:h-11 max-md:text-[15px] ${pane === x.id && !(narrow && listing) ? "bg-[#EFEFEC] font-semibold text-ink" : "text-[#3A3A38] hover:bg-[#F2F2F0]"}`}
+      className={`flex h-[30px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] max-md:h-11 max-md:text-[15px] ${pane === x.id && !(narrow && listing) ? "bg-[color:var(--hb-efefec)] font-semibold text-ink" : "text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)]"}`}
     >
       {x.icon}
       <span className="min-w-0 flex-1 truncate">{x.name}</span>
-      {x.value !== undefined && <span className="shrink-0 text-[11.5px] font-normal tabular-nums text-[#8A8A88]">{x.value}</span>}
+      {x.value !== undefined && <span className="shrink-0 text-[11.5px] font-normal tabular-nums text-[color:var(--ht-8a8a88)]">{x.value}</span>}
     </button>
   );
   const group = (label: string, why: string | null, items: NavItem[], heading?: React.ReactNode) => (
     <div className="flex flex-col gap-px pt-4">
-      <span className="px-2.5 text-[10.5px] font-semibold uppercase tracking-[0.05em] text-[#8A8A88]">{label}</span>
+      <span className="px-2.5 text-[10.5px] font-semibold uppercase tracking-[0.05em] text-[color:var(--ht-8a8a88)]">{label}</span>
       {heading}
-      {why && <span className="px-2.5 pb-1 text-[11px] leading-4 text-[#A3A3A0]">{why}</span>}
+      {why && <span className="px-2.5 pb-1 text-[11px] leading-4 text-[color:var(--ht-a3a3a0)]">{why}</span>}
       {items.map(navRow)}
     </div>
   );
   const switcher = (
-    <div className="mx-0.5 my-1.5 flex items-center gap-2 rounded-[10px] bg-white px-2 py-1.5 shadow-[0_0_0_1px_#E8E8E5,0_1px_2px_#00000008]">
-      <span className="flex size-5 shrink-0 items-center justify-center rounded-[6px] bg-[#1F5F4A] text-[11px] font-semibold uppercase text-white">{wsName[0] ?? "W"}</span>
+    <div className="mx-0.5 my-1.5 flex items-center gap-2 rounded-[10px] bg-white px-2 py-1.5 shadow-[0_0_0_1px_var(--h-e8e8e5),0_1px_2px_var(--h-00000008)]">
+      <span className="flex size-5 shrink-0 items-center justify-center rounded-[6px] bg-[color:var(--hb-1f5f4a)] text-[11px] font-semibold uppercase text-[color:var(--bops-on-fill)]">{wsName[0] ?? "W"}</span>
       {shared || own.length < 2 ? (
         <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{wsName}</span>
       ) : (
@@ -2363,7 +2413,7 @@ export function Settings({
         </select>
       )}
       {!shared && own.length > 1 && (
-        <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden className="shrink-0 text-[#9A9A98]">
+        <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden className="shrink-0 text-[color:var(--ht-9a9a98)]">
           <path d="M2.5 4.5L5 2l2.5 2.5M2.5 7.5L5 10l2.5-2.5" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )}
@@ -2515,34 +2565,41 @@ export function Settings({
         aria-label="Settings"
         className={
           narrow
-            ? `${listing ? "flex" : "hidden"} min-w-0 flex-1 flex-col overflow-y-auto bg-[#FBFBFA] px-3 pb-6 pt-2`
-            : "flex w-[240px] shrink-0 flex-col overflow-y-auto border-r border-[#E8E8E5] bg-[#FBFBFA] px-3 pb-4 pt-4"
+            ? `${listing ? "flex" : "hidden"} min-w-0 flex-1 flex-col overflow-y-auto bg-[color:var(--hb-fbfbfa)] px-3 pb-6 pt-2`
+            : "flex w-[240px] shrink-0 flex-col overflow-y-auto border-r border-[color:var(--h-e8e8e5)] bg-[color:var(--hb-fbfbfa)] px-3 pb-4 pt-4"
         }
       >
-        <button onClick={close} disabled={buying} aria-label="Back" title="Back (Esc)" data-settings-back className="flex items-center gap-2 self-start rounded-lg px-2 py-1 text-[14px] font-semibold hover:bg-[#F2F2F0] disabled:opacity-40 max-md:min-h-11 max-md:text-[17px]">
+        <button onClick={close} disabled={buying} aria-label="Back" title="Back (Esc)" data-settings-back className="flex items-center gap-2 self-start rounded-lg px-2 py-1 text-[14px] font-semibold hover:bg-[color:var(--hb-f2f2f0)] disabled:opacity-40 max-md:min-h-11 max-md:text-[17px]">
           <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden>
             <path d="M6 1.5L1.5 6 6 10.5" fill="none" stroke="#8A8A88" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           Settings
         </button>
         <div className="flex items-center gap-2.5 px-2 pb-1 pt-3">
-          <span className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-ink text-[12.5px] font-semibold tracking-[0.02em] text-white">{initialsOf(state)}</span>
+          <span className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-[color:var(--hb-0a0a0a)] text-[12.5px] font-semibold tracking-[0.02em] text-[color:var(--bops-on-fill)]">{initialsOf(state)}</span>
           <span className="flex min-w-0 flex-col">
             <span className="truncate text-[13.5px] font-semibold leading-[18px]">{who}</span>
-            <span className="truncate text-[11.5px] leading-4 text-[#8A8A88]">{user?.email ?? "Not signed in"}</span>
+            <span className="truncate text-[11.5px] leading-4 text-[color:var(--ht-8a8a88)]">{user?.email ?? "Not signed in"}</span>
           </span>
         </div>
         {group("Account", "Yours, in every workspace", account)}
         {group("Workspace", shared ? "Shared with you" : "Shared with its people", workspace, switcher)}
-        {/* Being built (lib/feature-status.ts): a placeholder, grayed with its percent, until feature/widgets-by-chat lands. */}
-        {!shared && <InProgressRow id="widgets-by-chat" name="Widgets" icon={glyph(WIDGETS_GLYPH)} className="h-[30px] text-[13px] text-ink max-md:h-11 max-md:text-[15px]" />}
+        {/* Your widgets: opens Home (widgets.tsx), marked as being tested while lib/feature-status.ts says so. */}
+        {!shared && onOpenPages && (
+          <InProgressRow id="widgets-by-chat">
+            <button data-settings-widgets onClick={onOpenPages} className="flex h-[30px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)] max-md:h-11 max-md:text-[15px]">
+              {glyph(WIDGETS_GLYPH)}
+              <span className="min-w-0 flex-1 truncate">Widgets</span>
+            </button>
+          </InProgressRow>
+        )}
         {team_.length > 0 && group("Orgo team only", null, team_)}
       </nav>
       <main data-settings-pane={pane} className={`${narrow && listing ? "hidden" : "flex"} min-h-0 min-w-0 flex-1 flex-col ${framed ? "" : "overflow-y-auto pb-8"}`}>
         {narrow && (
           // Narrow, the place has the window to itself: back to Settings' nav from its top.
-          <div className="sticky top-0 z-20 flex h-12 shrink-0 items-center border-b border-[#ECECEA] bg-white/95 px-1 backdrop-blur-[6px]">
-            <button onClick={() => setListing(true)} disabled={buying} aria-label="Back to Settings" data-settings-pane-back className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-[15px] font-semibold hover:bg-[#F2F2F0] disabled:opacity-40">
+          <div className="sticky top-0 z-20 flex h-12 shrink-0 items-center border-b border-[color:var(--h-ececea)] bg-white/95 px-1 backdrop-blur-[6px]">
+            <button onClick={() => setListing(true)} disabled={buying} aria-label="Back to Settings" data-settings-pane-back className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-[15px] font-semibold hover:bg-[color:var(--hb-f2f2f0)] disabled:opacity-40">
               <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden>
                 <path d="M6 1.5L1.5 6 6 10.5" fill="none" stroke="#8A8A88" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -2585,7 +2642,7 @@ function FirstLoad() {
           <span>This is taking longer than usual.</span>
           {canRestart && (
             <div className="flex w-[300px] justify-center">
-              <RestartButton className="flex items-center gap-1.5 rounded-full bg-[#F2F2F0] px-3.5 py-1.5 text-[13px] font-medium leading-4 text-ink hover:bg-[#EAEAE7]">
+              <RestartButton className="flex items-center gap-1.5 rounded-full bg-[color:var(--hb-f2f2f0)] px-3.5 py-1.5 text-[13px] font-medium leading-4 text-ink hover:bg-[color:var(--hb-eaeae7)]">
                 <RestartIcon />
                 Restart Bops
               </RestartButton>

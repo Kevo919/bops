@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { fromThisMac } from "@/lib/server/owner-email";
 import { fromBopsWindow } from "@/lib/server/ui-token";
 import { checkVoiceAddress } from "@/lib/voice-address";
@@ -10,8 +11,9 @@ export const dynamic = "force-dynamic";
  * Only the Bops window may (a paired phone, or a bot's Chrome, can't), and only this machine when there
  * is no window; on a server that only lets in the paired phone (BOPS_REQUIRE_REMOTE=1), that phone. No key or secret is ever read or written here: those stay in .env.local.
  */
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const mods = () => require(/* turbopackIgnore: true */ `${process.cwd()}/config/modules.cjs`) as {
+// Its own require (node:module), so this also loads as plain ESM, where there is no global require.
+const load = createRequire(import.meta.url);
+const mods = () => load(/* turbopackIgnore: true */ `${process.cwd()}/config/modules.cjs`) as {
   describe: (root: string) => Module[];
   modules: (root: string) => { id: string; required?: boolean; settings?: { key: string; type: unknown; check?: string }[] }[];
   write: (root: string, config: Record<string, Record<string, unknown>>) => void;

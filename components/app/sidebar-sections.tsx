@@ -107,9 +107,9 @@ export function ThreadRow({ session: s, onClick, readOnly, okWait }: { session: 
       onClick={onClick}
       onAnimationEnd={row.done}
       data-thread={s.id}
-      className={`group/thread flex h-[34px] shrink-0 items-center gap-2 rounded-[10px] px-2.5 text-left outline-none hover:bg-black/[0.03] focus-visible:shadow-[inset_0_0_0_1.5px_#0A0A0A] ${row.rise ? "motion-rise-in" : ""}`}
+      className={`group/thread flex h-[34px] shrink-0 items-center gap-2 rounded-[10px] px-2.5 text-left outline-none hover:bg-[color:var(--bops-tint)]/[0.03] focus-visible:shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)] ${row.rise ? "motion-rise-in" : ""}`}
     >
-      <span className={`min-w-0 flex-1 truncate text-[14px] leading-[18px] ${live(s) || needsYou(s) ? "text-ink" : "text-[#6B6B6B]"}`}>{s.title}</span>
+      <span className={`min-w-0 flex-1 truncate text-[14px] leading-[18px] ${live(s) || needsYou(s) ? "text-ink" : "text-[color:var(--ht-6b6b6b)]"}`}>{s.title}</span>
       {(live(s) || needsYou(s)) && (
         <span key={pop.n} onAnimationEnd={pop.done} className={`flex shrink-0 ${pop.pop ? "motion-dot-in" : ""}`}>
           <StatusIcon session={s} owner={readOnly} okWait={okWait} />
@@ -128,7 +128,7 @@ function MoreButton({ hidden, open, onToggle, className = "" }: { hidden: number
     <button
       onClick={onToggle}
       aria-expanded={open}
-      className={`flex h-7 shrink-0 items-center rounded-[10px] px-2.5 text-left text-[13px] leading-4 text-[#9A9A98] outline-none hover:bg-black/[0.03] hover:text-[#6B6B6B] focus-visible:shadow-[inset_0_0_0_1.5px_#0A0A0A] ${className}`}
+      className={`flex h-7 shrink-0 items-center rounded-[10px] px-2.5 text-left text-[13px] leading-4 text-[color:var(--ht-9a9a98)] outline-none hover:bg-[color:var(--bops-tint)]/[0.03] hover:text-[color:var(--ht-6b6b6b)] focus-visible:shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)] ${className}`}
     >
       {open ? "Show less" : `Show ${hidden} more`}
     </button>
@@ -155,9 +155,9 @@ function Capped({ rows, className = "" }: { rows: ReactNode[]; className?: strin
 function ChipFace({ count, mark, open, selected }: { count: number; mark: ReturnType<typeof chipMark>; open: boolean; selected?: boolean }) {
   const shown = open ? null : mark;
   return (
-    <span className={`flex h-[17px] items-center gap-1 rounded-[6px] px-1.5 text-[11.5px] leading-[14px] tabular-nums text-[#6B6B6B] ${selected ? "bg-white" : "bg-[#EEEEEC]"}`}>
+    <span className={`flex h-[17px] items-center gap-1 rounded-[6px] px-1.5 text-[11.5px] leading-[14px] tabular-nums text-[color:var(--ht-6b6b6b)] ${selected ? "bg-white" : "bg-[color:var(--hb-eeeeec)]"}`}>
       <Chevron open={open} />
-      {shown === "you" && <span data-chip-mark="you" className="size-[7px] shrink-0 rounded-full bg-highlighter shadow-[0_0_0_1.2px_#0A0A0A]" />}
+      {shown === "you" && <span data-chip-mark="you" className="size-[7px] shrink-0 rounded-full bg-highlighter shadow-[0_0_0_1.2px_var(--h-0a0a0a)]" />}
       {shown === "working" && (
         <span data-chip-mark="working" className="flex">
           <Spinner size={10} color="#3A3A38" />
@@ -182,12 +182,12 @@ function NeedCard({ id, icon, title, meta, onClick }: { id: string; icon: ReactN
       onAnimationEnd={row.done}
       data-need={id}
       title={meta ? `${title}\n${meta}` : title}
-      className={`flex shrink-0 items-start gap-2 rounded-[9px] bg-white px-2.5 py-1.5 text-left shadow-[0_0_0_1px_#E6E6E3] outline-none hover:shadow-[0_0_0_1px_#CFCFCB] focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] ${row.rise ? "motion-rise-in" : ""}`}
+      className={`flex shrink-0 items-start gap-2 rounded-[9px] bg-white px-2.5 py-1.5 text-left shadow-[0_0_0_1px_var(--h-e6e6e3)] outline-none hover:shadow-[0_0_0_1px_var(--h-cfcfcb)] focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] ${row.rise ? "motion-rise-in" : ""}`}
     >
       <span className="flex h-[17px] w-4 shrink-0 items-center justify-center">{icon}</span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[13px] font-medium leading-[17px] text-ink">{title}</span>
-        {meta && <span className="truncate text-[11.5px] leading-[14px] text-[#9A9A98]">{meta}</span>}
+        {meta && <span className="truncate text-[11.5px] leading-[14px] text-[color:var(--ht-9a9a98)]">{meta}</span>}
       </span>
     </button>
   );
@@ -230,42 +230,42 @@ function AskCard({ ask: a, botName, where, shared, onOpen }: { ask: AppApproval;
     <div
       onAnimationEnd={row.done}
       data-need={`ask:${a.id}`}
-      className={`flex shrink-0 flex-col gap-1.5 rounded-[9px] bg-white px-2.5 py-1.5 shadow-[0_0_0_1px_#E6E6E3] ${row.rise ? "motion-rise-in" : ""}`}
+      className={`flex shrink-0 flex-col gap-1.5 rounded-[9px] bg-white px-2.5 py-1.5 shadow-[0_0_0_1px_var(--h-e6e6e3)] ${row.rise ? "motion-rise-in" : ""}`}
     >
-      <button onClick={onOpen} title={a.preview ? `${title}\n${a.preview}` : title} className="flex items-start gap-2 text-left outline-none focus-visible:shadow-[0_0_0_1.5px_#0A0A0A]">
+      <button onClick={onOpen} title={a.preview ? `${title}\n${a.preview}` : title} className="flex items-start gap-2 text-left outline-none focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]">
         <span className="flex h-[17px] w-4 shrink-0 items-center justify-center">
           <NeedsYouDot />
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[13px] font-medium leading-[17px] text-ink">{title}</span>
-          <span className="truncate text-[11.5px] leading-[14px] text-[#9A9A98]">{meta}</span>
+          <span className="truncate text-[11.5px] leading-[14px] text-[color:var(--ht-9a9a98)]">{meta}</span>
         </span>
       </button>
       <span className="flex flex-wrap gap-1 pl-6">
-        <button disabled={busy} onClick={() => void decide("reject")} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
+        <button disabled={busy} onClick={() => void decide("reject")} className={`${btn} bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)]`}>
           Deny
         </button>
         {!a.onceOnly && (
-          <button disabled={busy} onClick={() => void decide("always")} title={scope} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
+          <button disabled={busy} onClick={() => void decide("always")} title={scope} className={`${btn} bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)]`}>
             Always allow
           </button>
         )}
         {/* A thread's own app or data ask (the kinds that honour it), from the owner's own Bops (members' answers can't scope to a thread). */}
         {!!a.threadId && !shared && !a.onceOnly && (a.kind === "app" || a.kind === "data") && (
-          <button disabled={busy} onClick={() => void decide("session")} title="This thread runs the same thing on without asking again" className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
+          <button disabled={busy} onClick={() => void decide("session")} title="This thread runs the same thing on without asking again" className={`${btn} bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)]`}>
             For this thread
           </button>
         )}
-        <button disabled={busy} onClick={() => void decide("once")} className={`${btn} bg-ink text-white`}>
+        <button disabled={busy} onClick={() => void decide("once")} className={`${btn} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]`}>
           Allow once
         </button>
       </span>
-      <span title={scope} className="truncate pl-6 text-[11.5px] leading-[14px] text-[#9A9A98]">
+      <span title={scope} className="truncate pl-6 text-[11.5px] leading-[14px] text-[color:var(--ht-9a9a98)]">
         {scope}
       </span>
-      {said && <span className="pl-6 text-[11.5px] leading-[14px] text-[#9A9A98]">{said}</span>}
+      {said && <span className="pl-6 text-[11.5px] leading-[14px] text-[color:var(--ht-9a9a98)]">{said}</span>}
       {shownError && (
-        <span role="alert" className="pl-6 text-[11.5px] leading-[14px] text-[#B42318]">
+        <span role="alert" className="pl-6 text-[11.5px] leading-[14px] text-[color:var(--ht-b42318)]">
           {shownError}
         </span>
       )}
@@ -308,7 +308,7 @@ function needCards(n: BotNeeds, acts: NeedActs) {
         key={`setup:${item}`}
         id={`setup:${item}`}
         icon={
-          <span className="flex text-[#6B6B6B]">
+          <span className="flex text-[color:var(--ht-6b6b6b)]">
             <KeyIcon size={12} />
           </span>
         }
@@ -390,7 +390,7 @@ export function WithThreads({
                 : `${name}'s threads, ${threads.length}${!open && mark === "you" ? ", one needs you" : !open && mark === "working" ? ", working" : ""}`
             }
             title={open ? "Hide" : cards.length ? "Show what needs you, and threads" : "Show threads"}
-            className="absolute bottom-[13px] right-2.5 flex rounded-[7px] outline-none focus-visible:shadow-[0_0_0_1.5px_#0A0A0A]"
+            className="absolute bottom-[13px] right-2.5 flex rounded-[7px] outline-none focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
           >
             {face}
           </button>
@@ -398,7 +398,7 @@ export function WithThreads({
       </div>
       {any && (
         <Fold open={open} lazy>
-          <div key={botId} className="mb-1 ml-[52px] mr-0.5 flex flex-col border-l border-[#E6E6E3] pl-1.5">
+          <div key={botId} className="mb-1 ml-[52px] mr-0.5 flex flex-col border-l border-[color:var(--h-e6e6e3)] pl-1.5">
             {cards.length > 0 && <Capped className="gap-1.5 pb-1.5 pt-0.5" rows={cards} />}
             {threads.length > 0 && <Capped rows={threads.map((s) => <ThreadRow key={s.id} session={s} onClick={() => onOpenThread(s)} readOnly={readOnly} okWait={okWaits?.has(s.id)} />)} />}
           </div>
@@ -473,7 +473,7 @@ export function attentionOf(state: AppState, needs: Map<string, BotNeeds>) {
 
 /** A row in Favorites: its mark, its words, and what's on its right. */
 const ROW =
-  "group/item flex h-[34px] shrink-0 items-center max-md:h-11 gap-2.5 rounded-[10px] px-2.5 text-left outline-none hover:bg-black/[0.03] focus-visible:shadow-[inset_0_0_0_1.5px_#0A0A0A]";
+  "group/item flex h-[34px] shrink-0 items-center max-md:h-11 gap-2.5 rounded-[10px] px-2.5 text-left outline-none hover:bg-[color:var(--bops-tint)]/[0.03] focus-visible:shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)]";
 
 /** A section's heading: its name, a count, and the chevron that folds it. */
 function SectionHead({ label, count, open, scope, onToggle }: { label: string; count?: number; open: boolean; scope: string; onToggle: () => void }) {
@@ -482,10 +482,10 @@ function SectionHead({ label, count, open, scope, onToggle }: { label: string; c
       onClick={onToggle}
       aria-expanded={open}
       data-list-heading
-      className="flex h-[30px] shrink-0 items-center gap-1.5 rounded-[10px] px-2.5 text-left text-[13px] font-medium leading-4 text-[#9A9A98] max-md:h-10 outline-none hover:bg-black/[0.03] hover:text-[#6B6B6B] focus-visible:shadow-[inset_0_0_0_1.5px_#0A0A0A]"
+      className="flex h-[30px] shrink-0 items-center gap-1.5 rounded-[10px] px-2.5 text-left text-[13px] font-medium leading-4 text-[color:var(--ht-9a9a98)] max-md:h-10 outline-none hover:bg-[color:var(--bops-tint)]/[0.03] hover:text-[color:var(--ht-6b6b6b)] focus-visible:shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)]"
     >
       <span>{label}</span>
-      {count !== undefined && <Count n={count} quiet={false} scope={scope} className="rounded-full bg-[#EEEEEC] px-1.5 text-[11.5px] leading-4 tabular-nums text-[#6B6B6B]" />}
+      {count !== undefined && <Count n={count} quiet={false} scope={scope} className="rounded-full bg-[color:var(--hb-eeeeec)] px-1.5 text-[11.5px] leading-4 tabular-nums text-[color:var(--ht-6b6b6b)]" />}
       <span className="flex-1" />
       <Chevron open={open} />
     </button>
@@ -497,7 +497,7 @@ function SectionHead({ label, count, open, scope, onToggle }: { label: string; c
 /** A pinned kind's mark, as its chip and page draw it. */
 function KindIcon({ id }: { id: FavoriteKind }) {
   return (
-    <span className="flex size-[18px] items-center justify-center rounded-full bg-[#EEEEEC] text-[#6B6B6B]">{id === "skills" ? <SkillsIcon size={11} /> : <CategoryIcon id={id} size={11} />}</span>
+    <span className="flex size-[18px] items-center justify-center rounded-full bg-[color:var(--hb-eeeeec)] text-[color:var(--ht-6b6b6b)]">{id === "skills" ? <SkillsIcon size={11} /> : <CategoryIcon id={id} size={11} />}</span>
   );
 }
 
@@ -514,7 +514,7 @@ function MemoryMeta({ id, ws, user }: { id: FavoriteKind; ws: string; user: stri
 }
 
 function Meta({ text }: { text: string | null }) {
-  return text ? <span className="shrink-0 text-[12px] leading-4 tabular-nums text-[#9A9A98]">{text}</span> : null;
+  return text ? <span className="shrink-0 text-[12px] leading-4 tabular-nums text-[color:var(--ht-9a9a98)]">{text}</span> : null;
 }
 
 /**
@@ -616,14 +616,14 @@ export function FavoritesSection({
                 onDragEnd={() => setDrag(null)}
                 className={`${ROW} relative ${drag?.id === id ? "opacity-40" : ""}`}
               >
-                {line && <span aria-hidden className="pointer-events-none absolute inset-x-2.5 -top-px h-[2px] rounded-full bg-ink" />}
+                {line && <span aria-hidden className="pointer-events-none absolute inset-x-2.5 -top-px h-[2px] rounded-full bg-[color:var(--hb-0a0a0a)]" />}
                 <KindIcon id={id} />
                 <span className="min-w-0 flex-1 truncate text-[14px] leading-[18px] text-ink">{label}</span>
                 {meta}
               </button>
             );
           })}
-          {drag && drag.before === null && list[list.length - 1] !== drag.id && <span aria-hidden className="mx-2.5 h-[2px] rounded-full bg-ink" />}
+          {drag && drag.before === null && list[list.length - 1] !== drag.id && <span aria-hidden className="mx-2.5 h-[2px] rounded-full bg-[color:var(--hb-0a0a0a)]" />}
         </div>
       </Fold>
       {menu && <SideMenu x={menu.x} y={menu.y} label={favoriteLabel(menu.id)} items={items(menu.id)} onClose={() => setMenu(null)} />}

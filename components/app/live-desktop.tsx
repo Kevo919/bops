@@ -600,7 +600,7 @@ function VncDesktop({
 export function Waking({ thumbnail, bot, text }: { thumbnail: boolean; bot?: { id: string; name: string; color: string }; text: string }) {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-live="polite" aria-label={text}>
-      <div className={`absolute left-1/2 -translate-x-1/2 rounded-[6%/9%] bg-white/45 shadow-[inset_0_0_0_1px_#FFFFFF99] ${thumbnail ? "top-[10%] h-[70%] w-[84%]" : "top-[7%] h-[76%] w-[86%]"}`}>
+      <div className={`absolute left-1/2 -translate-x-1/2 rounded-[6%/9%] bg-white/45 shadow-[inset_0_0_0_1px_var(--h-ffffff99)] ${thumbnail ? "top-[10%] h-[70%] w-[84%]" : "top-[7%] h-[76%] w-[86%]"}`}>
         <div className={`flex items-center gap-[3%] border-b border-white/60 px-[2.5%] ${thumbnail ? "h-[16%]" : "h-[7%]"}`}>
           {[0, 1, 2].map((i) => (
             <span key={i} className="aspect-square h-[38%] rounded-full bg-white/80" />
@@ -616,7 +616,7 @@ export function Waking({ thumbnail, bot, text }: { thumbnail: boolean; bot?: { i
               <Mascot botId={bot.id} color={bot.color} size={40} />
             </span>
           )}
-          <span className="rounded-full bg-white/85 px-3 py-1 text-[12.5px] font-medium leading-4 text-[#3A3A38] shadow-[0_0_0_1px_#0000000D,0_6px_16px_-8px_#00000033] backdrop-blur">{text}</span>
+          <span className="rounded-full bg-white/85 px-3 py-1 text-[12.5px] font-medium leading-4 text-[color:var(--ht-3a3a38)] shadow-[0_0_0_1px_var(--h-0000000d),0_6px_16px_-8px_var(--h-00000033)] backdrop-blur">{text}</span>
         </div>
       )}
     </div>

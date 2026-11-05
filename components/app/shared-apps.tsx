@@ -80,11 +80,11 @@ export function SharedAppsPage({ state }: { state: AppState }) {
     <div data-shared-apps className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto px-8 py-8">
       <div className="flex flex-col gap-1">
         <span className="text-[26px] font-bold leading-8 tracking-[-0.025em] text-ink">{W.title}</span>
-        <span className="text-[13.5px] leading-[18px] text-[#6B6B6B]">{write ? W.writeLine(ws) : W.readLine(ws)}</span>
-        {apps.at > 0 && <span className="text-[12px] leading-4 text-[#9A9A98]">{W.asOf(asOf(apps.at))}</span>}
+        <span className="text-[13.5px] leading-[18px] text-[color:var(--ht-6b6b6b)]">{write ? W.writeLine(ws) : W.readLine(ws)}</span>
+        {apps.at > 0 && <span className="text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{W.asOf(asOf(apps.at))}</span>}
       </div>
       {!apps.list.length ? (
-        <span className="text-[13px] text-[#6B6B6B]">{W.none}</span>
+        <span className="text-[13px] text-[color:var(--ht-6b6b6b)]">{W.none}</span>
       ) : (
         <div className="flex flex-col gap-3">
           {apps.list.map((a) => (
@@ -92,7 +92,7 @@ export function SharedAppsPage({ state }: { state: AppState }) {
           ))}
         </div>
       )}
-      <span className="text-[12px] leading-4 text-[#9A9A98]">{[W.noVariables, W.noLogs, W.noBuying].join(" ")}</span>
+      <span className="text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{[W.noVariables, W.noLogs, W.noBuying].join(" ")}</span>
     </div>
   );
 }
@@ -118,22 +118,22 @@ function SharedAppCard({ app: a, apps, acts }: { app: SharedApp; apps: SharedApp
   };
   const newest = a.acts?.[0];
   return (
-    <div data-shared-app={a.name} className="flex flex-col rounded-[14px] bg-white shadow-[0_0_0_1px_#ECECEA]">
+    <div data-shared-app={a.name} className="flex flex-col rounded-[14px] bg-white shadow-[0_0_0_1px_var(--h-ececea)]">
       <div className="flex items-center gap-3 px-4 py-3">
-        <span className={`size-2 shrink-0 rounded-full ${live?.state === "succeeded" ? "bg-[#2BB673]" : live?.state === "failed" ? "bg-[#B42318]" : "bg-[#C9C9C6]"}`} />
+        <span className={`size-2 shrink-0 rounded-full ${live?.state === "succeeded" ? "bg-[color:var(--hb-2bb673)]" : live?.state === "failed" ? "bg-[color:var(--hb-b42318)]" : "bg-[color:var(--hb-c9c9c6)]"}`} />
         <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="flex min-w-0 flex-1 flex-col text-left">
           <span className="truncate text-[14px] font-semibold leading-[18px]">{a.name}</span>
-          <span className="truncate text-[12px] leading-4 text-[#6B6B6B]">
+          <span className="truncate text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
             {[pv ? W.preview : null, stateWord(live?.state), serving ? shortId(serving) : null, pv ? site.preview : a.url].filter(Boolean).join(" · ")}
           </span>
         </button>
         {write ? (
-          <button type="button" disabled={!!going} onClick={() => void send({ act: "deploy", app: a.name })} className={`${BUTTON} bg-ink text-white`}>
+          <button type="button" disabled={!!going} onClick={() => void send({ act: "deploy", app: a.name })} className={`${BUTTON} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]`}>
             {W.deploy}
           </button>
         ) : (
           <span data-tip={W.readOnly} className="flex">
-            <button type="button" disabled className={`${BUTTON} text-[#9A9A98] shadow-[0_0_0_1px_#ECECEA]`}>
+            <button type="button" disabled className={`${BUTTON} text-[color:var(--ht-9a9a98)] shadow-[0_0_0_1px_var(--h-ececea)]`}>
               {W.deploy}
             </button>
           </span>
@@ -141,35 +141,35 @@ function SharedAppCard({ app: a, apps, acts }: { app: SharedApp; apps: SharedApp
       </div>
       {(going || acts.some((x) => x.state === "failed") || said || newest) && (
         <div className="flex flex-col gap-0.5 px-4 pb-2.5 text-[12px] leading-4">
-          {going && <span className="text-[#6B6B6B]">{going.state === "waiting" ? W.waiting : W.sending}</span>}
+          {going && <span className="text-[color:var(--ht-6b6b6b)]">{going.state === "waiting" ? W.waiting : W.sending}</span>}
           {acts
             .filter((x) => x.state === "failed")
             .map((x) => (
-              <span key={x.key} role="alert" className="text-[#B42318]">
+              <span key={x.key} role="alert" className="text-[color:var(--ht-b42318)]">
                 {x.error ?? W.failed}
               </span>
             ))}
           {said && (
-            <span role="alert" className="text-[#B42318]">
+            <span role="alert" className="text-[color:var(--ht-b42318)]">
               {said}
             </span>
           )}
-          {newest && <span data-act-line className={newest.ok ? "text-[#6B6B6B]" : "text-[#B42318]"}>{actLine(newest)}</span>}
+          {newest && <span data-act-line className={newest.ok ? "text-[color:var(--ht-6b6b6b)]" : "text-[color:var(--ht-b42318)]"}>{actLine(newest)}</span>}
         </div>
       )}
-      {!write && open && <span className="px-4 pb-2 text-[12px] leading-4 text-[#6B6B6B]">{W.readOnly}</span>}
+      {!write && open && <span className="px-4 pb-2 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{W.readOnly}</span>}
       {open && (
-        <div className="motion-fade-in flex flex-col gap-3 border-t border-[#F0F0ED] px-4 py-3">
+        <div className="motion-fade-in flex flex-col gap-3 border-t border-[color:var(--h-f0f0ed)] px-4 py-3">
           <Part title={W.sites}>
             {(a.sites ?? []).map((s) => (
               <span key={s.name} className="flex flex-col gap-0.5">
                 <span className="flex flex-wrap items-center gap-2 text-[12.5px] leading-[18px]">
                   <span className="font-medium">{s.name}</span>
-                  {s.preview && <span className="text-[#9A9A98]">{W.published}</span>}
-                  <span className="text-[#6B6B6B]">{stateWord(s.live?.state)}</span>
-                  {s.url && <span className="text-[#3A3A38]">{s.url}</span>}
+                  {s.preview && <span className="text-[color:var(--ht-9a9a98)]">{W.published}</span>}
+                  <span className="text-[color:var(--ht-6b6b6b)]">{stateWord(s.live?.state)}</span>
+                  {s.url && <span className="text-[color:var(--ht-3a3a38)]">{s.url}</span>}
                   {(s.domains ?? []).map((d) => (
-                    <span key={d.domain} className="rounded-full bg-[#F6F6F4] px-2 py-0.5 text-[11.5px] text-[#3A3A38]">
+                    <span key={d.domain} className="rounded-full bg-[color:var(--hb-f6f6f4)] px-2 py-0.5 text-[11.5px] text-[color:var(--ht-3a3a38)]">
                       {d.domain}
                     </span>
                   ))}
@@ -182,11 +182,11 @@ function SharedAppCard({ app: a, apps, acts }: { app: SharedApp; apps: SharedApp
             <Part title={W.history}>
               {a.commits.map((c) => (
                 <span key={c.id} className="flex items-center gap-2 text-[12.5px] leading-[18px]">
-                  <span className="font-mono text-[11.5px] text-[#9A9A98]">{shortId(c.id)}</span>
+                  <span className="font-mono text-[11.5px] text-[color:var(--ht-9a9a98)]">{shortId(c.id)}</span>
                   <span className="min-w-0 flex-1 truncate">{c.message}</span>
-                  <span className="shrink-0 text-[#9A9A98]">{`${c.author} · ${ago(c.at)}`}</span>
+                  <span className="shrink-0 text-[color:var(--ht-9a9a98)]">{`${c.author} · ${ago(c.at)}`}</span>
                   {write && (
-                    <button type="button" disabled={!!going} onClick={() => void send({ act: "deploy", app: a.name, at: c.id })} className={`${BUTTON} shadow-[0_0_0_1px_#E2E2DF]`}>
+                    <button type="button" disabled={!!going} onClick={() => void send({ act: "deploy", app: a.name, at: c.id })} className={`${BUTTON} shadow-[0_0_0_1px_var(--h-e2e2df)]`}>
                       {W.deploy}
                     </button>
                   )}
@@ -201,10 +201,10 @@ function SharedAppCard({ app: a, apps, acts }: { app: SharedApp; apps: SharedApp
                   <span className="min-w-0 flex-1 truncate">
                     {[stateWord(d.state), d.env === "preview" ? W.preview : d.env === "prod" ? W.published : null, d.at ? shortId(d.at) : null, d.site !== a.name ? d.site : null, d.when ? ago(d.when) : null].filter(Boolean).join(" · ")}
                   </span>
-                  {d.live && <span className="text-[#1E7A4C]">{W.live}</span>}
+                  {d.live && <span className="text-[color:var(--ht-1e7a4c)]">{W.live}</span>}
                   {/* Members go back on its Preview only (lib/server/member-acts.ts): never on a Published deploy. */}
                   {write && d.canRollback && !d.live && d.env !== "prod" && (
-                    <button type="button" disabled={!!going} onClick={() => void send({ act: "rollback", app: a.name, deployment: d.id, ...(d.site !== a.name ? { site: d.site } : {}) })} className={`${BUTTON} shadow-[0_0_0_1px_#E2E2DF]`}>
+                    <button type="button" disabled={!!going} onClick={() => void send({ act: "rollback", app: a.name, deployment: d.id, ...(d.site !== a.name ? { site: d.site } : {}) })} className={`${BUTTON} shadow-[0_0_0_1px_var(--h-e2e2df)]`}>
                       {W.goBack}
                     </button>
                   )}
@@ -227,12 +227,12 @@ function SharedAppCard({ app: a, apps, acts }: { app: SharedApp; apps: SharedApp
 function PreviewLine({ site: s, link, write }: { site: NonNullable<SharedApp["sites"]>[number]; link: string; write: boolean }) {
   return (
     <span data-shared-preview className="flex flex-wrap items-center gap-2 text-[12.5px] leading-[18px]">
-      <span className="text-[#9A9A98]">{W.preview}</span>
-      <span className="text-[#6B6B6B]">{stateWord(s.previewLive?.state)}</span>
-      <a href={link} target="_blank" rel="noreferrer" title={link} className="min-w-0 truncate font-mono text-[11.5px] leading-4 text-[#3A3A38] hover:underline">
+      <span className="text-[color:var(--ht-9a9a98)]">{W.preview}</span>
+      <span className="text-[color:var(--ht-6b6b6b)]">{stateWord(s.previewLive?.state)}</span>
+      <a href={link} target="_blank" rel="noreferrer" title={link} className="min-w-0 truncate font-mono text-[11.5px] leading-4 text-[color:var(--ht-3a3a38)] hover:underline">
         {link}
       </a>
-      {s.previewProtected && (write && s.previewPassword ? <PasswordShown password={s.previewPassword} /> : <span className="text-[12px] leading-4 text-[#9A9A98]">{W.askPassword}</span>)}
+      {s.previewProtected && (write && s.previewPassword ? <PasswordShown password={s.previewPassword} /> : <span className="text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{W.askPassword}</span>)}
     </span>
   );
 }
@@ -240,13 +240,13 @@ function PreviewLine({ site: s, link, write }: { site: NonNullable<SharedApp["si
 function Part({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase leading-4 tracking-[0.02em] text-[#9A9A97]">{title}</span>
+      <span className="text-[11px] font-semibold uppercase leading-4 tracking-[0.02em] text-[color:var(--ht-9a9a97)]">{title}</span>
       {children}
     </div>
   );
 }
 
-const FIELD = "h-8 min-w-0 rounded-[10px] bg-[#F7F7F6] px-2.5 text-[12.5px] outline-none shadow-[0_0_0_1px_#E6E6E3] focus:shadow-[0_0_0_1.5px_#0A0A0A]";
+const FIELD = "h-8 min-w-0 rounded-[10px] bg-[color:var(--hb-f7f7f6)] px-2.5 text-[12.5px] outline-none shadow-[0_0_0_1px_var(--h-e6e6e3)] focus:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]";
 
 /** A site's settings (port and the four commands), saved by the owner's Bops. Never its variables. */
 function SettingsPart({ app: a, disabled, onSave }: { app: SharedApp; disabled: boolean; onSave: (act: MemberAppAct) => void }) {
@@ -261,13 +261,13 @@ function SettingsPart({ app: a, disabled, onSave }: { app: SharedApp; disabled: 
   return (
     <Part title={W.settings}>
       <div data-shared-settings className="grid grid-cols-[90px_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5 text-[12.5px]">
-        <span className="text-[#6B6B6B]">Port</span>
+        <span className="text-[color:var(--ht-6b6b6b)]">Port</span>
         <input aria-label="Port" inputMode="numeric" value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, "").slice(0, 5))} className={FIELD} />
-        <span className="text-[#6B6B6B]">Install</span>
+        <span className="text-[color:var(--ht-6b6b6b)]">Install</span>
         <input aria-label="Install" value={install} onChange={(e) => setInstall(e.target.value)} className={FIELD} />
-        <span className="text-[#6B6B6B]">Build</span>
+        <span className="text-[color:var(--ht-6b6b6b)]">Build</span>
         <input aria-label="Build" value={build} onChange={(e) => setBuild(e.target.value)} className={FIELD} />
-        <span className="text-[#6B6B6B]">Start</span>
+        <span className="text-[color:var(--ht-6b6b6b)]">Start</span>
         <input aria-label="Start" value={start} onChange={(e) => setStart(e.target.value)} className={FIELD} />
       </div>
       <span className="flex items-center gap-2">
@@ -277,11 +277,11 @@ function SettingsPart({ app: a, disabled, onSave }: { app: SharedApp; disabled: 
           onClick={() =>
             onSave({ act: "settings", app: a.name, ...(site !== a.name ? { site } : {}), ...(port ? { port: n } : {}), ...(install !== (was?.install ?? "") ? { install } : {}), ...(build !== (was?.build ?? "") ? { build } : {}), ...(start !== (was?.start ?? "") ? { start } : {}) })
           }
-          className={`${BUTTON} bg-ink text-white`}
+          className={`${BUTTON} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]`}
         >
           {W.save}
         </button>
-        <span className="text-[12px] text-[#9A9A98]">{W.noVariables}</span>
+        <span className="text-[12px] text-[color:var(--ht-9a9a98)]">{W.noVariables}</span>
       </span>
     </Part>
   );
@@ -294,10 +294,10 @@ function DomainPart({ app: a, owned, disabled, onUse }: { app: SharedApp; owned:
   const ok = sub === "" || /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(sub);
   return (
     <Part title={W.domains}>
-      <span className="text-[12.5px] text-[#3A3A38]">{W.useDomain}</span>
+      <span className="text-[12.5px] text-[color:var(--ht-3a3a38)]">{W.useDomain}</span>
       <span data-shared-domain className="flex flex-wrap items-center gap-2">
         <input aria-label={W.subdomain} placeholder="www" value={sub} onChange={(e) => setSub(e.target.value.toLowerCase().slice(0, 63))} className={`${FIELD} w-[110px]`} />
-        <span className="text-[#9A9A98]">.</span>
+        <span className="text-[color:var(--ht-9a9a98)]">.</span>
         <select aria-label={W.domains} value={zone} onChange={(e) => setZone(e.target.value)} className={`${FIELD} appearance-none pr-6`}>
           {owned.map((d) => (
             <option key={d.id} value={d.id}>
@@ -305,11 +305,11 @@ function DomainPart({ app: a, owned, disabled, onUse }: { app: SharedApp; owned:
             </option>
           ))}
         </select>
-        <button type="button" disabled={disabled || !ok} onClick={() => onUse({ act: "domain", app: a.name, zone, ...(sub ? { subdomain: sub } : {}) })} className={`${BUTTON} bg-ink text-white`}>
+        <button type="button" disabled={disabled || !ok} onClick={() => onUse({ act: "domain", app: a.name, zone, ...(sub ? { subdomain: sub } : {}) })} className={`${BUTTON} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]`}>
           {W.use}
         </button>
       </span>
-      <span className="text-[12px] text-[#9A9A98]">{W.noBuying}</span>
+      <span className="text-[12px] text-[color:var(--ht-9a9a98)]">{W.noBuying}</span>
     </Part>
   );
 }

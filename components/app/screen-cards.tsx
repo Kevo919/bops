@@ -82,16 +82,16 @@ export function SignInCard({
                 else if (json.busy) setError("Already signing in with it. Give it a few seconds.");
                 else if (!json.signedIn) setError(`Signed in partway. ${host(read.url)} still wants something: fill it below, or take over.`);
               }}
-              className="flex items-center gap-2.5 rounded-[14px] bg-ink px-3.5 py-2.5 text-left text-white disabled:opacity-60"
+              className="flex items-center gap-2.5 rounded-[14px] bg-[color:var(--hb-0a0a0a)] px-3.5 py-2.5 text-left text-[color:var(--bops-on-fill)] disabled:opacity-60"
             >
               <KeyIcon />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-[13.5px] font-semibold leading-[18px]">{busy ? "Signing in…" : `Sign in as ${l.username}`}</span>
-                <span className="text-[11.5px] leading-4 text-white/60">Saved in Logins{l.hasTotp ? " · makes the 2FA code too" : ""}</span>
+                <span className="text-[11.5px] leading-4 text-[color:var(--bops-on-fill)]/60">Saved in Logins{l.hasTotp ? " · makes the 2FA code too" : ""}</span>
               </span>
             </button>
           ))}
-          <span className="pt-1 text-center text-[11.5px] leading-4 text-[#9A9A98]">or type it</span>
+          <span className="pt-1 text-center text-[11.5px] leading-4 text-[color:var(--ht-9a9a98)]">or type it</span>
         </div>
       )}
       <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3">
@@ -99,7 +99,7 @@ export function SignInCard({
           const f = form[k]!;
           return (
             <label key={f.id} className="flex flex-col gap-1">
-              <span className="text-[11.5px] font-medium leading-4 text-[#6B6B6B]">{f.label}</span>
+              <span className="text-[11.5px] font-medium leading-4 text-[color:var(--ht-6b6b6b)]">{f.label}</span>
               <input
                 autoFocus={i === 0}
                 type={k === "password" ? "password" : "text"}
@@ -113,12 +113,12 @@ export function SignInCard({
           );
         })}
         {!code && (
-          <label className="flex items-center gap-2 text-[12.5px] leading-4 text-[#3A3A38]">
-            <input type="checkbox" checked={save} onChange={(e) => setSave(e.target.checked)} className="size-3.5 accent-[#0A0A0A]" />
+          <label className="flex items-center gap-2 text-[12.5px] leading-4 text-[color:var(--ht-3a3a38)]">
+            <input type="checkbox" checked={save} onChange={(e) => setSave(e.target.checked)} className="size-3.5 accent-[color:var(--ht-0a0a0a)]" />
             Save to Logins, so {b.name} can sign in next time
           </label>
         )}
-        {error && <span className="text-[12px] leading-4 text-[#B42318]">{error}</span>}
+        {error && <span className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">{error}</span>}
         <div className="flex items-center gap-2">
           <button disabled={busy || !fields.some((k) => values[k]?.trim())} className={primary}>
             {busy ? "Working on it…" : code ? "Send code" : "Continue"}
@@ -127,7 +127,7 @@ export function SignInCard({
             Take over
           </button>
         </div>
-        <span className="text-[11px] leading-[15px] text-[#9A9A98]">
+        <span className="text-[11px] leading-[15px] text-[color:var(--ht-9a9a98)]">
           Goes straight into the page on {b.name}&apos;s screen. {save ? "Saved logins stay in your Mac's Keychain." : "Bops doesn't keep it."} No AI sees it.
         </span>
       </form>
@@ -165,15 +165,15 @@ function CardShell({
       <div
         onClick={(e) => e.stopPropagation()}
         // The arrow over the card, not the hand of the clickable screen under it (as WatchSheet): a click on the card itself does nothing.
-        className={`pointer-events-auto flex max-h-full w-full cursor-default flex-col gap-3 overflow-y-auto rounded-[22px] bg-white/95 p-4 shadow-[0_0_0_1px_#0000000F,0_24px_60px_-18px_#00000059] backdrop-blur ${compact ? "max-w-[360px]" : "max-w-[440px]"}`}
+        className={`pointer-events-auto flex max-h-full w-full cursor-default flex-col gap-3 overflow-y-auto rounded-[22px] bg-white/95 p-4 shadow-[0_0_0_1px_var(--h-0000000f),0_24px_60px_-18px_var(--h-00000059)] backdrop-blur ${compact ? "max-w-[360px]" : "max-w-[440px]"}`}
       >
         <div className="flex items-center gap-2.5">
           <Mascot botId={b.id} color={b.color} size={30} />
           <div className="flex min-w-0 flex-1 flex-col">
             <span className="text-[14.5px] font-semibold leading-5">{title}</span>
-            <span className="truncate text-[12px] leading-4 text-[#6B6B6B]">{subtitle}</span>
+            <span className="truncate text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{subtitle}</span>
           </div>
-          <button type="button" onClick={onDismiss} aria-label="Not now" className="flex size-7 shrink-0 items-center justify-center rounded-full hover:bg-[#F2F2F0]">
+          <button type="button" onClick={onDismiss} aria-label="Not now" className="flex size-7 shrink-0 items-center justify-center rounded-full hover:bg-[color:var(--hb-f2f2f0)]">
             <svg width="10" height="10" viewBox="0 0 12 12">
               <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="#6B6B6B" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
@@ -185,9 +185,9 @@ function CardShell({
   );
 }
 
-const fieldClass = "rounded-xl bg-[#F7F7F6] px-3 py-2.5 text-[14px] leading-5 outline-none shadow-[inset_0_0_0_1px_#E6E6E3] focus:bg-white focus:shadow-[inset_0_0_0_1.5px_#0A0A0A]";
-const primary = "flex-1 rounded-full bg-ink px-4 py-2.5 text-[14px] font-semibold leading-[18px] text-highlighter disabled:opacity-40";
-const secondary = "rounded-full px-3.5 py-2.5 text-[13px] font-medium leading-[18px] text-[#3A3A38] shadow-[inset_0_0_0_1px_#E2E2DF] hover:bg-[#F7F7F6]";
+const fieldClass = "rounded-xl bg-[color:var(--hb-f7f7f6)] px-3 py-2.5 text-[14px] leading-5 outline-none shadow-[inset_0_0_0_1px_var(--h-e6e6e3)] focus:bg-white focus:shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)]";
+const primary = "flex-1 rounded-full bg-[color:var(--hb-0a0a0a)] px-4 py-2.5 text-[14px] font-semibold leading-[18px] text-highlighter disabled:opacity-40";
+const secondary = "rounded-full px-3.5 py-2.5 text-[13px] font-medium leading-[18px] text-[color:var(--ht-3a3a38)] shadow-[inset_0_0_0_1px_var(--h-e2e2df)] hover:bg-[color:var(--hb-f7f7f6)]";
 
 async function act(botId: string, display: number, action: string, values?: Record<string, string>) {
   const res = await post("/api/screen-action", { botId, display, action, values });
@@ -222,11 +222,11 @@ export function PaymentCard({
   };
   return (
     <CardShell bot={b} title={`${b.name} wants to pay`} subtitle={`${read.title ? `${read.title} · ` : ""}${p.merchant}`} compact={compact} onDismiss={onDismiss}>
-      <div className="flex flex-col items-center gap-0.5 rounded-2xl bg-[#F7F7F6] py-4">
+      <div className="flex flex-col items-center gap-0.5 rounded-2xl bg-[color:var(--hb-f7f7f6)] py-4">
         <span className="text-[30px] font-semibold leading-9 tracking-[-0.02em]">{p.amount ?? "Amount unclear"}</span>
-        <span className="text-[12px] leading-4 text-[#6B6B6B]">at {p.merchant}</span>
+        <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">at {p.merchant}</span>
       </div>
-      {error && <span className="text-[12px] leading-4 text-[#B42318]">{error}</span>}
+      {error && <span className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">{error}</span>}
       <div className="flex items-center gap-2">
         <button disabled={!!busy || !p.confirm} onClick={() => void run("pay")} className={primary} title={p.confirm ? `Presses "${p.confirm.text}" on the page` : "Couldn't find the pay button"}>
           {busy === "pay" ? "Paying…" : `Approve${p.amount ? ` ${p.amount}` : ""}`}
@@ -238,7 +238,7 @@ export function PaymentCard({
           Take over
         </button>
       </div>
-      <span className="text-[11px] leading-[15px] text-[#9A9A98]">
+      <span className="text-[11px] leading-[15px] text-[color:var(--ht-9a9a98)]">
         {p.confirm ? `Approve presses "${p.confirm.text}" on ${b.name}'s screen.` : `Take over to check the page and pay yourself.`} Nothing is bought until you say so.
       </span>
     </CardShell>
@@ -286,19 +286,19 @@ export function EmailCard({
   const field = (k: "to" | "subject" | "body", label: string, multiline = false) =>
     e[k] && (
       <label className="flex flex-col gap-1">
-        <span className="text-[11.5px] font-medium leading-4 text-[#6B6B6B]">{label}</span>
+        <span className="text-[11.5px] font-medium leading-4 text-[color:var(--ht-6b6b6b)]">{label}</span>
         {multiline ? (
           <textarea
             value={draft?.[k] ?? ""}
             onChange={(ev) => setDraft({ ...draft, [k]: ev.target.value })}
             rows={compact ? 5 : 8}
-            className="resize-none rounded-xl bg-[#F7F7F6] px-3 py-2.5 text-[13.5px] leading-5 outline-none shadow-[inset_0_0_0_1px_#E6E6E3] focus:bg-white focus:shadow-[inset_0_0_0_1.5px_#0A0A0A]"
+            className="resize-none rounded-xl bg-[color:var(--hb-f7f7f6)] px-3 py-2.5 text-[13.5px] leading-5 outline-none shadow-[inset_0_0_0_1px_var(--h-e6e6e3)] focus:bg-white focus:shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)]"
           />
         ) : (
           <input
             value={draft?.[k] ?? ""}
             onChange={(ev) => setDraft({ ...draft, [k]: ev.target.value })}
-            className="rounded-xl bg-[#F7F7F6] px-3 py-2 text-[13.5px] leading-5 outline-none shadow-[inset_0_0_0_1px_#E6E6E3] focus:bg-white focus:shadow-[inset_0_0_0_1.5px_#0A0A0A]"
+            className="rounded-xl bg-[color:var(--hb-f7f7f6)] px-3 py-2 text-[13.5px] leading-5 outline-none shadow-[inset_0_0_0_1px_var(--h-e6e6e3)] focus:bg-white focus:shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)]"
           />
         )}
       </label>
@@ -307,7 +307,7 @@ export function EmailCard({
   return (
     <CardShell bot={b} title={`${b.name} drafted an email`} subtitle={`Read it, edit anything, then send · ${host(read.url)}`} compact={compact} onDismiss={onDismiss}>
       {draft === null ? (
-        <span className="py-6 text-center text-[12px] text-[#9A9A98]">Reading the draft…</span>
+        <span className="py-6 text-center text-[12px] text-[color:var(--ht-9a9a98)]">Reading the draft…</span>
       ) : (
         <>
           {field("to", "To")}
@@ -315,7 +315,7 @@ export function EmailCard({
           {field("body", "Message", true)}
         </>
       )}
-      {error && <span className="text-[12px] leading-4 text-[#B42318]">{error}</span>}
+      {error && <span className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">{error}</span>}
       <div className="flex items-center gap-2">
         <button disabled={!!busy || draft === null || !e.send} onClick={() => void run("send")} className={primary}>
           {busy === "send" ? "Sending…" : "Send"}
@@ -327,7 +327,7 @@ export function EmailCard({
           Take over
         </button>
       </div>
-      <span className="text-[11px] leading-[15px] text-[#9A9A98]">Send puts your edits into the real draft and presses Send. Nothing goes out until you do.</span>
+      <span className="text-[11px] leading-[15px] text-[color:var(--ht-9a9a98)]">Send puts your edits into the real draft and presses Send. Nothing goes out until you do.</span>
     </CardShell>
   );
 }

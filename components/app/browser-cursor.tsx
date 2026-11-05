@@ -168,10 +168,10 @@ export function BrowserCursors({ bot, feed, page, driver, idle = false }: { bot:
           </svg>
           <span
             data-cursor-tag
-            className="absolute left-0 top-0 flex h-7 translate-x-[13px] translate-y-[19px] items-center gap-1.5 whitespace-nowrap rounded-full bg-white py-1 pl-1 pr-2.5 text-[13px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#0A0A0A,0_4px_10px_-4px_rgb(10_10_10_/_0.3)] transition-transform duration-200 ease-out group-data-[flip]/cursor:translate-x-[calc(-100%-4px)] motion-reduce:transition-none"
+            className="absolute left-0 top-0 flex h-7 translate-x-[13px] translate-y-[19px] items-center gap-1.5 whitespace-nowrap rounded-full bg-white py-1 pl-1 pr-2.5 text-[13px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-0a0a0a),0_4px_10px_-4px_rgb(10_10_10_/_0.3)] transition-transform duration-200 ease-out group-data-[flip]/cursor:translate-x-[calc(-100%-4px)] motion-reduce:transition-none"
           >
             {by ? (
-              <span className="flex size-5 items-center justify-center rounded-full bg-[#EEEEEC] text-[11px] font-semibold text-[#3A3A38]">{initialsFrom(by.name)}</span>
+              <span className="flex size-5 items-center justify-center rounded-full bg-[color:var(--hb-eeeeec)] text-[11px] font-semibold text-[color:var(--ht-3a3a38)]">{initialsFrom(by.name)}</span>
             ) : (
               <Mascot botId={bot.id} color={bot.color} size={20} antenna={false} />
             )}

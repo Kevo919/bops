@@ -901,9 +901,10 @@ export type Message = {
    * Set on Bops' line about a look a bot changed in the chat (chat.ts change_look, the owner's own turn
    * only): what changed in one line, and the whole look before it (a record only: Undo takes the last
    * change back off AppState.look's history, never from here). The line offers Undo and Reset (back to
-   * Bops' own look); `undone`/`reset` once the owner pressed the button.
+   * Bops' own look); `undone`/`reset` once the owner pressed the button. `widgets`: the change was to the
+   * owner's widgets, pages or pinned tabs (change_widgets, lib/server/widgets.ts): Undo only, no Reset.
    */
-  look?: { summary: string; before: Look; undone?: true; reset?: true };
+  look?: { summary: string; before: Look; undone?: true; reset?: true; widgets?: true };
   /**
    * Set on the note a bot's save to the CRM leaves (lib/server/crm.ts): the workspace and file, how many
    * rows it added and changed (or that it made the file), the copy from before it (`snapshot`) and the
@@ -1687,7 +1688,58 @@ export type Look = {
   density?: LookDensity;
   /** Extra CSS, at most 20 KB, with everything that could load or run taken out first. */
   css?: string;
+  /** How much the window moves (lib/look-theme.ts motionCss): none, a little, as usual, or more. Off when the system asks for less motion, whatever this says. */
+  motion?: MotionLevel;
+  /** How fast what moves moves: slower, as usual, or quicker. */
+  motionSpeed?: MotionSpeed;
+  /**
+   * The owner's widgets, pages of them and the tabs pinned to them (lib/widgets.ts), kept with the look so a
+   * change to them is undone with the same Undo. Reset leaves them as they are: it puts back the look only.
+   */
+  layout?: WidgetLayout;
 };
+
+/** How much the window moves (Look.motion). */
+export type MotionLevel = "off" | "subtle" | "normal" | "lively";
+/** How fast it moves (Look.motionSpeed). */
+export type MotionSpeed = "slow" | "normal" | "fast";
+
+/** The kinds of widget there are (lib/widgets.ts WIDGET_KINDS): a fixed list, each drawn by Bops' own code from its settings alone. */
+export type WidgetKind = "clock" | "note" | "routines" | "needs-you" | "bot-status" | "quick-ask" | "links" | "counter" | "checklist" | "countdown";
+/** How much room a widget takes on its page: one column, two, or the whole row. */
+export type WidgetSize = "small" | "medium" | "wide";
+/**
+ * One widget on a page: its kind and its settings, data only (nothing in it ever runs). Every field is
+ * checked on the server before it's kept (lib/widgets.ts), and again as it's read.
+ */
+export type Widget = {
+  id: string;
+  kind: WidgetKind;
+  size: WidgetSize;
+  /** Its own name over it; none: the kind's. */
+  title?: string;
+  /** clock: the time zone it shows (an IANA name); none, this computer's. */
+  timeZone?: string;
+  /** note: what it says. */
+  text?: string;
+  /** routines, bot-status, quick-ask: the bot it's about; none, every bot (routines) or the main bot. */
+  botId?: string;
+  /** links: where each goes (http, https or mailto only). */
+  links?: { label: string; url: string }[];
+  /** counter: where it's at, and how much each press adds. */
+  value?: number;
+  step?: number;
+  /** checklist: its items. */
+  items?: { text: string; done: boolean }[];
+  /** countdown: the day it counts to (YYYY-MM-DD). */
+  date?: string;
+};
+/** A page of widgets: Home (id "home"), or one the owner made, listed in the sidebar. */
+export type WidgetPage = { id: string; name: string; widgets: Widget[] };
+/** A tab pinned to the side panel that opens a page or a single widget on it. */
+export type PinnedTab = { id: string; label: string; page: string; widget?: string };
+/** Every page and pinned tab (Look.layout). */
+export type WidgetLayout = { pages: WidgetPage[]; tabs: PinnedTab[] };
 
 /** The window's look and where it came from (AppState.look): what's on now, and the ones before it to go back to. */
 export type LookState = {

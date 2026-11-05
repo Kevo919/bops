@@ -1,6 +1,8 @@
-import type { Look, LookDensity, LookTheme } from "./types";
+import { DARK_PALETTE } from "./look-palette";
+import type { Look, LookDensity, LookTheme, MotionLevel, MotionSpeed } from "./types";
+import { layoutUsed, normalizeLayout } from "./widgets";
 
-export type { Look, LookDensity, LookTheme };
+export type { Look, LookDensity, LookTheme, MotionLevel, MotionSpeed };
 
 /**
  * How the Bops window looks, checked and turned into CSS (Look, AppState.look). Pure, so the server
@@ -17,6 +19,8 @@ export const FONT_SCALE_MIN = 0.85;
 export const FONT_SCALE_MAX = 1.4;
 export const LOOK_THEMES: readonly LookTheme[] = ["light", "dark", "system"];
 export const LOOK_DENSITIES: readonly LookDensity[] = ["compact", "normal", "roomy"];
+export const MOTION_LEVELS: readonly MotionLevel[] = ["off", "subtle", "normal", "lively"];
+export const MOTION_SPEEDS: readonly MotionSpeed[] = ["slow", "normal", "fast"];
 
 /** A look couldn't be kept: `message` says why in plain words, for the owner and for the bot that asked. */
 export class LookError extends Error {}
@@ -97,7 +101,7 @@ function accentOf(v: unknown): string {
  * something) refuses the whole change with why, so nothing half-checked is ever kept.
  */
 export function validateLook(input: unknown): Look {
-  if (!input || typeof input !== "object") throw new LookError("A look change needs at least one of theme, accent, font_scale, density or css.");
+  if (!input || typeof input !== "object") throw new LookError("A look change needs at least one of theme, accent, font_scale, density, css, motion or motion_speed.");
   const raw = input as Record<string, unknown>;
   const out: Look = {};
   let named = 0;
@@ -129,7 +133,17 @@ export function validateLook(input: unknown): Look {
     out.css = !raw.css.trim() ? "" : sanitizeCss(raw.css);
     named++;
   }
-  if (!named) throw new LookError("A look change needs at least one of theme, accent, font_scale, density or css.");
+  if (raw.motion !== undefined && raw.motion !== null) {
+    if (!MOTION_LEVELS.includes(raw.motion as MotionLevel)) throw new LookError(`The animations must be off, subtle, normal or lively, not "${String(raw.motion)}".`);
+    out.motion = raw.motion as MotionLevel;
+    named++;
+  }
+  if (raw.motion_speed !== undefined && raw.motion_speed !== null) {
+    if (!MOTION_SPEEDS.includes(raw.motion_speed as MotionSpeed)) throw new LookError(`The animation speed must be slow, normal or fast, not "${String(raw.motion_speed)}".`);
+    out.motionSpeed = raw.motion_speed as MotionSpeed;
+    named++;
+  }
+  if (!named) throw new LookError("A look change needs at least one of theme, accent, font_scale, density, css, motion or motion_speed.");
   return out;
 }
 
@@ -152,6 +166,14 @@ export function normalizeLook(input: unknown): Look {
     if (n !== 1) out.fontScale = n;
   }
   if (LOOK_DENSITIES.includes(raw.density as LookDensity)) out.density = raw.density as LookDensity;
+  // The usual motion is no field at all, like the usual text size.
+  if (MOTION_LEVELS.includes(raw.motion as MotionLevel) && raw.motion !== "normal") out.motion = raw.motion as MotionLevel;
+  if (MOTION_SPEEDS.includes(raw.motionSpeed as MotionSpeed) && raw.motionSpeed !== "normal") out.motionSpeed = raw.motionSpeed as MotionSpeed;
+  // The widgets, checked whole (lib/widgets.ts), and kept only when there's something in them.
+  if (raw.layout !== undefined) {
+    const layout = normalizeLayout(raw.layout);
+    if (layoutUsed(layout)) out.layout = layout;
+  }
   if (typeof raw.css === "string" && raw.css.trim())
     try {
       out.css = sanitizeCss(raw.css);
@@ -167,15 +189,99 @@ export function normalizeLookState(input: unknown): { current: Look; history: Lo
   return { current: normalizeLook(raw.current), history: (Array.isArray(raw.history) ? raw.history : []).slice(0, LOOK_HISTORY).map(normalizeLook) };
 }
 
-/** The dark palette over the app's own (globals.css): the window's papers and inks, turned over. */
+/**
+ * How much and how fast the window moves (Look.motion, Look.motionSpeed), as the variables every motion-
+ * class in globals.css reads: --motion-time scales how long each takes, --motion-reach how far it travels.
+ * Off stops them all: every motion- class, the mascots' loops and the animate- ones, transitions too. The
+ * system's own ask for less motion stops them whatever this says (globals.css's reduced motion blocks,
+ * and the same rule here once more, so nothing a look says can start them again).
+ */
+const MOTION_TIME: Record<MotionLevel, number> = { off: 0, subtle: 0.75, normal: 1, lively: 1.2 };
+const MOTION_REACH: Record<MotionLevel, number> = { off: 0, subtle: 0.4, normal: 1, lively: 1.8 };
+const SPEED_TIME: Record<MotionSpeed, number> = { slow: 1.6, normal: 1, fast: 0.6 };
+const MOVING = '[class*="motion-"], [class*="mascot-"], [class*="animate-"], [class*="boppy-"]';
+const STILL = `${MOVING.split(", ").map((s) => `${s}, ${s}::before, ${s}::after`).join(", ")} {\n  animation: none !important;\n  transition: none !important;\n}`;
+/**
+ * And everything else that moves: every Tailwind transition (duration-200 and the rest), the pages sliding in, a
+ * scroll that glides. Durations go to nothing, so what changes is just there; nothing loops.
+ */
+const STILL_ALL = `*, *::before, *::after {\n  transition-duration: 0s !important;\n  transition-delay: 0s !important;\n  animation-duration: 0s !important;\n  animation-delay: 0s !important;\n  animation-iteration-count: 1 !important;\n  scroll-behavior: auto !important;\n}`;
+
+export function motionCss(level: MotionLevel = "normal", speed: MotionSpeed = "normal"): string {
+  if (level === "off") return `:root {\n  --motion-time: 0;\n  --motion-reach: 0;\n}\n${STILL}\n${STILL_ALL}`;
+  const lines: string[] = [];
+  const time = Math.round(MOTION_TIME[level] * SPEED_TIME[speed] * 100) / 100;
+  const reach = MOTION_REACH[level];
+  // Tailwind's transitions with no duration of their own take --default-transition-duration (150ms): scaled the same.
+  if (time !== 1 || reach !== 1) lines.push(`:root {\n  --motion-time: ${time};\n  --motion-reach: ${reach};\n  --default-transition-duration: ${Math.round(150 * time)}ms;\n}`);
+  if (lines.length) lines.push(`@media (prefers-reduced-motion: reduce) {\n${STILL}\n${STILL_ALL}\n}`);
+  return lines.join("\n");
+}
+
+/**
+ * The dark palette over the app's own (globals.css): the window's papers and inks, turned over. The named colors
+ * (ink, paper, white...), the page's own (shadcn's background and foreground, which the body and the sidebar sit
+ * on; its primary is the raised grey of a dark fill and its destructive the lifted red, as the palette's are),
+ * the bots' washes (lib/look.ts: a deep shade of the bot's color, not a pale one, so words on them read),
+ * and every hard-coded color of the window's classes (DARK_PALETTE, generated by scripts/look-palette.mjs from
+ * components/app; app/look-palette.css has their light values), so every screen turns, not just a part.
+ */
 const DARK_VARS = `  color-scheme: dark;
   --color-paper: #17191c;
   --color-desk: #101214;
   --color-ink: #f2f2f0;
-  --color-pencil: #9a9a98;
+  --color-pencil: #a3a3a1;
   --color-rule: #2a2c2f;
   --color-white: #1c1f22;
-  --color-black: #0a0a0a;`;
+  --color-black: #0a0a0a;
+  --background: #17191c;
+  --foreground: #f2f2f0;
+  --card: #1c1f22;
+  --card-foreground: #f2f2f0;
+  --popover: #1c1f22;
+  --popover-foreground: #f2f2f0;
+  --primary: #3d4043;
+  --primary-foreground: #f5f5f3;
+  --destructive: #fe8c7b;
+  --secondary: #26292d;
+  --secondary-foreground: #f2f2f0;
+  --muted: #26292d;
+  --muted-foreground: #a3a3a1;
+  --accent: #26292d;
+  --accent-foreground: #f2f2f0;
+  --border: #2e3135;
+  --input: #34373b;
+  --sidebar: #17191c;
+  --sidebar-foreground: #f2f2f0;
+  --sidebar-border: #2e3135;
+  --bops-wash-base: #1c1f22;
+  --bops-wash-k: 0.6;
+  --bops-desk-0: oklab(29% -0.025 0.05);
+  --bops-desk-1: oklab(32% -0.035 0.065);
+  --bops-desk-2: oklab(36% -0.04 0.075);
+${DARK_PALETTE}`;
+
+/**
+ * The dark look: the palette, and the highlighter's ink. What's marked in the highlighter (a yellow button, a badge)
+ * inherits its words' color from around it, which the dark look turns light; on the highlighter they stay dark, or
+ * light on an accent dark enough to need it (black or white, whichever reads on the accent's lightness). And the
+ * hint in an empty box is the faint ink, whatever share of the ink it was in light: still 4.5:1 on any field. The
+ * loading Boppy and its notes (mascot.tsx, drawn in the ink's #0A0A0A) are the raised grey of a dark fill, not black
+ * on the dark paper.
+ */
+const DARK_CSS = `:root {
+${DARK_VARS}
+}
+.bg-highlighter {
+  color: oklch(from var(--color-highlighter) clamp(0, (0.62 - l) * 1000, 1) 0 0);
+}
+input::placeholder,
+textarea::placeholder {
+  color: #a7a7a5;
+}
+.boppy-loading-scene [fill="#0A0A0A"] {
+  fill: var(--hb-0a0a0a);
+}`;
 
 /**
  * The CSS for a look: variables the window's own rules and the custom CSS both build on, the palette
@@ -193,11 +299,13 @@ export function lookCssText(input: unknown): string {
   }
   if (look.density && look.density !== "normal") vars.push(`  --spacing: calc(0.25rem * ${DENSITY_SCALE[look.density]});`);
   if (vars.length) lines.push(`:root {\n${vars.join("\n")}\n}`);
-  if (look.theme === "dark") lines.push(`:root {\n${DARK_VARS}\n}`);
-  if (look.theme === "system") lines.push(`@media (prefers-color-scheme: dark) {\n:root {\n${DARK_VARS}\n}\n}`);
+  if (look.theme === "dark") lines.push(DARK_CSS);
+  if (look.theme === "system") lines.push(`@media (prefers-color-scheme: dark) {\n${DARK_CSS}\n}`);
   // Text size: the window sizes its text in pixels, so the base font size moves nothing; zoom is the
   // one lever that scales every piece of text, and the layout with it, as "bigger text" should.
   if (look.fontScale !== undefined && look.fontScale !== 1) lines.push(`body {\n  zoom: ${look.fontScale};\n}`);
+  const motion = motionCss(look.motion, look.motionSpeed);
+  if (motion) lines.push(motion);
   if (look.css) lines.push(look.css);
   return lines.join("\n");
 }

@@ -71,7 +71,7 @@ function useOlderBops() {
 
 /** The square marker of a section's row (the owner's pick): an ink border and the bot's colour when picked, else empty. */
 function Marker({ on, color }: { on: boolean; color: string }) {
-  return <span aria-hidden data-marker className={`size-4 shrink-0 rounded-[4.5px] border-[1.5px] ${on ? "border-ink" : "border-[#9A9A97]"}`} style={on ? { background: color } : undefined} />;
+  return <span aria-hidden data-marker className={`size-4 shrink-0 rounded-[4.5px] border-[1.5px] ${on ? "border-ink" : "border-[color:var(--h-9a9a97)]"}`} style={on ? { background: color } : undefined} />;
 }
 
 export function BotSettingsPage({
@@ -120,7 +120,7 @@ export function BotSettingsPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const sectionName = (s: SettingsSection) => (s === "phone" && !reach ? W.sections.contact : W.sections[s]);
-  const tool = "flex size-8 items-center justify-center rounded-full bg-white/60 shadow-[0_0_0_1px_#E6E6E3] hover:bg-white max-md:size-10";
+  const tool = "flex size-8 items-center justify-center rounded-full bg-white/60 shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-white max-md:size-10";
   const head = headerLine(state, b);
 
   return (
@@ -140,9 +140,9 @@ export function BotSettingsPage({
     >
       <nav
         aria-label={W.group}
-        className="flex min-h-0 flex-col overflow-y-auto bg-[#FBFBFA] px-3.5 py-[18px] shadow-[inset_-1px_0_0_#ECECEA] max-md:flex-row max-md:items-center max-md:gap-1 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:px-1.5 max-md:py-1.5 max-md:shadow-[inset_0_-1px_0_#ECECEA] max-md:[scrollbar-width:none]"
+        className="flex min-h-0 flex-col overflow-y-auto bg-[color:var(--hb-fbfbfa)] px-3.5 py-[18px] shadow-[inset_-1px_0_0_var(--h-ececea)] max-md:flex-row max-md:items-center max-md:gap-1 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:px-1.5 max-md:py-1.5 max-md:shadow-[inset_0_-1px_0_var(--h-ececea)] max-md:[scrollbar-width:none]"
       >
-        <button type="button" onClick={onBack} data-back className="flex items-center gap-2 self-start px-2 pb-3.5 pt-1 text-[12.5px] leading-4 text-[#6B6B6B] hover:text-ink max-md:min-h-10 max-md:shrink-0 max-md:self-center max-md:py-0 max-md:text-[14px]">
+        <button type="button" onClick={onBack} data-back className="flex items-center gap-2 self-start px-2 pb-3.5 pt-1 text-[12.5px] leading-4 text-[color:var(--ht-6b6b6b)] hover:text-ink max-md:min-h-10 max-md:shrink-0 max-md:self-center max-md:py-0 max-md:text-[14px]">
           <span aria-hidden>‹</span>
           {W.back}
         </button>
@@ -152,10 +152,10 @@ export function BotSettingsPage({
           </span>
           <span className="flex min-w-0 flex-col">
             <span className="truncate text-[14px] font-semibold leading-[18px]">{b.name}</span>
-            {wsName && <span className="truncate text-[11.5px] leading-4 text-[#6B6B6B]">{wsName}</span>}
+            {wsName && <span className="truncate text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]">{wsName}</span>}
           </span>
         </div>
-        <span className="px-2.5 pb-1.5 pt-2.5 text-[11px] uppercase leading-4 tracking-[0.02em] text-[#9A9A97] max-md:hidden">{W.group}</span>
+        <span className="px-2.5 pb-1.5 pt-2.5 text-[11px] uppercase leading-4 tracking-[0.02em] text-[color:var(--ht-9a9a97)] max-md:hidden">{W.group}</span>
         {SETTINGS_SECTIONS.map((s) => (
           <button
             key={s}
@@ -164,7 +164,7 @@ export function BotSettingsPage({
             aria-current={picked === s ? "true" : undefined}
             data-picked={picked === s || undefined}
             data-nav={s}
-            className={`flex items-center gap-2.5 rounded-[9px] px-2.5 py-[7px] text-left text-[13.5px] leading-[18px] max-md:min-h-10 max-md:shrink-0 max-md:whitespace-nowrap ${picked === s ? "bg-[#EFEFEC] font-semibold text-ink" : "text-[#3A3A38] hover:bg-black/[0.03]"}`}
+            className={`flex items-center gap-2.5 rounded-[9px] px-2.5 py-[7px] text-left text-[13.5px] leading-[18px] max-md:min-h-10 max-md:shrink-0 max-md:whitespace-nowrap ${picked === s ? "bg-[color:var(--hb-efefec)] font-semibold text-ink" : "text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--bops-tint)]/[0.03]"}`}
           >
             <Marker on={picked === s} color={b.color} />
             {sectionName(s)}
@@ -173,7 +173,7 @@ export function BotSettingsPage({
       </nav>
 
       <div ref={main} className="relative min-h-0 overflow-y-auto">
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[420px]" style={{ backgroundImage: `linear-gradient(180deg, transparent 40%, #FFFFFF 100%), ${botWash(b)}` }} />
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[420px]" style={{ backgroundImage: `linear-gradient(180deg, transparent 40%, var(--color-white) 100%), ${botWash(b)}` }} />
         <div className="absolute right-[22px] top-[18px] z-10 flex gap-2 max-md:right-3 max-md:top-3">
           <button type="button" onClick={() => onCollapse(picked)} aria-label={W.collapse} data-tip={W.collapse} data-collapse className={tool}>
             <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden>
@@ -188,14 +188,14 @@ export function BotSettingsPage({
         </div>
         <div className="relative max-w-[900px] px-[34px] py-[22px] max-md:px-4 max-md:pt-14">
           <div className="mt-2 flex items-center gap-5 max-md:gap-3.5">
-            <span className="grid size-[112px] shrink-0 place-items-center max-md:size-[72px] max-md:[&>*]:scale-75 rounded-full bg-white/75 shadow-[0_0_0_6px_#FFFFFF8C]">
+            <span className="grid size-[112px] shrink-0 place-items-center max-md:size-[72px] max-md:[&>*]:scale-75 rounded-full bg-white/75 shadow-[0_0_0_6px_var(--h-ffffff8c)]">
               <Mascot botId={b.id} color={b.color} size={84} />
             </span>
             <div className="flex min-w-0 flex-col">
               <h1 ref={heading} tabIndex={-1} className="truncate text-[30px] font-bold leading-9 tracking-[-0.015em] outline-none max-md:text-[24px] max-md:leading-8">
                 {b.name}
               </h1>
-              <span className="mt-1 flex items-center gap-1 text-[14px] leading-5 text-[#3A3A38]" data-header-line>
+              <span className="mt-1 flex items-center gap-1 text-[14px] leading-5 text-[color:var(--ht-3a3a38)]" data-header-line>
                 {head.text}
                 {head.ownMemory && (
                   <>
@@ -222,12 +222,12 @@ function SettingsCard({ id, title, summary, open, onToggle, children }: { id: Se
   return (
     <div id={`settings-${id}`} data-card={id} className={`scroll-mt-4 rounded-2xl ${GLASS}`}>
       <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={`settings-${id}-body`} className="flex w-full items-center gap-3 px-4 py-[13px] text-left">
-        <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className={`shrink-0 text-[#9A9A98] transition-transform ${open ? "rotate-90" : ""}`}>
+        <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className={`shrink-0 text-[color:var(--ht-9a9a98)] transition-transform ${open ? "rotate-90" : ""}`}>
           <path d="M3.5 2l4 3-4 3z" fill="currentColor" />
         </svg>
         <span className="shrink-0 text-[13px] font-semibold leading-4">{title}</span>
         {/* A block of its own, so a long line ends in an ellipsis rather than mid letter. */}
-        <span className="ml-auto block min-w-0 truncate text-right text-[12px] leading-4 text-[#6B6B6B]" data-summary title={typeof summary === "string" ? summary : undefined}>
+        <span className="ml-auto block min-w-0 truncate text-right text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]" data-summary title={typeof summary === "string" ? summary : undefined}>
           {summary}
         </span>
       </button>
@@ -242,7 +242,7 @@ function SettingsCard({ id, title, summary, open, onToggle, children }: { id: Se
 
 /** The card's own line at the bottom (saved, failed, the older Macs note). */
 const Note = ({ children, tone }: { children: React.ReactNode; tone?: "error" }) => (
-  <span className={`mt-2.5 block text-[12px] leading-4 ${tone === "error" ? "text-[#B42318]" : "text-[#6B6B6B]"}`}>{children}</span>
+  <span className={`mt-2.5 block text-[12px] leading-4 ${tone === "error" ? "text-[color:var(--ht-b42318)]" : "text-[color:var(--ht-6b6b6b)]"}`}>{children}</span>
 );
 
 /** How it works on its computer, in a line (the Computer card's, as ComputerChoice words it). */
@@ -344,7 +344,7 @@ function ShareAndPause({ state, bot: b }: { state: AppState; bot: Bot }) {
         type="button"
         onClick={() => void post("/api/sessions", { botId: b.id }, "DELETE")}
         disabled={!running}
-        className={`flex-1 rounded-[14px] px-4 py-[11px] text-left text-[14px] leading-[18px] text-[#B42318] disabled:text-[#C9C9C6] ${GLASS}`}
+        className={`flex-1 rounded-[14px] px-4 py-[11px] text-left text-[14px] leading-[18px] text-[color:var(--ht-b42318)] disabled:text-[color:var(--ht-c9c9c6)] ${GLASS}`}
       >
         {running ? `Pause ${b.name} · ${running} running` : `${b.name} is idle`}
       </button>
@@ -379,7 +379,7 @@ function TeamBody({ state, bot: b, older, onOpenChart }: { state: AppState; bot:
         inline
       />
       {ed.toast && (
-        <span role={ed.toast.error ? "alert" : "status"} data-team-toast className={`mt-3 flex items-center gap-2 text-[12px] leading-4 ${ed.toast.error ? "text-[#B42318]" : "text-[#6B6B6B]"}`}>
+        <span role={ed.toast.error ? "alert" : "status"} data-team-toast className={`mt-3 flex items-center gap-2 text-[12px] leading-4 ${ed.toast.error ? "text-[color:var(--ht-b42318)]" : "text-[color:var(--ht-6b6b6b)]"}`}>
           {ed.toast.text}
           {ed.toast.undo && (
             <button type="button" onClick={() => (ed.setToast(null), void ed.undo(ed.toast!.undo!))} className="font-medium text-ink hover:underline">
@@ -419,7 +419,7 @@ function McpRow({ state, bot: b, busy }: { state: AppState; bot: Bot; busy: bool
     <div data-mcp-row className="flex flex-col gap-1.5">
       <div className="flex items-baseline gap-2">
         <span className="text-[13px] font-semibold leading-4">MCP servers</span>
-        <span className="text-[12px] leading-4 text-[#6B6B6B]">Tools of its own, from config/bops.yaml. {mine.length ? "Ones with keys run for the chat only." : "None picked."}</span>
+        <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">Tools of its own, from config/bops.yaml. {mine.length ? "Ones with keys run for the chat only." : "None picked."}</span>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {names.map((name) => {
@@ -430,7 +430,7 @@ function McpRow({ state, bot: b, busy }: { state: AppState; bot: Bot; busy: bool
               disabled={busy}
               onClick={() => void send({ mcp: on ? mine.filter((n) => n !== name) : [...mine, name] })}
               title={servers![name].command ? `Runs ${servers![name].command}` : "A remote server (not wired up yet)"}
-              className={`rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 disabled:opacity-50 ${on ? "bg-ink text-white" : "shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6]"}`}
+              className={`rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 disabled:opacity-50 ${on ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f7f7f6)]"}`}
             >
               {name}
               {servers![name].chatOnly ? " · chat only" : ""}
@@ -447,8 +447,8 @@ function AiBody({ state, bot: b, links }: { state: AppState; bot: Bot; links: Se
   return (
     <div className="flex flex-col gap-3.5">
       <AiSlot state={state} bot={b} onShowScreen={links.onShowScreen} onOpenThread={links.onOpenThread} onOpenChat={links.onOpenChat} onAddKey={links.onOpenKeys} />
-      <div className="h-px bg-black/[0.05]" />
-      <HowIWork key={b.id} bot={b} className="bg-white/70 shadow-[0_0_0_1px_#ECECEA]" />
+      <div className="h-px bg-[color:var(--bops-tint)]/[0.05]" />
+      <HowIWork key={b.id} bot={b} className="bg-white/70 shadow-[0_0_0_1px_var(--h-ececea)]" />
       <Segmented
         title="Approvals"
         hint={b.autoApprove ? "Sends, posts and changes things without asking. Still asks before paying" : `Asks ${you(state)} before it sends, posts, deletes or pays`}
@@ -475,7 +475,7 @@ function AiBody({ state, bot: b, links }: { state: AppState; bot: Bot; links: Se
       )}
       <McpRow state={state} bot={b} busy={busy} />
       {error && (
-        <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}
@@ -523,7 +523,7 @@ function EmailBody({ state, bot: b, set, plan, contact, today, older, onUpgrade 
           onPick={(v) => void send({ othersMail: v })}
         />
         {error && (
-          <span role="alert" className="mt-1.5 block text-[12px] leading-4 text-[#B42318]">
+          <span role="alert" className="mt-1.5 block text-[12px] leading-4 text-[color:var(--ht-b42318)]">
             {error}
           </span>
         )}
@@ -558,11 +558,11 @@ function PhoneBody({ state, bot: b, set, reach, today, older, onOpenChat }: { st
       <VoicePicker state={state} bot={b} set={set} number={number} agentId={line && b.isMain ? line.agentId : b.phoneLine?.agentId} />
       <div className="mt-3 flex flex-col gap-1" data-answers>
         <Switch label={W.answersCalls} on={answers} disabled={busy} onFlip={(on) => void send({ answersCalls: on })} />
-        <span className="text-[11.5px] leading-4 text-[#6B6B6B]">
+        <span className="text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
           {answers ? (set.sequencesOff?.othersCalls ? W.answersOnYou(number) : W.answersOn(number)) : `${W.answersOff(b.name)}${CLOUD_HONOURS_CALL_SETTINGS ? "" : ` ${W.cloudStillAnswers}`}`}
         </span>
         {error && (
-          <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
+          <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
             {error}
           </span>
         )}
@@ -576,7 +576,7 @@ function PhoneBody({ state, bot: b, set, reach, today, older, onOpenChat }: { st
       <TodayRow
         text={today.calls || today.texts ? W.phoneToday({ calls: today.calls, texts: today.texts, taken: today.taken }) : W.nothingToday}
         action={
-          <button type="button" onClick={onOpenChat} className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[12.5px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6]">
+          <button type="button" onClick={onOpenChat} className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[12.5px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f7f7f6)]">
             {W.openChat}
           </button>
         }
@@ -595,7 +595,7 @@ function ContactBody({ bot: b, plan, contact, onUpgrade }: { bot: Bot; plan: Pho
         <Field label={W.phone} empty={W.noneYet} />
         {!line && !b.phone && <GetNumber bot={b} plan={plan} room={numberRoom} onUpgrade={onUpgrade} />}
       </div>
-      {line && main && !b.isMain && <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">{`Text ${main.name} at ${spacedPhone(line.phone)}: ${main.name} passes work to ${b.name}.`}</span>}
+      {line && main && !b.isMain && <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{`Text ${main.name} at ${spacedPhone(line.phone)}: ${main.name} passes work to ${b.name}.`}</span>}
       {/* Only for a bot that can get a number of its own: one reached through the team's number never does. */}
       {!line && <Note>{W.voiceLater}</Note>}
     </div>
@@ -666,7 +666,7 @@ function VoicePicker({ state, bot: b, set, number, agentId }: { state: AppState;
   return (
     <div ref={boxRef} className="relative mt-2 flex flex-col gap-1" data-voice>
       <div className="flex items-center gap-3">
-        <span className="min-w-0 flex-1 text-[13px] leading-[18px] text-[#3A3A38]">{W.voice}</span>
+        <span className="min-w-0 flex-1 text-[13px] leading-[18px] text-[color:var(--ht-3a3a38)]">{W.voice}</span>
         {current && !missing.includes(current) && <PlayButton v={current} playing={playing === current} onPlay={play} />}
         <button
           ref={buttonRef}
@@ -676,10 +676,10 @@ function VoicePicker({ state, bot: b, set, number, agentId }: { state: AppState;
           disabled={busy}
           onClick={() => setMenu((m) => !m)}
           data-voice-button
-          className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[13px] font-semibold leading-4 text-ink hover:bg-black/[0.04] disabled:opacity-60"
+          className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[13px] font-semibold leading-4 text-ink hover:bg-[color:var(--bops-tint)]/[0.04] disabled:opacity-60"
         >
           {set.callVoice ? W.voiceName(set.callVoice) : b.voice ? W.pickedForNameIs(W.voiceName(b.voice)) : W.pickedForName}
-          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className="text-[#8A8A88]">
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className="text-[color:var(--ht-8a8a88)]">
             <path d="M2.5 4l2.5 2.5L7.5 4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
@@ -698,13 +698,13 @@ function VoicePicker({ state, bot: b, set, number, agentId }: { state: AppState;
             e.stopPropagation();
             close();
           }}
-          className="motion-menu-in absolute right-0 top-8 z-20 flex w-[240px] flex-col rounded-[14px] bg-white p-1.5 shadow-[0_12px_32px_-8px_#0000002E,0_0_0_1px_#E8E8E5] outline-none"
+          className="motion-menu-in absolute right-0 top-8 z-20 flex w-[240px] flex-col rounded-[14px] bg-white p-1.5 shadow-[0_12px_32px_-8px_var(--h-0000002e),0_0_0_1px_var(--h-e8e8e5)] outline-none"
         >
-          <button type="button" aria-pressed={!set.callVoice} onClick={() => void pick(null)} data-voice-option="" className={`rounded-[9px] px-2.5 py-1.5 text-left text-[13px] leading-[18px] hover:bg-black/[0.04] ${!set.callVoice ? "font-semibold" : ""}`}>
+          <button type="button" aria-pressed={!set.callVoice} onClick={() => void pick(null)} data-voice-option="" className={`rounded-[9px] px-2.5 py-1.5 text-left text-[13px] leading-[18px] hover:bg-[color:var(--bops-tint)]/[0.04] ${!set.callVoice ? "font-semibold" : ""}`}>
             {b.voice ? W.pickedForNameIs(W.voiceName(b.voice)) : W.pickedForName}
           </button>
           {CALL_VOICES.map((v) => (
-            <div key={v} className="flex items-center gap-2 rounded-[9px] px-2.5 py-1 hover:bg-black/[0.04]">
+            <div key={v} className="flex items-center gap-2 rounded-[9px] px-2.5 py-1 hover:bg-[color:var(--bops-tint)]/[0.04]">
               {!missing.includes(v) && <PlayButton v={v} playing={playing === v} onPlay={play} />}
               <button type="button" aria-pressed={set.callVoice === v} onClick={() => void pick(v)} data-voice-option={v} className={`min-w-0 flex-1 py-0.5 text-left text-[13px] leading-[18px] ${set.callVoice === v ? "font-semibold" : ""}`}>
                 {W.voiceName(v)}
@@ -713,11 +713,11 @@ function VoicePicker({ state, bot: b, set, number, agentId }: { state: AppState;
           ))}
         </div>
       )}
-      <span className="text-[11.5px] leading-4 text-[#6B6B6B]" data-voice-note>
+      <span className="text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]" data-voice-note>
         {lineVoiceNote(state, b, agentId, current, number)}
       </span>
       {(said || error) && (
-        <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {said ?? error}
         </span>
       )}
@@ -736,7 +736,7 @@ function PlayButton({ v, playing, onPlay }: { v: CallVoice; playing: boolean; on
       }}
       aria-label={playing ? W.stop : W.play(W.voiceName(v))}
       data-play={v}
-      className="grid size-6 shrink-0 place-items-center rounded-full bg-ink text-white hover:bg-[#262626]"
+      className="grid size-6 shrink-0 place-items-center rounded-full bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)] hover:bg-[color:var(--hb-262626)]"
     >
       {playing ? (
         <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden>
@@ -756,12 +756,12 @@ function PlayButton({ v, playing, onPlay }: { v: CallVoice; playing: boolean; on
 function ComputerBody({ state, bot: b, links, onRoutines }: { state: AppState; bot: Bot; links: SettingsLinks; onRoutines: (app: string | null) => void }) {
   return (
     <div className="flex flex-col gap-2.5">
-      <ComputerSummary state={state} bot={b} className="w-full bg-white/70 shadow-[0_0_0_1px_#ECECEA]" onOpen={() => links.onOpenComputer(b.id)} />
+      <ComputerSummary state={state} bot={b} className="w-full bg-white/70 shadow-[0_0_0_1px_var(--h-ececea)]" onOpen={() => links.onOpenComputer(b.id)} />
       {/* The site of the workspace's apps it works on: the sidebar says it under its name. The owner's to pick. */}
-      <WorksOnRow state={state} bot={b} readOnly={!!state.shared} className="bg-white/70 shadow-[0_0_0_1px_#ECECEA]" />
-      {(!b.isMain || sharesComputer(b)) && state.host !== "mac" && !readOnly(state) && <ComputerChoice state={state} bot={b} className="bg-white/70 shadow-[0_0_0_1px_#ECECEA]" onUpgrade={links.onUpgrade} />}
-      {!state.shared && <Uses state={state} bot={b} onOpenVault={links.onOpenVault} onOpenRoutines={onRoutines} className="bg-white/70 shadow-[0_0_0_1px_#ECECEA]" />}
-      <BotKeys state={state} bot={b} onAdd={() => links.onOpenKeys(b.id)} className="bg-white/70 shadow-[0_0_0_1px_#ECECEA]" />
+      <WorksOnRow state={state} bot={b} readOnly={!!state.shared} className="bg-white/70 shadow-[0_0_0_1px_var(--h-ececea)]" />
+      {(!b.isMain || sharesComputer(b)) && state.host !== "mac" && !readOnly(state) && <ComputerChoice state={state} bot={b} className="bg-white/70 shadow-[0_0_0_1px_var(--h-ececea)]" onUpgrade={links.onUpgrade} />}
+      {!state.shared && <Uses state={state} bot={b} onOpenVault={links.onOpenVault} onOpenRoutines={onRoutines} className="bg-white/70 shadow-[0_0_0_1px_var(--h-ececea)]" />}
+      <BotKeys state={state} bot={b} onAdd={() => links.onOpenKeys(b.id)} className="bg-white/70 shadow-[0_0_0_1px_var(--h-ececea)]" />
     </div>
   );
 }
