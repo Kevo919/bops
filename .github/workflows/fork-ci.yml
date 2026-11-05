@@ -88,6 +88,8 @@ jobs:
         run: node --conditions=react-server scripts/test-key-check.mjs
       - name: LLM catalog tests
         run: node --conditions=react-server scripts/test-llms.mjs
+      - name: LLM config (plain ESM) tests
+        run: node --conditions=react-server scripts/test-llms-config.mjs
       - name: Models card tests
         run: node --conditions=react-server scripts/test-models-card.mjs
       - name: Models card UI tests

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { join, dirname, basename, resolve } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 
@@ -28,11 +28,6 @@ const hooks = registerHooks({
     }
   },
   load(url, context, next) {
-    // Native ESM needs the require binding which Next supplies to this existing loader.
-    if (url.endsWith("/lib/server/llms.ts")) return {
-      format: "module-typescript", shortCircuit: true,
-      source: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);\n' + readFileSync(fileURLToPath(url), "utf8"),
-    };
     if (url.includes("/lib/server/") && !url.endsWith("/lib/server/llms.ts")) {
       throw new Error(`Unexpected server dependency: ${url}`);
     }

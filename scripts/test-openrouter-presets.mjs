@@ -22,7 +22,6 @@ const originalFetch = globalThis.fetch;
 for (const key of Object.keys(process.env)) if (/^(BOPS_|OPENAI_|ANTHROPIC_|ZAI_|DEEPSEEK_|OPENROUTER_|DEEPINFRA_|ORGO_|NEXT_PUBLIC_BOPS)/.test(key)) delete process.env[key];
 process.env.NEXT_PUBLIC_BOPS_BRAINS = "1";
 const temp = mkdtempSync(join(tmpdir(), "bops-or-presets-"));
-const withRequire = (url) => ({ format: "module-typescript", shortCircuit: true, source: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);\n' + readFileSync(fileURLToPath(url), "utf8") });
 const hooks = registerHooks({
   resolve(specifier, context, next) {
     if (specifier.startsWith("@/")) specifier = pathToFileURL(join(root, specifier.slice(2))).href;
@@ -41,7 +40,6 @@ const hooks = registerHooks({
     }
   },
   load(url, context, next) {
-    if (url.endsWith("/lib/server/llms.ts") || url.endsWith("/app/api/models/route.ts")) return withRequire(url);
     if (url.endsWith("/lib/server/owner-email.ts"))
       return { format: "module", shortCircuit: true, source: "export const fromThisMac = request => ['localhost','127.0.0.1','[::1]'].includes(new URL(request.url).hostname);" };
     return next(url, context);
