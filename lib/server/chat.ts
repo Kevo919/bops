@@ -93,13 +93,13 @@ const SCHEDULE_PARAMS = {
   type: "object",
   additionalProperties: false,
   description:
-    'When it runs. Examples: "8 AM and 5 PM on Mon, Wed, Fri" is weekly, times ["08:00","17:00"], days [1,3,5]. "Every morning at 7:30" is daily, time "07:30". "On the 1st of each month at 9" is monthly, day_of_month 1. "On the last day of the month" is day_of_month -1. "Every 30 minutes from 8 AM to 8 PM on weekdays" is every, minutes 30, from "08:00", to "20:00", days [1,2,3,4,5]. "30 minutes before each meeting" is before_event, minutes 30. Fields a kind does not use are null.',
+    'When it runs. Examples: "8 AM and 5 PM on Mon, Wed, Fri" is weekly, times ["08:00","17:00"], days [1,3,5]. "Every morning at 7:30" is daily, time "07:30". "On the 1st of each month at 9" is monthly, day_of_month 1. "On the last day of the month" is day_of_month -1. "Every 30 minutes from 8 AM to 8 PM on weekdays" is every, minutes 30, from "08:00", to "20:00", days [1,2,3,4,5]. "30 minutes before each meeting" is before_event, minutes 30. A cron expression the user gives ("0 9 * * 1-5") is cron, expr "0 9 * * 1-5". Fields a kind does not use are null.',
   properties: {
     kind: {
       type: "string",
-      enum: ["daily", "weekdays", "weekly", "monthly", "every", "before_event", "once"],
+      enum: ["daily", "weekdays", "weekly", "monthly", "every", "before_event", "once", "cron"],
       description:
-        "daily: every day at its times. weekdays: Monday to Friday at its times. weekly: on the given days at its times. monthly: one day a month at its times. every: every few minutes, optionally only between some hours and on some days. before_event: before each meeting in the Google Calendar. once: one date and time.",
+        "daily: every day at its times. weekdays: Monday to Friday at its times. weekly: on the given days at its times. monthly: one day a month at its times. every: every few minutes, optionally only between some hours and on some days. before_event: before each meeting in the Google Calendar. once: one date and time. cron: a standard 5 field cron expression the user wrote (only when they gave one).",
     },
     time: { type: ["string", "null"], description: "24h HH:MM, for one time of day (daily, weekdays, weekly, monthly). Null when times is given." },
     times: {
@@ -121,8 +121,9 @@ const SCHEDULE_PARAMS = {
     },
     from: { type: ["string", "null"], description: "For every and before_event: runs only from this local time (24h HH:MM), e.g. 08:00. Null for all day." },
     to: { type: ["string", "null"], description: "For every and before_event: and until this local time, e.g. 22:00. Null for all day." },
+    expr: { type: ["string", "null"], description: 'For cron: the 5 field expression as the user gave it (minute, hour, day of month, month, day of week), e.g. "0 9 * * 1-5". Null for every other kind.' },
   },
-  required: ["kind", "time", "times", "day", "days", "day_of_month", "at", "minutes", "from", "to"],
+  required: ["kind", "time", "times", "day", "days", "day_of_month", "at", "minutes", "from", "to", "expr"],
 } as const;
 
 /** The schedule tool's own zone field: the times in another zone than the user's. */
@@ -142,6 +143,7 @@ type RawSchedule = {
   minutes?: number | null;
   from?: string | null;
   to?: string | null;
+  expr?: string | null;
 };
 
 /**
@@ -186,6 +188,10 @@ function toSchedule(r: RawSchedule | undefined): { schedule: Schedule } | { erro
     if (typeof r.minutes !== "number") return { error: "A meeting routine needs how many minutes before each meeting it runs (5 to 240)." };
     const w = window();
     return "error" in w ? w : { schedule: { kind: "before_event", minutes: r.minutes, source: "googlecalendar", ...w } };
+  }
+  if (r.kind === "cron") {
+    if (!r.expr?.trim()) return { error: "A cron routine needs its expression (expr), 5 fields like 0 9 * * 1-5." };
+    return { schedule: { kind: "cron", expr: r.expr.trim() } };
   }
   return { error: "That isn't a kind of schedule Bops knows." };
 }

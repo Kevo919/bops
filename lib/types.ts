@@ -1382,7 +1382,13 @@ export type Schedule =
    * (cloud/schedule.ts eventWindow), which starts where the runs before it got to (Routine.eventsThrough),
    * so every meeting is handled once.
    */
-  | { kind: "before_event"; minutes: number; source: "googlecalendar"; hours?: { from: string; to: string }; days?: number[] };
+  | { kind: "before_event"; minutes: number; source: "googlecalendar"; hours?: { from: string; to: string }; days?: number[] }
+  /**
+   * A standard five field cron expression ("0 9 * * 1-5": minute, hour, day of the month, month, day of
+   * the week; steps, ranges, lists and names read; no seconds), its times in the zone like the rest. Two
+   * runs are never under MIN_EVERY_MINUTES apart (cloud/schedule.ts parseCron checks).
+   */
+  | { kind: "cron"; expr: string };
 
 /** The shortest gap an "every" routine may have, in minutes. */
 export const MIN_EVERY_MINUTES = 15;
