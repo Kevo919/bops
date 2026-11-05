@@ -25,9 +25,15 @@ health:
   expect: 200
 fits_bot_computer: false
 fits_reason: The documented quick start is a Docker image; needs a Docker daemon.
-verified: false
-verified_reason: >-
-  Needs Docker here: the sandbox has the Docker CLI but no running daemon. Clone (00cd05d) and LICENSE were
-  read. The run line is the README quick start (docker run -p 8080:8080 ...) with -d and a name added;
-  the health path is the one the repo's compose files health-check (/api/v1/info/status). Open WebUI
-  also defaults to port 8080.
+verified:
+  date: "2026-11-05"
+  by: zai (Kevin's Windows PC, Docker Desktop 29.9.2 / WSL2)
+  commit: b787292
+  steps:
+    clone: pass
+    install: "pass: docker pull finished (image digest sha256:c6872dd0…)"
+    run: "pass: container started detached on 8080"
+    health: "pass: GET /api/v1/info/status returned 200 {\"version\":\"3.2.2\",\"status\":\"UP\"} after ~50s"
+  notes: >-
+    Port 8080 was free on this PC. First start needs about a minute before the status endpoint answers;
+    a runner should keep polling. No env or keys needed.
