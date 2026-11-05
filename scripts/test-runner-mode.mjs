@@ -40,12 +40,12 @@ const FAKES = {
   cloud: ["cloudOn", ...(ORGO ? ["cloudProxy"] : [])],
   ...(ORGO ? { usage: ["recordUsage"], "workspace-skills": ["folderKey", "moveWorkspaceFolder"] } : { orgo: ["orgo", "OrgoError"] }),
   plan: ["postOrgo"],
-  local: ["CHROME"],
+  local: ["chromeExe"],
   "orgo-sign-in": ["authStatus"],
   routines: [],
   ...(START ? { runner: ["checkIdentity", "IDENTITY_EVERY_MS", "runnerComputer", "startRunsOn", "watchIdentity", "WHO_AM_I_EVERY_MS"], "orgo-auth": ["loadOrgoKey", "lookForRunnerKey"], "free-hours": ["startActivityBeat"], "runner-chat": ["startRunnerChat"], "browser-runner": ["startBrowserRelay"] } : {}),
 };
-const VALUES = { local: { CHROME: "/nonexistent/Chrome" }, runner: { IDENTITY_EVERY_MS: 300000, WHO_AM_I_EVERY_MS: 60000 } };
+const VALUES = { runner: { IDENTITY_EVERY_MS: 300000, WHO_AM_I_EVERY_MS: 60000 } };
 const loaded = [];
 registerHooks({
   resolve(specifier, context, next) {
@@ -95,6 +95,7 @@ const state = { account: { user: { id: "u1" } }, bots: [{ id: "boppy", name: "Bo
 const posts = [];
 let ready = true;
 globalThis.__fake = {
+  local: { chromeExe: () => ({ path: "/nonexistent/Chrome", found: false }) },
   started: [],
   bound: [],
   store: {
