@@ -171,6 +171,11 @@ export function RoutineSuggest({
 
   const ticked = (t: Offer) => !t.already && (ticks[t.id] ?? t.defaultOn);
   const picked = (offers ?? []).filter(ticked);
+  // A picked one whose cron doesn't read yet can't be set up (the server would refuse it).
+  const cronBad = picked.some((t) => {
+    const s = whens[t.id]?.schedule;
+    return s?.kind === "cron" && !!cronError(s.expr);
+  });
   /** Its schedule as picked here, when that isn't the starter's own. */
   const scheduleOf = (t: Offer): Schedule | undefined => {
     const s = whens[t.id]?.schedule;
@@ -257,7 +262,7 @@ export function RoutineSuggest({
   };
 
   const setUp = async () => {
-    if (!botId || !picked.length) return;
+    if (!botId || !picked.length || cronBad) return;
     setBusy(true);
     setError(null);
     try {
@@ -374,7 +379,7 @@ export function RoutineSuggest({
         </button>
         <button
           onClick={() => void setUp()}
-          disabled={busy || !picked.length}
+          disabled={busy || !picked.length || cronBad}
           className="rounded-full bg-ink px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-white outline-none hover:bg-[#2A2A28] focus-visible:shadow-[0_0_0_1.5px_#0A0A0A,0_0_0_3px_#FFFFFF_inset] disabled:opacity-40"
         >
           {busy ? "Setting up…" : `Set up ${picked.length}`}
@@ -448,9 +453,8 @@ function OfferRow({
             <CadencePicker
               value={schedule}
               onChange={(s) => {
-                // A half-typed cron isn't saved (the server would 400 it): the picker keeps the draft,
-                // and this fires again the moment it becomes a good one (crawl L3).
-                if (s.kind === "cron" && cronError(s.expr)) return;
+                // Every keystroke goes up, so a cron can be typed one character at a time (the box is
+                // controlled by this value); a half-typed one holds Set up instead (crawl L3).
                 onSchedule(s);
                 // Changing when it runs means it's wanted.
                 if (!ticked) onTick(true);
