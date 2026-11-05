@@ -25,6 +25,7 @@ import {
 } from "@/lib/privacy";
 import type { DeletedDays, KeepDays } from "@/lib/types";
 import { post } from "./ui";
+import { useComputerWords } from "./computer-words";
 
 /**
  * Settings → Your data (lib/privacy.ts, app/api/privacy): where each kind of the user's things is kept and how
@@ -106,6 +107,7 @@ const sub = "text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]";
 
 /** Where each kind of thing is kept and how it goes, one plain line each. */
 function WhereKept({ info }: { info: PrivacyInfo }) {
+  const computerWords = useComputerWords();
   const h = info.here;
   const here: [string, string][] = [
     ["Images", countLine(h.uploads, ["image", "images"])],
@@ -154,7 +156,7 @@ function WhereKept({ info }: { info: PrivacyInfo }) {
         <div key={r.kind} className="flex flex-col gap-1 border-b border-[color:var(--h-f0f0ee)] py-2.5 last:border-0">
           <span className="text-[13px] font-medium leading-4">{r.kind}</span>
           <span className={sub}>
-            {r.where} {r.how}
+            {computerWords(r.where)} {computerWords(r.how)}
           </span>
           {r.extra}
         </div>
