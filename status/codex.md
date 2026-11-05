@@ -1,5 +1,5 @@
 # Codex status
-Updated 2026-11-05T05:23:11.8879723Z. Build IN PROGRESS; latest published score 66% (74.5/113). User authorizes tested/reviewed merges. Lead owns deployment and scoring.
+Updated 2026-11-05T05:23:11.8879723Z. Build IN PROGRESS; latest published score 69% (78/113). User authorizes tested/reviewed merges. Lead owns deployment and scoring.
 
 ## Completed: privacy and Windows SSH source fixes
 - PR62 merged c6d01ef: outside callers cannot invoke ask_teammate to indirectly read MEMORY.md. Chat-entry regression16pass, negativecontrol fails as expected, chattools85pass; typecheck/lint pass. Independent review complete.
@@ -25,4 +25,7 @@ Hourly check 2026-11-05T05:24:31.6027061Z : no new team messages since prior han
 
 ## Current hourly checkpoint 2026-11-05T06:20:53.9204391Z
 Lead rebuilt43d8950; independently confirmed health200 MqYVGKe32Z5ugBlKK6Kf1. This supersedes awaitingdeployment notes. Live UI blocked: screenshot confirms Windowslockscreen, Bopsactivationfails. Needs Kevin: unlockWindows. Repos/SOUL/Goals/MCP remainuntested. Evidence tests/2026-11-05-0620-codex-pc-locked.md. Noheavyjob/restart/merge; ownhourlylockreleasedonexit.
+
+
+Hourly checkpoint 2026-11-05T07:26:27.6691427Z : Windows still visibly locked; live app health200 remains MqYVGKe32Z5ugBlKK6Kf1. No new live-UI evidence. Lead server battery on43d8950 read:28scripts passed except known Node22 Windows-fuse incompatibility. Zai PR64 localvoice tests read, live service/Settings unverified and not assumed deployed. Noheavyjobs, merges, restarts or credential changes. Unlock request already sent; avoiding repeat notification. Next: lead0608 livePC list after unlock.
 
