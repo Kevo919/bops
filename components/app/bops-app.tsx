@@ -62,6 +62,7 @@ import { MacComputer } from "./mac-computer";
 import { RestartButton, RestartIcon, useCanRestart } from "./restart";
 import { ServicesSettings, type ServiceRow } from "./services";
 import { RunsOnSettings } from "./runs-on";
+import { AgentInstancesSettings } from "./agent-instances";
 import { chatInWorkspace, currentWorkspace, option, post, radio, SideToggleIcon, teamOf, useAppState, useSelfHosted, useStateRefused } from "./ui";
 import { viewOnly } from "./view-only";
 import { readOnlyLine, seesBrowser } from "@/lib/shared";
@@ -2024,7 +2025,7 @@ function WhereBotsWork({ state }: { state: AppState }) {
 }
 
 /** Settings' places: Account (yours, in every workspace), then Workspace (the one open now), then Orgo's team's own. */
-export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "phone" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains" | "look" | "repos" | "services";
+export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "phone" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains" | "look" | "repos" | "services" | "agents";
 
 /** A place in Settings' nav: its name, its glyph, and a quiet value on the right. */
 type NavItem = { id: SettingsPane; name: string; icon: React.ReactNode; value?: string | number };
@@ -2054,6 +2055,7 @@ const GLYPHS: Record<SettingsPane, string> = {
   look: "M8 2.5a5.5 5.5 0 0 0 0 11C9.4 13.5 10.5 12.4 10.5 11c0-1-.8-1.8-1.8-1.8 1 0 1.8-.8 1.8-1.8S10.7 5.6 9.7 5.6C10.7 5.6 11.5 4.8 11.5 3.8 11.5 3.1 10 2.5 8 2.5zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
   repos: "M3 3.5h4l1.2 1.5H13v7.5H3zM6 8.2l-1.3 1.3L6 10.8M10 8.2l1.3 1.3-1.3 1.3",
   services: "M5.5 2v3M10.5 2v3M3.5 5h9v2.5a4.5 4.5 0 0 1-9 0zM8 12v2",
+  agents: "M5 6.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM11 6.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM2 13c.4-2 1.5-3 3-3s2.6 1 3 3M8 13c.4-2 1.5-3 3-3s2.6 1 3 3",
 };
 
 /** Widgets (being built: lib/feature-status.ts), for its placeholder in Settings' nav. */
@@ -2257,7 +2259,7 @@ export function Settings({
   // An Admin of a shared workspace has its Team too (who's in: lib/server/shared-people.ts); never its chart or email.
   const adminHere = state.shared?.role === "admin";
   // The look is the owner's own window (never a shared workspace's): its pane is theirs alone too.
-  const fits = (p?: SettingsPane) => !!p && (p !== "domains" || domains) && (p !== "apps" || apps) && (p !== "look" || !state.shared) && (p !== "repos" || !state.shared) && (p !== "phone" || !state.shared) && (!state.shared || ((p !== "team" || adminHere) && p !== "chart" && p !== "email"));
+  const fits = (p?: SettingsPane) => !!p && (p !== "domains" || domains) && (p !== "apps" || apps) && (p !== "look" || !state.shared) && (p !== "repos" || !state.shared) && (p !== "agents" || (!state.shared && selfHosted)) && (p !== "phone" || !state.shared) && (!state.shared || ((p !== "team" || adminHere) && p !== "chart" && p !== "email"));
   const [pane, setPane] = useState<SettingsPane>(fits(at) ? at! : "profile");
   // A narrow window (narrow.ts) shows the nav or a place, never both: the nav first when Settings opened at no place in
   // particular; a place asked for (Logins, Plan and credit) opens at it, its Back going to the nav.
@@ -2306,6 +2308,8 @@ export function Settings({
     item("look", "Look"),
     item("mac", computerWords("This Mac")),
     item("services", "Services"),
+    // Your own DeepSeek Harness and Hermes Agent instances (agent-instances.tsx): the owner's own window, self-hosted.
+    ...(selfHosted && !shared ? [item("agents", "Agents you run")] : []),
   ];
   const workspace: NavItem[] = [
     item("general", "General"),
@@ -2440,6 +2444,13 @@ export function Settings({
       <>
         <PaneHead title="Services" sub="Texting, email, memory and connected apps: the outside services your bots use, and their keys." />
         <ServicesSettings focus={service && atAt ? { id: service, at: atAt } : undefined} />
+      </>
+    );
+  else if (pane === "agents" && selfHosted && !shared)
+    body = (
+      <>
+        <PaneHead title="Agents you run" sub="Your own DeepSeek Harness and Hermes Agent: add each one, and your bots can hand them tasks." />
+        <AgentInstancesSettings />
       </>
     );
   else if (pane === "mac")
