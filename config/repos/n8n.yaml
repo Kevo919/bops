@@ -30,8 +30,16 @@ health:
   expect: 200
 fits_bot_computer: false
 fits_reason: Its documented route needs a Docker daemon; npx n8n may work on Node 24 but was not tested.
-verified: false
-verified_reason: >-
-  Needs Docker here: the sandbox has the Docker CLI but no running daemon. Clone (5339f0c9) and LICENSE.md
-  were read; steps come from the README Quick Start (docker volume create + docker run, editor on :5678).
-  The run line uses -d instead of the README's -it --rm so it can stay up in the background.
+verified:
+  date: "2026-11-05"
+  by: zai (Kevin's Windows PC, Docker Desktop 29.9.2 / WSL2)
+  commit: a79aac7f
+  steps:
+    clone: pass
+    install: "pass: docker volume create n8n_data"
+    run: "pass: docker run -d pulled docker.n8n.io/n8nio/n8n automatically and started the container on 5678"
+    health: "pass: GET /healthz returned 200 {\"status\":\"ok\"} after ~20s"
+  notes: >-
+    The image is pulled by docker run itself, so the volume create is the only install step. No
+    N8N_ENCRYPTION_KEY set: n8n generated one into the n8n_data volume, as documented. Editor UI on
+    http://127.0.0.1:5678 was not clicked through; the healthz check is the recipe's gate.

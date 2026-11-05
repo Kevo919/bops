@@ -11,10 +11,14 @@ requirements:
   docker: true
   other:
     - docker compose
+    - python3 (only to generate PAPERLESS_SECRET_KEY)
 keys_optional: []
-keys_required: []
+keys_required:
+  - name: PAPERLESS_SECRET_KEY
+    for: Django secret key; the image refuses to start on the default 'change-me'. Generate once with python3 -c "import secrets; print(secrets.token_urlsafe(64))" into docker/compose/docker-compose.env
 clone: git clone --depth 1 https://github.com/paperless-ngx/paperless-ngx.git paperless-ngx
 install:
+  - cd docker/compose && printf 'PAPERLESS_SECRET_KEY=%s\n' "$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')" >> docker-compose.env
   - cd docker/compose && docker compose -f docker-compose.sqlite.yml pull
 run: cd docker/compose && docker compose -f docker-compose.sqlite.yml up -d
 background: false
@@ -25,10 +29,19 @@ health:
   expect: 200
 fits_bot_computer: false
 fits_reason: Docker compose is the supported install (bare metal is documented but long); needs a Docker daemon.
-verified: false
-verified_reason: >-
-  Needs Docker here: the sandbox has the Docker CLI but no running daemon. Clone (e6ea046) and LICENSE
-  were read. Steps follow the README and docker/compose/docker-compose.sqlite.yml (web on 8000:8000,
-  env_file docker-compose.env); the README's other route is the install-paperless-ngx.sh script. A first
-  admin user is created with docker compose run --rm webserver createsuperuser. The health path is the
-  login page and has not been checked.
+verified:
+  date: "2026-11-05"
+  by: zai (Kevin's Windows PC, Docker Desktop 29.9.2 / WSL2)
+  commit: cb3513c
+  steps:
+    clone: pass
+    install: "pass: secret-key line appended to docker-compose.env (last assignment wins), then compose pull"
+    run: "pass: compose up -d; webserver and broker Up, webserver passed its healthcheck"
+    health: "pass: GET /accounts/login/ returned 200 after ~40s"
+  notes: >-
+    Verification found a real gap: when PAPERLESS_SECRET_KEY is still the default 'change-me' that
+    docker-compose.env ships, the webserver crashed at once (django ImproperlyConfigured) and s6 stopped
+    the container, so the recipe now appends a generated key in install (the upstream error message
+    itself suggests this). Without that line the first up -d fails. A first admin user still needs
+    `docker compose -f docker-compose.sqlite.yml run --rm webserver createsuperuser` before login works
+    with a real account; the login page itself answers 200 without one.

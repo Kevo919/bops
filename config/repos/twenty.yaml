@@ -41,9 +41,20 @@ health:
   expect: 200
 fits_bot_computer: false
 fits_reason: Needs a Docker daemon plus Postgres, Redis, server and worker containers; heavy for a bot computer.
-verified: false
-verified_reason: >-
-  Needs Docker here: the sandbox has the Docker CLI but no running daemon. Clone (140dae38) and LICENSE were
-  read. Steps follow the README's Docker Compose self-host link and packages/twenty-docker
-  (docker-compose.yml publishes 3000:3000 and health-checks /healthz; .env.example sets TAG, SERVER_URL,
-  STORAGE_TYPE). The install lines generate secrets on the machine; none are stored here.
+verified:
+  date: "2026-11-05"
+  by: zai (Kevin's Windows PC, Docker Desktop 29.9.2 / WSL2)
+  commit: a0747326
+  steps:
+    clone: pass
+    install: "pass: cp .env.example .env plus generated APP_SECRET and PG_DATABASE_PASSWORD lines"
+    run: "pass: compose up -d; db, redis, server and worker all Up. Two retries needed (see notes)"
+    health: "pass: GET /healthz returned 200 {\"status\":\"ok\"} once the server was healthy"
+  notes: >-
+    Port 3000 was already taken on this PC (another project's open-webui container), so verification
+    used a local docker-compose.override.yml remapping the host port to 3300; the recipe's own 3000 was
+    not changed and works on a machine where 3000 is free. First boot runs long database migrations and
+    can miss compose's depends_on health window, so the first `docker compose up -d` reported
+    "dependency failed to start: container twenty-server-1 is unhealthy" while the server was still
+    migrating; the server reached healthy by itself and a second `up -d` started the worker. A runner
+    should retry the up command or keep waiting instead of treating that first error as final.
