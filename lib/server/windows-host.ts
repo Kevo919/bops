@@ -1,7 +1,7 @@
 import "server-only";
 import { execFile, execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { windowsChromeAt } from "./chrome-start";
+import { inUseFromCount, windowsChromeAt } from "./chrome-start";
 
 /**
  * Tasks on a Windows PC, where local.ts was written for the Mac: Chrome in another place, its version
@@ -61,6 +61,21 @@ const ps = (script: string, root: string) =>
   );
 
 export const botChromesRunning = async (root: string) => Number((await ps(`@(${FIND}).Count`, root)).trim()) > 0;
+
+/**
+ * Whether a Chrome runs with this one profile (ensureChrome, before it clears a lock a crashed one left). Fails
+ * closed: PowerShell failing, timing out or answering anything but a count reads as in use, so a lock a
+ * running Chrome holds is never removed.
+ */
+export const profileChromeRunning = (profile: string) =>
+  new Promise<boolean>((resolve) =>
+    execFile(
+      "powershell.exe",
+      ["-NoProfile", "-NonInteractive", "-Command", `@(${FIND}).Count`],
+      { windowsHide: true, timeout: 15000, env: { ...process.env, BOPS_CHROME_ROOT: profile } },
+      (e, out) => resolve(inUseFromCount(e, String(out ?? ""))),
+    ),
+  );
 
 export const stopBotChromes = (root: string) => ps(`${FIND} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`, root);
 
