@@ -67,9 +67,6 @@ export function AgentInstancesSettings() {
     <div data-agent-instances style={TONES} className="flex flex-col gap-2.5 px-[22px] pt-4 pb-8">
       <InProgress id="agents-you-run">
         <div className="flex flex-col gap-2.5">
-          <span className="text-[12.5px] leading-[18px] text-muted-foreground">
-            Your own DeepSeek Harness and Hermes Agent, as many as you like. Give each a name, and a bot can hand it a task in the chat and bring the answer back. Bops asks you first every time.
-          </span>
           {error && (
             <p role="alert" className="text-[12.5px] text-destructive">
               {error}
@@ -140,7 +137,7 @@ function AgentCard({ a, busy, onCheck, onEdit, onRemove }: { a: AgentView; busy:
             <span className="break-all">Its own folder: {a.home}</span>
           </>
         )}
-        <span data-agent-key>{a.key.needed || a.key.set ? (a.key.set ? `Key saved, ${a.key.ends}` : "No key saved yet") : a.key.label}</span>
+        <span data-agent-key>{a.key.needed || a.key.set ? (a.key.set ? (a.key.ends === "saved" ? "Key saved" : `Key saved, ${a.key.ends}`) : "No key saved yet") : a.key.label}</span>
       </div>
       {a.check && (
         <span data-agent-check={a.check.ok ? "ok" : "bad"} role="status" className="text-[12.5px] leading-[18px]" style={{ color: a.check.ok ? "var(--ok)" : "var(--bad)" }}>

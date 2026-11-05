@@ -2952,7 +2952,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
           .catch(failed);
       // Agents you run: asks the owner first every time, then hands the task over and waits (agent-instances-chat.ts).
       if (isAgentTool(name) && agentsHere && agentTools.length)
-        return runAgentTool(chatId, a as Record<string, unknown>, { approved })
+        return runAgentTool(chatId, a as Record<string, unknown>, { approved, stillOn: ours })
           .then((out) => {
             const who = typeof (a as { agent?: unknown }).agent === "string" ? String((a as { agent?: unknown }).agent).slice(0, 40) : "the agent";
             if (approved) {

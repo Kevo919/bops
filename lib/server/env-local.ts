@@ -34,7 +34,8 @@ export const looksLikeHttpsUrl = (v: string) => {
 };
 
 /** How a saved key shows: never the key, only that it's there and its last four characters. */
-export const maskKey = (v: string | undefined) => (v ? `ends in ${v.slice(-4)}` : "");
+/** How a saved key shows: never the key; its last four characters only when it is long enough (16 or more) that they give little away, else just "saved". */
+export const maskKey = (v: string | undefined) => (!v ? "" : v.length >= 16 ? `ends in ${v.slice(-4)}` : "saved");
 
 /** The line that sets `name` (with or without `export`), as dotenv reads it. */
 const setsName = (name: string) => new RegExp(`^\\s*(?:export\\s+)?${name}\\s*=`);

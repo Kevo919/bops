@@ -1,9 +1,9 @@
 import "server-only";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, normalize } from "node:path";
+import { dirname, isAbsolute, join, normalize, win32 } from "node:path";
 import { redact } from "@/lib/secret-patterns";
 import { envLocalFile, EnvLocalError, looksLikeKey, maskKey, readEnvLocalValue, setEnvLocal } from "./env-local";
 import { fromThisMac } from "./owner-email";
@@ -146,7 +146,7 @@ export const agentByName = (name: string) => load().find((a) => a.name.toLowerCa
 /** A name: plain words, digits and a little punctuation; no dashes, quotes or anything that could read as code. */
 const NAME = /^[A-Za-z0-9][A-Za-z0-9 .,'&()]{0,39}$/;
 /** A program: an absolute path (C:\… or /…), or a bare name on PATH. Nothing a shell would read as more than a path. */
-const UNSAFE = /["'`$%^&|<>;!*?\r\n\t]/;
+const UNSAFE = /["'`$%^&|<>;!*?\r\n\t\0]/;
 export function commandProblem(v: string): string | null {
   if (!v || v.length > 400 || UNSAFE.test(v)) return "Give the program's full path, like C:\\Users\\you\\AppData\\Local\\Programs\\DeepSeek Harness\\resources\\runtime\\cli\\bin\\dsh.cmd, with no quotes.";
   if (/^[A-Za-z0-9._]+$/.test(v)) return null;
@@ -156,6 +156,15 @@ export function commandProblem(v: string): string | null {
 const looksAbsolute = (v: string) => /^[A-Za-z]:[\\/]/.test(v) || (v.startsWith("/") && isAbsolute(v));
 export function homeProblem(v: string): string | null {
   if (!v || v.length > 400 || UNSAFE.test(v) || !looksAbsolute(v)) return "Give the folder's full path (starting with C:\\ or /), with no quotes.";
+  if (v.split(/[\\/]+/).some((part) => part === ".." || part === ".")) return "Give the folder's full path without . or .. in it.";
+  const home = homedir();
+  // Folders that are someone else's: the dsh desktop app's and Hermes' own homes, and Bops' own data. Bops' homes
+  // folder (~/.bops) only under its agents folder, where Bops makes them.
+  const theirs = [join(home, ".dsh"), join(home, ".hermes"), dataRoot(), process.cwd()];
+  if (theirs.some((t) => overlaps(t, v))) return "That folder belongs to something else (the DeepSeek Harness app, Hermes' own setup, or Bops). Choose a new, empty folder for this agent.";
+  const bops = join(home, ".bops");
+  const agents = process.env.BOPS_AGENT_HOMES || join(bops, "agents");
+  if (overlaps(bops, v) && !(folderKey(v).startsWith(folderKey(agents)) && folderKey(v) !== folderKey(agents))) return "That folder is part of Bops' own files. Choose a new, empty folder for this agent.";
   return null;
 }
 /** Folders compared as this PC would (any case, either slash): one inside another counts as the same (they'd share files). */
@@ -179,14 +188,15 @@ export function addressProblem(v: string): string | null {
   if (u.protocol === "https:") return null;
   if (u.protocol !== "http:") return "The address must start with http:// or https://.";
   if (onTailnetOrHere(host)) return null;
-  return "Use https for an address on the internet. http is only for this PC or your tailnet (a 100.x.x.x address, or a name ending in .ts.net).";
+  return "Use https for an address on the internet. http is only for this PC or your tailnet (a 100.x.x.x address, or a name ending in .ts.net, like bops.tail1234.ts.net).";
 }
-function onTailnetOrHere(host: string) {
-  if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".ts.net")) return true;
-  // Tailscale's addresses: 100.64.0.0/10. A one word name is a MagicDNS short name.
-  const m = /^100\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(host);
-  if (m) return Number(m[1]) >= 64 && Number(m[1]) <= 127;
-  return /^[a-z0-9]+$/.test(host);
+/** Plain http only here: this PC, Tailscale's 100.64.0.0/10 and fd7a:115c:a1e0::/48, and MagicDNS names (*.ts.net). */
+export function onTailnetOrHere(host: string) {
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return true;
+  if (/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+ts\.net$/.test(host)) return true;
+  const m = /^100\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (m) return Number(m[1]) >= 64 && Number(m[1]) <= 127 && Number(m[2]) <= 255 && Number(m[3]) <= 255;
+  return /^fd7a:115c:a1e0:/.test(host);
 }
 const cleanAddress = (v: string) => {
   const u = new URL(v);
@@ -277,6 +287,8 @@ export function removeAgent(id: unknown) {
   }
   save(list.filter((a) => a.id !== was.id));
   checks.delete(was.id);
+  stoppers.get(was.id)?.abort();
+  stoppers.delete(was.id);
 }
 
 /* ---------------- Running a program ---------------- */
@@ -289,42 +301,139 @@ function childEnv(extra: Record<string, string>) {
   return { ...env, ...extra };
 }
 
-type Ran = { code: number | null; out: string; err: string; missing?: boolean; timedOut?: boolean };
+type Ran = { code: number | null; out: string; err: string; missing?: boolean; timedOut?: boolean; stopped?: boolean };
 const MAX_OUT = 2_000_000;
 
-/** Run `command args` with `input` on stdin. Only fixed words go in args (the task goes on stdin), so a .cmd runs safely through cmd. */
-function run(command: string, args: string[], o: { env: Record<string, string>; cwd: string; input?: string; timeoutMs: number }): Promise<Ran> {
+/** How a program is started: the file, words before its own, and what it adds to the environment. */
+export type Launch = { file: string; pre: string[]; env: Record<string, string>; viaCmd: boolean };
+
+/**
+ * How to start `command` on this computer, without cmd.exe where that can be helped. On Windows, the DeepSeek Harness
+ * app's own command (…\resources\runtime\cli\bin\dsh.cmd, which only runs its Electron as Node on its CLI) is
+ * started the way that .cmd does it, directly; the default "dsh" finds that app in its usual place first
+ * (%LOCALAPPDATA%\Programs\DeepSeek Harness), else dsh.cmd on PATH; any other .cmd or .bat goes through cmd.
+ */
+export function resolveLaunch(command: string, o: { platform?: string; env?: Record<string, string | undefined>; exists?: (p: string) => boolean } = {}): Launch {
+  const platform = o.platform ?? process.platform;
+  const env = o.env ?? process.env;
+  const exists = o.exists ?? ((p: string) => existsSync(p));
+  if (platform !== "win32") return { file: command, pre: [], env: {}, viaCmd: false };
+  let cmd = command;
+  if (/^dsh(?:\.cmd)?$/i.test(cmd)) {
+    const local = env.LOCALAPPDATA;
+    const app = local ? win32.join(local, "Programs", "DeepSeek Harness", "resources", "runtime", "cli", "bin", "dsh.cmd") : "";
+    cmd = app && exists(app) ? app : "dsh.cmd";
+  }
+  const m = /^(.*)\\resources\\runtime\\cli\\bin\\dsh\.cmd$/i.exec(cmd);
+  if (m) {
+    const exe = win32.join(m[1], "DeepSeek Harness.exe");
+    const asar = win32.join(m[1], "resources", "app.asar");
+    if (exists(exe) && exists(asar))
+      return { file: exe, pre: ["--expose-internals", win32.join(asar, "dsh", "node_modules", "@deepseek-ai", "dsh-desktop-host", "lib", "cli.js")], env: { ELECTRON_RUN_AS_NODE: "1" }, viaCmd: false };
+  }
+  return { file: cmd, pre: [], env: {}, viaCmd: /\.(cmd|bat)$/i.test(cmd) };
+}
+
+/** Stop a program and everything it started: its whole tree on Windows (taskkill /T /F), its process group elsewhere. */
+function killTree(child: ChildProcess): Promise<void> {
+  const pid = child.pid;
+  if (!pid || child.exitCode !== null) return Promise.resolve();
+  if (process.platform === "win32")
+    return new Promise((done) => {
+      const k = spawn("taskkill", ["/T", "/F", "/PID", String(pid)], { windowsHide: true, stdio: "ignore" });
+      k.on("error", () => done());
+      k.on("close", () => done());
+    });
+  try {
+    process.kill(-pid, "SIGTERM");
+  } catch {
+    /* gone already */
+  }
   return new Promise((done) => {
-    const viaShell = process.platform === "win32" && /\.(cmd|bat)$/i.test(command);
+    const t = setTimeout(() => {
+      try {
+        process.kill(-pid, "SIGKILL");
+      } catch {
+        /* gone */
+      }
+      done();
+    }, 2000);
+    t.unref?.();
+    // The group leader's exit isn't the group's: give the rest a moment, then make sure.
+    child.once("close", () => {
+      setTimeout(() => {
+        try {
+          process.kill(-pid, "SIGKILL");
+        } catch {
+          /* all gone */
+        }
+        clearTimeout(t);
+        done();
+      }, 100);
+    });
+  });
+}
+
+/**
+ * Run `command args` with `input` on stdin, in a process group (or job tree) of its own so a timeout or a stop takes
+ * everything it started with it, and only returns once that's done. Only fixed words go in args (the task goes on
+ * stdin), so a .cmd runs safely through cmd.
+ */
+function run(command: string, args: string[], o: { env: Record<string, string>; cwd: string; input?: string; timeoutMs: number; signal?: AbortSignal }): Promise<Ran> {
+  return new Promise((done) => {
+    if (o.signal?.aborted) return done({ code: null, out: "", err: "", stopped: true });
+    const l = resolveLaunch(command, { env: o.env });
+    const env = { ...o.env, ...l.env } as NodeJS.ProcessEnv;
     let child: ChildProcess;
     try {
-      child = viaShell ? spawn(`"${command}"`, args, { cwd: o.cwd, env: o.env as NodeJS.ProcessEnv, shell: true, windowsHide: true }) : spawn(command, args, { cwd: o.cwd, env: o.env as NodeJS.ProcessEnv, windowsHide: true });
+      child = l.viaCmd
+        ? spawn(`"${l.file}"`, args, { cwd: o.cwd, env, shell: true, windowsHide: true })
+        : spawn(l.file, [...l.pre, ...args], { cwd: o.cwd, env, windowsHide: true, detached: process.platform !== "win32" });
     } catch {
       return done({ code: null, out: "", err: "", missing: true });
     }
     let out = "";
     let err = "";
     let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill("SIGTERM");
-      setTimeout(() => child.kill("SIGKILL"), 3000).unref();
-    }, o.timeoutMs);
+    let stopped = false;
+    let killing: Promise<void> | null = null;
+    const stop = (why: "time" | "stop") => {
+      if (killing) return;
+      if (why === "time") timedOut = true;
+      else stopped = true;
+      killing = killTree(child);
+    };
+    const timer = setTimeout(() => stop("time"), o.timeoutMs);
+    const onAbort = () => stop("stop");
+    o.signal?.addEventListener("abort", onAbort, { once: true });
     child.stdout?.on("data", (d: Buffer) => {
       if (out.length < MAX_OUT) out += d.toString("utf8");
     });
     child.stderr?.on("data", (d: Buffer) => {
       if (err.length < 200_000) err += d.toString("utf8");
     });
-    child.on("error", (e: NodeJS.ErrnoException) => {
+    let settled = false;
+    const finish = async (r: Ran) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
-      done({ code: null, out, err, missing: e.code === "ENOENT" || e.code === "EACCES" || e.code === "EINVAL" });
-    });
+      o.signal?.removeEventListener("abort", onAbort);
+      // Whatever it started goes with it, before this returns.
+      if (killing) await killing;
+      else if (process.platform !== "win32" && !l.viaCmd && child.pid)
+        try {
+          // It ended on its own: anything it left running in its group goes too.
+          process.kill(-child.pid, "SIGKILL");
+        } catch {
+          /* nothing left */
+        }
+      done({ ...r, timedOut, stopped });
+    };
+    child.on("error", (e: NodeJS.ErrnoException) => void finish({ code: null, out, err, missing: e.code === "ENOENT" || e.code === "EACCES" || e.code === "EINVAL" }));
     child.on("close", (code) => {
-      clearTimeout(timer);
       // cmd's own "not recognized" when the .cmd isn't there.
-      const missing = viaShell && code !== 0 && /is not recognized as an internal or external command/i.test(err);
-      done({ code, out, err, timedOut, missing });
+      const missing = l.viaCmd && code !== 0 && /is not recognized as an internal or external command/i.test(err);
+      void finish({ code, out, err, missing });
     });
     child.stdin?.on("error", () => {});
     child.stdin?.end(o.input ?? "");
@@ -344,12 +453,13 @@ const tidy = (s: string, n: number) => redact(s).replace(/\s+/g, " ").trim().sli
 
 const CHECK_TIMEOUT = 15_000;
 
-async function hermesFetch(a: Saved, path: string, init: RequestInit & { timeoutMs: number }) {
+async function hermesFetch(a: Saved, path: string, init: RequestInit & { timeoutMs: number; stop?: AbortSignal }) {
   const key = keyOf(a.id);
+  const { timeoutMs, stop, ...rest } = init;
   return fetch(`${a.address}${path}`, {
-    ...init,
+    ...rest,
     redirect: "error",
-    signal: AbortSignal.timeout(init.timeoutMs),
+    signal: anySignal([AbortSignal.timeout(timeoutMs), stop]),
     headers: { ...(init.headers as Record<string, string>), ...(key ? { Authorization: `Bearer ${key}` } : {}) },
   });
 }
@@ -395,6 +505,8 @@ const homeEnv = (a: Saved): Record<string, string> =>
 /* ---------------- A task ---------------- */
 
 const TASK_TIMEOUT = 20 * 60_000;
+const taskTimeout = () => Number(process.env.BOPS_AGENT_TASK_TIMEOUT_MS) || TASK_TIMEOUT;
+const MAX_REPLY_BYTES = 4_000_000;
 const MAX_ANSWER = 60_000;
 const DSH_SESSION = /^session-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** A chat's id as its sessions are kept under: a hash, so the registry never names a chat. */
@@ -413,38 +525,52 @@ function inTurn<T>(key: string, job: () => Promise<T>): Promise<T> {
 }
 
 /** Hand `task` to the instance named `name`, in chat `chatId`'s own session there, and wait for its answer. */
-export async function sendTask(name: string, task: string, chatId: string): Promise<TaskResult> {
+export async function sendTask(name: string, task: string, chatId: string, signal?: AbortSignal): Promise<TaskResult> {
   const a = agentByName(name);
   if (!a) return { ok: false, words: `There's no agent called ${tidy(name, 40)} in Settings, Agents you run.` };
   const t = task.trim();
   if (!t) return { ok: false, words: "The task was empty." };
-  return inTurn(`${a.id}:${chatKey(a, chatId)}`, () => (a.reach === "address" ? hermesTask(a, t, chatId) : a.kind === "dsh" ? dshTask(a, t, chatId) : hermesLocalTask(a, t)));
+  // Removing the agent stops its tasks too.
+  const both = anySignal([signal, stopperFor(a.id).signal]);
+  return inTurn(`${a.id}:${chatKey(a, chatId)}`, () => {
+    if (both.aborted) return Promise.resolve<TaskResult>({ ok: false, words: `The task for ${a.name} was stopped.` });
+    return a.reach === "address" ? hermesTask(a, t, chatId, both) : a.kind === "dsh" ? dshTask(a, t, chatId, both) : hermesLocalTask(a, t, both);
+  });
 }
 
-async function hermesTask(a: Saved, task: string, chatId: string): Promise<TaskResult> {
+async function hermesTask(a: Saved, task: string, chatId: string, signal: AbortSignal): Promise<TaskResult> {
   if (!keyOf(a.id)) return { ok: false, words: `${a.name} has no key. Paste its API server key in Settings, Agents you run.` };
   let r: Response;
   try {
     r = await hermesFetch(a, "/v1/chat/completions", {
       method: "POST",
-      timeoutMs: TASK_TIMEOUT,
+      timeoutMs: taskTimeout(),
+      stop: signal,
       headers: { "Content-Type": "application/json", "X-Hermes-Session-Id": `bops-${a.id}-${chatKey(a, chatId)}` },
       body: JSON.stringify({ model: "hermes-agent", messages: [{ role: "user", content: task }], stream: false }),
     });
   } catch (e) {
+    if (signal.aborted) return { ok: false, words: `The task for ${a.name} was stopped.` };
     const timeout = (e as Error)?.name === "TimeoutError";
-    return { ok: false, words: timeout ? `${a.name} didn't finish within 20 minutes.` : `Bops couldn't reach ${a.name}. Check that the server is on and Tailscale is connected, then try again.` };
+    return { ok: false, words: timeout ? `${a.name} didn't finish in time, so Bops stopped it.` : `Bops couldn't reach ${a.name}. Check that the server is on and Tailscale is connected, then try again.` };
   }
   if (r.status === 401 || r.status === 403) return { ok: false, words: `${a.name} turned down the key. Paste its API server key again in Settings, Agents you run.` };
   if (r.status === 429) return { ok: false, words: `${a.name} is busy right now. Try again in a minute.` };
-  const body = (await r.json().catch(() => null)) as { choices?: { message?: { content?: unknown } }[]; error?: { message?: unknown } } | null;
+  const raw = await readCapped(r, MAX_REPLY_BYTES);
+  if (raw === null) return { ok: false, words: `${a.name} answered with more than Bops takes in one reply (4 MB).` };
+  let body: { choices?: { message?: { content?: unknown } }[]; error?: { message?: unknown } } | null = null;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    body = null;
+  }
   if (!r.ok) return { ok: false, words: `${a.name} couldn't do it: ${tidy(typeof body?.error?.message === "string" ? body.error.message : `error ${r.status}`, 300)}` };
   const text = body?.choices?.[0]?.message?.content;
   if (typeof text !== "string" || !text.trim()) return { ok: false, words: `${a.name} finished without an answer.` };
   return { ok: true, text: redact(text).slice(0, MAX_ANSWER) };
 }
 
-async function dshTask(a: Saved, task: string, chatId: string): Promise<TaskResult> {
+async function dshTask(a: Saved, task: string, chatId: string, signal: AbortSignal): Promise<TaskResult> {
   const ck = chatKey(a, chatId);
   const sid = a.sessions?.[ck];
   // The headless runner adopts a session only from the folder it began in: each instance has one of its own.
@@ -452,9 +578,10 @@ async function dshTask(a: Saved, task: string, chatId: string): Promise<TaskResu
   mkdirSync(/*turbopackIgnore: true*/ cwd, { recursive: true });
   const key = keyOf(a.id);
   const args = ["--profile", "headless", "--json", ...(sid && DSH_SESSION.test(sid) ? ["--session-id", sid] : []), "-"];
-  const ran = await run(a.command!, args, { env: childEnv({ ...homeEnv(a), ...(key ? { DEEPSEEK_API_KEY: key } : {}) }), cwd, input: task, timeoutMs: TASK_TIMEOUT });
+  const ran = await run(a.command!, args, { env: childEnv({ ...homeEnv(a), ...(key ? { DEEPSEEK_API_KEY: key } : {}) }), cwd, input: task, timeoutMs: taskTimeout(), signal });
   if (ran.missing) return { ok: false, words: `Bops can't find ${a.command} on this PC. Fix its path in Settings, Agents you run.` };
-  if (ran.timedOut) return { ok: false, words: `${a.name} didn't finish within 20 minutes.` };
+  if (ran.stopped) return { ok: false, words: `The task for ${a.name} was stopped.` };
+  if (ran.timedOut) return { ok: false, words: `${a.name} didn't finish in time, so Bops stopped it.` };
   let session: string | undefined;
   let final: { text?: unknown; reason?: { kind?: unknown; error?: { message?: unknown } } | null } | undefined;
   let error: string | undefined;
@@ -477,10 +604,11 @@ async function dshTask(a: Saved, task: string, chatId: string): Promise<TaskResu
   return { ok: false, words: `${a.name} couldn't do it: ${tidy(why || "it stopped without an answer", 300)}` };
 }
 
-async function hermesLocalTask(a: Saved, task: string): Promise<TaskResult> {
-  const ran = await run(a.command!, ["chat", "--query-file", "-", "--oneshot", "-Q", "--source", "tool"], { env: childEnv(homeEnv(a)), cwd: a.home!, input: task, timeoutMs: TASK_TIMEOUT });
+async function hermesLocalTask(a: Saved, task: string, signal: AbortSignal): Promise<TaskResult> {
+  const ran = await run(a.command!, ["chat", "--query-file", "-", "--oneshot", "-Q", "--source", "tool"], { env: childEnv(homeEnv(a)), cwd: a.home!, input: task, timeoutMs: taskTimeout(), signal });
   if (ran.missing) return { ok: false, words: `Bops can't find ${a.command} on this PC. Fix its path in Settings, Agents you run.` };
-  if (ran.timedOut) return { ok: false, words: `${a.name} didn't finish within 20 minutes.` };
+  if (ran.stopped) return { ok: false, words: `The task for ${a.name} was stopped.` };
+  if (ran.timedOut) return { ok: false, words: `${a.name} didn't finish in time, so Bops stopped it.` };
   const text = ran.out.trim();
   if (ran.code !== 0 || !text) return { ok: false, words: `${a.name} couldn't do it: ${tidy(lastLine(ran.err) || "it stopped without an answer", 300)}` };
   return { ok: true, text: redact(text).slice(0, MAX_ANSWER) };
@@ -499,4 +627,40 @@ function remember(id: string, ck: string, session: string | undefined) {
   } catch {
     /* the next task starts a new session */
   }
+}
+
+/** One signal for several: aborted when any of them is. */
+function anySignal(list: (AbortSignal | undefined)[]): AbortSignal {
+  const real = list.filter((x): x is AbortSignal => !!x);
+  return real.length === 1 ? real[0] : AbortSignal.any(real);
+}
+
+/** Each instance's own stop: removing it stops what it's doing. */
+const stoppers = new Map<string, AbortController>();
+function stopperFor(id: string) {
+  let c = stoppers.get(id);
+  if (!c || c.signal.aborted) {
+    c = new AbortController();
+    stoppers.set(id, c);
+  }
+  return c;
+}
+
+/** A response's body, read as it comes, up to `max` bytes; null when there's more. */
+async function readCapped(r: Response, max: number): Promise<string | null> {
+  if (!r.body) return "";
+  const reader = r.body.getReader();
+  const parts: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    parts.push(value);
+  }
+  return Buffer.concat(parts).toString("utf8");
 }

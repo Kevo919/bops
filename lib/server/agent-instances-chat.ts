@@ -15,6 +15,8 @@ import { ownerName } from "./store";
  */
 
 export const AGENT_TOOL = "ask_agent";
+/** The longest task handed over: the ask card shows all of it (scrollable), and nothing longer is sent. */
+export const MAX_TASK = 8000;
 
 /** Whether a turn gets it: only the owner's own, in the Bops app, with at least one agent added. */
 export const agentsForTurn = (t: { outside?: boolean; member?: unknown; relayed?: boolean; background?: unknown }) => process.env.BOPS_SELF_HOSTED === "1" && !t.outside && !t.member && !t.relayed && !t.background;
@@ -43,7 +45,7 @@ export function agentChatTools() {
         type: "object",
         properties: {
           agent: { type: "string", enum: list.map((a) => a.name), description: "Which agent, by its name" },
-          task: { type: "string", description: "The task, in full, as the agent should read it" },
+          task: { type: "string", maxLength: MAX_TASK, description: `The task, in full, as the agent should read it (at most ${MAX_TASK} characters)` },
         },
         required: ["agent", "task"],
         additionalProperties: false,
@@ -53,17 +55,39 @@ export function agentChatTools() {
   ];
 }
 
-/** Run ask_agent. Asks first (NeedsOk) unless `approved`: the owner said yes to this very call. */
-export async function runAgentTool(chatId: string, args: Record<string, unknown>, opts: { approved?: boolean } = {}): Promise<string> {
+/**
+ * Run ask_agent. Asks first (NeedsOk) unless `approved`: the owner said yes to this very call. The card shows the
+ * whole task, exactly what is sent. `stillOn`: whether the chat turn still goes on; once it doesn't (stopped, taken
+ * back), the task is stopped too, its program and everything that program started.
+ */
+export async function runAgentTool(chatId: string, args: Record<string, unknown>, opts: { approved?: boolean; stillOn?: () => boolean } = {}): Promise<string> {
   const name = typeof args.agent === "string" ? args.agent.trim() : "";
   const task = typeof args.task === "string" ? args.task.trim() : "";
   const known = listAgents().find((a) => a.name.toLowerCase() === name.toLowerCase());
   if (!known) return `Failed: there's no agent called ${name.slice(0, 40) || "that"} in Settings, Agents you run.`;
   if (!task) return "Failed: give the agent a task.";
+  if (task.length > MAX_TASK) return `Failed: the task is ${task.length} characters; the most Bops hands over is ${MAX_TASK}, so ${ownerName()} can read all of it first. Shorten it and try again.`;
   if (!opts.approved) {
-    const ask: AskSpec = { action: `Hand a task to ${known.name} (${KIND_NAMES[known.kind]})`, resources: [known.name], preview: task.slice(0, 2000), kind: "app", onceOnly: true };
+    const ask: AskSpec = { action: `Hand a task to ${known.name} (${KIND_NAMES[known.kind]})`, resources: [known.name], preview: task, kind: "app", onceOnly: true };
     throw new NeedsOk(ask);
   }
-  const r = await sendTask(known.name, task, chatId);
+  const stop = new AbortController();
+  const watch = opts.stillOn
+    ? setInterval(() => {
+        let on = true;
+        try {
+          on = opts.stillOn!();
+        } catch {
+          on = false;
+        }
+        if (!on) stop.abort();
+      }, 1000)
+    : undefined;
+  let r: Awaited<ReturnType<typeof sendTask>>;
+  try {
+    r = await sendTask(known.name, task, chatId, stop.signal);
+  } finally {
+    if (watch) clearInterval(watch);
+  }
   return r.ok ? `${FROM_AGENT(known.name)}${r.text}` : `Failed: ${r.words}`;
 }

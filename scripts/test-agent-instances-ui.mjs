@@ -66,6 +66,8 @@ const orgoPort = orgo.address().port;
 
 // ---- the scratch folder: the repo's files linked in, its own .data with made-up bots and chats -----------------------
 const dir = mkdtempSync(join(tmpdir(), "bops-wip-"));
+// The agents' own folders: outside the Bops folder (which an agent may never use).
+const agentHomes = mkdtempSync(join(tmpdir(), "bops-agent-homes-"));
 for (const name of readdirSync(root)) if (name !== ".data" && !name.startsWith(".env") && name !== ".git") symlinkSync(join(root, name), join(dir, name));
 mkdirSync(join(dir, "home"));
 const now = Date.now();
@@ -142,7 +144,7 @@ const server = spawn(process.execPath, [join(root, "node_modules", "next", "dist
     BOPS_ORGO_ORIGIN: `http://127.0.0.1:${orgoPort}`,
     NEXT_TELEMETRY_DISABLED: "1",
     BOPS_TELEMETRY: "0",
-    BOPS_AGENT_HOMES: join(dir, "home", "agents"),
+    BOPS_AGENT_HOMES: agentHomes,
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -157,6 +159,7 @@ const stop = async () => {
   }
   orgo.close();
   rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
+  rmSync(agentHomes, { recursive: true, force: true });
 };
 process.on("exit", () => server.exitCode === null && server.kill());
 

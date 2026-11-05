@@ -109,6 +109,7 @@ function fakeHermes(label, key) {
       await new Promise((r) => setTimeout(r, 150));
       const task = body.messages.at(-1).content;
       if (task.includes("BREAK")) return json(500, { error: { message: "the model provider is down" } });
+      if (task.includes("HUGE")) return json(200, { choices: [{ message: { role: "assistant", content: "x".repeat(5_000_000) } }] });
       return json(200, { id: "c1", object: "chat.completion", model: "hermes-agent", choices: [{ index: 0, message: { role: "assistant", content: `${label} did: ${task} (turn ${turns})` }, finish_reason: "stop" }] });
     }
     json(404, { error: { message: "not found" } });
@@ -163,6 +164,31 @@ chmodSync(dshCmd, 0o755);
 const hermesCmd = join(bin, "hermes");
 writeFileSync(hermesCmd, `#!/bin/sh\n[ "$1" = --version ] && { echo "Hermes Agent v9 fake"; exit 0; }\n[ "$*" = "chat --query-file - --oneshot -Q --source tool" ] || { echo "bad usage: $*" >&2; exit 2; }\ntask=$(cat)\necho "local hermes in $(basename "$HERMES_HOME") did: $task"\n`);
 chmodSync(hermesCmd, 0o755);
+
+// A program that starts a grandchild (which writes its pid, then waits a long time), then waits itself: a stop or a
+// timeout must take both.
+const treeJs = join(bin, "fake-tree.mjs");
+writeFileSync(
+  treeJs,
+  `import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+if (process.argv[2] === "--version") { console.log("tree 1"); process.exit(0); }
+const g = spawn(process.execPath, ["-e", "require('fs').writeFileSync(process.env.DSH_HOME + '/grandchild.pid', String(process.pid)); setInterval(() => {}, 1000)"], { stdio: "ignore" });
+writeFileSync(process.env.DSH_HOME + "/child.pid", String(process.pid));
+setInterval(() => {}, 1000);
+`,
+);
+const treeCmd = join(bin, "dsh-tree");
+writeFileSync(treeCmd, `#!/bin/sh\nexec "${process.execPath}" "${treeJs}" "$@"\n`);
+chmodSync(treeCmd, 0o755);
+const alive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 /* ---------------- The modules ---------------- */
 
@@ -390,6 +416,99 @@ await call(asOwner({ action: "edit", id: by("Hermes backup").id, address: "http:
 f = await lib.sendTask("Hermes backup", "anything", "chat-3");
 assert.match(f.words, /^Bops couldn't reach Hermes backup\. Check that the server is on and Tailscale is connected, then try again\.$/);
 ok("failures say what happened in plain words: the agent's own error, a lost session, an unreachable server");
+
+
+/* 9b. Review fixes: stops take the whole tree; the task the owner sees is the task sent; replies and keys capped */
+{
+  r = await call(asOwner({ action: "add", name: "dsh tree", kind: "dsh", reach: "command", command: treeCmd }));
+  assert.equal(r.status, 200, r.text);
+  agents = r.json.agents;
+  const home = by("dsh tree").home;
+  const pids = () => [Number(readFileSync(join(home, "child.pid"), "utf8")), Number(readFileSync(join(home, "grandchild.pid"), "utf8"))];
+  const gone = async (list) => {
+    for (let i = 0; i < 40 && list.some(alive); i++) await new Promise((x) => setTimeout(x, 50));
+    return !list.some(alive);
+  };
+  // A timeout.
+  process.env.BOPS_AGENT_TASK_TIMEOUT_MS = "800";
+  let x = await lib.sendTask("dsh tree", "wait", "chat-t");
+  delete process.env.BOPS_AGENT_TASK_TIMEOUT_MS;
+  assert.equal(x.words, "dsh tree didn't finish in time, so Bops stopped it.");
+  let both = pids();
+  assert.ok(await gone(both), `child and grandchild both stopped (${both})`);
+  // The chat turn stops: the task stops, child and grandchild.
+  rmSync(join(home, "grandchild.pid"), { force: true });
+  let on = true;
+  setTimeout(() => (on = false), 600);
+  const t0 = Date.now();
+  const out = await chat.runAgentTool("chat-t", { agent: "dsh tree", task: "wait" }, { approved: true, stillOn: () => on });
+  assert.equal(out, "Failed: The task for dsh tree was stopped.");
+  assert.ok(Date.now() - t0 < 4000);
+  both = pids();
+  assert.ok(await gone(both), "a stopped turn stops the whole tree");
+  // Removing the agent stops its running task.
+  rmSync(join(home, "grandchild.pid"), { force: true });
+  const running = lib.sendTask("dsh tree", "wait", "chat-r");
+  await new Promise((y) => setTimeout(y, 500));
+  await call(asOwner({ action: "remove", id: by("dsh tree").id }));
+  x = await running;
+  assert.equal(x.words, "The task for dsh tree was stopped.");
+  assert.ok(await gone(pids()), "removing it stops the whole tree");
+  agents = (await call(asOwner())).json.agents;
+}
+// The owner's card shows the whole task, and nothing longer than the card holds is sent.
+{
+  const long = "word ".repeat(1200).trim();
+  await assert.rejects(chat.runAgentTool("chat-1", { agent: "Hermes on server", task: long }), (e) => e.ask.preview === long);
+  const before = hermesA.seen.length;
+  const tooLong = "x".repeat(chat.MAX_TASK + 1);
+  assert.match(await chat.runAgentTool("chat-1", { agent: "Hermes on server", task: tooLong }), /^Failed: the task is 8001 characters; the most Bops hands over is 8000/);
+  assert.match(await chat.runAgentTool("chat-1", { agent: "Hermes on server", task: tooLong }, { approved: true }), /^Failed: the task is 8001/);
+  assert.equal(hermesA.seen.length, before, "nothing longer was sent");
+  assert.equal(chat.agentChatTools()[0].parameters.properties.task.maxLength, chat.MAX_TASK);
+}
+// A reply past 4 MB is refused, read only that far.
+assert.equal((await lib.sendTask("Hermes on server", "HUGE", "chat-h")).words, "Hermes on server answered with more than Bops takes in one reply (4 MB).");
+// A short key shows as "saved", never its last four.
+{
+  const envLocal = await import("../lib/server/env-local.ts");
+  assert.equal(envLocal.maskKey("abcdefgh12"), "saved");
+  assert.equal(envLocal.maskKey("abcdefgh12345678"), "ends in 5678");
+}
+// Folders: no . or .., no NUL, not the dsh app's or Hermes' own home, not Bops' data, not elsewhere in ~/.bops.
+for (const [home, words] of [
+  [`${tmp}/a/../b`, /without \. or \.\./],
+  [join(tmp, "a\0b"), /full path/],
+  [join(process.env.HOME, ".dsh"), /belongs to something else/],
+  [join(process.env.HOME, ".dsh", "profiles"), /belongs to something else/],
+  [join(process.env.HOME, ".hermes"), /belongs to something else/],
+  [join(root, ".data"), /belongs to something else/],
+  [join(process.env.HOME, ".bops"), /part of Bops' own files/],
+  [join(process.env.HOME, ".bops", "users"), /part of Bops' own files/],
+])
+  await refuse({ name: "dsh folder", kind: "dsh", reach: "command", command: dshCmd, home }, words);
+// Plain http: this PC and the tailnet only (100.64.0.0/10, fd7a:115c:a1e0::/48, *.ts.net); never a bare LAN name.
+for (const a of ["http://100.90.53.92:8642", "http://bops-vps.tail4bbb43.ts.net:8642", "http://[fd7a:115c:a1e0::1]:8642", "http://localhost:8642", "https://hermes.example.com"]) assert.equal(lib.addressProblem(a), null, a);
+for (const a of ["http://vps:8642", "http://192.168.1.5:8642", "http://100.128.0.1:8642", "http://fd7b::1", "http://ts.net:80", "http://evil.ts.net.example.com"]) assert.match(lib.addressProblem(a) ?? "", /Use https|isn't a web address/, a);
+// Starting dsh on Windows: the app's own CLI directly (no cmd.exe), found from %LOCALAPPDATA% for the default "dsh".
+{
+  const LA = "C:\\Users\\MBV3n\\AppData\\Local";
+  const inst = `${LA}\\Programs\\DeepSeek Harness`;
+  const have = new Set([`${inst}\\resources\\runtime\\cli\\bin\\dsh.cmd`, `${inst}\\DeepSeek Harness.exe`, `${inst}\\resources\\app.asar`]);
+  const w = (cmd, exists = (p) => have.has(p)) => lib.resolveLaunch(cmd, { platform: "win32", env: { LOCALAPPDATA: LA }, exists });
+  assert.deepEqual(w("dsh"), {
+    file: `${inst}\\DeepSeek Harness.exe`,
+    pre: ["--expose-internals", `${inst}\\resources\\app.asar\\dsh\\node_modules\\@deepseek-ai\\dsh-desktop-host\\lib\\cli.js`],
+    env: { ELECTRON_RUN_AS_NODE: "1" },
+    viaCmd: false,
+  });
+  assert.equal(w(`${inst}\\resources\\runtime\\cli\\bin\\dsh.cmd`).file, `${inst}\\DeepSeek Harness.exe`);
+  assert.deepEqual(w("dsh", () => false), { file: "dsh.cmd", pre: [], env: {}, viaCmd: true }, "no app: dsh.cmd on PATH");
+  assert.deepEqual(w("D:\\tools\\dsh.cmd"), { file: "D:\\tools\\dsh.cmd", pre: [], env: {}, viaCmd: true });
+  assert.deepEqual(w("hermes"), { file: "hermes", pre: [], env: {}, viaCmd: false });
+  assert.deepEqual(lib.resolveLaunch("dsh", { platform: "linux", env: {} }), { file: "dsh", pre: [], env: {}, viaCmd: false });
+}
+ok("review fixes: timeout, a stopped turn and remove each stop child and grandchild; the card shows the whole task, over 8000 is refused; 4 MB reply cap; short keys show saved; folder and http rules; Windows dsh launch");
 
 /* 10. Remove */
 const goneId = by("Hermes backup").id;
