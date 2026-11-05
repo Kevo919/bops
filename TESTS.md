@@ -5,7 +5,7 @@ Every feature, how it was tested, when, by whom, and the result. **Kevin: read t
 Legend: ✅ passed · ⚠️ passed with a known limit · ❌ failed · ⏳ not yet tested this way.
 Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an independent agent read the code for bugs and security), **Live PC** (on Kevin's PC, real app), **Live server** (on the Hostinger server), **Live phone**, **Real account** (with Kevin's real provider account).
 
-**Tested: 66%** (110.5 of 168 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
+**Tested: 65%** (112.5 of 172 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
 
 **Visual features (Kevin, Nov 5):** a screen or visual change is only ✅ when (1) its tests pass, (2) a screenshot check passes (dark mode, no blank screens), (3) an independent review passes, and (4) it's tried in the real app on the PC.
 
@@ -53,6 +53,7 @@ Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an indepen
 | Bot tasks on this PC with your Claude plan (#80) | ✅ Nov 5 builder: pc-task-runner 14, cli-agents 43, local-subscriptions 15, executor-lifecycle 7 | ✅ Nov 5 security re-review + codex Windows review (nits in task 60) | ⏳ | n/a | ⏳ a real task on Kevin's Max plan |  |
 | Easy phone pairing: Your phone in Settings, QR codes, Scan button (#77) | ✅ Nov 5 builder: easy-pairing 15, phone-card-ui 5, PairLink unit 15, gradle build | ✅ Nov 5 reviewer (fixes done; QR decoded to bops://pair) | ⏳ | n/a | ⏳ Kevin's phone |  |
 | In-progress badges: grayed out, red label, percent; Being tested state (#84) | ✅ Nov 5 builder: in-progress 11, in-progress-ui 20 (light, dark, desktop, phone), mobile-layout 28 | ✅ Nov 5 reviewer (blocker fixed) | ⏳ | n/a | n/a |  |
+| Agents you run: several DeepSeek Harness and Hermes instances (#91) | ✅ Nov 5 builder: agent-instances 12, UI 9 | ✅ Nov 5 security review (8 fixes done) | ⏳ | n/a | ⏳ Hermes on the server with its key | Hermes API reachable on the tailnet (health 200, 401 without key) |
 | GitHub automatic checks (CI) | ✅ Nov 5: back on; #79 all green (web, check incl. secret scan, cloud-tests, android, mobile-layout) |  |  |  |  | Kevin to re-enable on the Actions page |
 
 ## Rules for every agent (how to test and how to log it)

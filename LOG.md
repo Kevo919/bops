@@ -6,6 +6,10 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 12:40 PM (Chicago)
+- **Merged #91: Agents you run.** Add as many DeepSeek Harness and Hermes Agent setups as you like, each with its own folder, address and key. Bots can hand them a task, and you approve it first. The default dsh uses your desktop app's own CLI.
+- **Next to merge:** #87 Settings → Services, then #92 the Chrome start fix. After that, one PC rebuild and restart.
+
 ### Nov 5, 12:15 PM (Chicago)
 - **Merged #88:** Windows wording. "Your PC" replaces "your Mac", and the Claude card now says what bot tasks really do.
 - **Hermes on the server is ready for Bops.** With Kevin's OK, only the Hermes container was changed: its API is now reachable on the tailnet only and needs its key. Backups were kept.
