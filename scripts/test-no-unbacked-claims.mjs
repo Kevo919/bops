@@ -6,7 +6,12 @@
 // - a real start_task call: the reply carries the task's session id (its card), with no such note; for a single-agent
 //   bot whose Works on is This PC, the task is placed on the PC outright, and the bot is told it works there;
 // - the record of what tools did comes back to the model as Bops' note after the message, never in the bot's words;
-// - one account's "this model can't take tools" is never another's.
+// - one account's "this model can't take tools" is never another's;
+// - only a tool of the matching kind that succeeded backs a claim: an email the user approved (the turn paused, then
+//   went on) backs "I've sent it", a send refused or failed doesn't, nor a tell_task to no task or a hand_off refused;
+// - no note on words that claim nothing ("I started thinking", "I sent you a summary above"), and a question ("how's my
+//   task?") is never read as a request to act;
+// - This PC only when the bot's Works on is This PC and the PC is ready: otherwise the old routing, said plainly.
 //
 // OpenAI and OpenRouter are fakes (fetch), sessions.ts is a stand-in that records the tasks started and runs nothing,
 // and the state lives in a throwaway folder: nothing reaches a real service, and no real task runs.
@@ -26,6 +31,7 @@ const fakeKey = (...parts) => ["fake", ...parts].join("-");
 process.env.OPENAI_API_KEY = fakeKey("openai");
 process.env.OPENROUTER_API_KEY = fakeKey("or", "default");
 process.env.OPENROUTER_API_KEY__WORK = fakeKey("or", "work");
+process.env.AGENTMAIL_API_KEY = fakeKey("am");
 const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
 const rootUrl = pathToFileURL(rootPath).href;
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-no-unbacked-"));
@@ -82,6 +88,7 @@ const reply = (text) => () => response(`resp_${asked.length}`, [said(text)]);
 const calling = (...items) => () => response(`resp_${asked.length}`, items);
 /** OpenRouter's calls: the key each came with and whether it had tools. The models in `refuses` can't take tools on the key named. */
 const routed = [];
+const mailed = [];
 const refuses = new Set();
 let routerSays = "Done.";
 globalThis.fetch = async (input, init) => {
@@ -100,6 +107,11 @@ globalThis.fetch = async (input, init) => {
     routed.push({ key, model: b.model, tools: !!b.tools?.length, messages: b.messages });
     if (b.tools?.length && refuses.has(`${key} ${b.model}`)) return json({ error: { message: "No endpoints found that support tool use.", code: 404 } }, 404);
     return json({ choices: [{ message: { content: routerSays } }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
+  }
+  // AgentMail (mail.ts): an email sent goes in `mailed`, and gets an id back.
+  if (url.origin === "https://api.agentmail.to" && /\/messages\/send$/.test(url.pathname)) {
+    mailed.push(JSON.parse(await req.text()));
+    return json({ message_id: `m_${mailed.length}`, thread_id: `t_${mailed.length}` });
   }
   throw new TypeError(`fetch failed (the test is offline: ${url.host})`);
 };
@@ -142,6 +154,7 @@ clearInterval(globalThis.__bopsRoutines);
 const chatId = botChatId("boppy");
 S.update((s) => {
   s.owner = { name: "Alex", timeZone: "America/New_York" };
+  Object.assign(s.bots.find((x) => x.id === "boppy"), { email: "boppy@bops.bot", mail: { inboxId: "in_1", podId: "pod_1" } });
 });
 const botMessages = () => S.getState().messages.filter((m) => m.chatId === chatId && m.role === "bot");
 const lastBot = () => botMessages().at(-1);
@@ -169,6 +182,14 @@ await check("the same model asked a plain question: it answers (the tools it can
   await Chat.handleMessage(chatId, "What is the downloads folder?");
   assert.equal(lastBot().text, "Downloads is the folder where files you save from the web land.");
   assert.equal(routed.at(-1).tools, false, "known for a while not to take tools: sent none");
+});
+
+await check("the same model asked about a task (a question, not a request): its answer, never the can't-run-tasks words", async () => {
+  routerSays = "Nothing is running right now.";
+  await Chat.handleMessage(chatId, "how's my task?");
+  assert.equal(lastBot().text, "Nothing is running right now.");
+  for (const q of ["how's my task?", "what did the research say?", "did you text Jordan?", "any reply yet?", "what's on my watch list?"]) assert.equal(Chat.asksToAct(q), false, q);
+  for (const r of ["Start a task on this PC to tidy my downloads", "can you email Jordan the quote", "Please book a table for two", "Thanks. Text me when it's done"]) assert.equal(Chat.asksToAct(r), true, r);
 });
 
 await check("one account's 'can't take tools' is never another's: the same model moved to the work account still gets tools", async () => {
@@ -210,8 +231,26 @@ await check("tools there, prose only: a reply saying it started a task with no t
   assert.equal(lastBot().text, "Sure, which folder do you mean?");
 });
 
-await check("a real start_task, single-agent bot whose Works on is This PC: the task goes on the PC, the reply carries its session id", async () => {
-  S.update((s) => (s.bots.find((b) => b.id === "boppy").runsOn = "mac"));
+await check("Works on This PC, but the PC isn't ready: the old routing (auto), said plainly; the bot isn't told tasks run there", async () => {
+  S.update((s) => {
+    s.bots.find((b) => b.id === "boppy").runsOn = "mac";
+    s.mac = { ready: false, reason: "Not set up" };
+  });
+  const n = started.length;
+  answers.push(calling(toolCall("start_task", { title: "Sort photos", goal: "Sort the photos folder", say: "Sorting them.", where: "auto", then_on_mac: null, part_of: null, skill: null })));
+  const k = asked.length;
+  await Chat.handleMessage(chatId, "Start a task to sort my photos folder");
+  assert.doesNotMatch(asked[k].instructions, /every task you start \(start_task\) runs there/);
+  assert.match(asked[k].instructions, /isn't ready right now: a task you start goes where Bops can run it/);
+  assert.equal(started.length, n + 1);
+  assert.equal(started.at(-1).where, "auto", "not forced onto a PC that can't take it");
+  const note = S.getState().messages.filter((m) => m.chatId === chatId && m.role === "system").at(-1);
+  assert.match(note.text, /^Boppy works on this (PC|computer|Mac), but it isn't ready, so "Sort photos" runs where Bops can run it$/);
+  S.update((s) => (s.sessions = []));
+});
+
+await check("a real start_task, single-agent bot whose Works on is This PC and the PC ready: the task goes on the PC, the reply carries its session id", async () => {
+  S.update((s) => (s.mac = { ready: true }));
   const n = started.length;
   answers.push(calling(toolCall("start_task", { title: "Tidy downloads", goal: "Tidy the downloads folder on this PC", say: "On it: tidying your downloads.", where: "auto", then_on_mac: null, part_of: null, skill: null })));
   const k = asked.length;
@@ -228,6 +267,10 @@ await check("a real start_task, single-agent bot whose Works on is This PC: the 
   console.log(`     reply: ${JSON.stringify(m.text)} sessionIds: ${JSON.stringify(m.sessionIds)}`);
   assert.deepEqual(m.sessionIds, [id], "its card: the real session id");
   assert.ok(!/No task was started/.test(m.text), "backed by the tool: no note");
+  // Worded for the cloud, or one part of a group: left to Bops, as before.
+  answers.push(calling(toolCall("start_task", { title: "Scrape prices", goal: "On the cloud computer, check the prices", say: "Checking.", where: "auto", then_on_mac: null, part_of: null, skill: null })));
+  await Chat.handleMessage(chatId, "Start a task to check the prices in the cloud");
+  assert.equal(started.at(-1).where, "auto");
 });
 
 await check("what tools did comes back as Bops' note after the message, never in the bot's own words", async () => {
@@ -239,17 +282,70 @@ await check("what tools did comes back as Bops' note after the message, never in
   const at = input.findIndex((x) => x.role === "assistant" && x.content === before);
   assert.ok(at >= 0, "the bot's words alone");
   assert.equal(input[at + 1].role, "developer");
-  assert.match(input[at + 1].content, /^Bops' record of what tools did for your message above \(from tool results, not words to copy\): started the task "Tidy downloads"\. Never write a record like this yourself/);
+  assert.match(input[at + 1].content, /^Bops' record of what tools did for your message above \(from tool results, not words to copy\): started the task "Scrape prices"\. Never write a record like this yourself/);
   assert.ok(!JSON.stringify(input).includes("[What was done"), "no bracketed record anywhere to imitate");
   // A task is running now (backed by the state), so saying so gets no note.
   assert.equal(lastBot().text, "It's still going.");
+});
+
+/** A turn that paused for the user's OK on `call` (resumeChat): it goes on with their `answer`; `turn` is what it kept. */
+const resumeWith = (call, answer, turn = {}) =>
+  Chat.resumeChat({ id: `apr_${++calls}`, botId: "boppy", chatId, action: "Send it", resources: [], preview: "", at: 1, reply: { reply: answer, at: 2 }, resume: { engine: "chat", responseId: "resp_paused", callId: "call_paused", call, outputs: [], turn: { config: { model: "gpt-test", effort: "low" }, seen: [], madeUp: [], outsideRead: false, ...turn } } });
+const SEND = { name: "send_email", arguments: JSON.stringify({ to: ["dana@acme.example"], cc: null, subject: "Quote", text: "Here's the quote." }) };
+
+await check("a send the user approved (the turn paused, then went on): 'I've sent the email' is backed, no note", async () => {
+  const m = mailed.length;
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith(SEND, "once");
+  assert.equal(mailed.length, m + 1, "the email went (AgentMail's fake)");
+  assert.equal(lastBot().text, "I've sent the email to Dana.");
+});
+
+await check("what other calls of a paused round did is kept (ChatPause.did): declined now, an earlier send still backs the claim; without it, it doesn't", async () => {
+  answers.push(reply("I've sent the invoice to Dana."));
+  await resumeWith(SEND, "reject", { did: { send: true } });
+  assert.equal(lastBot().text, "I've sent the invoice to Dana.");
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith(SEND, "reject");
+  assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
+});
+
+await check("a send that didn't go backs nothing: bad address (Nothing was sent.), no inbox", async () => {
+  const m = mailed.length;
+  answers.push(calling(toolCall("send_email", { to: ["not an address"], cc: null, subject: "Hi", text: "Hi" })), reply("I've sent the email to Dana."));
+  await Chat.handleMessage(chatId, "Email Dana hi");
+  assert.equal(mailed.length, m);
+  assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
+  const had = S.getState().bots.find((b) => b.id === "boppy").mail;
+  S.update((s) => delete s.bots.find((b) => b.id === "boppy").mail);
+  answers.push(calling(toolCall("send_email", { to: ["dana@acme.example"], cc: null, subject: "Hi", text: "Hi" })), reply("I've emailed Dana."));
+  await Chat.handleMessage(chatId, "Email Dana hi");
+  assert.equal(lastBot().text, "I've emailed Dana.\n\nNothing was sent.");
+  S.update((s) => (s.bots.find((b) => b.id === "boppy").mail = had));
+});
+
+await check("a task tool that didn't start one backs nothing: tell_task to no task, a hand_off that isn't allowed", async () => {
+  S.update((s) => (s.sessions = []));
+  const n = started.length;
+  answers.push(calling(said("I've started a task for it."), toolCall("tell_task", { thread_id: "ses_nope", message: "and the other folder", say: null })));
+  await Chat.handleMessage(chatId, "Tell the task to do the other folder too");
+  assert.equal(lastBot().text, "I've started a task for it.\n\nNo task was started.");
+  answers.push(calling(said("I've started a task for Max on it."), toolCall("hand_off", { bot_id: "nobody", title: "Research", goal: "Research it", say: null, where: "auto", then_on_mac: null })));
+  await Chat.handleMessage(chatId, "Hand the research to someone");
+  assert.equal(lastBot().text, "I've started a task for Max on it.\n\nNo task was started.");
+  assert.equal(started.length, n, "nothing started");
 });
 
 await check("unbacked(): each kind of claim, and what backs it", () => {
   const none = { task: false, running: false, send: false, schedule: false };
   assert.equal(Chat.unbacked("I've sent the email to Jordan.", none), "Nothing was sent.");
   assert.equal(Chat.unbacked("I've scheduled a reminder for 9am.", none), "Nothing was scheduled.");
-  assert.equal(Chat.unbacked("Started a new task for that.", none), "No task was started.");
+  assert.equal(Chat.unbacked("I've started a new task for that.", none), "No task was started.");
+  assert.equal(Chat.unbacked("I kicked off two threads.", none), "No task was started.");
+  assert.equal(Chat.unbacked("Your reminder has been set for 9.", none), "Nothing was scheduled.");
+  // Words that claim nothing done get nothing.
+  for (const t of ["I started thinking about how to split it up.", "I sent you a summary above.", "As I sent you earlier, the meeting is at 3.", "I've started looking at it and have a question first.", "Should I start a task for it?", "I can send it once you say yes."])
+    assert.equal(Chat.unbacked(t, none), "", t);
   assert.equal(Chat.unbacked("I've sent the email to Jordan.", { ...none, send: true }), "");
   assert.equal(Chat.unbacked("Your task is running.", { ...none, running: true }), "");
   assert.equal(Chat.unbacked("Paris is the capital of France.", none), "");
