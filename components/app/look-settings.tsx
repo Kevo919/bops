@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { post } from "./ui";
 import { Segmented } from "./segmented";
+import { InProgress } from "./in-progress";
 import { FONT_SCALE_MAX, FONT_SCALE_MIN, LOOK_CSS_LIMIT, LOOK_HISTORY, normalizeLook } from "@/lib/look-theme";
 import type { AppState, LookDensity, LookTheme } from "@/lib/types";
 
@@ -76,6 +77,12 @@ export function LookSettings({ state }: { state: AppState }) {
         <div className={rows}>
           <Segmented<LookDensity> title="Spacing" hint="How much room the window's parts keep." value={look.density ?? "normal"} options={[["compact", "Compact"], ["normal", "Normal"], ["roomy", "Roomy"]]} onPick={(density) => send({ density })} />
         </div>
+        {/* Being built (lib/feature-status.ts): a placeholder, grayed with its percent, until the setting lands. */}
+        <InProgress id="animations-setting" className="-mx-1.5 border-t border-rule px-1.5 pt-1">
+          <div className="flex w-full items-center gap-3 py-2.5 pr-12">
+            {line("Animations", "How much the window moves: full, calm or off.")}
+          </div>
+        </InProgress>
       </div>
       <div className="rounded-[14px] bg-white px-3.5 py-2.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         {line(`Custom CSS`, `Plain styles only, at most ${LOOK_CSS_LIMIT.toLocaleString("en-US")} characters. Nothing that loads or runs anything is kept.`)}

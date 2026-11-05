@@ -128,6 +128,7 @@ export function Sidebar({
   /** The workspace switcher open from the start (expanded from the rail's workspace). */
   workspaces?: boolean;
 }) {
+  const computerWords = useComputerWords();
   const [query, setQuery] = useState<string | null>(search);
   const q = query?.trim().toLowerCase();
   // A workspace shared with the user is read only: no bot menu, and nothing new is made in it.
@@ -265,7 +266,7 @@ export function Sidebar({
           {onCollapse && (
             <button
               onClick={onCollapse}
-              title="Collapse the sidebar (⌘\)"
+              title={computerWords("Collapse the sidebar (⌘\\)")}
               aria-label="Collapse the sidebar"
               className="flex size-[34px] shrink-0 items-center justify-center rounded-full hover:bg-[color:var(--bops-tint)]/[0.05]"
             >

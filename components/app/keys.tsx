@@ -597,6 +597,10 @@ function KeyLine({
 /** Orgo's computers run their agents on these keys from the same vault (orgo-web lib/computer-agent). */
 const ORGO_USES: Record<string, string> = { ANTHROPIC_API_KEY: "Anthropic", OPENAI_API_KEY: "OpenAI" };
 
+/** Keys whose vault copy is NOT the chat's model key (crawl M3, option B): said on the row, so Logins
+ *  showing an OpenAI key never reads as the chat being set up. */
+const NOT_THE_CHAT: Record<string, string> = { OPENAI_API_KEY: "This one is for bots' API calls; the chat's models read this computer's own OpenAI key, not the vault." };
+
 /**
  * Add a key: a service from the list Bops can call (by its vault name, as in Orgo's Secrets), the key pasted into a password field, and the bots that may use it. `replace`: a new value for a saved key,
  * which keeps who may use it. The value is cleared once Orgo has it.
@@ -708,6 +712,7 @@ function AddKey({
           {isSaved && <span className="text-[color:var(--ht-9a9a98)]"> Saving replaces the one in your vault.</span>}
           {info.workspaceKeys && <span className="text-[color:var(--ht-9a9a98)]"> {scope === "workspace" ? "For this workspace only." : "For all your workspaces."}</span>}
           {ORGO_USES[p.name] && <span className="text-[color:var(--ht-9a9a98)]"> Orgo computers that use your {ORGO_USES[p.name]} key use this one too.</span>}
+          {NOT_THE_CHAT[p.name] && <span className="text-[color:var(--ht-9a9a98)]"> {NOT_THE_CHAT[p.name]}</span>}
         </span>
       ) : null}
       <input

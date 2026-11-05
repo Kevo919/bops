@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useComputerWords } from "./computer-words";
 import { appsOwnShown } from "@/lib/apps-access";
 import { builtinLabels, builtinSkills, type BuiltinSkill } from "@/lib/builtin-skills";
 import { botHasLabel, botHasSkill, cleanLabel, isUnsorted, LABEL_ABOUT_MAX, labelInfoOf, sameLabel, SKILL_LABEL_MAX, UNSORTED, type SkillGroup, type SkillLabelInfo } from "@/lib/skill-labels";
@@ -165,6 +166,7 @@ async function call<T>(body: Record<string, unknown>): Promise<{ ok: true; json:
  * chips, under the title as on Issues.
  */
 export function SkillsPage({ state, only, focus, focusAt, nav, onClose }: { state: AppState; only?: SkillKind; focus?: string; focusAt?: number; nav?: ReactNode; onClose: () => void }) {
+  const computerWords = useComputerWords();
   const ws = currentWorkspace(state);
   const team = teamOf(state);
   const { skills, apps } = skillsIn(state, ws);
@@ -236,7 +238,7 @@ export function SkillsPage({ state, only, focus, focusAt, nav, onClose }: { stat
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <span className="text-[20px] font-semibold leading-6 tracking-[-0.01em]">{only === "app" ? "Apps" : "Skills"}</span>
             <span className="text-[13px] leading-[19px] text-[color:var(--ht-6b6b6b)]">
-              {about} {orgo ? "Kept in step with Orgo." : "Kept on this Mac."}
+              {about} {orgo ? "Kept in step with Orgo." : computerWords("Kept on this Mac.")}
             </span>
           </div>
           <CloseButton onClick={onClose} className="mt-1.5" />
@@ -571,6 +573,7 @@ function SkillView({
   /** What Update from folder left out, said over the page as an import's is. */
   onUpdated: (result: { name?: string; skipped: Problem[]; warnings: Problem[]; error?: string; updated?: boolean }) => void;
 }) {
+  const computerWords = useComputerWords();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [version, setVersion] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);

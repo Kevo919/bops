@@ -2952,9 +2952,10 @@ export function ToPicker({ state, onOpenChat, onCancel }: { state: AppState; onO
 }
 
 function Kbd({ n }: { n: number }) {
+  const computerWords = useComputerWords();
   return (
     <span className="flex gap-[3px]">
-      <span className="rounded-[5px] bg-white px-1.5 py-0.5 text-[11px] leading-[14px] text-[color:var(--ht-6b6b6b)] shadow-[0_0_0_1px_var(--h-e2e2df)]">⌘</span>
+      <span className="rounded-[5px] bg-white px-1.5 py-0.5 text-[11px] leading-[14px] text-[color:var(--ht-6b6b6b)] shadow-[0_0_0_1px_var(--h-e2e2df)]">{computerWords("⌘")}</span>
       <span className="rounded-[5px] bg-white px-1.5 py-0.5 font-mono text-[11px] leading-[14px] text-[color:var(--ht-6b6b6b)] shadow-[0_0_0_1px_var(--h-e2e2df)]">{n}</span>
     </span>
   );
@@ -3296,6 +3297,9 @@ const withoutBriefing = (text: string) =>
     .filter((p) => !/^\s*(computer briefing|briefing)\s*:/i.test(p) && !/^\s*computer\s*:.*\b(screens?|idle|free|untouched|home screen)\b/i.test(p))
     .join("\n\n") || text;
 
+/** Under the buttons of an ask that always asks (AppApproval.onceOnly). */
+export const ONCE_ONLY_LINE = "This always asks: each time is a yes for that time only.";
+
 const CHANNEL_NAME: Record<string, string> = { slack: "Slack", telegram: "Telegram", discord: "Discord" };
 
 /**
@@ -3393,12 +3397,14 @@ function AppApprovalCard({ state, approval: a, className = "" }: { state: AppSta
             <button disabled={busy} onClick={() => void decide("reject")} className={`${btn} bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)]`}>
               Deny
             </button>
-            <button disabled={busy} onClick={() => void decide("always")} title={alwaysScope(name, a)} className={`${btn} bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)]`}>
-              Always allow
-            </button>
+            {!a.onceOnly && (
+              <button disabled={busy} onClick={() => void decide("always")} title={alwaysScope(name, a)} className={`${btn} bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)]`}>
+                Always allow
+              </button>
+            )}
             {/* A thread's own app or data asks (the kinds that honour it, permission.ts Session.allowedAsks):
                 the same thing runs on without asking again, this thread alone. Never in a shared workspace. */}
-            {!!a.threadId && !state.shared && (a.kind === "app" || a.kind === "data") && (
+            {!!a.threadId && !state.shared && !a.onceOnly && (a.kind === "app" || a.kind === "data") && (
               <button disabled={busy} onClick={() => void decide("session")} title="This thread runs the same thing on without asking again; a new thread asks as new" className={`${btn} bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)]`}>
                 Allow for this thread
               </button>
@@ -3414,7 +3420,7 @@ function AppApprovalCard({ state, approval: a, className = "" }: { state: AppSta
       </div>
       )}
       {/* What Always allow covers: this bot and this action from now on, whoever it's for (lib/permission.ts). */}
-      {!telling && answerer === "you" && <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{alwaysScope(name, a)}</span>}
+      {!telling && answerer === "you" && <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{a.onceOnly ? ONCE_ONLY_LINE : alwaysScope(name, a)}</span>}
       {going && <span className="text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{sent?.state === "sending" ? "Sending…" : ANSWER_WAITS_LINE}</span>}
       {shownError && (
         <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">

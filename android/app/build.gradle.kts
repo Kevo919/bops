@@ -48,5 +48,9 @@ android {
     }
 }
 
-// No libraries: the app is Android's own WebView and two screens, so there's nothing to keep up to date but Android.
-dependencies {}
+// One library: Google's code scanner (Play services) for Scan QR code. It shows its own camera screen,
+// so the app needs no camera permission. Everything else is Android's own WebView and a few screens.
+dependencies {
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+    testImplementation("junit:junit:4.13.2")
+}

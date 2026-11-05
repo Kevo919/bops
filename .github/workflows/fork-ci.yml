@@ -49,6 +49,8 @@ jobs:
           node scripts/test-subscriptions-ui.mjs --brains-off
       - name: Local subscription authentication tests
         run: node --conditions=react-server scripts/test-local-subscriptions.mjs
+      - name: Bot tasks on this PC (Claude plan or OpenAI key) tests
+        run: node --conditions=react-server scripts/test-pc-task-runner.mjs
       - name: Local Codex conversation process tests
         run: node --conditions=react-server scripts/test-local-codex-chat.mjs
       - name: Desktop and phone proxy boundary tests
@@ -76,6 +78,8 @@ jobs:
         run: node --conditions=react-server scripts/test-connections.mjs
       - name: Connections card UI tests
         run: node scripts/test-connections-ui.mjs
+      - name: Composio (your account) tests (For You MCP)
+        run: node --conditions=react-server scripts/test-composio-for-you.mjs
       - name: Chat provider tests
         run: node --conditions=react-server scripts/test-chat-providers.mjs
       - name: Key check tests

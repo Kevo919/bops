@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useComputerWords } from "./computer-words";
 import { levelOf as memberLevelOf } from "@/lib/member-access";
 import {
   accountIn,
@@ -138,6 +139,7 @@ export function LoginsPage({
   onClose?: () => void;
   onOpenBot?: (botId: string) => void;
 }) {
+  const computerWords = useComputerWords();
   const ws = currentWorkspace(state);
   const shared = !!state.shared;
   const wsName = shared ? (state.shared?.name ?? "this workspace") : (state.workspaces?.find((w) => w.id === ws)?.name ?? "this workspace");
@@ -215,7 +217,7 @@ export function LoginsPage({
               <span className="mt-0.5 text-[13px] leading-[19px] text-[color:var(--ht-6b6b6b)]">
                 {shared
                   ? "Your own apps, keys and site logins. They're yours, not this workspace's bots'."
-                  : `Apps, keys and site logins for ${wsName}'s bots. Each bot gets only the access you give it. Passwords stay in your Mac's Keychain, and no AI sees them.`}
+                  : computerWords(`Apps, keys and site logins for ${wsName}'s bots. Each bot gets only the access you give it. Passwords stay in your Mac's Keychain, and no AI sees them.`)}
               </span>
             </div>
             <div className="relative mt-[30px] shrink-0">
@@ -310,7 +312,8 @@ export function LoginsPage({
           )}
 
           {!all.length ? (
-            editing !== "new" && <QuickStart onPick={(app) => setPicking({ app })} />
+            // (Not while Connect's picker is open above: it has the same apps, or says the same when none can connect.)
+            editing !== "new" && !picking && <QuickStart onPick={(app) => setPicking({ app })} />
           ) : !hits.length && !others.length ? (
             <div className="py-10 text-center text-[13.5px] leading-5 text-[color:var(--ht-6b6b6b)]">{term ? <>Nothing matches &ldquo;{q.trim()}&rdquo;.</> : only === "attention" ? "Nothing needs you." : `No logins in ${wsName} yet.`}</div>
           ) : (
@@ -692,6 +695,7 @@ function LoginPanel({
   onSignIn: (p: { app?: string; replaces?: string }) => void;
   onEdit: (id: string) => void;
 }) {
+  const computerWords = useComputerWords();
   const ws = currentWorkspace(state);
   const shared = !!state.shared;
   const team = teamOf(state);
@@ -936,7 +940,7 @@ function LoginPanel({
         {sure ? (
           <>
             <span className="w-full pb-1 text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">
-              {a ? `Disconnect ${title}? No bot can use it any more, in any workspace.` : l ? `Delete the ${l.site} login? It's gone from your Mac's Keychain too.` : `Remove ${k!.name} from your Orgo vault? Your bots stop using it.`}
+              {a ? `Disconnect ${title}? No bot can use it any more, in any workspace.` : l ? computerWords(`Delete the ${l.site} login? It's gone from your Mac's Keychain too.`) : `Remove ${k!.name} from your Orgo vault? Your bots stop using it.`}
             </span>
             <button
               disabled={busy}

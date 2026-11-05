@@ -49,7 +49,7 @@ const resultOf = async (key, status, data) => {
 
 try {
   await test("GET exposes exactly eight metadata rows and makes no provider calls", async () => {
-    const expected = [ROUTE_KEYS.openai, "OPENAI_EXECUTOR_API_KEY", ROUTE_KEYS.anthropic, ROUTE_KEYS.zai, ROUTE_KEYS["zai-coding-cn"], ROUTE_KEYS.deepseek, ROUTE_KEYS.openrouter, "ORGO_API_KEY", ROUTE_KEYS.ollama, "COMPOSIO_API_KEY", "ZAPIER_MCP_URL"];
+    const expected = [ROUTE_KEYS.openai, "OPENAI_EXECUTOR_API_KEY", ROUTE_KEYS.anthropic, ROUTE_KEYS.zai, ROUTE_KEYS["zai-coding-cn"], ROUTE_KEYS.deepseek, ROUTE_KEYS.openrouter, "ORGO_API_KEY", ROUTE_KEYS.ollama, "COMPOSIO_API_KEY", "ZAPIER_MCP_URL", "COMPOSIO_MCP_URL"];
     assert.equal(ROUTE_KEYS["zai-coding-cn"], "ZAI_CODING_CN_API_KEY", "the China Coding Plan has a key of its own");
     assert.equal(keyCheckList().find(x => x.key === "ZAI_CODING_CN_API_KEY").label, "Z.ai Coding Plan (China)");
     assert.equal(ROUTE_KEYS.ollama, "OLLAMA_BASE_URL", "Ollama's row is its address: it has no key");

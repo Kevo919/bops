@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppState } from "@/lib/types";
 import type { KeyCheckResult } from "@/lib/server/key-check";
+import { InProgress } from "./in-progress";
 
 /*
  * Settings → This Mac → Connections: the outside accounts Bops can use, one row each, in plain words. Composio (your
- * connected apps: Gmail, Slack, Notion, Google Sheets…), Zapier (the actions on your Zapier MCP server) and
+ * connected apps: Gmail, Slack, Notion, Google Sheets…), Composio (your account: the apps connected in Composio's
+ * For You, over its MCP address; shown only masked), Zapier (the actions on your Zapier MCP server) and
  * OpenRouter (hundreds of AI models, some free). Each row says whether its key is set, and after Check whether it
  * works; where to get the key, and what to paste where. Keys are added by hand in .env.local, as on the Keys card:
  * nothing here reads, shows or saves one. The status comes from /api/key-check (the same as Keys): only whether a
@@ -29,6 +31,14 @@ export const CONNECTIONS: Row[] = [
     what: "Lets your bots use Gmail, Slack, Notion, Google Sheets and about 1,000 more apps. You sign in to each app on its own page; Composio keeps the login, Bops never sees your password.",
     getKey: { label: "Get a key at composio.dev", href: "https://composio.dev" },
     paste: "Sign in at composio.dev, open Settings, Project Settings, and copy the project key under API Keys (it starts with ak_). Put it in .env.local as COMPOSIO_API_KEY=your_key, then restart Bops.",
+  },
+  {
+    key: "COMPOSIO_MCP_URL",
+    name: "Composio (your account)",
+    what: "Lets your bots use the apps you already connected yourself in Composio's For You area (like Gmail and Google Drive), in your own chats in Bops. Reading runs right away; anything that sends, changes, deletes or pays asks you first.",
+    getKey: { label: "Open Composio", href: "https://composio.dev" },
+    paste: "In Composio, open For You, then Connect my agent, copy the address, paste it here: in .env.local, add a line COMPOSIO_MCP_URL= followed by the address. If that page shows a key too (it starts with ck_), add a line COMPOSIO_MCP_KEY= followed by the key. Then restart Bops and press Check.",
+    more: "Only in your own chats in the Bops app: not for team members, Telegram, Discord, Slack, texts, emails, routines, or the bots' cloud computers.",
   },
   {
     key: "ZAPIER_MCP_URL",
@@ -136,7 +146,7 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
           const r = rows?.find((x) => x.key === c.key);
           const s = statusOf(r, busy === c.key);
           const checked = r && r.status !== "set" && r.status !== "not set";
-          return (
+          const row = (
             <div key={c.key} data-connection={c.key} className="flex flex-col gap-1 rounded-md px-2.5 py-2 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
               <div className="flex items-center gap-2">
                 <span data-dot={s.tone} className={`size-[8px] shrink-0 rounded-full ${DOT[s.tone]}`} />
@@ -145,6 +155,7 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
               </div>
               <div data-status className="text-[12px] text-[color:var(--ht-3a3a38)]">{s.words}</div>
               {checked && r.message && <div data-message className="text-[12px] text-pencil">{r.message}</div>}
+              {r?.shown && <div data-shown className="text-[12px] text-pencil">Saved: {r.shown}</div>}
               <p className="text-[12px] text-pencil">{c.what}</p>
               <p className="text-[12px] text-pencil">{c.paste}</p>
               {c.more && <p className="text-[12px] text-pencil">{c.more}</p>}
@@ -157,6 +168,14 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
                 )}
               </div>
             </div>
+          );
+          // Being tested (lib/feature-status.ts): usable, marked with its percent until its live check passes.
+          return c.key === "COMPOSIO_MCP_URL" ? (
+            <InProgress key={c.key} id="composio-for-you">
+              {row}
+            </InProgress>
+          ) : (
+            row
           );
         })}
         <a className="text-[12px] underline" href="https://github.com/Kevo919/bops/blob/windows-port/docs/connections.md" target="_blank" rel="noopener noreferrer">Step by step: connecting Composio, Zapier and OpenRouter</a>
