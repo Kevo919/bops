@@ -5,7 +5,7 @@ Every feature, how it was tested, when, by whom, and the result. **Kevin: read t
 Legend: ✅ passed · ⚠️ passed with a known limit · ❌ failed · ⏳ not yet tested this way.
 Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an independent agent read the code for bugs and security), **Live PC** (on Kevin's PC, real app), **Live server** (on the Hostinger server), **Live phone**, **Real account** (with Kevin's real provider account).
 
-**Tested: 65%** (114.5 of 176 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
+**Tested: 65%** (116.5 of 179 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
 
 **Visual features (Kevin, Nov 5):** a screen or visual change is only ✅ when (1) its tests pass, (2) a screenshot check passes (dark mode, no blank screens), (3) an independent review passes, and (4) it's tried in the real app on the PC.
 
@@ -55,6 +55,7 @@ Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an indepen
 | In-progress badges: grayed out, red label, percent; Being tested state (#84) | ✅ Nov 5 builder: in-progress 11, in-progress-ui 20 (light, dark, desktop, phone), mobile-layout 28 | ✅ Nov 5 reviewer (blocker fixed) | ⏳ | n/a | n/a |  |
 | Agents you run: several DeepSeek Harness and Hermes instances (#91) | ✅ Nov 5 builder: agent-instances 12, UI 9 | ✅ Nov 5 security review (8 fixes done) | ⏳ | n/a | ⏳ Hermes on the server with its key | Hermes API reachable on the tailnet (health 200, 401 without key) |
 | Settings → Services: paste service keys, no files (#87) | ✅ Nov 5 builder: service-keys 15, no-blank-screens 49 | ✅ Nov 5 security review (6 fixes done) | ⏳ | n/a | ⏳ Kevin's real keys |  |
+| Bot's Chrome starts on this PC, with a plain reason when it can't (#92) | ✅ Nov 5 builder: chrome-start 13, pc-task-runner 14, executor-lifecycle 7 | ✅ Nov 5 reviewer (4 fixes done) | ⏳ codex retest | n/a | n/a |  |
 | GitHub automatic checks (CI) | ✅ Nov 5: back on; #79 all green (web, check incl. secret scan, cloud-tests, android, mobile-layout) |  |  |  |  | Kevin to re-enable on the Actions page |
 
 ## Rules for every agent (how to test and how to log it)

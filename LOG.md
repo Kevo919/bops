@@ -6,6 +6,18 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 1:35 PM (Chicago)
+- **Merged #92: the bot's Chrome on this PC.**
+  - If it can't start, the task now says why in plain words.
+  - It retries once on a busy port.
+  - It clears a stale lock only when that's safe.
+  - It never touches your own Chrome profile.
+- **Queue:**
+  1. #93 (no false "task started") is merging now.
+  2. Dark mode (#85) catches up right after.
+  3. Then #94 (Repos security) and #86 (widgets).
+  4. Then one PC rebuild and restart.
+
 ### Nov 5, 1:20 PM (Chicago)
 - **Merged #87: Settings → Services.** Paste keys for texting, email, memory, Composio (both kinds) and Zapier. No files to edit. Keys are saved only from your PC's Bops window and never shown back.
 - **Next:** #92 Chrome start, #93 no false "task started", then #94 Repos security (last 3 small fixes), dark mode (#85) and widgets (#86).
