@@ -5,7 +5,7 @@ Every feature, how it was tested, when, by whom, and the result. **Kevin: read t
 Legend: ✅ passed · ⚠️ passed with a known limit · ❌ failed · ⏳ not yet tested this way.
 Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an independent agent read the code for bugs and security), **Live PC** (on Kevin's PC, real app), **Live server** (on the Hostinger server), **Live phone**, **Real account** (with Kevin's real provider account).
 
-**Tested: 65%** (88 of 136 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
+**Tested: 66%** (89.5 of 136 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
 
 | Feature | Unit/CI | Review | Live PC | Live server | Real account / phone | Notes |
 |---|---|---|---|---|---|---|
@@ -41,7 +41,7 @@ Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an indepen
 | Phone pairing card: Unpair / Pair again ask first (#65, from the crawl) | ✅ Nov 5 crawl: phone-card-ui 5 | ✅ Nov 5 lead | ⏳ | ⏳ | ⏳ | |
 | Repos section padding (#66, from the crawl) | ✅ Nov 5 crawl: repos-ui 8 | ✅ Nov 5 lead | ⏳ | n/a | n/a | |
 | Every screen and button, desktop 1280x800 (crawl) | ✅ Nov 5 crawl: 44 screens, 969 controls, no crashes | ✅ Nov 5 lead | ⏳ (crawl ran on a throwaway copy) | n/a | n/a | details: tests/2026-11-05-0807-e2e-ui-crawl.md |
-| Narrow window / phone layout (420px, 412px) | ❌ Nov 5 crawl: sidebar takes 340px, 15 screens unreachable | ⏳ | n/a | n/a | ❌ the Android app shows this page | one-column layout being built (lead) |
+| Narrow window / phone layout (420px, 412px) | ✅ Nov 5: one-column layout (#70); 44 of 44 screens reachable at 420 and 412 (was 33); mobile-layout test 28/28 | ⚠️ Nov 5 lead: screenshots checked; phone Back button and the composer's placeholder overlap are follow-ups | n/a | n/a | ⏳ Kevin's phone (Android app) | one-column layout being built (lead) |
 | A stale phone pairing (#67, from the crawl) | ✅ Nov 5 crawl: refused-load-ui test | ✅ Nov 5 lead | n/a | ⏳ | ⏳ | |
 | GitHub automatic checks (CI) | ❌ paused by GitHub since Nov 3 |  |  |  |  | Kevin to re-enable on the Actions page |
 
