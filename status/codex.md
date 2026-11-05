@@ -1,21 +1,26 @@
 # Codex status
-Updated2026-11-05T04:36Z. Target100; official published57% (64.5/113), awaiting lead reconciliation of new evidence. User explicitly authorizes tested/reviewed merges. Hourly check active.
+Updated 2026-11-05T05:15Z. Build IN PROGRESS; latest published score 59% (66.5/113). User authorizes reviewed, tested merges. Lead owns deployment and score reconciliation.
 
-## Completed this session
-- Live PC LrLp1ZXZRqEZNML0dwY0z: chat and Connections Composio/OpenRouter checks passed.
-- Model label edit immediately reflected in chat picker without reload; original label restored. tests/0430-codex-picker-refresh.
-- Word/Excel/PowerPoint generated via chat and downloaded in desktop; ZIP XML/hashes verified. tests/0435-codex-office-download. Exact one-slide request produced2slides: partial layout, not an unqualified pass.
-- PR56 merged7080674: executor presence-only check and corrected environment-key guide. 10focusedtests,tsc,lint0errors, independentreview passed; CI stillpaused. Not deployed; lead owns rebuilds. tests/0435-codex-executor-key-check.
+## Completed and merged
+- PR62 c6d01ef: outside callers cannot invoke ask_teammate to indirectly read MEMORY.md. Real chat-entry regression tests 16 pass; negative control fails as expected; chat-tools 85 pass; type generation/typecheck and lint pass (30 existing warnings).
+- PR63 1829f4d: non-owners cannot read private or legacy-unknown repository run output/errors. Known-public member output and owner access preserved. Repo suite 28 pass after rebase; negative control 4 expected failures; type generation/typecheck and lint pass (30 existing warnings). Independent review complete. Windows Bash firewall fixture corrected without weakening assertions.
+- Both privacy changes are SOURCE VERIFIED, not deployed or live external-account verified. Lead notified in messages/2026-11-05-0510-codex-to-lead-privacy-merged.md. CI remains paused, not green.
+- Earlier live PC checks on build LrLp1ZXZRqEZNML0dwY0z: chat, Connections checks, model-picker refresh, Office downloads and Ideas lifecycle passed. PowerPoint exact one-slide layout remains partial (two slides produced).
 
-## Next
-Fresh production UI verification after lead rebuild56. Continue Models presets/accounts/AutoRouter; Repos after zai securityfixes; SOUL/MEMORY; cron/away/allow-thread; goals;MCP;Look;freshinstaller. Preserve configuration and avoid duplicate ownership.
+## Active: Windows SSH, PR60
+- executor_options owns computer-ssh.ts, local-preview.ts and hosted-app tests in isolated worktree bops-hosted-apps-windows. milestone_audit independently reviews.
+- Native Windows SSH uses a per-connection stdio tunnel after the existing Host gate; no extra raw loopback listener. Strict host pins and identity-only authentication retained.
+- Real Windows key generation and current-user-only protected key ACL test passed after fixing ProgramData environment and DACL-only application. Response, Host gate and redacted failure cases passed; timeout/cancellation/expiry and full hosted-app suite still underway. Not merged.
+- The original harness-only result was 128 pass / 6 fail; do not count those failures resolved until new complete results.
+- OS cron/at persistence finding remains assigned to zai per lead 0500 correction; Bops scheduler removal alone does not resolve it.
 
-## Windows task blocker / Needs Kevin
-NativeWindows runner still requires dedicated OpenAI environment key matching applicationkey owner/org/project plus APIcredit. AskedKevin sign intoPlatform and confirmcredit; no response yet. Local subscription sign-ins are account-only, not native task support. CloudClaude signin previouslyverified; cloudtasks do not prove PCexecution. No credential changes.
-Remaining external prerequisites include Actions re-enable,Gmail/Zapier auth,Androiddevice,and real provider-account/preset cases. Board z.ai quota resetNov8 may constrain100%.
+## Needs Kevin / remaining external checks
+- Native PC task completion still needs a dedicated OpenAI environment key matching the application key owner/org/project and usable API credit. User reports Platform sign-in; billing inspection could not proceed because the exposed browser tab was invalid and the browser tool denied access. No keys or billing changed; no bypass attempted.
+- Actions re-enable, real Gmail/Zapier authorization, Android device and real provider-account/preset cases remain external prerequisites. No claim of full task completion or 100%.
+- Claude memory observer authentication is stale; project board and canonical work-state logging continue.
 
-## Estimates and logs
-Conditional active-team estimates80%=6-12h,85%=10-18h,90%=16-30h,95%=2-3workingdays;100%dependency-bound. Plan tests/0435-codex-target100-plan. These are not deadlines or verified scores.
-Lead rebuilds/score;zai #38/#39/server checks;Codex LivePC/executor. No heavy job remains owned; no restart/deploy by parent. User testfiles retained in Downloads.
-
-2026-11-05T04:43Z update: Ideas lifecycle LIVE PASS (0442). PR59 merged1ccce9d aftertests/independentreview, not deployed. PR57/58 securityreviews FAIL (comments and boardmessages); awaitingzai fixes, no blindmerge. DraftPR60 Windowsharness improves125/9 to128/6; remainingSSH/Bash platform failures unresolved, notmerged. Noheavylockowned. Billing inspection stillblocked bybrowserinvalidtabpolicy; userrequestedcontinueindependentwork. Next: re-review57/58 fixes; coordinate genuineWindowsSSHport; remainingLivePCtests. Evidence tests/0443-codex-hosted-apps-windows.
+## Coordination and next action
+- Parent holds hourly coordination lock codex-interactive-privacy-ssh-20261105; SSH worker owns heavy test lock. Release only owned locks on exit. No deployment, Docker, emulator or foreign process changes by parent.
+- Hourly automation bops-hourly-build-check remains active until actual BUILD DONE.
+- Finish SSH tests and independent review, fix failures, update PR60 and merge only passing work. Lead then rebuilds and performs fresh live verification of privacy and SSH. Keep test evidence and logs synchronized.
+- Conditional estimates previously published: 80% 6-12 active-team hours; 85% 10-18; 90% 16-30; 95% 2-3 working days. 100% has no reliable ETA until external prerequisites and live checks pass.
