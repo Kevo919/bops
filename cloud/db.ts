@@ -25,6 +25,11 @@ export function db(): pg.Pool {
     application_name: "bops-cloud",
     // No statement runs on forever and keeps its connection (one of 10) and whatever waits on it: Postgres
     // cancels it (57014). A wait that may rightly be long (a migration, a plan lock) lifts it (unbounded).
+    // Row-lock waits count too. Behind a delete (delete-user.ts onUser holds the state row, and at its
+    // last step the account row), a write cut at 57014 would have found the user gone had it waited (a
+    // state write, a number, line or inbox recorded: their foreign keys wait on the account row only at
+    // the last step), so it fails a little sooner and the Mac's retry is refused as deleted. The one
+    // write that must wait it out is ownObject's of what a delete deletes at a provider: exempt there.
     statement_timeout: config.dbStatementTimeoutMs(),
   });
   pool.on("error", (e) => console.error(`[db] idle client: ${e.message}`));
@@ -35,15 +40,63 @@ export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(tex
   return db().query<T>(text, values);
 }
 
+/** A statement or a wait for a connection that ran past its bound (queryWithin). */
+export class DbTimeout extends Error {
+  code = "57014";
+}
+
 /**
- * One statement that must answer within `ms` (Postgres cancels it after, 57014), tighter than the
- * pool's statement timeout: for a read something else waits on, such as a start's balance (turn-guard.ts).
+ * A pool connection within `ms`, or DbTimeout. One that comes after is given straight back. (The
+ * pool's own connectionTimeoutMillis is the 10 s any caller waits; this is a tighter one.)
+ */
+function connectWithin(ms: number): Promise<pg.PoolClient> {
+  const asked = db().connect();
+  return new Promise((resolve, reject) => {
+    let late = false;
+    const timer = setTimeout(() => {
+      late = true;
+      reject(new DbTimeout(`no database connection within ${ms} ms`));
+    }, ms);
+    asked.then(
+      (c) => {
+        clearTimeout(timer);
+        if (late) c.release();
+        else resolve(c);
+      },
+      (e: Error) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
+/**
+ * One statement that must answer within `ms` in all, its wait for a pool connection included, tighter
+ * than the pool's statement timeout: for a read something else waits on, such as a start's balance
+ * (turn-guard.ts). Postgres cancels the statement with what's left (57014); a connection that doesn't
+ * answer even so is cut by the client a second later, and not given back to the pool.
  */
 export async function queryWithin<T extends pg.QueryResultRow = pg.QueryResultRow>(ms: number, text: string, values: unknown[] = []): Promise<pg.QueryResult<T>> {
-  return tx(async (c) => {
-    await c.query(`SET LOCAL statement_timeout = ${Math.max(1, Math.floor(ms))}`);
-    return c.query<T>(text, values);
-  });
+  const end = Date.now() + ms;
+  const c = await connectWithin(ms);
+  const left = () => Math.max(1, Math.floor(end - Date.now()));
+  let broken: Error | undefined;
+  try {
+    // pg reads query_timeout per query (lib/client.js), though its types don't list it.
+    const q = <R extends pg.QueryResultRow>(sql: string, v?: unknown[]) => c.query<R>({ text: sql, values: v, query_timeout: left() + 1_000 } as pg.QueryConfig);
+    await q("BEGIN");
+    await q(`SET LOCAL statement_timeout = ${left()}`);
+    const r = await q<T>(text, values);
+    await q("COMMIT");
+    return r;
+  } catch (e) {
+    broken = e as Error;
+    throw e;
+  } finally {
+    // After a failure its state isn't known (a statement may still be running): never handed out again.
+    c.release(broken ?? undefined);
+  }
 }
 
 /** A session's statement timeout lifted for a wait that may rightly be long (a lock another holds through slow work), then put back. */
@@ -128,13 +181,20 @@ export async function migrate(): Promise<string[]> {
  * last step looks, or after the row is gone and not at all.
  */
 export async function ownObject(userId: string, provider: string, kind: string, objectId: string, model?: string, botId?: string) {
-  await query(
+  const atProvider = STORED_AT_PROVIDER.has(`${provider}:${kind}`);
+  const run = <T extends pg.QueryResultRow>(text: string, values: unknown[]) =>
+    // What a delete deletes at a provider waits out a delete's step holding the state row, however long
+    // it takes (bounded only by lock_timeout): cut at the statement timeout, it wouldn't be recorded
+    // though the state row is still there, so the delete's last step couldn't see it and it would be
+    // left at the provider.
+    atProvider ? tx(async (c) => (await c.query(`SET LOCAL statement_timeout = 0; SET LOCAL lock_timeout = ${config.dbLockWaitMs()}`), c.query<T>(text, values))) : query<T>(text, values);
+  await run(
     `INSERT INTO bops.cloud_objects (object_id, provider, kind, user_id, model, bot_id, used_at)
      SELECT $1, $2, $3, $4, $5, $6, CASE WHEN $3 = 'agent_session' THEN now() END
      WHERE NOT EXISTS (SELECT 1 FROM bops.deleted_users WHERE user_id = $4)
         OR ($7 AND EXISTS (SELECT 1 FROM bops.app_state WHERE user_id = $4 FOR KEY SHARE))
      ON CONFLICT (provider, object_id) DO NOTHING`,
-    [objectId, provider, kind, userId, model ?? null, botId ?? null, STORED_AT_PROVIDER.has(`${provider}:${kind}`)],
+    [objectId, provider, kind, userId, model ?? null, botId ?? null, atProvider],
   );
 }
 

@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { appendFile, readFile, rename, unlink } from "node:fs/promises";
+import {
+  appendFile,
+  open,
+  readdir,
+  readFile,
+  rename,
+  unlink,
+} from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import { config } from "./config.ts";
 import { recordUsageFor } from "./usage.ts";
 
@@ -13,8 +21,9 @@ import { recordUsageFor } from "./usage.ts";
  *   finds the row and pays nothing more. So it's written once, however many times it's tried.
  * - A write that fails is tried again a few times, waiting longer each time (usageQueueTiming).
  * - One that still fails, or is still waiting when the cloud stops, goes on the spool: one JSON line
- *   per use in a file that outlives the process (config.usageSpool, under systemd's StateDirectory).
- *   The spool is replayed at the start and every minute; what fails again goes back on it.
+ *   per use, each appended in one write and fsynced, in a file that outlives the process
+ *   (config.usageSpool, under systemd's StateDirectory). A line a crash cut short costs only itself
+ *   (readSpool). The spool is replayed at the start and every minute; what fails again goes back on it.
  * - With no spool set, a use that can't be written is kept in memory and tried again with the spool's
  *   replays, and one still not written when the cloud stops is logged whole ("[usage] NOT RECORDED"),
  *   so it can be written by hand. It is never only a warning.
@@ -126,24 +135,48 @@ function nap(ms: number) {
   });
 }
 
-/** Put uses on the spool; any it can't take are parked in memory (and logged whole at a stop). */
-async function spool(uses: QueuedUse[]) {
-  const path = config.usageSpool();
-  if (!path) {
-    for (const u of uses) parked.set(u.ref, u);
-    return;
-  }
+/**
+ * One use as a spool line. Each starts with a newline too: a line a crash cut short (no newline at its
+ * end) is then never joined to the next one, which stays a line of its own (and blank lines are skipped).
+ */
+const spoolLine = (u: QueuedUse) => `\n${JSON.stringify(u)}\n`;
+
+/** Append one use to the spool: one write of its whole line, then fsync, so once this returns it's on disk. */
+async function appendUse(path: string, u: QueuedUse) {
+  const f = await open(path, "a", 0o600);
   try {
-    await appendFile(path, uses.map((u) => JSON.stringify(u) + "\n").join(""), {
-      mode: 0o600,
-    });
-    for (const u of uses) parked.delete(u.ref);
-  } catch (e) {
-    console.error(
-      `[usage] the spool (${path}) couldn't be written, ${uses.length} kept in memory: ${(e as Error).message}`,
-    );
-    for (const u of uses) parked.set(u.ref, u);
+    await f.write(spoolLine(u));
+    await f.sync();
+  } finally {
+    await f.close();
   }
+}
+
+/**
+ * Put uses on the spool, each in its own write; any it can't take are parked in memory (tried again
+ * at the next replay, and logged whole at a stop). Whether they're all on it.
+ */
+async function spool(uses: QueuedUse[]): Promise<boolean> {
+  const path = config.usageSpool();
+  let all = true;
+  for (const u of uses) {
+    if (!path) {
+      parked.set(u.ref, u);
+      all = false;
+      continue;
+    }
+    try {
+      await appendUse(path, u);
+      parked.delete(u.ref);
+    } catch (e) {
+      console.error(
+        `[usage] the spool (${path}) couldn't take ${u.ref}, kept in memory: ${(e as Error).message}`,
+      );
+      parked.set(u.ref, u);
+      all = false;
+    }
+  }
+  return all;
 }
 
 const isUse = (x: unknown): x is QueuedUse => {
@@ -157,48 +190,107 @@ const isUse = (x: unknown): x is QueuedUse => {
   );
 };
 
+/** Where a use's line starts (JSON.stringify keeps QueuedUse's key order, ref first). */
+const LINE_START = '{"ref":';
+
+/**
+ * The uses in a spool's text, and what couldn't be read. Line by line, so a bad one costs only itself;
+ * and in a line that doesn't read (a torn line of an older spool, with the next one joined on), the
+ * last use that starts in it is tried on its own.
+ */
+export function readSpool(text: string): { uses: QueuedUse[]; bad: string[] } {
+  const uses: QueuedUse[] = [];
+  const bad: string[] = [];
+  const parse = (t: string): QueuedUse | null => {
+    try {
+      const u: unknown = JSON.parse(t);
+      return isUse(u) ? { ...u, detail: u.detail ?? {} } : null;
+    } catch {
+      return null;
+    }
+  };
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    const whole = parse(line);
+    if (whole) {
+      uses.push(whole);
+      continue;
+    }
+    const at = line.lastIndexOf(LINE_START);
+    const tail = at > 0 ? parse(line.slice(at)) : null;
+    if (tail) uses.push(tail);
+    bad.push(tail ? line.slice(0, at) : line);
+  }
+  return { uses, bad };
+}
+
 let replaying: Promise<number> | null = null;
 
 /**
- * Write what's on the spool (and parked in memory): the spool is moved aside first, so a use spooled
- * meanwhile goes on a new one, and one moved aside but not done when the cloud stopped is read again
- * at the next start. What fails again goes back on the spool. How many uses were written.
+ * Write what's on the spool (and parked in memory). Each spool file is claimed first by renaming it to
+ * a name only this process uses (`<spool>.replaying.<pid>.<random>`): a use spooled meanwhile goes on
+ * a new spool, a file a replay of a process that stopped left behind is claimed and read here, and no
+ * process ever deletes a file it didn't claim. What fails again goes back on the spool, and a claimed
+ * file is deleted only once all of it is written or back on the spool. A parked use stays parked until
+ * it's written or spooled, so a stop meanwhile still logs it. How many uses were written.
  */
 export function replayUsage(): Promise<number> {
   return (replaying ??= replayOnce().finally(() => (replaying = null)));
 }
 
+/** Claim the spool and any replay files left behind: each renamed to this process's own name. The names claimed. */
+async function claimSpools(path: string): Promise<string[]> {
+  const dir = dirname(path);
+  const base = basename(path);
+  let names: string[] = [];
+  try {
+    names = await readdir(dir);
+  } catch {
+    return [];
+  }
+  const claimed: string[] = [];
+  for (const name of names
+    .filter((n) => n === base || n.startsWith(`${base}.replaying.`))
+    .sort()) {
+    const mine = join(
+      dir,
+      `${base}.replaying.${process.pid}.${randomUUID().slice(0, 8)}`,
+    );
+    try {
+      await rename(join(dir, name), mine);
+      claimed.push(mine);
+    } catch {
+      // Gone meanwhile, or claimed by another process: theirs.
+    }
+  }
+  return claimed;
+}
+
 async function replayOnce(): Promise<number> {
   const uses = new Map<string, QueuedUse>(parked);
-  parked.clear();
   const path = config.usageSpool();
-  const aside = path ? `${path}.replaying` : "";
-  if (path) {
-    // A replay that didn't finish (the cloud stopped) left its file: read it first, then today's.
-    let left = "";
+  const claimed = path ? await claimSpools(path) : [];
+  const unread: string[] = [];
+  for (const file of claimed) {
+    let text = "";
     try {
-      left = await readFile(aside, "utf8");
-    } catch {
-      // none left over
+      text = await readFile(file, "utf8");
+    } catch (e) {
+      console.error(
+        `[usage] ${file} couldn't be read, kept: ${(e as Error).message}`,
+      );
+      unread.push(file);
+      continue;
     }
-    let now = "";
-    try {
-      if (!left) await rename(path, aside);
-      now = left ? "" : await readFile(aside, "utf8");
-    } catch {
-      // no spool yet
-    }
-    for (const line of (left || now).split("\n")) {
-      if (!line.trim()) continue;
-      try {
-        const u: unknown = JSON.parse(line);
-        if (isUse(u)) uses.set(u.ref, { ...u, detail: u.detail ?? {} });
-      } catch {
-        console.error(
-          `[usage] a spool line couldn't be read, kept as it was: ${line.slice(0, 500)}`,
-        );
-        await appendFile(path, line + "\n", { mode: 0o600 }).catch(() => {});
-      }
+    const { uses: found, bad } = readSpool(text);
+    for (const u of found) if (!uses.has(u.ref)) uses.set(u.ref, u);
+    if (bad.length) {
+      console.error(
+        `[usage] ${bad.length} spool fragment(s) in ${file} couldn't be read, kept in ${path}.bad`,
+      );
+      await appendFile(`${path}.bad`, bad.map((b) => b + "\n").join(""), {
+        mode: 0o600,
+      }).catch(() => {});
     }
   }
   let wrote = 0;
@@ -206,6 +298,7 @@ async function replayOnce(): Promise<number> {
   for (const u of uses.values()) {
     try {
       await write(u);
+      parked.delete(u.ref);
       wrote++;
     } catch (e) {
       console.warn(
@@ -214,8 +307,11 @@ async function replayOnce(): Promise<number> {
       again.push(u);
     }
   }
-  if (again.length) await spool(again);
-  if (aside) await unlink(aside).catch(() => {});
+  const respooled = await spool(again);
+  // Every use in them is written or back on the spool (if not, they're replayed again from here).
+  if (respooled)
+    for (const file of claimed)
+      if (!unread.includes(file)) await unlink(file).catch(() => {});
   if (wrote) console.log(`[usage] ${wrote} use(s) from the spool written`);
   return wrote;
 }
