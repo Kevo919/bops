@@ -5,7 +5,7 @@ Every feature, how it was tested, when, by whom, and the result. **Kevin: read t
 Legend: ✅ passed · ⚠️ passed with a known limit · ❌ failed · ⏳ not yet tested this way.
 Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an independent agent read the code for bugs and security), **Live PC** (on Kevin's PC, real app), **Live server** (on the Hostinger server), **Live phone**, **Real account** (with Kevin's real provider account).
 
-**Tested: 66%** (89.5 of 136 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
+**Tested: 66%** (90.5 of 137 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
 
 | Feature | Unit/CI | Review | Live PC | Live server | Real account / phone | Notes |
 |---|---|---|---|---|---|---|
@@ -37,11 +37,11 @@ Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an indepen
 | Ollama chat (#28) | ✅ | ✅ | n/a | ⚠️ Nov 3 lead: works, too slow | n/a |  |
 | Android app (#1, #2, #14, #26) | ✅ | ✅ | n/a | n/a | ⏳ Kevin's phone install + pairing |  |
 | z.ai China Coding Plan (#23) | ✅ | ✅ | n/a | n/a | ⏳ quota resets Nov 8 |  |
-| Free local voice, Voice (local) module (#64, #68) | ✅ Nov 5 voice-local 15 (fake services; each fix's check fails without it), lead re-ran | ✅ Nov 5 reviewer; all 7 findings fixed in #68 | ⏳ | ⏳ | ⏳ a running speech service (Speaches recipe) |  |
+| Free local voice, Voice (local) module (#64, #68) | ✅ Nov 5 voice-local 15 (fake services; each fix's check fails without it), lead re-ran | ✅ Nov 5 reviewer; all 7 findings fixed in #68 | ⏳ | ⚠️ Nov 5 lead: voice-local on the server's code (1fb2921) | ⏳ a running speech service (Speaches recipe) |  |
 | Phone pairing card: Unpair / Pair again ask first (#65, from the crawl) | ✅ Nov 5 crawl: phone-card-ui 5 | ✅ Nov 5 lead | ⏳ | ⏳ | ⏳ | |
 | Repos section padding (#66, from the crawl) | ✅ Nov 5 crawl: repos-ui 8 | ✅ Nov 5 lead | ⏳ | n/a | n/a | |
 | Every screen and button, desktop 1280x800 (crawl) | ✅ Nov 5 crawl: 44 screens, 969 controls, no crashes | ✅ Nov 5 lead | ⏳ (crawl ran on a throwaway copy) | n/a | n/a | details: tests/2026-11-05-0807-e2e-ui-crawl.md |
-| Narrow window / phone layout (420px, 412px) | ✅ Nov 5: one-column layout (#70); 44 of 44 screens reachable at 420 and 412 (was 33); mobile-layout test 28/28 | ⚠️ Nov 5 lead: screenshots checked; phone Back button and the composer's placeholder overlap are follow-ups | n/a | n/a | ⏳ Kevin's phone (Android app) | one-column layout being built (lead) |
+| Narrow window / phone layout (420px, 412px) | ✅ Nov 5: one-column layout (#70); 44 of 44 screens reachable at 420 and 412 (was 33); mobile-layout test 28/28 | ⚠️ Nov 5 lead: screenshots checked; phone Back button and the composer's placeholder overlap are follow-ups | n/a | ⚠️ Nov 5 lead: server build 1fb2921 includes it; mobile-layout test not run on the server (needs Playwright) | ⏳ Kevin's phone (Android app) | one-column layout being built (lead) |
 | A stale phone pairing (#67, from the crawl) | ✅ Nov 5 crawl: refused-load-ui test | ✅ Nov 5 lead | n/a | ⏳ | ⏳ | |
 | GitHub automatic checks (CI) | ❌ paused by GitHub since Nov 3 |  |  |  |  | Kevin to re-enable on the Actions page |
 
