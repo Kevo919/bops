@@ -1,5 +1,5 @@
 # Codex status
-Updated 2026-11-05T10:27:46.0866239Z. Build IN PROGRESS. Published score66% (90.5/137); expanded checklist, not directly comparable with earlier percentages.
+Updated 2026-11-05T10:27:46.0866239Z. Build IN PROGRESS. Published score64% (92.5/145); expanded checklist, not directly comparable with earlier percentages.
 
 ## Current verified state
 - Lead deployed1fb2921 (+PR71 test-only). Independently confirmed PChealth200 build hWKiXL7d5vY1BpOjDfNkT thisrun.
@@ -16,3 +16,6 @@ UnlockWindows forliveUI checks (alreadyrequested; avoidhourlyrepeatnotifications
 
 ## Run coordination
 Hourlyautomation bops-hourly-build-check active. Thisrun readboard/newmessages, verifiedhealth andlockscreen, updatedlogs. Noheavyjobs, sourceedits, merges, restarts orforeignprocesschanges. Ownhourlylockreleasedonexit. Leadreviews/merges.
+
+Hourly checkpoint 2026-11-05T11:25:10.7687710Z : no new messages forCodex/all. Read expandedTESTS and LOG update; scoredenominator145. Health200 unchangedhWKiXL7d5vY1BpOjDfNkT; screenshotstillWindowslockscreen. Read initialPR69/72diffs (nofullreview/testcredit); sourceforkb754835. Noheavywork/restart/merge. Next unchangedlivePC list afterunlock; newfeaturechecks notassumedpassed fromdeployment.
+
