@@ -17,6 +17,7 @@ import { BotBrowser, WatchChip } from "./bot-browser";
 import { ChatEdge, gridColumns, storedChatWidth } from "./chat-edge";
 import { LookStyle } from "./look-style";
 import { LookSettings } from "./look-settings";
+import { layoutOf, WidgetPageView, WidgetTab } from "./widgets";
 import { ReposSection } from "./repos";
 import { BotComputers } from "./bot-computers";
 import { BrainSettings } from "./brains";
@@ -250,6 +251,8 @@ function Bops({ state }: { state: AppState | null }) {
   // place again, even the one it's at. Only here, in this window: nothing of it is saved.
   const [settings, setSettings] = useState<false | { at?: SettingsPane; keysFor?: string; chartBot?: string; service?: ServiceRow; atAt: number }>(false);
   const openSettings = (at?: SettingsPane, more: { keysFor?: string; chartBot?: string; service?: ServiceRow } = {}) => setSettings({ ...(at ? { at } : {}), ...more, atAt: Date.now() });
+  // A page of the owner's widgets (widgets.tsx), over the chat like Settings: Home or one of theirs, by its id.
+  const [widgetPage, setWidgetPage] = useState<string | null>(null);
   // A bot's full settings page (bot-settings.tsx), over the whole window, at a section; `atAt` makes each opening a new page.
   const [botPage, setBotPage] = useState<{ botId: string; at?: SettingsSection; atAt: number } | null>(null);
   // What had focus as the page opened (the panel's Open full settings, or one of its rows), and whether closing gives it
@@ -465,7 +468,10 @@ function Bops({ state }: { state: AppState | null }) {
   const apps = appsShown(state);
   // The apps the bots made stay the owner's, in a workspace shared with Your Apps too.
   const ownApps = appsOwnShown(state);
-  const tabs = tabsShown(openTabs, state, { chatBotId, ws: currentWorkspace(state), crm, memory, apps });
+  // The tabs the owner pinned (Look.layout, widgets.tsx) come after the rest, from the layout itself, so they're
+  // there after a restart; none in a workspace shared with them.
+  const pinnedTabs: PanelTab[] = state.shared ? [] : layoutOf(state).tabs.map((t) => ({ id: `pin_${t.id}`, kind: "widgets", page: t.page, widget: t.widget, label: t.label, pinned: t.id }));
+  const tabs = [...tabsShown(openTabs.filter((t) => t.kind !== "widgets"), state, { chatBotId, ws: currentWorkspace(state), crm, memory, apps }), ...pinnedTabs];
   // The owner's browser tab beside the first (the chat's bot's browser), when that bot has a computer up.
   const browserTab = browserTabOf(state, chatBotId);
   if (active === BROWSER_TAB && !browserTab) setActive(CHAT_TAB);
@@ -805,6 +811,7 @@ function Bops({ state }: { state: AppState | null }) {
       if (settings && settingsHeld.current) return;
       setSettings(false);
       setBotPage(null);
+      setWidgetPage(null);
       fn(...a);
     };
   const pickTab = (id: string) => {
@@ -1000,7 +1007,9 @@ function Bops({ state }: { state: AppState | null }) {
   const wide = focus || !panelOpen;
   // A page in the main area (Settings, a bot's settings page): it covers the columns past the sidebar, as wide as the
   // sidebar is now (its rail, or itself), sliding with it.
-  const covered = !!settings || !!pageBot;
+  // A page of widgets: the owner's own, never over a shared workspace.
+  const widgetPageOn = !!widgetPage && !state.shared;
+  const covered = !!settings || !!pageBot || widgetPageOn;
   const sidebarWidth = sidebarOpen ? 340 : 72;
   // The chat's column, when the panel is beside it, as wide as its edge was dragged (chat-edge.tsx).
   const columns = { gridTemplateColumns: gridColumns(sidebarWidth, wide ? null : chatWidth) };
@@ -1095,7 +1104,7 @@ function Bops({ state }: { state: AppState | null }) {
           )
         ) : (
         <TitleBar
-          bare={!!pageBot || !!settings}
+          bare={!!pageBot || !!settings || widgetPageOn}
           columns={columns}
           slide={slide}
           wide={focus || !panelOpen}
@@ -1162,6 +1171,17 @@ function Bops({ state }: { state: AppState | null }) {
             onOpenAutopilot={leavePages(({ section, focus: item }: AutopilotOpen) => openAutopilot(section, item, null))}
             footer={footer}
             menuActions={pageMenuActions}
+            pageOpen={widgetPageOn ? widgetPage : null}
+            onOpenPage={
+              state.shared
+                ? undefined
+                : (id: string) => {
+                    if (settings && settingsHeld.current) return;
+                    setSettings(false);
+                    setBotPage(null);
+                    setWidgetPage(id);
+                  }
+            }
           />
           )}
           </div>
@@ -1384,6 +1404,16 @@ function Bops({ state }: { state: AppState | null }) {
                         onClose={() => leaveTab(tab.id)}
                       />
                     </div>
+                  ) : tab?.kind === "widgets" ? (
+                    <WidgetTab
+                      key={tab.id}
+                      state={state}
+                      pageId={tab.page}
+                      widgetId={tab.widget}
+                      links={{ onOpenChat: openChat, onOpenLink: (url) => openWeb(url) }}
+                      onOpenPage={(id) => setWidgetPage(id)}
+                      onUnpin={() => void post("/api/widgets", { changes: [{ action: "unpin_tab", tab: tab.pinned }] })}
+                    />
                   ) : tab?.kind === "autopilot" ? (
                     <div key={tab.id} className="motion-fade-in flex min-h-0 flex-1 flex-col">
                       <AutopilotPage
@@ -1471,6 +1501,19 @@ function Bops({ state }: { state: AppState | null }) {
             />
           </div>
         )}
+        {widgetPageOn && widgetPage && (
+          <div className={`absolute inset-y-0 right-0 z-30 flex bg-desk ${PAGE_SLIDE}`} style={{ left: narrow ? 0 : sidebarWidth }} inert={!!settings || !!pageBot}>
+            <WidgetPageView
+              key={widgetPage}
+              state={state}
+              pageId={widgetPage}
+              onClose={() => setWidgetPage(null)}
+              onGone={() => setWidgetPage(null)}
+              covered={!!settings || !!pageBot}
+              links={{ onOpenChat: leavePages(openChat), onOpenLink: leavePages((url: string) => openWeb(url)) }}
+            />
+          </div>
+        )}
         {settings && (
           // Over a bot's settings page when it opened from there (its Plan and credit, its Org chart): Back goes back to it.
           <div className={`absolute inset-y-0 right-0 z-30 flex bg-white ${PAGE_SLIDE}`} style={{ left: narrow ? 0 : sidebarWidth }}>
@@ -1499,6 +1542,10 @@ function Bops({ state }: { state: AppState | null }) {
                 onHold={holdSettings}
                 onShowScreen={leavePages(showScreen)}
                 onOpenVault={() => openVault()}
+                onOpenPages={() => {
+                  setSettings(false);
+                  setWidgetPage("home");
+                }}
               />
             </OpenAppTask.Provider>
             </OpenHostedApp.Provider>
@@ -2228,6 +2275,7 @@ export function Settings({
   onOpenBot,
   onMakeBot,
   onOpenWatch = () => {},
+  onOpenPages,
 }: {
   state: AppState;
   onClose: () => void;
@@ -2248,6 +2296,8 @@ export function Settings({
   onOpenBot?: (botId: string) => void;
   onMakeBot?: () => void;
   onOpenWatch?: (w: Watch) => void;
+  /** Your widgets' Home page (widgets.tsx), from the nav: Settings gives way to it. */
+  onOpenPages?: () => void;
 }) {
   const computerWords = useComputerWords();
   const selfHosted = useSelfHosted();
@@ -2534,8 +2584,15 @@ export function Settings({
         </div>
         {group("Account", "Yours, in every workspace", account)}
         {group("Workspace", shared ? "Shared with you" : "Shared with its people", workspace, switcher)}
-        {/* Being built (lib/feature-status.ts): a placeholder, grayed with its percent, until feature/widgets-by-chat lands. */}
-        {!shared && <InProgressRow id="widgets-by-chat" name="Widgets" icon={glyph(WIDGETS_GLYPH)} className="h-[30px] text-[13px] text-ink max-md:h-11 max-md:text-[15px]" />}
+        {/* Your widgets: opens Home (widgets.tsx), marked as being tested while lib/feature-status.ts says so. */}
+        {!shared && onOpenPages && (
+          <InProgressRow id="widgets-by-chat">
+            <button data-settings-widgets onClick={onOpenPages} className="flex h-[30px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)] max-md:h-11 max-md:text-[15px]">
+              {glyph(WIDGETS_GLYPH)}
+              <span className="min-w-0 flex-1 truncate">Widgets</span>
+            </button>
+          </InProgressRow>
+        )}
         {team_.length > 0 && group("Orgo team only", null, team_)}
       </nav>
       <main data-settings-pane={pane} className={`${narrow && listing ? "hidden" : "flex"} min-h-0 min-w-0 flex-1 flex-col ${framed ? "" : "overflow-y-auto pb-8"}`}>

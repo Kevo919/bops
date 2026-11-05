@@ -2271,6 +2271,8 @@ function LookNote({ m, readOnly = false, className = "" }: { m: Message; readOnl
   };
   const button = "shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium leading-4 text-ink hover:bg-[color:var(--bops-tint)]/[0.05] disabled:opacity-40";
   const done = look.undone ? "Undone" : look.reset ? "Back to Bops' own look" : undefined;
+  // A change to the widgets (change_widgets): Undo takes it back; Reset is the look's alone.
+  const widgets = !!look.widgets;
   return (
     <div className={`flex w-full max-w-[400px] flex-col self-center rounded-[14px] bg-[color:var(--hb-f7f7f6)] py-2 pl-3 pr-1.5 text-[12px] leading-4 ${className}`}>
       <div className="flex items-start gap-2">
@@ -2279,7 +2281,7 @@ function LookNote({ m, readOnly = false, className = "" }: { m: Message; readOnl
           <circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.3" />
         </svg>
         <div className="min-w-0 flex-1 pt-px">
-          <span className="font-medium text-[color:var(--ht-6b6b6b)]">{done ?? "New look"}</span>
+          <span className="font-medium text-[color:var(--ht-6b6b6b)]">{done ?? (widgets ? "Widgets changed" : "New look")}</span>
           <span className={`line-clamp-2 text-[color:var(--ht-3a3a3a)]${done ? " text-[color:var(--ht-9a9a98)] line-through" : ""}`} title={look.summary}>
             {look.summary}
           </span>
@@ -2289,14 +2291,16 @@ function LookNote({ m, readOnly = false, className = "" }: { m: Message; readOnl
             <button disabled={busy} onClick={() => act("undo")} className={button}>
               Undo
             </button>
-            <button
-              disabled={busy}
-              onClick={() => act("reset")}
-              onBlur={() => setConfirmReset(false)}
-              className={`${button} ${confirmReset ? "bg-[color:var(--hb-b42318)] text-[color:var(--bops-on-fill)]" : ""}`}
-            >
-              {confirmReset ? "For sure?" : "Reset"}
-            </button>
+            {!widgets && (
+              <button
+                disabled={busy}
+                onClick={() => act("reset")}
+                onBlur={() => setConfirmReset(false)}
+                className={`${button} ${confirmReset ? "bg-[color:var(--hb-b42318)] text-[color:var(--bops-on-fill)]" : ""}`}
+              >
+                {confirmReset ? "For sure?" : "Reset"}
+              </button>
+            )}
           </div>
         )}
       </div>

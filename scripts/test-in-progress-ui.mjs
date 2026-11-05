@@ -1,9 +1,9 @@
 // Features being built (lib/feature-status.ts), in the real built app: each placeholder shows where it will live,
 // grayed and out of reach, its red label and its percent, in light and in dark, at 1280 px and at a phone's 412 px:
-// - Settings' nav: Widgets, a compact row (a tap says what's left, nothing opens);
-// - Settings, Look: Animations;
-// - being tested: Bot tasks on this PC (#80's real card) and Composio (your account) (#83's real row, This computer,
-//   Connections) usable, not grayed, the red "Being tested" label, 85%, and what's left under the label;
+// - Settings' nav: Widgets (PR #86), the real row, usable, Being tested at 85%, and it opens the Home page;
+// - being tested: Bot tasks on this PC (#80's real card), Composio (your account) (#83's real row, This computer,
+//   Connections) and Animations (#86's real rows, Look) usable, not grayed, the red "Being tested" label, 85%, and
+//   what's left under the label;
 // - the child under each is inert (a click lands on the placeholder, never on what's under it), aria-disabled, its
 //   red the light or the dark one as the look's theme says, and at 412 px the page never scrolls sideways.
 // The same harness as scripts/test-mobile-layout.mjs: the production build (`npx next build` first) with `next start`
@@ -233,26 +233,6 @@ async function place(page, phone, p) {
   await page.locator(`[data-settings-nav="${p}"]`).click();
   await settle(page);
 }
-/** A placeholder: shown, aria-disabled, its label red (light or dark), its percent, and a click lands on it, not under it. */
-async function placeholder(page, id, percent, theme) {
-  const el = page.locator(`[data-in-progress="${id}"]`).filter({ visible: true }).first();
-  await el.waitFor({ state: "visible", timeout: 10000 });
-  await el.scrollIntoViewIfNeeded();
-  assert.equal(await el.getAttribute("aria-disabled"), "true", `${id}: not aria-disabled`);
-  const holder = page.locator(`:is([data-in-progress="${id}"], span:has(> [data-in-progress="${id}"]))`).filter({ visible: true }).first();
-  assert.equal((await holder.locator("[data-in-progress-percent]").first().innerText()).trim(), `${percent}%`, `${id}: its percent`);
-  const color = await holder.locator("[data-in-progress-label]").first().evaluate((n) => getComputedStyle(n).color);
-  assert.equal(color, RED[theme], `${id}: its label is ${color}, not the ${theme} red`);
-  const hit = await el.evaluate((n) => {
-    const inner = n.querySelector("[inert]");
-    if (!inner) return "no inert child";
-    const r = inner.getBoundingClientRect();
-    const at = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(r.height / 2, 10));
-    return at && (at === n || (n.contains(at) && !inner.contains(at))) ? "ok" : `the click lands on ${at?.outerHTML.slice(0, 80)}`;
-  });
-  assert.ok(hit === "ok" || id === "widgets-by-chat", `${id}: ${hit}`);
-  return el;
-}
 async function noSideways(page, what) {
   const m = await page.evaluate(() => ({ W: innerWidth, s: Math.max(document.scrollingElement.scrollWidth, document.body.scrollWidth) }));
   assert.ok(m.s <= m.W + 1, `${what}: the page scrolls sideways (${m.s}px in ${m.W}px)`);
@@ -266,34 +246,25 @@ try {
       const { ctx, page, errors } = await context(kind === "phone" ? "phone" : "owner");
       const phone = kind === "phone";
       const tag = `${kind}-${theme}`;
-      await check(`${tag}: Settings' nav has Widgets, compact, In progress and 10%; a tap says what's left, nothing opens`, async () => {
+      // Widgets is built (PR #86): Settings' nav has the real row, usable, marked Being tested at 85%, and it opens Home.
+      await check(`${tag}: Settings' nav has Widgets, usable, Being tested and 85%, and it opens your Home page`, async () => {
         await openSettings(page);
-        const row = await placeholder(page, "widgets-by-chat", 10, theme);
-        assert.equal(await row.locator("xpath=..").locator("[data-in-progress-label]").innerText(), "In progress");
+        const row = page.locator('[data-in-progress="widgets-by-chat"][data-in-progress-state="testing"]').filter({ has: page.locator("[data-settings-widgets]") }).first();
+        await row.waitFor({ state: "visible", timeout: 10000 });
+        assert.equal(await row.getAttribute("aria-disabled"), null, "it's marked disabled");
+        assert.equal(await row.locator("[inert]").count(), 0, "something in it is inert");
+        assert.equal((await row.locator("[data-in-progress-label]").innerText()).trim(), "Being tested");
+        assert.equal(await row.locator("[data-in-progress-label]").evaluate((n) => getComputedStyle(n).color), RED[theme]);
+        assert.equal((await row.locator("[data-in-progress-percent]").innerText()).trim(), "85%");
+        assert.equal(await row.getAttribute("title"), "85% built. What's left: Try it on your PC.");
         await noSideways(page, tag);
         await shot(page, `${tag}-settings-nav`);
-        const before = await page.locator("main[data-settings-pane]").getAttribute("data-settings-pane").catch(() => null);
-        // Playwright waits on aria-disabled; a person taps it anyway, so the tap goes in at its place (a real mouse click).
-        await row.click({ force: true });
-        const tip = page.locator('[role="tooltip"]').filter({ hasText: "What's left" }).filter({ visible: true }).first();
-        await tip.waitFor({ state: "visible", timeout: 3000 });
-        assert.match(await tip.innerText(), /^10% built\. What's left: Ask a bot in the chat for a widget or a page/);
-        assert.equal(await page.locator("main[data-settings-pane]").getAttribute("data-settings-pane").catch(() => null), before, "the tap opened a place");
-        await shot(page, `${tag}-settings-nav-tip`);
+        await row.locator("[data-settings-widgets]").click();
+        await page.locator('[data-widget-page="home"]').waitFor({ state: "visible", timeout: 10000 });
+        await shot(page, `${tag}-widgets-home`);
+        await page.getByRole("button", { name: "Close the page" }).click();
+        await settle(page);
       });
-      for (const [p, id, percent, name] of [
-        ["look", "animations-setting", 10, "look"],
-      ])
-        await check(`${tag}: Settings, ${p}: the ${id} placeholder, grayed, red label, ${percent}%`, async () => {
-          await openSettings(page);
-          await place(page, phone, p);
-          const el = await placeholder(page, id, percent, theme);
-          await noSideways(page, `${tag} ${p}`);
-          await el.focus();
-          await page.keyboard.press("Enter");
-          await page.locator(`[data-in-progress="${id}"] [role="tooltip"]`).waitFor({ state: "visible", timeout: 3000 });
-          await shot(page, `${tag}-settings-${name}`);
-        });
       await check(`${tag}: nothing threw`, async () => assert.deepEqual(errors, []));
       await ctx.close();
       // Being tested: #80's real Bot tasks card and #83's real Composio (your account) row, usable (not grayed, not
@@ -302,6 +273,7 @@ try {
       for (const [p, id, name, left, real, file] of [
         ["profile", "pc-tasks-claude-plan", "Bot tasks on this PC", "A real task on your PC.", '[role="group"][aria-label="Bot tasks on this PC"]', "being-tested-pc-tasks"],
         ["mac", "composio-for-you", "Composio (your account)", "Paste your For You address and key, then a live check.", '[data-connection="COMPOSIO_MCP_URL"]', "being-tested-composio"],
+        ["look", "animations-setting", "Animations", "Try it on your PC.", "[data-animations]", "being-tested-animations"],
       ])
         await check(`${tag}: ${name} is usable, marked Being tested, 85%, a tap on the label says what's left below it`, async () => {
           const pg = app.page;

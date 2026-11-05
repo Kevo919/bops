@@ -59,7 +59,7 @@ const good = { id: "sample-feature", name: "A sample", percent: 25, left: "Wire 
 
 check("the list parses, with the features being built now and their percents", () => {
   const byId = Object.fromEntries(F.FEATURES_IN_PROGRESS.map((f) => [f.id, f.percent]));
-  assert.deepEqual(byId, { "widgets-by-chat": 10, "animations-setting": 10, "composio-for-you": 85, "pc-tasks-claude-plan": 85, "agents-you-run": 70, "agents-dsh-remote": 10, "agents-dsh-desktop": 5, "phone-pairing": 75, "phone-verify-codes": 0 });
+  assert.deepEqual(byId, { "widgets-by-chat": 85, "animations-setting": 85, "composio-for-you": 85, "pc-tasks-claude-plan": 85, "agents-you-run": 70, "agents-dsh-remote": 10, "agents-dsh-desktop": 5, "phone-pairing": 75, "phone-verify-codes": 0 });
   for (const f of F.FEATURES_IN_PROGRESS) assert.ok(f.name && f.left, f.id);
   assert.deepEqual(F.checkFeatures([good]), [{ ...good, state: "building" }]);
   for (const id of ["pc-tasks-claude-plan", "composio-for-you"]) assert.equal(F.FEATURES_IN_PROGRESS.find((f) => f.id === id).state, "testing", id);
@@ -91,14 +91,15 @@ check("bad entries are refused, each with its reason", () => {
 });
 
 const child = h("button", { type: "button", onClick: () => {} }, "Open animations");
-const seeded = F.FEATURES_IN_PROGRESS.find((f) => f.id === "animations-setting");
+// A feature still being built (Widgets and Animations are now being tested: PR #86).
+const seeded = F.FEATURES_IN_PROGRESS.find((f) => f.id === "agents-dsh-remote");
 
 check("<InProgress>: its child grayed and inert, the red label, the percent badge, disabled with its aria", () => {
-  const html = renderToStaticMarkup(h(W.InProgress, { id: "animations-setting" }, child));
-  assert.match(html, /data-in-progress="animations-setting"/);
+  const html = renderToStaticMarkup(h(W.InProgress, { id: seeded.id }, child));
+  assert.match(html, /data-in-progress="agents-dsh-remote"/);
   assert.match(html, /role="group"/);
   assert.match(html, /aria-disabled="true"/);
-  assert.match(html, /aria-label="Animations: not set up yet, 10% built."/);
+  assert.match(html, /aria-label="DeepSeek Harness on another computer: not set up yet, 10% built."/);
   // The child is out of reach: inert (no clicks, no focus), hidden from screen readers, grayed.
   assert.match(html, /<div inert="" aria-hidden="true" class="[^"]*pointer-events-none[^"]*opacity-50 grayscale"><button[^>]*>Open animations<\/button><\/div>/);
   assert.match(html, /data-in-progress-label[^>]*text-\[var\(--wip-red\)\][^>]*>.*Not set up yet<\/span>/);
@@ -141,12 +142,12 @@ check("<InProgress>: past half it reads In progress; a label asked for wins", ()
   const half = F.FEATURES_IN_PROGRESS.find((f) => f.id === "phone-pairing");
   assert.match(renderToStaticMarkup(h(W.InProgress, { id: "phone-pairing" }, child)), />In progress<\/span>[\s\S]*>75%</);
   assert.equal(half.state, "building");
-  assert.match(renderToStaticMarkup(h(W.InProgress, { id: "widgets-by-chat", label: "In progress" }, child)), />In progress</);
+  assert.match(renderToStaticMarkup(h(W.InProgress, { id: "agents-dsh-remote", label: "In progress" }, child)), />In progress</);
 });
 
 check("<InProgressRow>: compact, a disabled button with the red label and the percent on the right", () => {
-  const html = renderToStaticMarkup(h(W.InProgressRow, { id: "widgets-by-chat", name: "Widgets", icon: h("svg", { "aria-hidden": true }) }));
-  assert.match(html, /<button type="button" data-in-progress="widgets-by-chat" aria-disabled="true" aria-label="Widgets: in progress, 10% built."/);
+  const html = renderToStaticMarkup(h(W.InProgressRow, { id: "agents-dsh-remote", name: "Widgets", icon: h("svg", { "aria-hidden": true }) }));
+  assert.match(html, /<button type="button" data-in-progress="agents-dsh-remote" aria-disabled="true" aria-label="Widgets: in progress, 10% built."/);
   assert.match(html, /opacity-55">Widgets<\/span>/);
   assert.match(html, />In progress<\/span><\/span><span data-in-progress-percent[^>]*>10%<\/span>/);
   assert.match(html, /role="tooltip"/);
@@ -161,8 +162,8 @@ check("at 100, or with no entry, the child renders as it would alone", () => {
   const was = seeded.percent;
   try {
     seeded.percent = 100;
-    assert.equal(renderToStaticMarkup(h(W.InProgress, { id: "animations-setting" }, child)), alone);
-    assert.equal(renderToStaticMarkup(h(W.InProgressRow, { id: "animations-setting", name: "Animations" }, child)), alone);
+    assert.equal(renderToStaticMarkup(h(W.InProgress, { id: seeded.id }, child)), alone);
+    assert.equal(renderToStaticMarkup(h(W.InProgressRow, { id: seeded.id, name: "Animations" }, child)), alone);
   } finally {
     seeded.percent = was;
   }
@@ -205,7 +206,10 @@ check("no raw hex color classes in what this adds (the dark palette check): ligh
 
 check("the placeholders are wired where they go, each tiny and self-contained", () => {
   const at = (file) => readFileSync(new URL(file, rootUrl), "utf8");
-  assert.match(at("components/app/bops-app.tsx"), /<InProgressRow id="widgets-by-chat" name="Widgets"/);
+  // Widgets and Animations are built (PR #86): the real Settings row, Pages and Animations rows, marked being tested.
+  assert.match(at("components/app/bops-app.tsx"), /<InProgressRow id="widgets-by-chat">\s*<button data-settings-widgets/);
+  assert.match(at("components/app/sidebar.tsx"), /<InProgress id="widgets-by-chat">\s*<PagesNav/);
+  for (const id of ["widgets-by-chat", "animations-setting"]) assert.equal(F.FEATURES_IN_PROGRESS.find((f) => f.id === id).state, "testing", id);
   assert.doesNotMatch(at("components/app/bops-app.tsx"), /WipCard|pc-tasks-claude-plan/, "the Bot tasks placeholder is still there");
   assert.match(at("components/app/setup.tsx"), /<InProgress id="pc-tasks-claude-plan">\s*<PcTaskRunnerCard(?: onView=\{setPcView\})? \/>\s*<\/InProgress>/);
   assert.match(at("components/app/look-settings.tsx"), /<InProgress id="animations-setting"/);

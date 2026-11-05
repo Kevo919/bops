@@ -17,6 +17,7 @@ import { KnowledgeIcon, type OrbitSection } from "./memory-categories";
 import { KeyIcon } from "./screen-cards";
 import { MonitorIcon, teamOf } from "./ui";
 import { readOnly, seesBrowser } from "@/lib/shared";
+import { WidgetsIcon } from "./widgets";
 
 /*
  * The right side is a row of tabs in the title bar, like a browser's. The first tab is always the
@@ -59,7 +60,12 @@ export type PanelTab =
    */
   | { id: string; kind: "preview"; ws: string; name: string; site?: string; bot?: string; url: string }
   /** A bot's browser (bot-browser.tsx): the page in front on the screen its task holds, live, to watch and take over. Never saved. */
-  | { id: string; kind: "browser"; botId: string };
+  | { id: string; kind: "browser"; botId: string }
+  /**
+   * A tab the owner pinned (Look.layout's tabs, widgets.tsx): a page of their widgets, or one widget on it. It comes
+   * from the layout, not from what's open, so it's there after a restart, and Unpin (not its X) takes it away.
+   */
+  | { id: string; kind: "widgets"; page: string; widget?: string; label: string; pinned: string };
 
 /** The tab that follows the chat. */
 export const CHAT_TAB = "chat";
@@ -120,6 +126,7 @@ export const isReading = (t?: PanelTab) =>
     t.kind === "hosted-app" ||
     t.kind === "preview" ||
     t.kind === "browser" ||
+    t.kind === "widgets" ||
     t.kind === "made-apps");
 
 /**
@@ -205,7 +212,7 @@ export function TabBar({
     // Narrow (narrow.ts), in the panel's own bar: as wide as its tabs, the bar scrolling them sideways.
     <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden max-md:flex-none max-md:overflow-visible">
       {all.map((t) => (
-        <Tab key={t.id} state={state} tab={t} on={t.id === active} closable={t.id !== CHAT_TAB && t.id !== BROWSER_TAB} onPick={() => onPick(t.id)} onClose={() => onClose(t.id)} />
+        <Tab key={t.id} state={state} tab={t} on={t.id === active} closable={t.id !== CHAT_TAB && t.id !== BROWSER_TAB && t.kind !== "widgets"} onPick={() => onPick(t.id)} onClose={() => onClose(t.id)} />
       ))}
       {/* A workspace shared with the user: its New tab page lists the owner's things to open as if they were the viewer's (no new tab there). */}
       {!readOnly(state) && (
@@ -282,7 +289,9 @@ function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState
                   ? GROUP_NAME
                   : t.kind === "autopilot"
                     ? "Routines"
-                    : "New tab";
+                    : t.kind === "widgets"
+                      ? t.label
+                      : "New tab";
   return (
     <div
       onClick={onPick}
@@ -313,6 +322,8 @@ function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState
         <AppMark app={hosted} size={15} />
       ) : t.kind === "made-apps" ? (
         <AppsIcon />
+      ) : t.kind === "widgets" ? (
+        <WidgetsIcon />
       ) : (
         <GlobeIcon />
       )}

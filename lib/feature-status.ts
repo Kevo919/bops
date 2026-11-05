@@ -37,8 +37,8 @@ export type FeatureInProgress = {
 };
 
 const LIST: FeatureInProgress[] = [
-  { id: "widgets-by-chat", name: "Widgets and pages by chat", percent: 10, left: "Ask a bot in the chat for a widget or a page, and it builds it here", where: "feature/widgets-by-chat" },
-  { id: "animations-setting", name: "Animations", percent: 10, left: "Choose how much the window moves: full, calm or off" },
+  { id: "widgets-by-chat", name: "Widgets and pages by chat", percent: 85, left: "Try it on your PC", state: "testing", where: "PR #86" },
+  { id: "animations-setting", name: "Animations", percent: 85, left: "Try it on your PC", state: "testing", where: "PR #86" },
   { id: "composio-for-you", name: "Composio (your account)", percent: 85, left: "Paste your For You address and key, then a live check", state: "testing", where: "PR #83, merged; live check left" },
   { id: "pc-tasks-claude-plan", name: "Bot tasks on this PC", percent: 85, left: "A real task on your PC", state: "testing", where: "PR #80, merged; live test left" },
   { id: "phone-verify-codes", name: "Proving your mobile number", percent: 0, left: "Paste the Twilio Verify keys in Settings, Services; until then they go in .env.local", state: "building", where: "Services screen follow up (task 59, PR #87)" },

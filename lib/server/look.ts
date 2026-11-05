@@ -12,12 +12,16 @@ import type { Bot, Look } from "../types";
 /** The look on now, normalized as it's read (the state file or the cloud's copy may hold anything): nothing set is Bops' own look, which is what Reset goes back to. */
 export const currentLook = (): Look => normalizeLook(getState().look?.current);
 
-/** Put the next look in: what's replaced goes onto the front of the history (at most LOOK_HISTORY), so Undo walks back. */
-function setLook(next: Look): Look {
+/**
+ * Put the next look in: what's replaced goes onto the front of the history (at most LOOK_HISTORY), so Undo
+ * walks back. `quiet`: not onto the history (what's typed into a note, a box ticked, a counter pressed:
+ * using a widget, not changing the layout), so Undo still takes back the last real change.
+ */
+export function setLook(next: Look, quiet = false): Look {
   const clean = normalizeLook(next);
   update((s) => {
     const look = normalizeLookState(s.look);
-    look.history = [look.current, ...look.history].slice(0, LOOK_HISTORY);
+    if (!quiet) look.history = [look.current, ...look.history].slice(0, LOOK_HISTORY);
     look.current = clean;
     s.look = look;
   });
@@ -67,8 +71,10 @@ export function undoLook(messageId?: string): boolean {
  * On a card, the card says it was reset.
  */
 export function resetLook(messageId?: string): void {
+  // The widgets stay (Look.layout): Reset is for how the window looks, not what's on its pages.
+  const { layout, ...look } = currentLook();
   // Already Bops' own: nothing to keep for Undo.
-  if (Object.keys(currentLook()).length) setLook({});
+  if (Object.keys(look).length) setLook(layout ? { layout } : {});
   else update((s) => void (s.look = normalizeLookState(s.look)));
   if (!messageId) return;
   update((s) => {
@@ -88,6 +94,8 @@ const says = (change: Look, was: Look): string => {
   if (change.fontScale !== undefined && change.fontScale !== was.fontScale) parts.push(`text ${Math.round(change.fontScale * 100)}%`);
   if (change.density !== undefined && change.density !== was.density) parts.push(`${change.density} spacing`);
   if (change.css !== undefined && change.css !== was.css) parts.push(change.css ? "custom CSS" : "custom CSS cleared");
+  if (change.motion !== undefined && change.motion !== (was.motion ?? "normal")) parts.push(change.motion === "off" ? "animations off" : `${change.motion} animations`);
+  if (change.motionSpeed !== undefined && change.motionSpeed !== (was.motionSpeed ?? "normal")) parts.push(`${change.motionSpeed} animation speed`);
   return parts.length ? parts.join(", ") : "nothing new (it was already so)";
 };
 
@@ -111,7 +119,10 @@ export function changeLookFromChat(b: Bot, input: unknown, chatId: string): stri
   }
   const summary = typeof (input as { summary?: unknown })?.summary === "string" && (input as { summary: string }).summary.trim() ? (input as { summary: string }).summary.trim().slice(0, 200) : fallbackSummary(change, currentLook());
   const { was } = applyLook(change);
-  const card: LookCard = { summary, before: normalizeLook(was) };
+  // The card keeps what the look was, not the widgets (a record only, and the widgets can be large).
+  const { layout: _layout, ...before } = normalizeLook(was);
+  void _layout;
+  const card: LookCard = { summary, before };
   addMessage({ chatId, role: "system", text: `Look changed: ${summary}`, look: card });
   return `Done: ${says(change, was)}. ${b.name === "Bops" || b.isMain ? "The owner" : `${b.name}'s owner`} can Undo it under the reply or in Settings, or reset the look in Settings.`;
 }
