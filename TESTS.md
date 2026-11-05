@@ -5,7 +5,7 @@ Every feature, how it was tested, when, by whom, and the result. **Kevin: read t
 Legend: ✅ passed · ⚠️ passed with a known limit · ❌ failed · ⏳ not yet tested this way.
 Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an independent agent read the code for bugs and security), **Live PC** (on Kevin's PC, real app), **Live server** (on the Hostinger server), **Live phone**, **Real account** (with Kevin's real provider account).
 
-**Tested: 64%** (87.5 of 136 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
+**Tested: 65%** (88 of 136 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
 
 | Feature | Unit/CI | Review | Live PC | Live server | Real account / phone | Notes |
 |---|---|---|---|---|---|---|
@@ -37,7 +37,7 @@ Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an indepen
 | Ollama chat (#28) | ✅ | ✅ | n/a | ⚠️ Nov 3 lead: works, too slow | n/a |  |
 | Android app (#1, #2, #14, #26) | ✅ | ✅ | n/a | n/a | ⏳ Kevin's phone install + pairing |  |
 | z.ai China Coding Plan (#23) | ✅ | ✅ | n/a | n/a | ⏳ quota resets Nov 8 |  |
-| Free local voice, Voice (local) module (#64) | ✅ Nov 5 zai: voice-local 6 | ⚠️ Nov 5 reviewer: audio follows redirects; silent OpenAI fallback; module-off gap (fix in progress) | ⏳ | ⏳ | ⏳ a running speech service (Speaches recipe) |  |
+| Free local voice, Voice (local) module (#64, #68) | ✅ Nov 5 voice-local 15 (fake services; each fix's check fails without it), lead re-ran | ✅ Nov 5 reviewer; all 7 findings fixed in #68 | ⏳ | ⏳ | ⏳ a running speech service (Speaches recipe) |  |
 | Phone pairing card: Unpair / Pair again ask first (#65, from the crawl) | ✅ Nov 5 crawl: phone-card-ui 5 | ✅ Nov 5 lead | ⏳ | ⏳ | ⏳ | |
 | Repos section padding (#66, from the crawl) | ✅ Nov 5 crawl: repos-ui 8 | ✅ Nov 5 lead | ⏳ | n/a | n/a | |
 | Every screen and button, desktop 1280x800 (crawl) | ✅ Nov 5 crawl: 44 screens, 969 controls, no crashes | ✅ Nov 5 lead | ⏳ (crawl ran on a throwaway copy) | n/a | n/a | details: tests/2026-11-05-0807-e2e-ui-crawl.md |
