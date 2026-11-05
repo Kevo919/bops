@@ -347,6 +347,8 @@ function packagedServer() {
   // at its real size (ORGO_RTC_HEIGHT=960; otherwise it shrinks the bot's screen, lib/server/orgo.ts
   // webrtcWanted). Then this default goes. A Mac's .env.local can still say BOPS_WEBRTC=1.
   const shipped = { BOPS_WEBRTC: "0" };
+  // The .env.local the server writes a key to when the owner pastes it in Settings (lib/server/pc-task-setting.ts).
+  shipped.BOPS_ENV_LOCAL = path.join(app.getPath("userData"), ".env.local");
   return { dir, home, log, env: { ...shipped, ...env, ...(fs.existsSync(relay) ? { BOPS_RELAY_BIN: relay } : {}), ...(fs.existsSync(ingot) ? { BOPS_INGOT_DIR: ingot } : {}) } };
 }
 

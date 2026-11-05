@@ -31,3 +31,5 @@ d3d39c26007b4a6ac6355edd2b7c09ba131a810c:scripts/test-repo-recipes.mjs:generic-a
 dde234dc68b82239e236be9d193b93d185e425fd:tests/2026-11-05-1158-reviewer-pr69-pr72.md:generic-api-key:12
 # PR #80 test fixture: a planted fake CLAUDE_CODE_OAUTH_TOKEN the test proves is stripped.
 588d2a741ea8a443417116bf5259ec65f97a5f17:scripts/test-pc-task-runner.mjs:generic-api-key:25
+# PR #83 test: the literal placeholder ZAPIER_MCP_URL=that_url the card tells people to paste, not a credential.
+480f6fb7f825c62d72a4fea594ad556f7bbc01c1:scripts/test-connections-ui.mjs:generic-api-key:115
