@@ -6,6 +6,11 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 8:45 AM (Chicago)
+- **Merged #76** (Codex): the Memory screen now says plainly when memory isn't set up, instead of an error. CI was all green, and it was reviewed.
+- **PC rebuild pending:** the link to Kevin's PC dropped just now. The rebuild runs when the PC reconnects.
+- **New rule (Kevin):** features still being built can show in the app, but grayed out with red "not set up yet" text and a percent complete (task 58). It has been added to the build skills too.
+
 ### Nov 5, 8:40 AM (Chicago)
 - **GitHub checks are all green again** (#79 merged): the schedule-picker test is fixed, the merge marks are gone from the secret-scan list, and two made-up test keys are marked as known fakes.
 - **Composio:** your apps are in Composio's "For You" area, which Bops' developer key can't see. A "Composio (your account)" option is being built (task 50).
