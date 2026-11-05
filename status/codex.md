@@ -1,37 +1,18 @@
 # Codex status
-Updated 2026-11-05T05:23:11.8879723Z. Build IN PROGRESS; latest published score 66% (89.5/136; expanded checklist). User authorizes tested/reviewed merges. Lead owns deployment and scoring.
+Updated 2026-11-05T10:27:46.0866239Z. Build IN PROGRESS. Published score66% (90.5/137); expanded checklist, not directly comparable with earlier percentages.
 
-## Completed: privacy and Windows SSH source fixes
-- PR62 merged c6d01ef: outside callers cannot invoke ask_teammate to indirectly read MEMORY.md. Chat-entry regression16pass, negativecontrol fails as expected, chattools85pass; typecheck/lint pass. Independent review complete.
-- PR63 merged1829f4d: private and legacy-unknown repo output/errors withheld from nonowners, public/member and owner paths preserved. Repo28pass onlatestbase; negativecontrol4expectedfailures; typecheck/lint pass. Independent review complete.
-- PR60 merged43d8950: native Windows OpenSSH stdio preview connections, protected key ACLs, strict pins and Host gate, bounded failures/cleanup. Finalheadc357b5d: hosted134pass0fail; focused11pass0fail; typecheckexit0; lint0errors30existingwarnings; diffclean. Independent product/security and testreviews complete.
-- Actual native keygen/ACL/ssh-G and WSL Linux-permission tests passed. Transportusesdoubles; no realremoteSSH handshake or interactivepreview/deploymentclaim. Windows endpoint changes require closing/reopening preview. No rawlistener. No silenttestskips.
-- Evidence: tests/2026-11-05-0505-codex-outside-teammate.md, tests/2026-11-05-0510-codex-private-repo-status.md, tests/2026-11-05-0522-codex-windows-ssh.md. CIpaused, notgreen.
+## Current verified state
+- Lead deployed1fb2921 (+PR71 test-only). Independently confirmed PChealth200 build hWKiXL7d5vY1BpOjDfNkT thisrun.
+- Windows remains visibly locked. Native Bopswindow920274 present but UI inaccessible. No livePC featurechecks credited thisrun; existingunlockrequest remainspending.
+- PrivacyPR62/63 and WindowsSSHPR60 merged, tested/reviewed source. SSH134hosted+11focused passed; nativekeygen/ACL/argumentparse real, transportdoubles; realremoteSSH stillunverified.
+- PR68 source re-review closed Codexvoicefindings (down-onlyopt-infallback, truthfulhelp, loopbackrecipe). Realmicrophone/service/UI and120stimeout test stillunverified. Evidence tests/2026-11-05-0925-codex-voice-rereview.md.
 
-## Next / shared ownership
-Lead has deployment handoff for43d8950 includingprivacy62/63. Codex acknowledges lead0520 split: realPC checks after controlledrebuild; lead owns throwaway cloudUIcrawl; zai owns OScron/at persistencefinding then narrowlayoutfixes. Bops-scheduler removal alone doesnotresolveOScron/at.
-Prior livePC LrLp1ZXZRqEZNML0dwY0z: chat, Connectionschecks, modelpickerrefresh, Office downloads and Ideas lifecycle verified. PowerPoint exactone-slide request producedtwo, loggedpartial. Freshbuild realSSH, taskcompletion, sign-in/account flows, tray/restart/installer remain toverify.
+## Next and ownership
+Afterunlock: lead0958 livePC list on hWKiXL7d5vY1BpOjDfNkT: Reposapproval/private-member, SOUL/MEMORY, Goals,MCP, sign-instatus,tray,close/reopen,restartpersistence,freshinstaller; add minimumwindowwidth andphone412px whereavailable. One evidencefileperfeature.
+Lead ownsrebuilds/mobilelayout; zai owns remainingcrawlbugs/key-store decision. No overlappingcodeedits. PriorOffice/chat/Connections/picker/Ideas evidence retained; not rerunwithoutreason.
 
-## Needs Kevin / blockers
-NativePC tasks need dedicatedOpenAI environmentkey matching applicationkey owner/org/project and APIcredit. User reportsPlatformsignin; billingtab exposedinvalid andbrowsertool deniedaccess. No bypass, keys or billingchanges. Local subscription signin alone isnotnative taskexecution.
-Actions re-enable, Gmail/Zapier authorization, Androiddevice andrealprovideraccount/presetcases remain externalprerequisites. No100%claim. Claude memoryobserverauthentication stale; board andcanonicalworkstate loggingcontinue.
+## Needs Kevin
+UnlockWindows forliveUI checks (alreadyrequested; avoidhourlyrepeatnotifications). NativePC tasks stillrequirecorrect OpenAIenvironmentkey/access andAPIcredit; no credentials changed. Gmail/Zapier/Android/realprovideraccounts remainexternalprerequisites. No100%claim.
 
 ## Run coordination
-Allscopedagentsfinished; SSHheavylockreleased. Parentreleasesonly its ownedhourlylock onexit. Noapprestart/deployment, Docker/emulator orforeignprocesschanges. Hourlyautomation bops-hourly-build-check remainsactive untilactualBUILD DONE.
-Previousconditionalestimates:80%=6-12active-teamhours;85%=10-18;90%=16-30;95%=2-3workingdays.100%hasnoreliableETA untilexternalprerequisites andlivechecks pass.
-
-Hourly check 2026-11-05T05:24:31.6027061Z : no new team messages since prior handoff. Live health HTTP200 still LrLp1ZXZRqEZNML0dwY0z; checkout2687b38 and existing dirtyconfig/llms.yaml preserved. Await lead-controlled rebuild43d8950 before changed-code live verification. No repeated suites, heavy jobs, merges or restarts this run. Own hourlylock released on exit.
-
-
-## Current hourly checkpoint 2026-11-05T06:20:53.9204391Z
-Lead rebuilt43d8950; independently confirmed health200 MqYVGKe32Z5ugBlKK6Kf1. This supersedes awaitingdeployment notes. Live UI blocked: screenshot confirms Windowslockscreen, Bopsactivationfails. Needs Kevin: unlockWindows. Repos/SOUL/Goals/MCP remainuntested. Evidence tests/2026-11-05-0620-codex-pc-locked.md. Noheavyjob/restart/merge; ownhourlylockreleasedonexit.
-
-
-Hourly checkpoint 2026-11-05T07:26:27.6691427Z : Windows still visibly locked; live app health200 remains MqYVGKe32Z5ugBlKK6Kf1. No new live-UI evidence. Lead server battery on43d8950 read:28scripts passed except known Node22 Windows-fuse incompatibility. Zai PR64 localvoice tests read, live service/Settings unverified and not assumed deployed. Noheavyjobs, merges, restarts or credential changes. Unlock request already sent; avoiding repeat notification. Next: lead0608 livePC list after unlock.
-
-
-Hourly checkpoint 2026-11-05T08:24:45.5041225Z : reviewed PR64 at zai request while desktopstilllocked. Changesrequested: fallbackclassification, truthfulprivacyhelp, loopback-onlySpeachesdefault; evidence tests/2026-11-05-0825-codex-voice-local-review.md, messagedzai. Read-onlyreview, no runtimeaudio/Docker tests orsourcechanges; no merge. Leadmobilelayout untouched. Next re-reviewzai followups and resumelivePC afterunlock.
-
-
-Hourlycheckpoint 2026-11-05T09:24:57.2230961Z : PR68 source re-review closes mythreevoicefindings. No livevoiceclaim; timeout/service/UIuntested. Windowsstilllocked; useralreadyaskedunlock. LeadmobilelayoutPR70 andmemoryPR69 merged perremote; notassumeddeployed. Evidence tests/2026-11-05-0925-codex-voice-rereview.md. Noheavywork/merge/restart. Next realPCchecksafterunlock andconfirmcurrentbuild.
-
+Hourlyautomation bops-hourly-build-check active. Thisrun readboard/newmessages, verifiedhealth andlockscreen, updatedlogs. Noheavyjobs, sourceedits, merges, restarts orforeignprocesschanges. Ownhourlylockreleasedonexit. Leadreviews/merges.
