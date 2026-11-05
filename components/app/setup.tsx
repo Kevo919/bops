@@ -16,6 +16,7 @@ import type { KeyCheckResult } from "@/lib/server/key-check";
 import { ModelsCard } from "./models-card";
 import { ConnectionsCard } from "./connections-card";
 import { HandyCard } from "./handy-card";
+import { checkVoiceAddress } from "@/lib/voice-address";
 
 /*
  * Everything Bops needs on this Mac, in one place: Settings → This Mac. It never stands in the way: signing in
@@ -917,7 +918,7 @@ export function KeysCard() {
   );
 }
 
-type ModuleSetting = { key: string; label: string; help: string | null; type: "text" | "toggle" | string[]; placeholder: string | null; value: unknown };
+type ModuleSetting = { key: string; label: string; help: string | null; type: "text" | "toggle" | string[]; placeholder: string | null; check?: string | null; value: unknown };
 type ModuleInfo = { id: string; name: string; help: string; required: boolean; enabled: boolean; keysSet: boolean; keys: string[]; settings: ModuleSetting[] };
 
 /**
@@ -993,6 +994,16 @@ function ModulesCard() {
                             <input className="rounded border border-[#E6E6E3] px-1.5 py-1 font-mono" placeholder={st.placeholder ?? "Default"} value={String(value(m, st.key, st.value) ?? "")} onChange={(e) => change(m.id, st.key, e.target.value)} />
                           )}
                           {st.help && <span className="text-pencil">{st.help}</span>}
+                          {st.check === "local-address" &&
+                            (() => {
+                              const checked = checkVoiceAddress(String(value(m, st.key, st.value) ?? ""));
+                              const words = checked.ok ? checked.warning : checked.error;
+                              return words ? (
+                                <span data-address-warning className="text-[#B54708]">
+                                  {words}
+                                </span>
+                              ) : null;
+                            })()}
                         </label>
                       ))}
                   </div>

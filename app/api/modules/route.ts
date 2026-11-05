@@ -1,5 +1,6 @@
 import { fromThisMac } from "@/lib/server/owner-email";
 import { fromBopsWindow } from "@/lib/server/ui-token";
+import { checkVoiceAddress } from "@/lib/voice-address";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const mods = () => require(/* turbopackIgnore: true */ `${process.cwd()}/config/modules.cjs`) as {
   describe: (root: string) => Module[];
-  modules: (root: string) => { id: string; required?: boolean; settings?: { key: string; type: unknown }[] }[];
+  modules: (root: string) => { id: string; required?: boolean; settings?: { key: string; type: unknown; check?: string }[] }[];
   write: (root: string, config: Record<string, Record<string, unknown>>) => void;
 };
 type Module = { id: string; enabled: boolean; settings: { key: string; value: unknown }[] };
@@ -44,7 +45,12 @@ export async function PUT(request: Request) {
       if (key === "enabled" && !m.required && typeof value === "boolean") out.enabled = value;
       else if (s?.type === "toggle" && typeof value === "boolean") out[key] = value;
       else if (Array.isArray(s?.type) && (value === "" || (s.type as string[]).includes(String(value)))) out[key] = value;
-      else if (s?.type === "text" && typeof value === "string" && value.length <= 500 && !/[\r\n]/.test(value)) out[key] = value.trim();
+      else if (s?.type === "text" && typeof value === "string" && value.length <= 500 && !/[\r\n]/.test(value)) {
+        // An address that can't work (not http or https) is refused here; one off this machine is only warned about (Settings shows it).
+        const checked = s.check === "local-address" ? checkVoiceAddress(value) : null;
+        if (checked && !checked.ok) return Response.json({ error: checked.error }, { status: 400 });
+        out[key] = value.trim();
+      }
     }
     clean[id] = out;
   }

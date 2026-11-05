@@ -2,7 +2,7 @@ import { notReady } from "@/lib/server/ready";
 import { MAX_RECORDING, transcribe } from "@/lib/server/transcribe";
 import { noteOutOfCredit, outOfCreditWords } from "@/lib/server/cloud";
 
-/** The chat's mic: a recording (form field `audio`, and `botId` the chat is with), back as text. */
+/** The chat's mic: a recording (form field `audio`, and `botId` the chat is with), back as `text` (and a `note` when Voice (local) fell back to OpenAI). */
 export async function POST(request: Request) {
   const unready = notReady();
   if (unready) return unready;
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (audio.size > MAX_RECORDING) return Response.json({ error: "That recording is too long." }, { status: 413 });
   const botId = form?.get("botId");
   try {
-    return Response.json({ text: await transcribe(audio, typeof botId === "string" && botId ? botId : undefined) });
+    return Response.json(await transcribe(audio, typeof botId === "string" && botId ? botId : undefined));
   } catch (e) {
     if (noteOutOfCredit(e)) return Response.json({ error: outOfCreditWords() }, { status: 402 });
     return Response.json({ error: (e as Error).message }, { status: 502 });

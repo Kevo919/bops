@@ -541,6 +541,13 @@ export function ChatView({
   const [dropping, setDropping] = useState(false);
   // What went wrong with the mic, shown under the composer for a few seconds.
   const [micError, setMicError] = useState<string | null>(null);
+  // How the mic's words came when not the way the owner set up (Voice (local) down, so OpenAI): said, then gone.
+  const [micNote, setMicNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!micNote) return;
+    const t = setTimeout(() => setMicNote(null), 8000);
+    return () => clearTimeout(t);
+  }, [micNote]);
   // Why the chat's model didn't change (ChatModelPick), until the next pick.
   const [modelError, setModelError] = useState<string | null>(null);
   useEffect(() => {
@@ -1005,8 +1012,9 @@ export function ChatView({
             <MicButton
               botId={solo?.id}
               onError={setMicError}
-              onText={(said) => {
+              onText={(said, note) => {
                 setMicError(null);
+                setMicNote(note ?? null);
                 setDraft((d) => (d.trim() ? `${d.trimEnd()} ${said}` : said));
                 document.getElementById("composer")?.focus();
               }}
@@ -1041,6 +1049,7 @@ export function ChatView({
           </form>
           )}
           {micError && <div className="px-3 pt-1.5 text-[12px] leading-4 text-[#B42318]">{micError}</div>}
+          {micNote && !micError && <div data-mic-note className="px-3 pt-1.5 text-[12px] leading-4 text-[#B54708]">{micNote}</div>}
           {(modelError ?? chatModelHint(state, c)) && <div className="px-3 pt-1.5 text-[12px] leading-4 text-[#B54708]">{modelError ?? chatModelHint(state, c)}</div>}
         </div>
       </div>
