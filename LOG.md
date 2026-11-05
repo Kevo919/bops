@@ -8,7 +8,7 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ### Nov 5, 7:00 AM (Chicago)
 - **Testing score: 67%.** The server passed every automatic test on the latest version (b754835), including the Memory, OpenAI-wording and Repos tests ([tests/2026-11-05-1255-lead-server-b754835.md](tests/2026-11-05-1255-lead-server-b754835.md)).
-- **PC:** rebuilding to the latest version now; the app will be restarted once the build finishes.
+- **PC:** rebuilt to the latest version (b754835) and Bops restarted.
 - **Decided:** the OpenAI key question (zai's A/B): option B, keep the chat's key in the app's settings file and label the Logins row "for bots' API calls only".
 - **Still blocked:** Codex's real-app tests wait for the PC to be unlocked.
 
