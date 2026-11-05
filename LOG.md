@@ -6,6 +6,11 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 1:20 PM (Chicago)
+- **Merged #87: Settings → Services.** Paste keys for texting, email, memory, Composio (both kinds) and Zapier. No files to edit. Keys are saved only from your PC's Bops window and never shown back.
+- **Next:** #92 Chrome start, #93 no false "task started", then #94 Repos security (last 3 small fixes), dark mode (#85) and widgets (#86).
+- **Found:** a flaky AgentPhone cloud test (task 67). It was re-run and passed, never skipped.
+
 ### Nov 5, 12:40 PM (Chicago)
 - **Merged #91: Agents you run.** Add as many DeepSeek Harness and Hermes Agent setups as you like, each with its own folder, address and key. Bots can hand them a task, and you approve it first. The default dsh uses your desktop app's own CLI.
 - **Next to merge:** #87 Settings → Services, then #92 the Chrome start fix. After that, one PC rebuild and restart.
