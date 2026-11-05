@@ -7,7 +7,7 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 ---
 
 ### Nov 5, 1:55 AM (Chicago)
-- **Testing score: 67%.** Three new features were added to the table, so the number dipped a little even though more is tested. The server passed every automatic test on tonight's version.
+- **Testing score: 66%.** Three new features were added to the table, so the number dipped a little even though more is tested. The server passed every automatic test on tonight's version.
 - **Merged:** #64 free local voice (talk to bots through your own speech service; OpenAI only as a fallback), #65 the phone card now asks before Unpair or Pair again, #66 the Repos page spacing. #65 and #66 came from the robot click-through.
 - **Blocked:** your PC is locked, so Codex's live tests in the app are paused until you unlock it.
 - **Overnight:** the click-through robot keeps going; z.ai is fixing the last Repos sandbox item.
