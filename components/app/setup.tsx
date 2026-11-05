@@ -115,7 +115,8 @@ export function PcTaskRunnerCard() {
   return (
     <div role="group" aria-label="Bot tasks on this PC" className="rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]">
       <h3 className="font-semibold">Bot tasks on this PC</h3>
-      <p className="my-2 text-[#6B6B6B]">Who does the work when a bot runs a task here. Your Claude plan uses the Claude Code sign in above and the bot&apos;s own Chrome; it asks you before running commands, opening a new website, clicking or typing in the browser, or reading files outside the task&apos;s folder, and it can&apos;t change files outside that folder. It can&apos;t control your other apps yet. An OpenAI key needs credit on your OpenAI account.</p>
+      <p className="my-2 text-[#6B6B6B]">Who does the work when a bot runs a task here. Your Claude plan uses the Claude Code sign in above and the bot&apos;s own Chrome; it asks you before running commands, opening a new website, clicking or typing in the browser, or reading files outside the task&apos;s folder, and it can&apos;t change files outside that folder. It can&apos;t control your other apps yet. We recommend it.</p>
+      <p className="mb-2 text-[#6B6B6B]">OpenAI key: tasks run on OpenAI instead, which needs an OpenAI <strong>environment key</strong>, not an ordinary API key. Make one in OpenAI Platform under Agents, Environments, Keys, and select Create. Use the same project as your OPENAI_API_KEY, and make sure that project has credit.</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={busy || !view} aria-pressed={picked === "claude"} onClick={() => void send({ choice: "claude" })} className={picked === "claude" ? dark : light}>Your Claude plan (signed in)</button>
         <button type="button" disabled={busy || !view} aria-pressed={picked === "openai"} onClick={() => void send({ choice: "openai" })} className={picked === "openai" ? dark : light}>OpenAI key</button>
@@ -124,13 +125,13 @@ export function PcTaskRunnerCard() {
       {view?.problem && <p role="status" className="mt-2 text-[#B42318]">{view.problem}</p>}
       <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); const k = key.trim(); if (!k || busy) return; setKey(""); void send({ key: k }); }}>
         <label className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="font-medium">OpenAI key for bot tasks</span>
-          <input type="password" autoComplete="off" spellCheck={false} value={key} onChange={(e) => setKey(e.target.value)} placeholder={view?.openaiKey.set ? `Saved: ${view.openaiKey.masked}` : "Paste a key that starts with sk-"} aria-label="OpenAI key for bot tasks" className="min-w-0 rounded-lg border border-[#E6E6E3] bg-white p-2" />
+          <span className="font-medium">OpenAI environment key for bot tasks</span>
+          <input type="password" autoComplete="off" spellCheck={false} value={key} onChange={(e) => setKey(e.target.value)} placeholder={view?.openaiKey.set ? `Saved, ${view.openaiKey.masked}` : "Paste the environment key"} aria-label="OpenAI key for bot tasks" className="min-w-0 rounded-lg border border-[#E6E6E3] bg-white p-2" />
         </label>
         <button type="submit" disabled={busy || !key.trim()} className={dark}>Save key</button>
         {view?.openaiKey.set && <button type="button" disabled={busy} onClick={() => void send({ key: "" })} className={light}>Remove key</button>}
       </form>
-      {view?.openaiKey.set && <p className="mt-1 text-[#6B6B6B]">Saved on this PC as {view.openaiKey.masked}. Bops never shows it again.</p>}
+      {view?.openaiKey.set && <p className="mt-1 text-[#6B6B6B]">Saved on this PC ({view.openaiKey.masked}). Bops never shows it again. Run a small task to check it connects.</p>}
       {error && <p role="alert" className="mt-2 text-[#B42318]">{error}</p>}
     </div>
   );

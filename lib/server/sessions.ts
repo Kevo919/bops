@@ -2279,14 +2279,20 @@ async function pcClaudeTurns(sessionId: string, o: { s: Session; b: Bot; folder:
   const cli = randomUUID();
   let began = false;
   pcClaudeThreads.set(sessionId, { workspace, origins: new Set(), note: (text) => step(sessionId, "note", text) });
+  // The turn running now, if any: the run's end waits for it (and everything it started) to be gone before its folder goes.
+  let current: { ac: AbortController; done: Promise<unknown> } | undefined;
   return {
-    close: () => void pcClaudeThreads.delete(sessionId),
+    close: async () => {
+      current?.ac.abort();
+      await current?.done.catch(() => {});
+      pcClaudeThreads.delete(sessionId);
+    },
     turn: async (input: string) => {
       const ac = new AbortController();
       interrupts.set(sessionId, () => ac.abort());
       if (stopped.has(sessionId)) ac.abort();
       try {
-        const out = await runClaudeTurn({
+        const running = runClaudeTurn({
           cmd: claudeTaskCommand({ claude: claude.file!, env: claude.env, workspace, mcpConfig, promptFile, session: cli, resume: began }),
           input,
           parse: claudeDriver.parse,
@@ -2300,9 +2306,12 @@ async function pcClaudeTurns(sessionId: string, o: { s: Session; b: Bot; folder:
             else if (ev.type === "thinking") patchSession(sessionId, { activity: ev.text.slice(0, 80) });
           },
         });
+        current = { ac, done: running };
+        const out = await running;
         began = true;
         return out.text || "Done.";
       } finally {
+        current = undefined;
         interrupts.delete(sessionId);
       }
     },
@@ -3245,7 +3254,7 @@ async function run(sessionId: string) {
       // The owner's other apps (Cua Driver) aren't Claude Code's here: said once, plainly, never done another way.
       if (macUi) step(sessionId, "note", PC_WORDS.noScreen);
       const onPc = await pcClaudeTurns(sessionId, { s, b, folder: folder!, port, display, full, onMac, outside: !!outside });
-      closeBrain = async () => onPc.close();
+      closeBrain = () => onPc.close();
       turn = (input) => onPc.turn(input ?? "");
     } else if (onComputerTool) {
       const onTool = await computerToolTurns(sessionId, { computerId, display, sharedWith: c.id !== b.id ? c.name : undefined, resuming, model: bopsModel });

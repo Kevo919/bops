@@ -2,6 +2,7 @@ import "server-only";
 import { spawn, execFile, execFileSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import { redactDeep } from "@/lib/secret-patterns";
 import { stopOf, type CliEvent } from "./cli-agents";
 
@@ -22,12 +23,12 @@ export type ClaudeSignIn = "connected" | "signed-out" | "connecting" | "missing"
 export const PC_WORDS = {
   signIn: "Sign in to Claude in Settings, AI subscriptions, This PC, then try again.",
   noClaude: "Claude Code isn't installed on this PC. Install it, sign in to Claude in Settings, AI subscriptions, This PC, then try again.",
-  addKey: "Add an OpenAI key in Settings, Bot tasks on this PC, then try again.",
-  none: "No AI is set up for bot tasks on this PC. Sign in to Claude in Settings, AI subscriptions, This PC, or add an OpenAI key in Settings, Bot tasks on this PC.",
+  addKey: "Add an OpenAI environment key in Settings, Bot tasks on this PC, then try again. Make it in OpenAI Platform under Agents, Environments, Keys (Create), in the same project as your OPENAI_API_KEY. An ordinary API key won't work.",
+  none: "No AI is set up for bot tasks on this PC. Sign in to Claude in Settings, AI subscriptions, This PC (recommended), or add an OpenAI environment key in Settings, Bot tasks on this PC.",
   limit: "Your Claude plan reached its usage limit. Try again once it resets, or switch Bot tasks on this PC to OpenAI key.",
   down: "Claude isn't answering right now. Try again in a few minutes.",
   model: "Your Claude plan can't use the model Claude Code picked. Check Claude Code's model setting, then try again.",
-  openaiRejected: "OpenAI turned down the key for bot tasks on this PC. Check the OpenAI key in Settings, Bot tasks on this PC, and add credit to your OpenAI account, or switch to Your Claude plan (signed in).",
+  openaiRejected: "OpenAI turned down the key for bot tasks on this PC. It must be an environment key made in OpenAI Platform under Agents, Environments, Keys (Create), in the same project as your OPENAI_API_KEY, and that project needs credit. An ordinary API key is turned down. Or switch to Your Claude plan (signed in).",
   update: "Claude Code on this PC is too old for bot tasks. Update it (run claude update), then try again.",
   noScreen: "On Your Claude plan, bot tasks on this PC can use files and the bot's own Chrome. They can't control other apps on this PC yet: for that, switch Bot tasks on this PC to OpenAI key.",
 } as const;
@@ -71,10 +72,13 @@ export function writePcRunnerChoice(file: string, choice: PcRunner | null) {
 
 /** The only key this path writes. */
 export const EXECUTOR_KEY = "OPENAI_EXECUTOR_API_KEY";
-/** An OpenAI key's shape: sk- then key characters, nothing that could end a line or start another setting. */
-export const looksLikeOpenAiKey = (v: string) => /^sk-[A-Za-z0-9_-]{20,300}$/.test(v);
+/**
+ * An OpenAI environment key's shape, loosely (its prefix isn't assumed): key characters only, nothing that could end
+ * a line or start another setting. Whether it can connect an environment is only known when a task runs.
+ */
+export const looksLikeOpenAiKey = (v: string) => /^[A-Za-z0-9._-]{20,400}$/.test(v);
 /** How a saved key shows: never the key, only that it's there and its last four characters. */
-export const maskKey = (v: string | undefined) => (v ? `sk-...${v.slice(-4)}` : "");
+export const maskKey = (v: string | undefined) => (v ? `ends in ${v.slice(-4)}` : "");
 
 /**
  * Set (or with "" remove) OPENAI_EXECUTOR_API_KEY in this PC's .env.local, the file Bops reads its keys from
@@ -82,7 +86,7 @@ export const maskKey = (v: string | undefined) => (v ? `sk-...${v.slice(-4)}` : 
  * needed. Every other line stays as it was. Written to a new file and moved over the old one, owner only.
  */
 export function saveExecutorKey(file: string, value: string, env: NodeJS.ProcessEnv = process.env) {
-  if (value && !looksLikeOpenAiKey(value)) throw new Error("That doesn't look like an OpenAI key. It starts with sk- and has no spaces.");
+  if (value && !looksLikeOpenAiKey(value)) throw new Error("That doesn't look like an OpenAI key. Paste the whole environment key, with no spaces.");
   let lines: string[] = [];
   try {
     lines = readFileSync(/*turbopackIgnore: true*/ file, "utf8").split(/\r?\n/);
@@ -305,27 +309,46 @@ export function claudeFailure(text: string): string {
   return "Claude Code stopped before it finished this. Try again, or switch Bot tasks on this PC to OpenAI key.";
 }
 
-/** Stop a turn's Claude Code and whatever it started (on Windows its whole tree: its MCP servers too). */
-export function stopClaude(child: ChildProcess) {
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  if (process.platform === "win32" && child.pid) return void execFile("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true }, () => {});
-  // Elsewhere its own process group (spawned detached): Claude Code, its MCP servers and whatever its shell started.
-  const group = (sig: NodeJS.Signals) => {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Whether any process of a POSIX process group is still there. */
+const groupAlive = (pid: number) => {
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === "EPERM";
+  }
+};
+const exited = (child: ChildProcess) => new Promise<void>((r) => (child.exitCode !== null || child.signalCode !== null ? r() : child.once("exit", () => r())));
+
+/**
+ * Stop a turn's Claude Code and whatever it started (its MCP servers, what its shell ran), and resolve only once
+ * they're gone: on Windows its whole tree (taskkill /T /F, finished, then Claude Code's own exit); elsewhere its
+ * process group (spawned detached), SIGTERM, then SIGKILL after `graceMs`, until no process of the group is left.
+ * Resolves false when something was still there after all that, so the caller says so rather than going on.
+ */
+export async function stopClaude(child: ChildProcess, graceMs = 5000): Promise<boolean> {
+  const pid = child.pid;
+  if (!pid) return true;
+  if (process.platform === "win32") {
+    if (child.exitCode === null && child.signalCode === null)
+      await new Promise<void>((r) => execFile("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true }, () => r()));
+    return Promise.race([exited(child).then(() => true), sleep(graceMs + 5000).then(() => false)]);
+  }
+  const signal = (sig: NodeJS.Signals) => {
     try {
-      if (child.pid) process.kill(-child.pid, sig);
-      else child.kill(sig);
+      process.kill(-pid, sig);
     } catch {
-      try {
-        child.kill(sig);
-      } catch {
-        /* gone */
-      }
+      /* none left */
     }
   };
-  const kill = setTimeout(() => group("SIGKILL"), 5000);
-  kill.unref?.();
-  child.once("exit", () => clearTimeout(kill));
-  group("SIGTERM");
+  if (!groupAlive(pid)) return true;
+  signal("SIGTERM");
+  for (let waited = 0; waited < graceMs && groupAlive(pid); waited += 50) await sleep(50);
+  if (groupAlive(pid)) signal("SIGKILL");
+  for (let waited = 0; waited < 5000 && groupAlive(pid); waited += 50) await sleep(50);
+  await Promise.race([exited(child), sleep(1000)]);
+  return !groupAlive(pid);
 }
 
 /** The most a line of Claude Code's output may be, and how long a turn may run at all. */
@@ -333,8 +356,10 @@ const LINE_MOST = 4 * 1024 * 1024;
 
 /**
  * One turn on Claude Code: `input` in on stdin, each event out (`parse`: cli-agents.ts claudeDriver's, so its
- * steps read as a cloud brain's do) as it comes, redacted first. Resolves with its answer; a turn that failed,
- * or a process that ended with no result, throws a PcTaskError in words. Stop (`signal`) ends it at once.
+ * steps read as a cloud brain's do) as it comes, decoded as a stream (a character split across two reads stays
+ * whole) and redacted first. It settles only once Claude Code and everything it started are gone (stopClaude),
+ * so nothing of it outlives the turn into the task's cleanup or the next task. Resolves with its answer only for
+ * a successful result AND a clean exit (code 0); otherwise a PcTaskError in words. Stop (`signal`) ends it.
  */
 export function runClaudeTurn(o: {
   cmd: { file: string; args: string[]; cwd: string; env: NodeJS.ProcessEnv };
@@ -345,6 +370,8 @@ export function runClaudeTurn(o: {
   onDenied?: (tools: string[]) => void;
   signal?: AbortSignal;
   timeoutMs?: number;
+  /** How long Stop waits after SIGTERM before SIGKILL (POSIX). */
+  graceMs?: number;
 }): Promise<{ text: string; session?: string }> {
   return new Promise((resolve, reject) => {
     if (o.signal?.aborted) return reject(new PcTaskError("Stopped by you"));
@@ -355,30 +382,36 @@ export function runClaudeTurn(o: {
     } catch {
       return reject(new PcTaskError(PC_WORDS.noClaude));
     }
+    const out = new StringDecoder("utf8");
+    const err = new StringDecoder("utf8");
     let buf = "";
     let errTail = "";
     let said = "";
     let session: string | undefined;
     let result: { ok: boolean; text?: string } | undefined;
-    let done = false;
-    const finish = (e?: Error) => {
-      if (done) return;
-      done = true;
+    // Why it's ending before its own end (Stop, too long, couldn't start), once that's known.
+    let cut: Error | undefined;
+    let settling = false;
+    const settle = async (code: number | null, sig: NodeJS.Signals | null) => {
+      if (settling) return;
+      settling = true;
       clearTimeout(timer);
       o.signal?.removeEventListener("abort", abort);
-      if (e) reject(e);
-      else if (result?.ok) resolve({ text: (result.text || said).trim(), session });
-      else reject(new PcTaskError(claudeFailure(result?.text ?? errTail)));
+      // Whatever it left running (an MCP server, a command its shell started) goes too, before the turn is over.
+      const gone = await stopClaude(child, o.graceMs);
+      if (!gone) return reject(new PcTaskError("Claude Code didn't stop on this PC. Restart Bops before the next task."));
+      if (cut) return reject(cut);
+      if (result?.ok && code === 0 && !sig) return resolve({ text: (result.text || said).trim(), session });
+      if (result?.ok) return reject(new PcTaskError("Claude Code ended with an error after it answered, so this may not be finished. Try again."));
+      reject(new PcTaskError(claudeFailure(result?.text ?? errTail)));
     };
-    const abort = () => {
-      stopClaude(child);
-      finish(new PcTaskError("Stopped by you"));
+    const end = (why: Error) => {
+      cut ??= why;
+      void settle(null, null);
     };
+    const abort = () => end(new PcTaskError("Stopped by you"));
     o.signal?.addEventListener("abort", abort, { once: true });
-    const timer = setTimeout(() => {
-      stopClaude(child);
-      finish(new PcTaskError("Claude Code took too long on this, so it was stopped. Try again with a smaller task."));
-    }, o.timeoutMs ?? 60 * 60_000);
+    const timer = setTimeout(() => end(new PcTaskError("Claude Code took too long on this, so it was stopped. Try again with a smaller task.")), o.timeoutMs ?? 60 * 60_000);
     timer.unref?.();
     const line = (raw: string) => {
       if (!raw.trim()) return;
@@ -397,22 +430,24 @@ export function runClaudeTurn(o: {
         o.onEvent(ev);
       }
     };
-    child.stdout!.on("data", (d: Buffer) => {
-      buf += d.toString();
+    const take = (text: string) => {
+      buf += text;
       if (buf.length > LINE_MOST) buf = buf.slice(-LINE_MOST);
       let at: number;
       while ((at = buf.indexOf("\n")) >= 0) {
         line(buf.slice(0, at));
         buf = buf.slice(at + 1);
       }
-    });
+    };
+    child.stdout!.on("data", (d: Buffer) => take(out.write(d)));
     // Its errors are only read for why it stopped (a sign in, a limit): never shown or logged.
-    child.stderr!.on("data", (d: Buffer) => void (errTail = (errTail + d.toString()).slice(-4096)));
-    child.once("error", () => finish(new PcTaskError(PC_WORDS.noClaude)));
-    child.once("close", () => {
+    child.stderr!.on("data", (d: Buffer) => void (errTail = (errTail + err.write(d)).slice(-4096)));
+    child.once("error", () => end(new PcTaskError(PC_WORDS.noClaude)));
+    child.once("close", (code: number | null, sig: NodeJS.Signals | null) => {
+      take(out.end());
       line(buf);
       buf = "";
-      finish();
+      void settle(code, sig);
     });
     child.stdin!.on("error", () => {});
     child.stdin!.end(o.input);

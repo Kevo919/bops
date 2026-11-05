@@ -55,8 +55,16 @@ process.stdin.on("end", () => {
   const out = (e) => process.stdout.write(JSON.stringify(e) + "\\n");
   const sid = process.argv[process.argv.indexOf(process.argv.includes("--resume") ? "--resume" : "--session-id") + 1];
   const mode = /MODE:(\\w+)/.exec(input)?.[1] ?? "ok";
+  if (mode === "okexit1") { out({ type: "system", subtype: "init", session_id: sid, mcp_servers: [] }); out({ type: "result", subtype: "success", is_error: false, result: "Looks done" }); setTimeout(() => process.exit(1), 20); return; }
+  if (mode === "utf8") {
+    out({ type: "system", subtype: "init", session_id: sid, mcp_servers: [] });
+    const line = Buffer.from(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "Café 👍 naïve" }) + "\\n");
+    const at = line.indexOf(Buffer.from("👍")) + 2;
+    process.stdout.write(line.subarray(0, at), () => setTimeout(() => process.stdout.write(line.subarray(at)), 50));
+    return;
+  }
   if (mode === "hang") {
-    const kid = require("node:child_process").spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+    const kid = require("node:child_process").spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"], { stdio: "ignore" });
     fs.writeFileSync(path.join(process.env.HOME, "fake-claude.pids"), process.pid + " " + kid.pid);
     process.on("SIGTERM", () => {});
     setInterval(() => {}, 1000);
@@ -153,7 +161,10 @@ await test("runner choice: Claude plan by default when signed in, else the OpenA
 await test("OpenAI key path still picks the Codex executor, and its auth failure says what to do", () => {
   assert.deepEqual(runner.pickPcRunner({ choice: "openai", claude: "connected", openaiKey: true, local: true }), { runner: "openai", chosen: true });
   const said = runner.executorWords("Local executor exited with code 1 (authentication rejected).");
-  assert.match(said, /add credit to your OpenAI account/);
+  assert.match(said, /environment key made in OpenAI Platform under Agents, Environments, Keys \(Create\), in the same project as your OPENAI_API_KEY/);
+  assert.match(said, /An ordinary API key is turned down/);
+  assert.match(runner.PC_WORDS.addKey, /environment key/);
+  assert.match(runner.PC_WORDS.addKey, /An ordinary API key won't work/);
   assert.equal(runner.executorWords("Local executor exited with code 1."), "Local executor exited with code 1.");
 });
 
@@ -170,7 +181,7 @@ await test("the setting file and the OpenAI key in .env.local: kept lines, maske
   runner.saveExecutorKey(envFile, EXEC_KEY, env);
   assert.equal(readFileSync(envFile, "utf8"), `BOPS_SELF_HOSTED=1\nOTHER=x\nOPENAI_EXECUTOR_API_KEY=${EXEC_KEY}\n`);
   assert.equal(env.OPENAI_EXECUTOR_API_KEY, EXEC_KEY);
-  assert.equal(runner.maskKey(EXEC_KEY), "sk-...EEEE");
+  assert.equal(runner.maskKey(EXEC_KEY), "ends in EEEE");
   runner.saveExecutorKey(envFile, "", env);
   assert.equal(readFileSync(envFile, "utf8"), "BOPS_SELF_HOSTED=1\nOTHER=x\n");
   assert.equal(env.OPENAI_EXECUTOR_API_KEY, undefined);
@@ -196,7 +207,7 @@ await test("route: owner in the desktop window only; the key goes in, only its m
   assert.equal(saved.status, 200);
   assert.ok(!text.includes(EXEC_KEY), "the key is never sent back");
   const j = JSON.parse(text);
-  assert.deepEqual(j, { choice: "openai", runner: "openai", openaiKey: { set: true, masked: "sk-...EEEE" } });
+  assert.deepEqual(j, { choice: "openai", runner: "openai", openaiKey: { set: true, masked: "ends in EEEE" } });
   assert.ok(readFileSync(process.env.BOPS_ENV_LOCAL, "utf8").includes(`OPENAI_EXECUTOR_API_KEY=${EXEC_KEY}`));
   const bad = await route.POST(req({ method: "POST", body: JSON.stringify({ key: "hello world" }) }));
   assert.equal(bad.status, 400);
@@ -314,6 +325,9 @@ await test("failure paths: a turn that isn't signed in, at its limit, or a crash
   await assert.rejects(run("auth"), (e) => e instanceof runner.PcTaskError && e.message === runner.PC_WORDS.signIn);
   await assert.rejects(run("limit"), (e) => e.message === runner.PC_WORDS.limit);
   await assert.rejects(run("crash"), (e) => e.message === runner.PC_WORDS.signIn && !/x-api-key|Unauthorized/.test(e.message), "its own output is never shown");
+  await assert.rejects(run("okexit1"), (e) => e instanceof runner.PcTaskError && /ended with an error after it answered/.test(e.message), "a success result then exit 1 is not success");
+  const utf = await run("utf8");
+  assert.equal(utf.text, "Café 👍 naïve", "a character split across two reads stays whole");
   const denied = [];
   const r = await runner.runClaudeTurn({ cmd: cmd(), input: "MODE:denied", parse: cli.claudeDriver.parse, onEvent: () => {}, onDenied: (t) => denied.push(...t) });
   assert.deepEqual(denied, ["Bash"], "a tool that wasn't approved is said in the thread, not lost");
@@ -412,19 +426,39 @@ await test("approve tool: asks the owner through Bops for a PC task's click; nev
   cli.pcClaudeThreads.delete("ses_1");
 });
 
-await test("POSIX: Claude Code runs in its own process group, and Stop ends the whole group", { skip: process.platform === "win32" }, async () => {
-  const ac = new AbortController();
-  const started = runner.runClaudeTurn({ cmd: cmd(), input: "MODE:hang", parse: cli.claudeDriver.parse, onEvent: () => {}, signal: ac.signal });
+const alive = (p) => {
+  try {
+    process.kill(p, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+/** Start a turn whose Claude Code (the child) started a grandchild, both ignoring SIGTERM; resolve their pids. */
+async function hanging(extra) {
   const pidFile = join(home, "fake-claude.pids");
-  for (let i = 0; i < 100 && !existsSync(pidFile); i++) await new Promise((r) => setTimeout(r, 50));
-  const [pid, childPid] = readFileSync(pidFile, "utf8").trim().split(" ").map(Number);
-  ac.abort();
-  await assert.rejects(started, /Stopped by you/);
-  const alive = (p) => { try { process.kill(p, 0); return true; } catch { return false; } };
-  for (let i = 0; i < 100 && (alive(pid) || alive(childPid)); i++) await new Promise((r) => setTimeout(r, 50));
-  assert.ok(!alive(pid), "Claude Code stopped");
-  assert.ok(!alive(childPid), "what it started stopped with it");
   rmSync(pidFile, { force: true });
+  const turn = runner.runClaudeTurn({ cmd: cmd(), input: "MODE:hang", parse: cli.claudeDriver.parse, onEvent: () => {}, graceMs: 300, ...extra });
+  for (let i = 0; i < 200 && !existsSync(pidFile); i++) await new Promise((r) => setTimeout(r, 25));
+  const [child, grandchild] = readFileSync(pidFile, "utf8").trim().split(" ").map(Number);
+  assert.ok(alive(child) && alive(grandchild), "both running before Stop");
+  return { turn, child, grandchild };
+}
+
+await test("Stop waits until Claude Code and what it started are gone, then settles", { skip: process.platform === "win32" }, async () => {
+  const ac = new AbortController();
+  const h = await hanging({ signal: ac.signal });
+  ac.abort();
+  await assert.rejects(h.turn, /Stopped by you/);
+  // Checked at once, with no waiting: the turn only settled once the whole tree had exited (both ignore SIGTERM).
+  assert.ok(!alive(h.child), "Claude Code is gone when the turn settles");
+  assert.ok(!alive(h.grandchild), "its grandchild is gone when the turn settles");
+});
+
+await test("a turn that takes too long is stopped the same way before it settles", { skip: process.platform === "win32" }, async () => {
+  const h = await hanging({ timeoutMs: 400 });
+  await assert.rejects(h.turn, /took too long/);
+  assert.ok(!alive(h.child) && !alive(h.grandchild));
 });
 
 rmSync(tmp, { recursive: true, force: true });
