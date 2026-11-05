@@ -7,6 +7,8 @@ Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an indepen
 
 **Tested: 66%** (101.5 of 153 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
 
+**Visual features (Kevin, Nov 5):** a screen or visual change is only ✅ when (1) its tests pass, (2) a screenshot check passes (dark mode, no blank screens), (3) an independent review passes, and (4) it's tried in the real app on the PC.
+
 | Feature | Unit/CI | Review | Live PC | Live server | Real account / phone | Notes |
 |---|---|---|---|---|---|---|
 | Windows app starts, health check | ✅ Nov 3 codex | ✅ Nov 3 lead | ✅ Nov 4 lead (build V2Lm2…) | n/a | n/a |  |
