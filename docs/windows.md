@@ -48,6 +48,14 @@ The current repository-linked app uses these locations:
 
 Uninstalling the desktop app is not an account deletion or a deletion of cloud-hosted state. Keep backups of data you need; do not place the source checkout or personal data inside the installer's program directory.
 
+## Previews of apps on remote computers
+
+When a remote app is not reachable over Tailscale, Bops can open its preview using Windows OpenSSH Client (`%SystemRoot%\System32\OpenSSH\ssh.exe` and `ssh-keygen.exe`). The app still runs on its remote computer; this connection does not execute tasks on your Windows PC. Bops creates its own SSH key in its account data folder and restricts that key to your Windows user.
+
+On Windows, each accepted preview request gets its own SSH connection. There is no additional local forwarding port that bypasses the preview's Host check. Opening the preview does not prove SSH authentication succeeded: if the connection fails or returns no response within 20 seconds, the request gets a generic 502 error without authentication details. Closing the preview or stopping/removing its app closes its connections.
+
+If the remote computer changes its SSH address or host key after restarting, close and reopen the preview. Windows keeps the address and host-key pin fixed for the lifetime of that preview rather than automatically accepting a new endpoint.
+
 ## Validation status
 
 Local subscription sign-in is available only in the self-hosted desktop window, not the phone or hosted browser UI. Claude Code must be installed with its official native installer. Complete its automatically opened browser flow; Bops cannot accept the authorization code from a manually opened Claude sign-in URL.

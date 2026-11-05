@@ -2,9 +2,10 @@ import "server-only";
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import net from "node:net";
+import { Duplex } from "node:stream";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Carrier } from "./local-preview";
+import type { Carrier, CarrierStream } from "./local-preview";
 import { computerSsh, orgo, OrgoError } from "./orgo";
 import { userDir } from "./store";
 
@@ -23,11 +24,54 @@ import { userDir } from "./store";
  * A tunnel is /usr/bin/ssh with nothing but one forward: a socket of its own on this Mac (in a folder only this
  * user can open) to that port of the computer's loopback, no command and no other forward, none of the user's
  * ssh config, agent or known hosts.
+ *
+ * Windows uses one native OpenSSH -W stdio process per accepted preview connection, with no extra local listener.
+ * Creating the process is not readiness: the first HTTP response must arrive within 20 seconds. An authentication
+ * failure returns a fixed 502 without SSH diagnostics. The endpoint and host-key pin remain fixed for the preview;
+ * reopen it after the remote computer changes its SSH address/key. Windows does not auto-refresh those pins.
  */
 
 /** Which ssh and ssh-keygen run (overridable only for scripts/test-hosted-apps.mjs: Bops never sets them). */
-const SSH_BIN = () => process.env.BOPS_SSH_BIN || "/usr/bin/ssh";
-const KEYGEN_BIN = () => process.env.BOPS_SSH_KEYGEN_BIN || "/usr/bin/ssh-keygen";
+const windows = process.platform === "win32";
+const systemRoot = () => process.env.SystemRoot || process.env.SYSTEMROOT || "C:\\Windows";
+const SSH_BIN = () => process.env.BOPS_SSH_BIN || (windows ? join(systemRoot(), "System32", "OpenSSH", "ssh.exe") : "/usr/bin/ssh");
+const KEYGEN_BIN = () => process.env.BOPS_SSH_KEYGEN_BIN || (windows ? join(systemRoot(), "System32", "OpenSSH", "ssh-keygen.exe") : "/usr/bin/ssh-keygen");
+const nullConfig = () => windows ? "NUL" : "/dev/null";
+const sshEnv = (): NodeJS.ProcessEnv => {
+  const env: Record<string, string> = {
+    PATH: process.env.PATH ?? "/usr/bin:/bin",
+    ...(windows ? { SystemRoot: systemRoot(), WINDIR: systemRoot(), ProgramData: process.env.ProgramData || process.env.PROGRAMDATA || join(systemRoot(), "..", "ProgramData"), TEMP: tmpdir(), TMP: tmpdir() } : {}),
+  };
+  return env as NodeJS.ProcessEnv;
+};
+
+/** Only Bops-owned SSH files: Windows OpenSSH needs ACLs, not chmod's emulated mode bits. */
+async function privatePath(path: string, directory = false) {
+  if (!windows) { chmodSync(/*turbopackIgnore: true*/ path, directory ? 0o700 : 0o600); return; }
+  const script = `
+$ErrorActionPreference='Stop'
+$sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User
+$p=$env:BOPS_SSH_ACL_PATH
+$dir=$env:BOPS_SSH_ACL_DIR -eq '1'
+$acl=Get-Acl -LiteralPath $p
+if($acl.GetOwner([System.Security.Principal.SecurityIdentifier]) -ne $sid){throw "Unexpected SSH file owner"}
+$acl.SetAccessRuleProtection($true,$false)
+foreach($old in @($acl.Access)){$acl.RemoveAccessRuleSpecific($old)}
+if($dir){
+  $rule=[System.Security.AccessControl.FileSystemAccessRule]::new($sid,'FullControl','ContainerInherit,ObjectInherit','None','Allow')
+}else{
+  $rule=[System.Security.AccessControl.FileSystemAccessRule]::new($sid,'FullControl','Allow')
+}
+$acl.AddAccessRule($rule)
+if($dir){[System.IO.Directory]::SetAccessControl($p,$acl)}else{[System.IO.File]::SetAccessControl($p,$acl)}
+`;
+  await new Promise<void>((done, fail) => execFile(
+    join(systemRoot(), "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+    ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")],
+    { windowsHide: true, timeout: 15_000, env: { ...sshEnv(), BOPS_SSH_ACL_PATH: path, BOPS_SSH_ACL_DIR: directory ? "1" : "0" } },
+    (error) => error ? fail(new SshError("no-key", "Could not protect Bops' SSH files")) : done(),
+  ));
+}
 
 /** How long ssh may take to connect and open its forward before it counts as not answering. */
 const UP_MS = 20_000;
@@ -81,17 +125,18 @@ export async function sshKey(): Promise<{ dir: string; key: string; pub: string 
     pub = await made;
   }
   // (ssh refuses a private key others can read.)
-  chmodSync(/*turbopackIgnore: true*/ key, 0o600);
+  await privatePath(dir, true);
+  await privatePath(key);
   return { dir, key, pub: `${pub} bops` };
 }
 
 /** A new key pair (ed25519, no passphrase) in place of whatever half of one was there: its public key's type and body. */
 async function makeKey(dir: string, key: string): Promise<string> {
   mkdirSync(/*turbopackIgnore: true*/ dir, { recursive: true, mode: 0o700 });
-  chmodSync(/*turbopackIgnore: true*/ dir, 0o700);
+  await privatePath(dir, true);
   for (const f of [key, `${key}.pub`]) rmSync(/*turbopackIgnore: true*/ f, { force: true });
   await new Promise<void>((done, fail) =>
-    execFile(/*turbopackIgnore: true*/ KEYGEN_BIN(), ["-q", "-t", "ed25519", "-N", "", "-C", "bops", "-f", key], { timeout: 15_000 }, (e) => (e ? fail(new SshError("no-key", e.message)) : done())),
+    execFile(/*turbopackIgnore: true*/ KEYGEN_BIN(), ["-q", "-t", "ed25519", "-N", "", "-C", "bops", "-f", key], { timeout: 15_000, windowsHide: true, env: sshEnv() }, (e) => (e ? fail(new SshError("no-key", "Could not create Bops' SSH key")) : done())),
   );
   const pub = PUB.exec(readFileSync(/*turbopackIgnore: true*/ `${key}.pub`, "utf8"))?.[0];
   if (!pub || !existsSync(/*turbopackIgnore: true*/ key)) throw new SshError("no-key", "ssh-keygen made no key");
@@ -149,6 +194,7 @@ export async function sshPlace(computerId: string): Promise<SshPlace> {
   const had = existsSync(/*turbopackIgnore: true*/ knownHosts) ? readFileSync(/*turbopackIgnore: true*/ knownHosts, "utf8") : "";
   const kept = had.split("\n").filter((l) => l.trim() && l.split(" ")[0] !== name);
   writeFileSync(/*turbopackIgnore: true*/ knownHosts, `${[...kept, `${name} ${hostKey}`].join("\n")}\n`, { mode: 0o600 });
+  await privatePath(knownHosts);
   return { host, port, user, key: k.key, knownHosts };
 }
 
@@ -157,9 +203,9 @@ export async function sshPlace(computerId: string): Promise<SshPlace> {
  * pinned host key only, nothing asked of anyone, no command, that one forward, and gone once the computer stops
  * answering.
  */
-export const sshArgs = (at: SshPlace, sock: string, port: number) => [
+const identityArgs = (at: SshPlace) => [
   "-F",
-  "/dev/null",
+  nullConfig(),
   "-i",
   at.key,
   "-o",
@@ -173,7 +219,7 @@ export const sshArgs = (at: SshPlace, sock: string, port: number) => [
   "-o",
   `UserKnownHostsFile="${at.knownHosts}"`,
   "-o",
-  "GlobalKnownHostsFile=/dev/null",
+  `GlobalKnownHostsFile=${nullConfig()}`,
   "-o",
   "HostKeyAlgorithms=ssh-ed25519",
   "-o",
@@ -186,6 +232,9 @@ export const sshArgs = (at: SshPlace, sock: string, port: number) => [
   "ServerAliveCountMax=3",
   "-o",
   "ConnectTimeout=10",
+];
+export const sshArgs = (at: SshPlace, sock: string, port: number) => [
+  ...identityArgs(at),
   "-o",
   "StreamLocalBindUnlink=yes",
   "-N",
@@ -198,6 +247,78 @@ export const sshArgs = (at: SshPlace, sock: string, port: number) => [
   "--",
   at.host,
 ];
+
+/** Windows has no stream-local SSH forward. -W carries one accepted HTTP stream over stdio: no raw local port. */
+export const sshStdioArgs = (at: SshPlace, port: number) => [
+  ...identityArgs(at), "-W", `127.0.0.1:${port}`, "-p", String(at.port), "-l", at.user, "--", at.host,
+];
+
+class SshStdioStream extends Duplex {
+  private child: ChildProcess;
+  private firstResponse?: ReturnType<typeof setTimeout>;
+  private idle?: ReturnType<typeof setTimeout>;
+  private idleMs = 0;
+  private answered = false;
+  constructor(at: SshPlace, port: number) {
+    super();
+    this.child = spawn(/*turbopackIgnore: true*/ SSH_BIN(), sshStdioArgs(at, port), { stdio: ["pipe", "pipe", "pipe"], env: sshEnv(), windowsHide: true });
+    // Spawn only means writable, not authenticated/ready. No response by the deadline is a failed connection.
+    this.firstResponse = setTimeout(() => this.destroy(new Error("Its computer's SSH did not answer")), UP_MS);
+    this.child.once("spawn", () => this.emit("connect"));
+    this.child.stdout!.on("data", (data: Buffer) => {
+      this.answered = true;
+      clearTimeout(this.firstResponse);
+      this.firstResponse = undefined;
+      this.touch();
+      if (!this.push(data)) this.child.stdout!.pause();
+    });
+    this.child.stdout!.once("end", () => {
+      if (!this.answered) this.destroy(new Error("Its computer's SSH did not answer"));
+      else this.push(null);
+    });
+    this.child.stdin!.on("error", () => this.destroy(new Error("Its computer's SSH stopped")));
+    // Never expose authentication diagnostics, host addresses or provider output in an error response/log.
+    this.child.stderr!.resume();
+    this.child.once("error", () => this.destroy(new Error("Its computer's SSH could not start")));
+    this.child.once("exit", (code) => { if (code !== 0 && !this.destroyed) this.destroy(new Error("Its computer's SSH stopped")); });
+  }
+  private touch() {
+    clearTimeout(this.idle);
+    if (this.idleMs) this.idle = setTimeout(() => this.emit("timeout"), this.idleMs);
+  }
+  setTimeout(ms: number, callback?: () => void) { this.idleMs = ms; if (callback) this.once("timeout", callback); this.touch(); return this; }
+  _read() { this.child.stdout!.resume(); }
+  _write(chunk: Buffer, encoding: BufferEncoding, done: (error?: Error | null) => void) { this.touch(); this.child.stdin!.write(chunk, encoding, done); }
+  _final(done: (error?: Error | null) => void) { this.child.stdin!.end(done); }
+  _destroy(error: Error | null, done: (error?: Error | null) => void) {
+    clearTimeout(this.firstResponse); clearTimeout(this.idle);
+    this.child.stdin?.destroy(); this.child.stdout?.destroy(); this.child.stderr?.destroy();
+    if (this.child.exitCode === null && this.child.signalCode === null) {
+      this.child.kill();
+      const child = this.child;
+      setTimeout(() => { if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL"); }, 3000).unref();
+    }
+    done(error);
+  }
+}
+
+/** One child per accepted connection; closing a preview prevents new children and destroys existing ones. */
+function stdioCarrier(at: SshPlace, port: number): Carrier {
+  const streams = new Set<SshStdioStream>();
+  let closed = false;
+  return { via: "ssh", connect: () => {
+    if (closed) {
+      const ended = new Duplex({ read() {}, write(_chunk, _encoding, done) { done(new Error("Its computer's SSH is closed")); } }) as CarrierStream;
+      ended.setTimeout = () => ended;
+      process.nextTick(() => ended.destroy(new Error("Its computer's SSH is closed")));
+      return ended;
+    }
+    const stream = new SshStdioStream(at, port);
+    streams.add(stream);
+    stream.once("close", () => streams.delete(stream));
+    return stream;
+  }, close: () => { closed = true; for (const stream of streams) stream.destroy(); streams.clear(); } };
+}
 
 /** A folder for this server's tunnel sockets, only this user's (a short path: a socket's is at most 104 bytes). */
 function sockDir() {
@@ -231,6 +352,11 @@ const running = (t: Tunnel) => t.up && !!t.child && t.child.exitCode === null &&
  * meanwhile waits for the try under way. `host`: the computer's SSH address.
  */
 export async function sshTunnel(computerId: string, port: number): Promise<{ host: string; carrier: Carrier }> {
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new SshError("no-address");
+  if (windows) {
+    const at = await sshPlace(computerId);
+    return { host: at.host, carrier: stdioCarrier(at, port) };
+  }
   g.bopsSshCount = (g.bopsSshCount ?? 0) + 1;
   const t: Tunnel = { computerId, port, sock: join(/*turbopackIgnore: true*/ sockDir(), `${g.bopsSshCount}.sock`), host: "", up: false, closed: false, failures: 0 };
   try {
