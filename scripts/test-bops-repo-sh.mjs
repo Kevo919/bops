@@ -56,7 +56,7 @@ exit 0`,
   pgrep: `[ -f "$STUB_DIR/pgrep" ] && cat "$STUB_DIR/pgrep"; exit 0`,
   // The user's processes: "pgrep" a live one that won't end, "zombie" a dead one not yet reaped.
   ps: `case "$*" in
-  *stat=*) [ -f "$STUB_DIR/pgrep" ] && echo S; [ -f "$STUB_DIR/zombie" ] && echo Z ;;
+  *stat=*) [ -f "$STUB_DIR/ps-fails" ] && exit 1; echo "0 Ss"; [ -f "$STUB_DIR/pgrep" ] && echo "4242 S"; [ -f "$STUB_DIR/zombie" ] && echo "4242 Z" ;;
   *ppid=*) [ -f "$STUB_DIR/zombie" ] && echo 999999 ;;
 esac
 exit 0`,
@@ -154,12 +154,12 @@ check("stop: crontab, its own at jobs, incrontab, lingering, user manager cleare
     const r = s.run("stop", "t1", "repo-test");
     assert.match(r.out, /BOPS_REPO_STOPPED=1/, r.out);
     const c = s.calls();
-    for (const want of ["crontab -r -u repo-test", "incrontab -r -u repo-test", "atq ", "atrm 7", "atrm 9", "loginctl disable-linger repo-test", "systemctl stop user@4242.service", "pkill -TERM -u repo-test", KILLALL, "pkill -KILL -u repo-test", "ps -o stat= -u repo-test", "ps -o ppid= -u repo-test"])
+    for (const want of ["crontab -r -u repo-test", "incrontab -r -u repo-test", "atq ", "atrm 7", "atrm 9", "loginctl disable-linger repo-test", "systemctl stop user@4242.service", "pkill -TERM -u repo-test", KILLALL, "pkill -KILL -u repo-test", "ps -e -o uid=,stat=", "ps -o ppid= -u repo-test"])
       assert.ok(c.some((l) => l === want || l.startsWith(want)), `stop runs ${want}\n${c.join("\n")}`);
     assert.ok(!c.includes("atrm 8"), "another user's at job is left alone");
     assert.ok(c.indexOf(KILLALL) > c.indexOf("pkill -TERM -u repo-test"), "frozen and killed, as the user, after the TERM");
     assert.ok(c.indexOf("crontab -r -u repo-test") < c.indexOf("pkill -TERM -u repo-test"), "what it scheduled goes before its processes are ended");
-    assert.ok(c.lastIndexOf("crontab -r -u repo-test") > c.lastIndexOf("ps -o stat= -u repo-test"), "and once more after");
+    assert.ok(c.lastIndexOf("crontab -r -u repo-test") > c.lastIndexOf("ps -e -o uid=,stat="), "and once more after");
     assert.ok(!existsSync(join(s.dir, "linger", "repo-test")), "its linger file is gone");
   } finally {
     s.done();
@@ -177,8 +177,8 @@ check("stop: a process that won't end fails the stop, but only after every clean
     assert.doesNotMatch(r.out, /BOPS_REPO_STOPPED/);
     const c = s.calls();
     assert.equal(c.filter((l) => l === KILLALL).length, 10, "ten freeze-and-kill rounds");
-    assert.ok(c.lastIndexOf("crontab -r -u repo-test") > c.lastIndexOf("ps -o stat= -u repo-test"), "the second cleanup still ran");
-    assert.ok(c.lastIndexOf("atrm 9") > c.lastIndexOf("ps -o stat= -u repo-test"));
+    assert.ok(c.lastIndexOf("crontab -r -u repo-test") > c.lastIndexOf("ps -e -o uid=,stat="), "the second cleanup still ran");
+    assert.ok(c.lastIndexOf("atrm 9") > c.lastIndexOf("ps -e -o uid=,stat="));
     // A zombie (dead, not yet reaped) isn't a process left: its parent is woken, and the stop passes.
     rmSync(join(s.dir, "pgrep"));
     s.flag("zombie");
@@ -187,6 +187,48 @@ check("stop: a process that won't end fails the stop, but only after every clean
     // reset too: it fails rather than wiping src under a live process.
     const reset = s.run("reset", "t1", "repo-test");
     assert.match(reset.out, /BOPS_REPO_FAIL=procs-left/);
+  } finally {
+    s.done();
+  }
+});
+
+check("fail-closed nits: prepare ends leftovers first; stop cleans up fully even when a deny list can't be written; a failing ps is never 'none left'", () => {
+  const s = sandbox();
+  try {
+    // prepare: a leftover of an earlier run is ended before the probe and before the old HOME goes.
+    s.run("prepare", "t1", "repo-test", "-");
+    const oldHome = readFileSync(join(s.dir, "keep", "t1", "home"), "utf8").trim();
+    s.clear();
+    assert.match(s.run("prepare", "t1", "repo-test", "-").out, /BOPS_REPO_READY=1/);
+    let c = s.calls();
+    const killed = c.indexOf(KILLALL);
+    assert.ok(killed >= 0 && killed < c.findIndex((l) => l.startsWith("runuser") && l.includes("python3")), "killed before the probe");
+    assert.ok(!existsSync(oldHome), "then the old HOME went");
+    const home2 = readFileSync(join(s.dir, "keep", "t1", "home"), "utf8").trim();
+    s.flag("pgrep");
+    s.clear();
+    const stuck = s.run("prepare", "t1", "repo-test", "-");
+    assert.match(stuck.out, /BOPS_REPO_FAIL=procs-left/);
+    assert.ok(existsSync(home2), "a process that won't end: its HOME is left, nothing deleted under it");
+    assert.ok(!s.calls().some((l) => l.includes("python3")), "and no probe ran");
+    rmSync(join(s.dir, "pgrep"));
+    // stop: cron.deny can't be written (a folder in its place): every cleanup step still runs, then it fails.
+    rmSync(join(s.dir, "etc", "cron.deny"));
+    mkdirSync(join(s.dir, "etc", "cron.deny"));
+    s.clear();
+    const r = s.run("stop", "t1", "repo-test");
+    assert.match(r.out, /BOPS_REPO_FAIL=no-deny/, r.out);
+    assert.doesNotMatch(r.out, /BOPS_REPO_STOPPED/);
+    c = s.calls();
+    for (const want of ["crontab -r -u repo-test", "atrm 7", "pkill -TERM -u repo-test", KILLALL, "systemctl stop user@4242.service"]) assert.ok(c.includes(want), `still ran ${want}`);
+    rmSync(join(s.dir, "etc", "cron.deny"), { recursive: true });
+    // ps failing: the count is unknown, so the stop fails (procs-left), after every cleanup step.
+    s.flag("ps-fails");
+    s.clear();
+    const p = s.run("stop", "t1", "repo-test");
+    assert.match(p.out, /BOPS_REPO_FAIL=procs-left/);
+    assert.match(Buffer.from(p.out.match(/BOPS_REPO_WHY=(\S+)/)[1], "base64").toString("utf8"), /couldn't be counted/);
+    assert.ok(s.calls().lastIndexOf("crontab -r -u repo-test") > s.calls().lastIndexOf(KILLALL));
   } finally {
     s.done();
   }

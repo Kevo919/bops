@@ -159,8 +159,16 @@ unschedule() { # <user>
 # until none is left. Returns 1 (LEFT=<n>) when some wouldn't end: the caller still cleans up, then fails.
 # A dead one waiting to be reaped (a zombie) runs nothing and isn't counted; its parent (runuser, root's,
 # which stops itself when its child is stopped) is woken so it reaps it and ends.
+# Counted from every process on the computer (ps -e always lists some): if ps fails or lists nothing,
+# the count is "?", never 0, so a check that couldn't look fails closed.
 LEFT=0
-live_procs() { ps -o stat= -u "$1" 2>/dev/null | grep -vc '^Z'; }
+live_procs() { # <user>
+  local uid out
+  uid=$(id -u "$1" 2>/dev/null) || { echo "?"; return; }
+  out=$(ps -e -o uid=,stat= 2>/dev/null) && [ -n "$out" ] || { echo "?"; return; }
+  printf '%s\n' "$out" | awk -v u="$uid" '$1 == u && $2 !~ /^Z/ { n++ } END { print n + 0 }'
+}
+left_why() { [ "$LEFT" = "?" ] && echo "Its processes couldn't be counted (ps failed), so Bops can't say they all ended." || echo "$LEFT of its processes wouldn't end."; }
 kill_all() { # <user>
   local u=$1 i pp
   LEFT=0
@@ -295,6 +303,9 @@ case "$CMD" in
     [ "$(id -u "$U")" != 0 ] || fail no-user
     deny_schedule "$U"
     unschedule "$U"
+    # Anything left of an earlier run ends before the probe and before its old HOME goes.
+    kill_all "$U" || { unschedule "$U"; fail procs-left "$(left_why)"; }
+    unschedule "$U"
     mkdir -p "$BASE" && chown root:root "$BASE" && chmod 711 "$BASE"
     mkdir -p "$DIR" && chown "$U:$U" "$DIR" && chmod 700 "$DIR"
     # A fresh HOME for this run: the old one goes.
@@ -311,7 +322,7 @@ case "$CMD" in
   reset)
     U=${3:-}; user_ok "$U"
     unschedule "$U"
-    kill_all "$U" || { unschedule "$U"; fail procs-left "$LEFT of its processes wouldn't end."; }
+    kill_all "$U" || { unschedule "$U"; fail procs-left "$(left_why)"; }
     unschedule "$U"
     # src is in the user's folder: made new (never through a link left there), then given to it.
     rm -rf -- "$SRC" && mkdir -m 700 -- "$SRC" && [ -d "$SRC" ] && [ ! -L "$SRC" ] && chown -h "$U:$U" "$SRC" || fail reset
@@ -386,6 +397,7 @@ case "$CMD" in
     U=${3:-}; user_ok "$U"
     if id "$U" >/dev/null 2>&1; then deny_schedule "$U"; unschedule "$U"; fi
     n=0; id "$U" >/dev/null 2>&1 && n=$(live_procs "$U")
+    [ "$n" = "?" ] && n=1 # couldn't count: not said to have stopped by itself
     echo "BOPS_REPO_STATUS procs=$n"
     tail_of "$K/run.log"
     ;;
@@ -394,12 +406,14 @@ case "$CMD" in
     # What it scheduled first (so nothing starts again while it's being ended), then its processes,
     # then once more (a process ended mid-way may have left a crontab behind).
     # Every step runs whatever happens: a process that wouldn't end fails the stop only at the end.
-    ok=1
-    if id "$U" >/dev/null 2>&1; then deny_schedule "$U"; fi
+    # (deny_schedule runs in a subshell: a deny list it can't write fails the stop at the end, not here.)
+    ok=1 denied=""
+    if id "$U" >/dev/null 2>&1; then denied=$(deny_schedule "$U"); fi
     unschedule "$U"
     kill_all "$U" || ok=0
     unschedule "$U"
-    [ "$ok" = 1 ] || fail procs-left "$LEFT of its processes wouldn't end."
+    [ "$ok" = 1 ] || fail procs-left "$(left_why)"
+    case "$denied" in *BOPS_REPO_FAIL=*) printf '%s\n' "$denied"; exit 1 ;; esac
     echo "BOPS_REPO_STOPPED=1"
     ;;
   sweep)
