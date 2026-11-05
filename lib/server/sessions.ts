@@ -3089,7 +3089,7 @@ async function run(sessionId: string) {
   const mac = onMac || s.host === "mac";
   // Full access on this Mac (MacState.fullAccess): its executor runs outside the sandbox, with a shell, the user's files and apps.
   const full = mac && fullAccessOn();
-  const port = onMac ? macTaskPort(getState().bots.indexOf(b), s.macScreen ?? 0) : cdpPort(getState().bots.indexOf(b), display);
+  let port = onMac ? macTaskPort(getState().bots.indexOf(b), s.macScreen ?? 0) : cdpPort(getState().bots.indexOf(b), display);
   // On the Mac, a folder of the task's own, under the signed-in user's (local.ts taskDir): the only place
   // its executor can write (executorCommand). Kept from here, so the one it made is the one removed at
   // the end, even when the user has signed out meanwhile.
@@ -3139,7 +3139,8 @@ async function run(sessionId: string) {
     // Out of AI credit: it doesn't start (the chat shows that, with Upgrade). A brain's run isn't on AI credit, nor one on the owner's Claude plan.
     if (!brain && !pcClaude && (await creditsOut())) throw outOfCreditError();
     step(sessionId, "setup", mac ? computerWords("Getting a browser ready on your Mac", process.platform) : "Getting the computer ready");
-    if (mac) await ensureChrome(b.id, port);
+    // Another app held its port: its Chrome is on another now (local.ts ensureChrome), and the browser tools go there.
+    if (mac) port = await ensureChrome(b.id, port);
     else {
       // On a computer's runner, which reads the user's state now and then: they may have taken this screen over on a Mac
       // of theirs since (AppState.driving). Read now, and another screen it is (or theirs once they hand it back).
@@ -4313,8 +4314,7 @@ export async function takeOverMacChrome(botId: string, macScreen: number) {
     if (working) stopSession(working.id, "Paused while you took over");
     if (working) addMessage({ chatId: working.chatId, role: "system", text: `You took over from ${bot(working.botId)?.name} · paused ${working.title}` });
   }
-  const port = macTaskPort(getState().bots.findIndex((b) => b.id === botId), macScreen);
-  await ensureChrome(botId, port);
+  const port = await ensureChrome(botId, macTaskPort(getState().bots.findIndex((b) => b.id === botId), macScreen));
   if ((await currentUrl(port)) === "about:blank") await navigate(port, "https://www.google.com");
 }
 

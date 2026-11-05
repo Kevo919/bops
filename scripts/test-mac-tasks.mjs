@@ -294,7 +294,7 @@ for (const p of sources.filter((p) => p.startsWith(join(rootPath, "components"))
 
 // The Mac is ready with the Codex CLI (to run bots' tools) and Chrome; no sign-in step, and looking ran no Codex.
 await M.checkMac();
-const chromeHere = existsSync(L.CHROME);
+const chromeHere = L.chromeExe().found;
 assert.equal(S.getState().mac.ready, chromeHere);
 assert.equal(S.getState().mac.next, chromeHere ? undefined : "chrome");
 for (const gone of ["signingIn", "signInCode", "signInError", "plan", "approvals", "alwaysApps"]) assert.ok(!(gone in S.getState().mac), `state.mac.${gone} is gone`);
