@@ -812,8 +812,8 @@ export const repoTaskTools = (owner: string, { run }: { run: boolean }) =>
     strict: true,
   }));
 
-/** Where a tool call is from: the owner's own turn or thread, the chat or thread it's in, and whether the owner said yes to this very call. */
-export type RepoToolPlace = { owner: boolean; chatId?: string; threadId?: string; approved?: boolean };
+/** Where a tool call is from: the owner's own turn or thread, the chat or thread it's in, whether the owner said yes to this very call, and the plan (AppApproval.repoPlan) that ask showed — their yes settles only that one. */
+export type RepoToolPlace = { owner: boolean; chatId?: string; threadId?: string; approved?: boolean; askedPlan?: string };
 
 /** The plan a bot's run_repo asked about, by bot and arguments: the one the owner's yes runs. */
 const pendingKey = (botId: string, a: Record<string, unknown>) => `${botId}|${String(a.repo_id ?? "")}|${String(a.url ?? "")}`;
@@ -845,9 +845,11 @@ export async function repoTool(botId: string, name: string, a: Record<string, un
     if (a.action === "stop") return await stopRepo(botId, target.repoId ?? basisOf(target).id);
     const key = pendingKey(botId, a);
     if (place.approved) {
-      // Their yes runs the plan they saw, never one made again after it (a new commit asks again).
+      // Their yes runs the plan they saw, never one made again after it (a new commit asks again): the plan the
+      // answered ask showed (place.askedPlan) is the only one it settles, so a plan made since is asked about again.
       const pending = repoState().pending?.find((x) => x.key === key);
       if (!pending) return `That approval has nothing to run anymore. Call run_repo again to ask ${owner} again.`;
+      if (pending.plan.id !== place.askedPlan) return `That approval was for an older plan, and ${owner}'s yes doesn't cover this one. Call run_repo again to show ${owner} the plan as it is now.`;
       update((s) => {
         if (s.repos) s.repos.pending = (s.repos.pending ?? []).filter((x) => x.key !== key);
       });
@@ -865,7 +867,7 @@ export async function repoTool(botId: string, name: string, a: Record<string, un
       const r = (s.repos ??= {});
       r.pending = [...(r.pending ?? []).filter((x) => x.key !== key), { key, plan, at: Date.now() }].slice(-50);
     });
-    const ask: AskSpec = { action: REPO_ASK_ACTION, resources: [`${plan.repo}@${plan.commit.slice(0, 12)}`, ...plan.ports.map((p) => `port ${p}`)], preview: planText(plan) };
+    const ask: AskSpec = { action: REPO_ASK_ACTION, resources: [`${plan.repo}@${plan.commit.slice(0, 12)}`, ...plan.ports.map((p) => `port ${p}`)], preview: planText(plan), repoPlan: plan.id };
     throw new NeedsOk(ask);
   } catch (e) {
     if (e instanceof NeedsOk) throw e;

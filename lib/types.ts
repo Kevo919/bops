@@ -2372,6 +2372,8 @@ export type AppApproval = {
    * their logins (lib/member-access.ts ownerOnlyAsk), so the card says whose ask it was.
    */
   askedFor?: string;
+  /** A repo run's ask (lib/server/repos.ts): the id of the exact plan whose text the card showed; the yes settles only that plan. */
+  repoPlan?: string;
 };
 
 /** How the user answers a request (OpenCode's reply, Codex's ReviewDecision approved / approved_for_session / denied). */
