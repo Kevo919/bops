@@ -1506,6 +1506,7 @@ function Bops({ state }: { state: AppState | null }) {
               pageId={widgetPage}
               onClose={() => setWidgetPage(null)}
               onGone={() => setWidgetPage(null)}
+              covered={!!settings || !!pageBot}
               links={{ onOpenChat: leavePages(openChat), onOpenLink: leavePages((url: string) => openWeb(url)) }}
             />
           </div>

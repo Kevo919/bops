@@ -153,7 +153,7 @@ export type WidgetLinks = {
  * A page of widgets in the main area (Home or one of the owner's): its name, Edit (add, move, resize,
  * remove, set each one up), Pin as a tab, and for a page of theirs Rename and Remove.
  */
-export function WidgetPageView({ state, pageId, onClose, onGone, links }: { state: AppState; pageId: string; onClose: () => void; onGone: () => void; links: WidgetLinks }) {
+export function WidgetPageView({ state, pageId, onClose, onGone, links, covered = false }: { state: AppState; pageId: string; onClose: () => void; onGone: () => void; links: WidgetLinks; covered?: boolean }) {
   const layout = layoutOf(state);
   const page = layout.pages.find((p) => p.id === pageId);
   const [editing, setEditing] = useState(false);
@@ -165,14 +165,15 @@ export function WidgetPageView({ state, pageId, onClose, onGone, links }: { stat
   }, [page, onGone]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
+      // Not while a page over it (Settings, a bot's page) has the key: Esc closes that one only.
+      if (e.key !== "Escape" || e.defaultPrevented || covered) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
       onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, covered]);
   if (!page) return null;
   const pinned = layout.tabs.find((t) => t.page === page.id && !t.widget);
   const act = async (ops: LayoutOp[]) => setError((await change(ops)) ?? "");

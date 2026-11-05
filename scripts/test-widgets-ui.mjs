@@ -337,7 +337,7 @@ try {
   await check("Animations in Settings, Look: Off stops the motion classes, Normal plays them", async () => {
     await p.locator('[data-page-row="home"]').click();
     await p.locator('[data-widget-page="home"]').waitFor();
-    const anim = () => p.locator(".motion-widget-in").first().evaluate((e) => getComputedStyle(e).animationName);
+    const anim = () => p.locator("[data-widget-page] .motion-widget-in").first().evaluate((e) => getComputedStyle(e).animationName);
     assert.equal(await anim(), "widget-in");
     await p.getByRole("button", { name: /team, account and settings/ }).first().click();
     await p.getByRole("menuitem", { name: "Settings", exact: true }).first().click();
@@ -352,6 +352,7 @@ try {
     assert.equal(await p.locator("[data-animation-speed]").getByRole("radio", { name: "Fast" }).isDisabled(), true, "speed waits while Off");
     await p.keyboard.press("Escape");
     await settle(p);
+    assert.equal(await p.locator('[data-widget-page="home"]').count(), 1, "Esc closed Settings only, not the page under it");
     assert.equal(await anim(), "none", "Off: the widget's arrival doesn't play");
     await look({ action: "set", look: { motion: "lively", motion_speed: "slow" } });
     await settle(p, 900);
