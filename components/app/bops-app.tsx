@@ -55,6 +55,7 @@ import { PickComputer, useSizePick } from "./computer-size";
 import { AiSubscriptionsCard, ThisMacSettings } from "./setup";
 import { TooltipLayer } from "./tooltip";
 import { LoginsPage } from "./logins";
+import { InProgress, InProgressRow } from "./in-progress";
 import { MacPreviews } from "./mac-tab";
 import { OPEN_MAC_KEY } from "./mac-pip";
 import { MacComputer } from "./mac-computer";
@@ -1975,6 +1976,21 @@ const GLYPHS: Record<SettingsPane, string> = {
   repos: "M3 3.5h4l1.2 1.5H13v7.5H3zM6 8.2l-1.3 1.3L6 10.8M10 8.2l1.3 1.3-1.3 1.3",
 };
 
+/** Widgets (being built: lib/feature-status.ts), for its placeholder in Settings' nav. */
+const WIDGETS_GLYPH = "M2.5 2.5h5v5h-5zM9.5 2.5h4v3h-4zM9.5 7.5h4v6h-4zM2.5 9.5h5v4h-5z";
+
+/** A placeholder for a feature being built (components/app/in-progress.tsx): its row, grayed, with its percent. */
+function WipCard({ id, title, hint }: { id: string; title: string; hint: string }) {
+  return (
+    <InProgress id={id} className="mx-[22px] mt-4">
+      <div className="rounded-[14px] bg-white px-3.5 py-3 shadow-[0_0_0_1px_#E6E6E3]">
+        <div className="pr-12 text-[13px] font-semibold leading-4">{title}</div>
+        <div className="text-[12px] leading-4 text-[#6B6B6B]">{hint}</div>
+      </div>
+    </InProgress>
+  );
+}
+
 /** A pane's title and what it's for, above what it holds. */
 function PaneHead({ title, sub }: { title: string; sub?: string }) {
   return (
@@ -2335,6 +2351,8 @@ export function Settings({
       <>
         <PaneHead title={computerWords("This Mac")} sub="Permissions here, where your bots work, and their computers." />
         <ThisMacSettings state={state} />
+        {/* Being built (lib/feature-status.ts, PR #80): a placeholder until its own row lands. */}
+        <WipCard id="pc-tasks-claude-plan" title={computerWords("Bot tasks on this Mac")} hint="Your bots run tasks right on this computer, on your Claude plan." />
         <WhereBotsWork state={state} />
         {/* Bots in browsers on this Mac have no computer to run routines on; a self-hosted Bops has no Bops Cloud for a runner to share the state through. */}
         {!selfHosted && state.host !== "mac" && <RunsOnSettings state={state} />}
@@ -2411,6 +2429,8 @@ export function Settings({
         </div>
         {group("Account", "Yours, in every workspace", account)}
         {group("Workspace", shared ? "Shared with you" : "Shared with its people", workspace, switcher)}
+        {/* Being built (lib/feature-status.ts): a placeholder, grayed with its percent, until feature/widgets-by-chat lands. */}
+        {!shared && <InProgressRow id="widgets-by-chat" name="Widgets" icon={glyph(WIDGETS_GLYPH)} className="h-[30px] text-[13px] text-[#3A3A38] max-md:h-11 max-md:text-[15px]" />}
         {team_.length > 0 && group("Orgo team only", null, team_)}
       </nav>
       <main data-settings-pane={pane} className={`${narrow && listing ? "hidden" : "flex"} min-h-0 min-w-0 flex-1 flex-col ${framed ? "" : "overflow-y-auto pb-8"}`}>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { InProgress } from "./in-progress";
 import { useComputerWords } from "./computer-words";
 import { levelOf as memberLevelOf } from "@/lib/member-access";
 import {
@@ -277,6 +278,15 @@ export function LoginsPage({
           )}
 
           <Connecting state={state} />
+          {/* Being built (lib/feature-status.ts): a placeholder, grayed with its percent, until feature/composio-for-you lands. */}
+          {!shared && (
+            <InProgress id="composio-for-you">
+              <div className="rounded-2xl px-3.5 py-3 shadow-[0_0_0_1px_#ECECEA]">
+                <div className="pr-12 text-[13.5px] font-semibold leading-[18px]">Composio (your account)</div>
+                <div className="text-[12px] leading-4 text-[#6B6B6B]">Your own Composio account, for the apps your bots use.</div>
+              </div>
+            </InProgress>
+          )}
           {/* Connect's An app, and Sign in again: the picker, here in the page as the login's form is. */}
           {picking && <AppPicker key={`${picking.app ?? ""}:${picking.replaces ?? ""}`} state={state} start={picking.app} replaces={picking.replaces} onClose={() => setPicking(null)} />}
           {editing === "new" && <LoginForm state={state} onDone={() => setEditing(null)} />}
