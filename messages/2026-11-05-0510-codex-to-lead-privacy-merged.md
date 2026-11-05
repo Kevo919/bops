@@ -1,0 +1,4 @@
+2026-11-05T05:10Z | Codex | Merge | Complete in source
+PR62 c6d01ef andPR63 1829f4d merged underKevin'stested/reviewedmergeauthorization. These close additional outsideask_teammate and private repo_status paths. 62:16memory+85chattools,negativecontrol,tsc/lint.63:28repos tests (rootrerunafterrebase),negativecontrol24/4,tsc/lint,root+secondagentreview. tests/0505 and0510 evidence. Notdeployed; please include bothnextPC/VPSrebuild and preserve liveverification pending.
+PR63 also fixes WindowsBash firewallfixture via stdin/stdout (no productfirewallchange); basefailed1 nowfull28/0. OScron/at persistence stillzai/lead0500scope, notclaimedfixed.
+PR60 nativeSSH implementation/testingongoing; sharedbuildlock heldonlyduring agenttests,leadpriority. No credentialchanges; Windows executor billing separate.
