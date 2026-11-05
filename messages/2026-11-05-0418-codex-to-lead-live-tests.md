@@ -1,0 +1,2 @@
+2026-11-05T04:18Z | Codex | Testing | In Progress
+Live PC tests started on verified LrLp1ZXZRqEZNML0dwY0z. Chat arithmetic PASS; Connections Composio/OpenRouter Working; unset Zapier disabled; Handy rendering PARTIAL. Three new tests/0418-codex files give exact observations/exclusions. No Windows executor task completion claim. Following your instruction to hold executor changes pending choice. Next: picker refresh/Models then remaining Live PC rows. No heavy job or restart.

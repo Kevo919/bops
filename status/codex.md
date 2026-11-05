@@ -1,32 +1,20 @@
 # Codex status
-Updated 2026-11-05T03:15Z. Build IN PROGRESS; PC HOLD lifted. Hourly automation bops-hourly-build-check remains active.
+Updated 2026-11-05T04:18Z. Build IN PROGRESS. Hourly automation active; PC HOLD lifted per latest lead messages.
 
-## Current blocker: Windows task execution
-Actual bounded Windows task failed before tools. Executor registration returned 403 missing api.agents.environments.connect. Models-list HTTP 200 does not verify this permission. Official OpenAI environment documentation requires a dedicated environment key, with application/executor keys belonging to the same owner, organization and project. Do not simply broaden an ordinary API key.
+## Current assignment
+Live PC column of TESTS.md, per lead 0330/0416/0420. Executor configuration is now explicitly waiting on Kevin's choice and lead's word; do not change it.
 
-Kevin authorized help configuring this. OpenAI Platform was signed out at last UI observation; sign-in was handed to Kevin. No response confirming completion received. No key created, replaced, printed or permissions changed this run. Next: inspect the existing environment-key setup after login, configure the correct credential, then repeat the bounded Windows task and verify actual completion.
+## This run: verified on rebuilt PC
+Health build LrLp1ZXZRqEZNML0dwY0z. Native Bops chat answered 17 times 23 = 391. Keys Composio check passed. Connections Composio and OpenRouter checks both Working; unset Zapier correctly disabled. Handy card rendered with Windows guidance. Separate tests/2026-11-05-0418-codex-{chat,connections,handy}.md record exact scope and exclusions.
 
-## Verified complete
-- Claude Code 2 cloud Max-plan sign-in confirmed by live Bops UI in preceding interactive work. This is separate from the Windows executor credential; stale earlier signin-blocker text is superseded.
-- PC health checked previously (2026-11-04T22:10Z): build P_S193HxhsD_-o438kaUj matches disk. Existing production build remains responsive; no task-completion claim.
-- PR49 Windows task-card wording previously verified. Historical chat text retained.
-- REA native analysis, JADX, WABT, apktool and SDK ADB checks passed previously; Harness Ghidra availability verified. Evidence: %TEMP%/rea-verify-20261103/VERIFICATION.md. No attached-phone test.
+## Concrete next checks
+Continue model-picker refresh and Models presets/accounts/Auto Router; then Repos approval flow, SOUL/MEMORY, cron, away setting, allow-for-thread, make_doc download, goals, MCP, Look, fresh installer. None of these full feature rows is claimed complete by this run. Preserve existing models, user data and provider configuration. UI left at Settings > This PC, Connections/Voice typing area.
 
-## Remaining work and coordination
-- VPS deployment remains older 0d9eea3 at last check; not refreshed or deployed this run.
-- Docker recipe verification remains deferred; no heavy jobs or foreign processes started/stopped.
-- Zai reports task31 / PR51 merged at f39a386, with an Actions trigger gap documented. This is board-reported, not independently CI-verified. No new codex/all instruction found. GitHub CLI is signed out here; its PR query could not run. No merges attempted.
-- Preserve dirty config/llms.yaml. Lead reviews/merges; no merges this run.
+## Blockers and ownership
+Executor still fails known environment authorization; cloud Claude signin previously confirmed separately. Lead owns PC/VPS rebuilds and merges; zai owns assigned review fixes/server verification. No heavy jobs, code edits, credential changes or service restarts this run.
 
 ## Needs Kevin
-Pending the already-requested OpenAI Platform sign-in to inspect/configure the environment key. No repeated request sent this heartbeat.
+Existing executor-choice and Actions requests remain with lead; no repeated question sent. Account-specific Gmail/Zapier tests need their connections, not just a working Composio key.
 
 ## Handoff
-Latest board fetched and read; health passed. No code changes, new builds or credential modifications. Continue executor authorization before claiming Windows end-to-end acceptance. Hourly log: %LOCALAPPDATA%/Bops-team/codex-hourly.log; only this run's lock released on exit.
-
-
-Latest coordination: zai reports PR44/45/40 merged and owns PR35/38 verification. Those changes are not claimed deployed on this PC: health remains P_S193HxhsD_-o438kaUj. No new codex/all message or executor-login confirmation. Avoid concurrent test matrices while zai verifies.
-
-
-2026-11-05T03:15Z coordination supersedes earlier merge notes: lead is back, reports zero open PRs and cron replacement PR52 merged at af98afe. Lead owns PC/VPS rebuilds and build lock. Codex retains executor environment-key setup after the existing OpenAI login handoff. No build, service restart, merge or credential change this run. No new sign-in confirmation received. CI outage is already escalated by lead; do not claim local checks are CI.
-
+Evidence pushed on team; lead updates TESTS.md. Hourly log in %LOCALAPPDATA%/Bops-team/codex-hourly.log. Release only own hourly lock at exit.
