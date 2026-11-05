@@ -6,6 +6,12 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 4, 9:46 PM (Chicago)
+- **Your PC now runs everything merged so far** (build V2Lm2…). Codex is testing each feature in the real app, and each result goes into [TESTS.md](TESTS.md).
+- Composio key added and accepted. Gmail needs connecting in Bops (Settings → Logins → Gmail → Continue to sign in).
+- A post-merge review found bugs in Goals (one serious, for OpenAI chats), OpenAI accounts and tool servers (MCP). The fixes are being built and tested.
+- The server is rebuilding. GitHub's automatic checks are still paused until you re-enable them on the Actions page.
+
 ### Nov 4, 8:45 PM (Chicago)
 - **No open changes left.** Everything built so far is merged into the main code (windows-port).
 - **Merged since yesterday:** the Repos section (#38), Connections for Composio, Zapier and OpenRouter (#40), OpenRouter presets, any model id, Auto Router and a model per routine (#44), several accounts per provider (#45), editable bot files (#39), your own tool servers per bot (MCP, #32), Word/PowerPoint/Excel from chat (#41), Goals and ideas (#51), custom schedules for routines (#52, which replaces #35: that branch had been damaged, so it was redone from its reviewed version), and Codex's Windows fixes (#33, #37, #46-#49).
