@@ -10,7 +10,7 @@ import { OpenSettings } from "./open-settings";
 import { you } from "@/lib/shared";
 
 type Fact = { id: string; text: string; private: boolean; at?: number; source?: string };
-type Data = { workspace: string; ws: string; own?: boolean; card: Fact[]; facts: Fact[]; error?: string; unreachable?: boolean; off?: boolean };
+type Data = { workspace: string; ws: string; own?: boolean; card: Fact[]; facts: Fact[]; error?: string; unreachable?: boolean; refused?: boolean; off?: boolean };
 /** The bot whose own memory the tab shows (it keeps its memory to itself: lib/chain.ts), so a change goes to its own bank. */
 const OwnMemoryOf = createContext<string | undefined>(undefined);
 /** Each bot's Memory tab as last loaded, so opening it again is instant (then it refreshes). */
@@ -36,7 +36,8 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
     setDataFor(b.id);
     setData(seen.get(b.id) ?? null);
   }
-  const [results, setResults] = useState<Fact[] | null>(null);
+  // A search's answer: null before one, "down" while the service can't be reached or refused (D2), else the facts.
+  const [results, setResults] = useState<Fact[] | "down" | null>(null);
   const [mine, setMine] = useState(false);
   const [tick, setTick] = useState(0);
   const [asking, setAsking] = useState(false);
@@ -73,7 +74,7 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
     let gone = false;
     void fetch(`/api/memory?${new URLSearchParams({ bot: b.id, q: query })}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((j: Data) => !gone && setResults(j.facts ?? []))
+      .then((j: Data) => !gone && setResults(j.unreachable || j.refused ? "down" : (j.facts ?? [])))
       .catch(() => {});
     return () => {
       gone = true;
@@ -195,6 +196,8 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
           <Section title="Matches">
             {!results ? (
               <Quiet>Looking…</Quiet>
+            ) : results === "down" ? (
+              <Quiet>Can&rsquo;t reach the memory service right now &mdash; try again in a moment.</Quiet>
             ) : results.length ? (
               <FactList ws={data?.ws ?? ""} facts={results} onChange={reload} />
             ) : (
@@ -204,6 +207,8 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
         </div>
       ) : !data ? (
         <Quiet>Loading…</Quiet>
+      ) : data.refused ? (
+        <Quiet>Memory&rsquo;s service refused this key. Check the memory key in Settings &mdash; trying again won&rsquo;t fix a refused key.</Quiet>
       ) : data.unreachable ? (
         <Quiet>Can&rsquo;t reach the memory service right now. It&rsquo;s set up, but it didn&rsquo;t answer &mdash; try again in a moment.</Quiet>
       ) : data.error ? (

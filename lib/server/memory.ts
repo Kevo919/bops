@@ -869,7 +869,16 @@ export function shareMemory(ws: string, from: string | null) {
 export async function memoryInfo(ws: string) {
   const b = bindingOf(ws);
   const sharedWith = (getState().workspaces ?? []).filter((w) => w.id !== ws && bindingOf(w.id).bank === b.bank).map((w) => ({ id: w.id, name: w.name }));
-  const lines = on() ? await within(card(b).catch(() => []), 8000) : [];
+  // An outage is an outage, not an empty memory (the 1158 review's D1): card() rejecting - or its read
+  // running out of time - while memory is on throws, so the route says can't-reach instead of the sheet
+  // drawing a normal, empty card. Memory off keeps today's plain empty.
+  let cardDown: unknown = false;
+  const lines = on() ? await within(card(b).catch((e: unknown) => { cardDown = e ?? true; return []; }), 8000) : [];
+  if (on() && (cardDown !== false || lines === null)) {
+    // The service's own error goes through as-is (a refused key stays a refused key; the route
+    // classifies it). Only a timeout gets the plain words.
+    throw cardDown !== false && cardDown !== true ? (cardDown as Error) : new Error("The memory service didn't answer.");
+  }
   const ok = new Set(lines ? await shareable(lines) : []);
   return {
     on: on(),
@@ -931,7 +940,9 @@ export async function memoryFor(botId: string, opts: { q?: string; mine?: boolea
   else if (mine) raw = mine.size ? ((await bankFor(b).client.conclusions.list({ size: 100, filters: { observer_id: b.peer, observed_id: b.peer, session_id: { in: [...mine] } } })).items as Raw[]) : [];
   else raw = (await p.conclusions.list({ size: 100 })).items as Raw[];
   const facts = (await worthShowing(raw.map((c) => ({ id: c.id, text: c.content, at: Date.parse(c.createdAt) || 0, source: sourceOf(c.sessionId) })))).slice(0, 40);
-  const lines = opts.q || mine ? [] : await card(b).catch(() => [] as string[]);
+  // A card failure here is an outage like anywhere else (the 1945 review's #4 route test caught it):
+  // let it throw, so the route says can't-reach / refused instead of a normal-looking empty tab.
+  const lines = opts.q || mine ? [] : await card(b);
   const ok = new Set(await shareable([...lines, ...facts.map((f) => f.text)]));
   return {
     workspace: getState().workspaces?.find((w) => w.id === ws)?.name ?? "this workspace",

@@ -7,6 +7,7 @@ import { currentWorkspace, post } from "./ui";
 type Info = {
   on: boolean;
   unreachable?: boolean;
+  refused?: boolean;
   error?: string;
   bank: string;
   own: boolean;
@@ -81,6 +82,8 @@ export function MemorySheet({ state, onClose }: { state: AppState; onClose: () =
         <div className="flex flex-col gap-5 px-5 pb-5">
           {!info ? (
             <div className="py-6 text-center text-[13px] text-[color:var(--ht-9a9a98)]">Loading…</div>
+          ) : info.refused ? (
+            <div className="py-6 text-center text-[13px] text-[color:var(--ht-b42318)]">Memory&rsquo;s service refused this key. Check the memory key in Settings &rarr; Services &mdash; trying again won&rsquo;t fix a refused key.</div>
           ) : info.unreachable ? (
             <div className="py-6 text-center text-[13px] text-[color:var(--ht-9a9a98)]">Can&rsquo;t reach the memory service right now. It&rsquo;s set up, but it didn&rsquo;t answer &mdash; try again in a moment.</div>
           ) : !info.on ? (

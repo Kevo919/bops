@@ -24,8 +24,23 @@ export async function GET(request: Request) {
     return Response.json(await memoryInfo(u.get("ws") ?? currentWorkspaceId()));
   } catch (e) {
     // Memory is on but its service wouldn't answer: a different thing from off, and the sheet must say so
-    // ("can't reach") instead of falling back to "isn't on" (the error's JSON has no `on` field).
-    if (memoryOn()) return Response.json({ unreachable: true, error: (e as Error).message }, { status: 503 });
+    // ("can't reach") instead of falling back to "isn't on". A refused key is its own state (the 1158
+    // review's D3, and the 1945 review's #3): decided by the HTTP status the call returned (err.status)
+    // or the SDK's own error names - never by matching message text, which matches ports and ids too. A
+    // code bug (anything else) stays a plain 500, not a 503 that says "try again". The service's own
+    // message stays on the server log, redacted, never the body (D4).
+    if (memoryOn()) {
+      const err = e as { status?: number; name?: string; message?: string };
+      const refused = err.status === 401 || err.status === 403 || err.name === "AuthenticationError" || err.name === "PermissionDeniedError";
+      console.warn(`[memory] ${refused ? "refused" : "unreachable"}: ${String(err.message ?? "").replace(/[A-Za-z0-9_-]{20,}/g, "[redacted]").slice(0, 200)}`);
+      // 503 only for a genuine outage: a network failure (fetch's TypeError, the SDK's own
+      // ConnectionError/TimeoutError), or the card read timing out - the same shapes D1's throw covers.
+      // Everything else is 500.
+      const outage =
+        !refused &&
+        (err.name === "TypeError" || err.name === "ConnectionError" || err.name === "TimeoutError" || err.message === "The memory service didn't answer." || /fetch failed|network|timeout|ECONN|ENOTFOUND|EAI_AGAIN|socket/i.test(String(err.message ?? "")));
+      return Response.json(refused ? { refused: true } : outage ? { unreachable: true } : { error: "Memory failed; this isn't an outage." }, { status: refused || outage ? 503 : 500 });
+    }
     return Response.json({ error: (e as Error).message }, { status: 500 });
   }
 }
