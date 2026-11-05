@@ -2,7 +2,7 @@
 // Windows PC (BOPS_SELF_HOSTED=1, the desktop window's token, no texting, email or memory service, no Composio key), at
 // 1280x800, against the real built app. For each screen it fails if:
 //  (a) its pane has nothing under its header: under ~20 characters of visible text, or no visible control;
-//  (b) its visible text says "undefined", "NaN", "[object Object]" or raw JSON ({"), or an error page shows;
+//  (b) its visible text says "undefined", "NaN", "[object Object]", raw JSON ({") or raw error words ("fetch failed", "Failed to fetch", ECONNREFUSED, a TypeError…), or an error page shows;
 //  (c) the page threw or logged a console error, or an /api call answered 5xx;
 // and it warns (only) when (d) a visible button is disabled with nothing near it saying why.
 // The screens: every place in Settings' nav (Account and Workspace: Profile, Plan and credit, Usage, How bots reach you,
@@ -46,7 +46,15 @@ const warnings = [];
 async function check(name, fn) {
   if (process.env.ONLY && !new RegExp(process.env.ONLY, "i").test(name)) return;
   try {
-    await fn();
+    try {
+      await fn();
+    } catch (e) {
+      // The browser's tab crashed (not the app): a new tab, and this screen once more.
+      if (!(crashed || /Target crashed|Page crashed|Target page, context or browser has been closed/.test(String(e.message ?? e)))) throw e;
+      results.push(`info ${name}: the browser's tab crashed; tried again in a new tab`);
+      await newTab();
+      await fn();
+    }
     results.push(`ok   ${name}`);
   } catch (e) {
     failed++;
@@ -220,22 +228,35 @@ await ctx.route("**/*", async (route) => {
   }
   return route.continue();
 });
-const page = await ctx.newPage();
 let seen = { errors: [], api5xx: [] };
-page.on("pageerror", (e) => seen.errors.push(`threw: ${String(e).slice(0, 200)}`));
-page.on("console", (m) => {
-  if (m.type() !== "error") return;
-  const t = m.text();
-  if (/ERR_BLOCKED_BY_CLIENT/.test(t)) return; // our own refusal of the internet, above
-  const at = m.location()?.url ? ` (${new URL(m.location().url).pathname})` : "";
-  // An app's logo is fetched from the web by the server, refused here (the preload): a 404 the page draws a letter for.
-  if (/status of 404/.test(t) && /\/api\/apps\/logo\//.test(at)) return;
-  seen.errors.push(`console: ${t.slice(0, 200)}${at}`);
-});
-page.on("response", (r) => {
-  const u = new URL(r.url());
-  if (u.pathname.startsWith("/api/") && r.status() >= 500) seen.api5xx.push(`${r.status()} ${r.request().method()} ${u.pathname}`);
-});
+/**
+ * The tab every screen is looked at in. Headless Chromium's renderer can crash on this machine (out of memory, not
+ * the app: it shows as "Target crashed" with no page error first); then a new tab takes its place, and the screen it
+ * crashed on is tried once more (check, above), so one crash doesn't fail every screen after it.
+ */
+let page;
+let crashed = false;
+async function newTab() {
+  if (page && !page.isClosed()) await page.close().catch(() => {});
+  page = await ctx.newPage();
+  crashed = false;
+  page.on("crash", () => (crashed = true));
+  page.on("pageerror", (e) => seen.errors.push(`threw: ${String(e).slice(0, 200)}`));
+  page.on("console", (m) => {
+    if (m.type() !== "error") return;
+    const t = m.text();
+    if (/ERR_BLOCKED_BY_CLIENT/.test(t)) return; // our own refusal of the internet, above
+    const at = m.location()?.url ? ` (${new URL(m.location().url).pathname})` : "";
+    // An app's logo is fetched from the web by the server, refused here (the preload): a 404 the page draws a letter for.
+    if (/status of 404/.test(t) && /\/api\/apps\/logo\//.test(at)) return;
+    seen.errors.push(`console: ${t.slice(0, 200)}${at}`);
+  });
+  page.on("response", (r) => {
+    const u = new URL(r.url());
+    if (u.pathname.startsWith("/api/") && r.status() >= 500) seen.api5xx.push(`${r.status()} ${r.request().method()} ${u.pathname}`);
+  });
+}
+await newTab();
 
 const shots = process.env.SHOTS || "/tmp/claude-0/qa-shots";
 mkdirSync(shots, { recursive: true });
@@ -264,7 +285,8 @@ const LOOK = ([sel, headSel]) => {
   const overlay = !!document.querySelector("nextjs-portal") || /Application error: a client-side exception/.test(document.body.innerText);
   return { text, under, controls: controls.length, quiet, overlay };
 };
-const BAD = [/\bundefined\b/, /\bNaN\b/, /\[object Object\]/, /\{"/];
+// Raw error words a person should never read: a fetch's own failure, a server's stack, JSON that didn't parse.
+const BAD = [/\bundefined\b/, /\bNaN\b/, /\[object Object\]/, /\{"/, /fetch failed/i, /Failed to fetch/, /NetworkError/, /ECONNREFUSED|ETIMEDOUT|ENOTFOUND/, /Internal Server Error/, /Unexpected token/, /is not valid JSON/, /\bTypeError\b/, /\bSyntaxError\b/];
 
 /** One screen, judged: what `sel` holds (past `head`), and what the page did meanwhile. */
 async function judge(name, sel, head) {
@@ -293,24 +315,65 @@ async function judge(name, sel, head) {
   assert.deepEqual(problems, [], `${name}`);
 }
 
+/** One wait, with its own timeout, failing with what it was waiting for (not just "Timeout exceeded"). */
+async function step(label, ms, fn) {
+  try {
+    return await fn(ms);
+  } catch (e) {
+    throw new Error(`waiting for ${label} (${ms} ms): ${String(e.message ?? e).split("\n")[0]}`);
+  }
+}
+
+/**
+ * The window, loaded afresh and ready: the page, the sidebar, the state's first answer, and the account button that
+ * opens Settings (no fixed sleep: each is waited for, each with its own timeout).
+ */
 async function fresh() {
   seen = { errors: [], api5xx: [] };
-  await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
-  await page.locator("aside").first().waitFor({ timeout: 30000 });
-  await page.waitForTimeout(600);
+  if (crashed || page.isClosed()) await newTab();
+  const stateRead = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/state" && r.request().method() === "GET", { timeout: 30000 }).catch(() => null);
+  await step("the page to load", 30000, (ms) => page.goto(`${BASE}/`, { waitUntil: "domcontentloaded", timeout: ms }));
+  await step("the sidebar", 30000, (ms) => page.locator("aside").first().waitFor({ state: "visible", timeout: ms }));
+  await stateRead;
+  await step("the account button", 15000, (ms) => button(/team, account and settings/, false).waitFor({ state: "visible", timeout: ms }));
+  await step("the page to settle", 10000, (ms) => page.waitForLoadState("load", { timeout: ms }));
 }
 const button = (name, exact = true) => page.getByRole("button", { name, exact }).first();
 const row = (name) => page.locator("aside button").filter({ hasText: new RegExp(`^\\s*${name}`) }).first();
+/** Settings, from the account menu: tried again (up to three times) when a click lands before the menu is ready. */
 async function openSettings() {
-  await button(/team, account and settings/, false).click();
-  await page.getByRole("menuitem", { name: "Settings", exact: true }).first().click();
-  await page.locator('nav[aria-label="Settings"]').waitFor({ state: "visible" });
+  const nav = page.locator('nav[aria-label="Settings"]');
+  for (let i = 1; ; i++) {
+    try {
+      await step("the account menu's button", 10000, (ms) => button(/team, account and settings/, false).click({ timeout: ms }));
+      await step("the account menu's Settings", 5000, (ms) => page.getByRole("menuitem", { name: "Settings", exact: true }).first().click({ timeout: ms }));
+      await step("Settings to open", 5000, (ms) => nav.waitFor({ state: "visible", timeout: ms }));
+      return;
+    } catch (e) {
+      if (i >= 3) throw new Error(`Settings didn't open after ${i} tries: ${e.message}`);
+      await page.keyboard.press("Escape").catch(() => {});
+    }
+  }
 }
 
 try {
   // ---- Settings: every place in its nav ----------------------------------------------------------------------------
   await fresh();
   await openSettings();
+  // Some places come in once their own read answers (Your phone, after /api/remote): read the nav once it has held
+  // still for a second (at most 8 seconds), not at the first paint.
+  await step("Settings' nav to settle", 8000, async (ms) => {
+    let last = -1;
+    let still = 0;
+    for (const end = Date.now() + ms; Date.now() < end; ) {
+      const n = await page.locator("[data-settings-nav]").count();
+      still = n === last ? still + 1 : 0;
+      last = n;
+      if (still >= 4) return;
+      await page.waitForTimeout(250);
+    }
+    throw new Error(`still changing (${last} places)`);
+  });
   const places = await page.locator("[data-settings-nav]").evaluateAll((els) => els.map((e) => [e.getAttribute("data-settings-nav"), e.innerText.trim().split("\n")[0]]));
   results.push(`info Settings' nav here: ${places.map(([, n]) => n).join(", ")}`);
   await check("Settings' nav names This PC (a Windows PC's words)", async () => {
@@ -320,8 +383,14 @@ try {
     await check(`Settings, ${label}`, async () => {
       await fresh();
       await openSettings();
-      await page.locator(`[data-settings-nav="${p}"]`).click();
-      await page.locator(`main[data-settings-pane="${p}"]`).waitFor({ state: "visible" });
+      // Logins reads Composio's accounts again as it opens (PATCH /api/apps): wait for that answer, and its page.
+      const synced = p === "logins" ? page.waitForResponse((r) => new URL(r.url()).pathname === "/api/apps" && r.request().method() === "PATCH", { timeout: 20000 }) : null;
+      await step(`${label} in the nav`, 10000, (ms) => page.locator(`[data-settings-nav="${p}"]`).click({ timeout: ms }));
+      await step(`the ${label} pane`, 15000, (ms) => page.locator(`main[data-settings-pane="${p}"]`).waitFor({ state: "visible", timeout: ms }));
+      if (synced) {
+        await step("the Logins page", 15000, (ms) => page.locator("[data-logins]").waitFor({ state: "visible", timeout: ms }));
+        await step("PATCH /api/apps to answer", 20000, () => synced);
+      }
       await judge(`settings-${p}`, `main[data-settings-pane="${p}"]`, "[data-pane-head]");
     });
 
@@ -330,22 +399,99 @@ try {
     await fresh();
     await openSettings();
     await page.locator('[data-settings-nav="logins"]').click();
+    await step("the Logins page", 15000, (ms) => page.locator("[data-logins]").waitFor({ state: "visible", timeout: ms }));
     await button("Connect").click();
     await page.getByRole("button", { name: /^An app/ }).click();
     await page.locator("[data-app-picker]").waitFor({ state: "visible" });
     await judge("settings-logins-connect-app", "[data-app-picker]");
   });
 
-  // How bots reach you, with neither set up: its one button goes to This PC, which says how each one stands.
-  await check("Settings, How bots reach you: its button opens This PC, which names what to add", async () => {
+  // Each "not set up yet" note opens Settings, Services at its own row, with the cursor in that row's key box.
+  const landsOn = async (id) => {
+    const pane = page.locator('main[data-settings-pane="services"]');
+    await pane.waitFor({ state: "visible" });
+    const row = pane.locator(`#service-${id}`);
+    await row.waitFor({ state: "visible" });
+    await page.waitForFunction((rid) => document.activeElement?.closest(`#service-${rid}`) != null, id, { timeout: 5000 });
+    assert.ok(await row.locator("input").first().isVisible(), `${id}: its key box is there`);
+  };
+  for (const [id, label] of [["phone", "Set up texting"], ["mail", "Set up email"]])
+    await check(`Settings, How bots reach you: "${label}" opens Services at its row`, async () => {
+      await fresh();
+      await openSettings();
+      await page.locator('[data-settings-nav="reach"]').click();
+      await page.getByRole("button", { name: label, exact: true }).click();
+      await landsOn(id);
+    });
+  await check("Settings, Email and phone: its note opens Services at texting's row", async () => {
     await fresh();
     await openSettings();
-    await page.locator('[data-settings-nav="reach"]').click();
-    await page.getByRole("button", { name: /See what's set up in This PC/ }).click();
-    const pc = page.locator('main[data-settings-pane="mac"]');
-    await pc.waitFor({ state: "visible" });
-    await pc.getByText(/Off\. Add AGENTPHONE_API_KEY/).waitFor({ state: "attached" });
-    await pc.getByText(/Off\. Add AGENTMAIL_API_KEY/).waitFor({ state: "attached" });
+    await page.locator('[data-settings-nav="email"]').click();
+    await page.locator('main[data-settings-pane="email"] [data-open-service="phone"]').first().click();
+    await landsOn("phone");
+  });
+  await check("Settings, This PC: the Phone card's Set up texting opens Services at its row", async () => {
+    await fresh();
+    await openSettings();
+    await page.locator('[data-settings-nav="mac"]').click();
+    await page.locator('main[data-settings-pane="mac"]').getByRole("button", { name: "Set up texting", exact: true }).click();
+    await landsOn("phone");
+  });
+  await check("Settings, Logins, Connect an app: Add a Composio key opens Services at its row", async () => {
+    await fresh();
+    await openSettings();
+    await page.locator('[data-settings-nav="logins"]').click();
+    await step("the Logins page", 15000, (ms) => page.locator("[data-logins]").waitFor({ state: "visible", timeout: ms }));
+    await button("Connect").click();
+    await page.getByRole("button", { name: /^An app/ }).click();
+    await page.locator("[data-app-picker] [data-open-service=apps]").click();
+    await landsOn("apps");
+  });
+  await check("Boppy's profile, Memory: Add a Honcho key opens Services at its row", async () => {
+    await fresh();
+    await row("Boppy").click();
+    await button("Boppy's profile").click();
+    await page.locator("section[data-panel]").getByRole("button", { name: /^Memory$/i }).first().click();
+    await page.locator("[data-memory-off] [data-open-service=memory]").click();
+    await landsOn("memory");
+  });
+  // Services, the whole pane at the desktop width (every row, and what isn't built yet).
+  await check("Settings, Services: every row, the whole pane", async () => {
+    await fresh();
+    await openSettings();
+    await page.locator('[data-settings-nav="services"]').click();
+    const pane = page.locator('main[data-settings-pane="services"]');
+    await pane.locator("[data-service]").first().waitFor({ state: "visible" });
+    const rows = await pane.locator("[data-service]").evaluateAll((els) => els.map((e) => e.getAttribute("data-service")));
+    assert.deepEqual(rows, ["phone", "mail", "memory", "apps", "composio-account", "zapier"]);
+    assert.ok((await pane.locator("[data-in-progress]").count()) >= 1, "what isn't built yet shows as in progress");
+    // A tall window, so one picture holds the whole pane (an element shot of a scrolling pane cuts off).
+    await page.setViewportSize({ width: 1280, height: 2300 });
+    try {
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: join(shots, "settings-services-full.png") });
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 800 });
+    }
+  });
+  // Services at a phone's width (412 wide): every row and its boxes fit, nothing scrolls sideways.
+  await check("Settings, Services at 412 wide", async () => {
+    await page.setViewportSize({ width: 412, height: 915 });
+    try {
+      await fresh();
+      await button(/team, account and settings/, false).click();
+      await page.getByRole("menuitem", { name: "Settings", exact: true }).first().click();
+      await page.locator('[data-settings-nav="services"]').click();
+      await page.locator('main[data-settings-pane="services"] [data-service]').first().waitFor({ state: "visible" });
+      await judge("settings-services-412", 'main[data-settings-pane="services"]', "[data-pane-head]");
+      const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      assert.ok(wide <= 0, `the page scrolls sideways by ${wide}px`);
+      await page.setViewportSize({ width: 412, height: 3000 });
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: join(shots, "settings-services-412-full.png") });
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 800 });
+    }
   });
 
   // How bots reach you while the server hasn't answered yet: "Checking", not a blank pane.

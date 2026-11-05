@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { OpenSettings } from "./open-settings";
 import type { AppState } from "@/lib/types";
 import type { KeyCheckResult } from "@/lib/server/key-check";
 import { InProgress } from "./in-progress";
@@ -57,6 +58,9 @@ export const CONNECTIONS: Row[] = [
   },
 ];
 
+/** The row in Settings, Services where each one's key is pasted (services.tsx), so nobody edits .env.local by hand. */
+const SERVICE_ROW: Record<string, "apps" | "composio-account" | "zapier"> = { COMPOSIO_API_KEY: "apps", COMPOSIO_MCP_URL: "composio-account", ZAPIER_MCP_URL: "zapier" };
+
 const DOT: Record<string, string> = { ok: "bg-[#12B76A]", set: "bg-[#F5B83D]", error: "bg-[#D92D20]", off: "bg-[#C9C9C6]" };
 
 /** A row's status, in plain words, and its dot. */
@@ -75,6 +79,7 @@ const light = "rounded-full px-3 py-1 text-[12px] font-medium leading-4 shadow-[
 const openLogins = () => document.querySelector<HTMLButtonElement>('[data-settings-nav="logins"]')?.click();
 
 export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> }) {
+  const openSettings = useContext(OpenSettings);
   const [rows, setRows] = useState<KeyCheckResult[] | null>(null);
   const [busy, setBusy] = useState<string | null>("refresh");
   const [error, setError] = useState<string | null>(null);
@@ -161,6 +166,11 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
               {c.more && <p className="text-[12px] text-pencil">{c.more}</p>}
               <div className="flex flex-wrap items-center gap-3 text-[12px]">
                 <a className="underline" href={c.getKey.href} target="_blank" rel="noopener noreferrer">{c.getKey.label}</a>
+                {SERVICE_ROW[c.key] && openSettings && (
+                  <button data-open-service={SERVICE_ROW[c.key]} className="underline" onClick={() => openSettings("services", { service: SERVICE_ROW[c.key] })}>
+                    Paste it in Settings, Services
+                  </button>
+                )}
                 {c.key === "COMPOSIO_API_KEY" && (
                   <button data-open-apps className="underline" onClick={openLogins}>
                     Connected apps{apps ? ` (${apps})` : ""}: add Gmail, Slack, Notion… in Logins

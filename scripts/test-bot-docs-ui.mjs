@@ -69,6 +69,8 @@ const docsOf = () => ({
 const json = (j, status = 200) => ({ ok: status < 400, status, json: async () => j });
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
+  // The tab asks whether this Bops is self-hosted (ui.tsx useSelfHosted), for what its "not set up" note says.
+  if (u.startsWith("/api/config")) return json({ selfHosted: true, platform: "win32" });
   if (u.startsWith("/api/memory")) return json({ ws: "ws_main", workspace: "Main", card: bops.pinned.map((text, i) => ({ id: `card:${i}`, text, private: false })), facts: [] });
   if (u.startsWith("/api/bots/docs")) {
     if (!init.method || init.method === "GET") return json(docsOf());
