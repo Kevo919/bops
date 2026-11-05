@@ -37,7 +37,7 @@ await check("L7: Reset asks once, at both places (the settings row and the chat'
 await check("L9: a missed Orgo read is kept, with a doubling back-off", () => {
   const s = read("lib/server/plan.ts");
   assert.ok(!/not kept, so the next look asks again/.test(s), "the old un-cache-on-null is gone");
-  assert.match(s, /keep: KEEP_MS/, "a read starts at the plain minute");
+  assert.match(s, /keep: lastWasMiss \? kept!\.keep : KEEP_MS/, "a read after misses starts where the last left off (the 1505 fix)");
   assert.match(s, /read\.keep \* 2, FAIL_KEEP_MAX_MS/, "each miss in a row doubles it, capped");
   assert.match(s, /kept\.at < kept\.keep\)/, "the cache window is the record's own keep");
 });

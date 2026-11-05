@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Bot, ScreenRead, VaultLogin } from "@/lib/types";
 import { Mascot } from "./mascot";
 import { post } from "./ui";
+import { useComputerWords } from "./computer-words";
 
 /*
  * Generative cards: native Bops UI drawn over the bot's real page when Jev reads something on it
@@ -40,6 +41,7 @@ export function SignInCard({
   onDismiss: () => void;
   vault: VaultLogin[];
 }) {
+  const computerWords = useComputerWords();
   const form = read.form!;
   // Saved logins this bot may use on this site: one tap, filled from the Keychain.
   const pageHost = host(read.url);
@@ -128,7 +130,7 @@ export function SignInCard({
           </button>
         </div>
         <span className="text-[11px] leading-[15px] text-[color:var(--ht-9a9a98)]">
-          Goes straight into the page on {b.name}&apos;s screen. {save ? "Saved logins stay in your Mac's Keychain." : "Bops doesn't keep it."} No AI sees it.
+          Goes straight into the page on {b.name}&apos;s screen. {save ? computerWords("Saved logins stay in your Mac's Keychain.") : "Bops doesn't keep it."} No AI sees it.
         </span>
       </form>
     </CardShell>

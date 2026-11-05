@@ -6,6 +6,7 @@ import { isMcp, type Service } from "@/lib/vault-services";
 import { AppLogo } from "./apps";
 import { Mascot } from "./mascot";
 import { ago, post, teamOf } from "./ui";
+import { useComputerWords } from "./computer-words";
 
 /*
  * Pieces of the Logins page (logins.tsx): a service's mark, and saved site logins (a row each, and the form that adds or
@@ -91,6 +92,7 @@ export function Badge({ children }: { children: React.ReactNode }) {
 
 /** Add a login, or change one. Secrets are write-only: an existing one shows as dots and can only be replaced. */
 export function LoginForm({ state, login, onDone }: { state: AppState; login?: VaultLogin; onDone: () => void }) {
+  const computerWords = useComputerWords();
   const [site, setSite] = useState(login?.site ?? "");
   const [username, setUsername] = useState(login?.username ?? "");
   const [password, setPassword] = useState("");
@@ -195,7 +197,7 @@ export function LoginForm({ state, login, onDone }: { state: AppState; login?: V
           Cancel
         </button>
         <span className="flex-1" />
-        <span className="text-[11.5px] leading-4 text-[color:var(--ht-9a9a98)]">Stored in your Mac&apos;s Keychain</span>
+        <span className="text-[11.5px] leading-4 text-[color:var(--ht-9a9a98)]">{computerWords("Stored in your Mac&apos;s Keychain")}</span>
       </div>
     </form>
   );

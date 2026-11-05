@@ -316,7 +316,11 @@ export async function orgoPlan({ fresh = false } = {}): Promise<OrgoPlan | null>
   const kept = g.bopsOrgoPlan;
   // Another user's key, or a computer made or deleted since: read again.
   if (!fresh && kept?.key === key && kept.changes === computerChanges() && Date.now() - kept.at < kept.keep) return kept.plan;
-  const read = { key, changes: computerChanges(), at: Date.now(), keep: KEEP_MS, plan: readPlan(key) };
+  // A read after misses for the same key and computers starts where the last one left off (the 1505
+  // review: restarting at the minute every time meant a 404ing Orgo was asked 30 times an hour, never
+  // reaching the half hour the back-off promises). A plan resets to the plain minute.
+  const lastWasMiss = kept?.key === key && kept.changes === computerChanges() && kept.keep > KEEP_MS;
+  const read = { key, changes: computerChanges(), at: Date.now(), keep: lastWasMiss ? kept!.keep : KEEP_MS, plan: readPlan(key) };
   g.bopsOrgoPlan = read;
   // A miss doubles this read's keep, up to the cap; a plan resets it. (forgetPlan, a new key and changed
   // computers read again at once, as before.)
