@@ -1,5 +1,5 @@
 import "server-only";
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 /*
@@ -19,13 +19,15 @@ export const envLocalFile = () => process.env.BOPS_ENV_LOCAL || join(/*turbopack
 /** A setting's name: capitals, digits and _ (what .env.example uses). */
 const NAME = /^[A-Z][A-Z0-9_]{1,63}$/;
 /**
- * A key's shape, loosely (no provider's prefix is assumed): key characters only. No space, newline, `=`, `#` or quote,
- * so a pasted value can never end its line, start another setting or be read back as something else.
+ * A key's shape, loosely (no provider's prefix is assumed): key characters only. No space, newline, `=`, `#`, `$` or
+ * quote, so a pasted value can never end its line, start another setting, be cut at a comment or be expanded as
+ * another variable (Next reads .env.local with dotenv-expand, which expands $NAME).
  */
 export const looksLikeKey = (v: string) => /^[A-Za-z0-9._~+/:-]{8,400}$/.test(v);
 /** A public web address (where texts arrive): https, a host, nothing that could break the line. */
 export const looksLikeHttpsUrl = (v: string) => {
-  if (!/^https:\/\/[A-Za-z0-9._~:/?&%+@!$*,;-]{3,400}$/.test(v) || v.includes("=")) return false;
+  // `=` is allowed (a query string): setEnvLocal quotes such a value. Never `$`, `#`, a quote, a space or NUL.
+  if (!/^https:\/\/[A-Za-z0-9._~:/?&%+@!*,;=-]{3,400}$/.test(v)) return false;
   try {
     return new URL(v).protocol === "https:";
   } catch {
@@ -33,9 +35,17 @@ export const looksLikeHttpsUrl = (v: string) => {
   }
 };
 
-/** How a saved key shows: never the key, only that it's there and its last four characters. */
-/** How a saved key shows: never the key; its last four characters only when it is long enough (16 or more) that they give little away, else just "saved". */
+/**
+ * How a saved key shows: never the key. Its last four characters only when it's long enough (16 or more) that four
+ * say little about it; a shorter one shows as "saved".
+ */
 export const maskKey = (v: string | undefined) => (!v ? "" : v.length >= 16 ? `ends in ${v.slice(-4)}` : "saved");
+
+/**
+ * What no saved value may hold, whatever its kind: a line break or NUL (a new line, a new setting), `$` (expanded as a
+ * variable by dotenv-expand), or a quote or backslash (which would end or escape the quotes a value with `=` gets).
+ */
+export const UNSAFE_IN_VALUE = /[\r\n\0$"'`\\]/;
 
 /** The line that sets `name` (with or without `export`), as dotenv reads it. */
 const setsName = (name: string) => new RegExp(`^\\s*(?:export\\s+)?${name}\\s*=`);
@@ -68,20 +78,32 @@ export class EnvLocalError extends Error {}
  */
 export function setEnvLocal(file: string, name: string, value: string, valid: (v: string) => boolean = looksLikeKey) {
   if (!NAME.test(name)) throw new EnvLocalError("That isn't a setting Bops knows.");
-  if (value && (!valid(value) || /[\r\n=]/.test(value))) throw new EnvLocalError("That doesn't look like a key. Paste the whole key, with no spaces.");
-  let lines: string[] = [];
+  if (value && (!valid(value) || UNSAFE_IN_VALUE.test(value))) throw new EnvLocalError("That doesn't look like a key. Paste the whole key, with no spaces.");
+  let text: string | null = null;
   try {
-    lines = readFileSync(/*turbopackIgnore: true*/ file, "utf8").split(/\r?\n/);
+    text = readFileSync(/*turbopackIgnore: true*/ file, "utf8");
+  } catch {
+    /* no file yet */
+  }
+  const lines = text === null ? [] : text.split(/\r?\n/);
+  // The file's own line endings (Windows' CRLF stays CRLF) and its permissions are kept; a new file is owner only.
+  const eol = text?.includes("\r\n") ? "\r\n" : "\n";
+  let mode = 0o600;
+  try {
+    mode = statSync(/*turbopackIgnore: true*/ file).mode & 0o777;
   } catch {
     /* no file yet */
   }
   const kept = lines.filter((l) => !setsName(name).test(l));
   while (kept.length && kept[kept.length - 1] === "") kept.pop();
-  if (value) kept.push(`${name}=${value}`);
+  // A value with `=`, `#` or a space (an address with a query string) goes in double quotes, so dotenv reads it whole
+  // and never as a comment; nothing in it can end the quotes (UNSAFE_IN_VALUE).
+  if (value) kept.push(/[=#\s]/.test(value) ? `${name}="${value}"` : `${name}=${value}`);
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
   try {
     mkdirSync(/*turbopackIgnore: true*/ dirname(file), { recursive: true });
-    writeFileSync(/*turbopackIgnore: true*/ tmp, kept.length ? `${kept.join("\n")}\n` : "", { mode: 0o600 });
+    writeFileSync(/*turbopackIgnore: true*/ tmp, kept.length ? `${kept.join(eol)}${eol}` : "", { mode });
+    chmodSync(/*turbopackIgnore: true*/ tmp, mode);
     renameSync(/*turbopackIgnore: true*/ tmp, file);
   } catch {
     // Never the file system's own message: it could name a path.

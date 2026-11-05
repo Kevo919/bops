@@ -122,6 +122,9 @@ export function proxy(request: NextRequest) {
   // Local CLI accounts belong to this desktop, never to a paired phone or hosted browser.
   if ((path === "/api/local-subscriptions" || path === "/api/pc-task-runner") && (!token || !LOOPBACK.has(hostname(host)) || request.headers.has("x-bops-remote") || request.cookies.has("bops_remote") || !fromWindow(request, token)))
     return NextResponse.json({ error: "Local subscriptions are only available in the desktop app." }, { status: 403 });
+  // Service keys (Settings, Services) are saved and checked from this desktop's window only; anyone else reads status.
+  if (path === "/api/services" && method !== "GET" && (!token || !LOOPBACK.has(hostname(host)) || request.headers.has("x-bops-remote") || request.cookies.has("bops_remote") || !fromWindow(request, token)))
+    return NextResponse.json({ error: "Only the owner can add keys, in the Bops app on this PC." }, { status: 403 });
   // Agents you run (Settings): the owner's own agents, seen and changed from this desktop's window only, by anyone's method.
   if (path === "/api/agent-instances" && (!token || !LOOPBACK.has(hostname(host)) || request.headers.has("x-bops-remote") || request.cookies.has("bops_remote") || !fromWindow(request, token)))
     return NextResponse.json({ error: "Only the owner can see and change the agents you run, in the Bops app on this PC." }, { status: 403 });

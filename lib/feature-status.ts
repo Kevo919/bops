@@ -41,6 +41,7 @@ const LIST: FeatureInProgress[] = [
   { id: "animations-setting", name: "Animations", percent: 10, left: "Choose how much the window moves: full, calm or off" },
   { id: "composio-for-you", name: "Composio (your account)", percent: 85, left: "Paste your For You address and key, then a live check", state: "testing", where: "PR #83, merged; live check left" },
   { id: "pc-tasks-claude-plan", name: "Bot tasks on this PC", percent: 85, left: "A real task on your PC", state: "testing", where: "PR #80, merged; live test left" },
+  { id: "phone-verify-codes", name: "Proving your mobile number", percent: 0, left: "Paste the Twilio Verify keys in Settings, Services; until then they go in .env.local", state: "building", where: "Services screen follow up (task 59, PR #87)" },
   { id: "agents-you-run", name: "Agents you run", percent: 70, left: "Review, then a live check: Hermes on your server and dsh on your PC", state: "testing", where: "feature/agent-instances" },
   { id: "agents-dsh-remote", name: "DeepSeek Harness on another computer", percent: 10, left: "dsh documents no task address for other apps yet: its web page needs a sign in token", where: "feature/agent-instances" },
   { id: "agents-dsh-desktop", name: "Drive the DeepSeek Harness app", percent: 5, left: "The app's window takes no outside tasks. Add its dsh.cmd as a program on this PC for now", where: "feature/agent-instances" },

@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { describeSchedule, runsADay } from "@/cloud/schedule";
 import { APP_LEVELS, appLogo, FEATURED_APPS, levelIn, type AppAccess, type AppAccount, type AppConnecting, type AppLevel, type AppState, type Bot, type LastUses, type Schedule } from "@/lib/types";
 import { CHECK_TIMES, checkerOf, isKeyApp } from "@/lib/routine-catalog";
 import { Mascot, Spinner } from "./mascot";
 import { KeyIcon } from "./screen-cards";
-import { ago, post, teamOf } from "./ui";
+import { ago, post, teamOf, useSelfHosted } from "./ui";
+import { OpenSettings } from "./open-settings";
 
 /*
  * The user's apps, in the Vault. Only what's connected is listed, one row per app (however many
@@ -51,12 +52,22 @@ function useCatalog() {
 
 /** What Connect says on a computer with no Composio: connecting apps isn't set up here, and what it takes. */
 function AppsOff() {
+  const selfHosted = useSelfHosted();
+  const openSettings = useContext(OpenSettings);
   return (
     <div data-apps-off className="flex flex-col gap-1 text-[12.5px] leading-[18px]">
       <span className="font-medium text-ink">Connecting apps isn&apos;t set up on this computer yet.</span>
       <span className="text-[#6B6B6B]">
-        To turn it on, add a Composio key (COMPOSIO_API_KEY) to the .env.local file in your Bops folder, then restart Bops. Keys and website logins work without it, and your bots can still use any app on their computer.
+        {selfHosted
+          ? "To turn it on, paste a Composio key in Settings, Services, then restart Bops."
+          : "Bops Cloud runs connected apps for you while you're signed in with Orgo, and they aren't on for your account right now."}{" "}
+        Keys and website logins work without it, and your bots can still use any app on their computer.
       </span>
+      {selfHosted && openSettings && (
+        <button data-open-service="apps" onClick={() => openSettings("services", { service: "apps" })} className="mt-1 self-start rounded-full bg-desk px-3 py-1.5 text-[12.5px] font-medium leading-4 text-ink hover:bg-rule">
+          Add a Composio key
+        </button>
+      )}
     </div>
   );
 }
@@ -558,7 +569,10 @@ export function AppPicker({ state, start, replaces, onClose }: { state: AppState
   }, [onClose]);
   // Brought into view as it opens, under the page's heading.
   const card = useRef<HTMLDivElement>(null);
-  useEffect(() => card.current?.scrollIntoView?.({ block: "nearest" }), []);
+  // (In braces: a newer Chromium's scrollIntoView returns a promise, which React would call as the cleanup on close.)
+  useEffect(() => {
+    card.current?.scrollIntoView?.({ block: "nearest" });
+  }, []);
   const info = chosen ? (apps?.find((a) => a.app === chosen) ?? { app: chosen, name: (state.accounts ?? []).find((a) => a.app === chosen)?.appName ?? chosen, tags: [], auth: "oauth" as const }) : null;
 
   return (
