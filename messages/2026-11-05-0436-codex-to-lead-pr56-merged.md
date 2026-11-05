@@ -1,0 +1,3 @@
+2026-11-05T04:36Z | Codex | Merge | Complete
+Kevin's explicit tested-merge authorization: PR56 merged at70806746d3b663674e62b5fa844be4b42d960085. Executor docs/status fix passed10focusedtests,typecheck,lint0errors, independentreview. tests/0435-codex-executor-key-check has evidence and exclusions. This is not deployed yet; lead retains rebuild ownership. Please include56 next PC/VPS build and mark fresh KeysUI test pending. No actual executor completion claimed.
+Live PC: picker refresh pass with original label restored; docx/xlsx/pptx downloads verified with XML/hashes; ppt requested1slide produced2 (minor exact-layout gap). Evidence in0430/0435 files. Score still published57 pending your reconciliation. Native execution remains user environmentkey/credit blocker.

@@ -1,20 +1,19 @@
 # Codex status
-Updated 2026-11-05T04:18Z. Build IN PROGRESS. Hourly automation active; PC HOLD lifted per latest lead messages.
+Updated2026-11-05T04:36Z. Target100; official published57% (64.5/113), awaiting lead reconciliation of new evidence. User explicitly authorizes tested/reviewed merges. Hourly check active.
 
-## Current assignment
-Live PC column of TESTS.md, per lead 0330/0416/0420. Executor configuration is now explicitly waiting on Kevin's choice and lead's word; do not change it.
+## Completed this session
+- Live PC LrLp1ZXZRqEZNML0dwY0z: chat and Connections Composio/OpenRouter checks passed.
+- Model label edit immediately reflected in chat picker without reload; original label restored. tests/0430-codex-picker-refresh.
+- Word/Excel/PowerPoint generated via chat and downloaded in desktop; ZIP XML/hashes verified. tests/0435-codex-office-download. Exact one-slide request produced2slides: partial layout, not an unqualified pass.
+- PR56 merged7080674: executor presence-only check and corrected environment-key guide. 10focusedtests,tsc,lint0errors, independentreview passed; CI stillpaused. Not deployed; lead owns rebuilds. tests/0435-codex-executor-key-check.
 
-## This run: verified on rebuilt PC
-Health build LrLp1ZXZRqEZNML0dwY0z. Native Bops chat answered 17 times 23 = 391. Keys Composio check passed. Connections Composio and OpenRouter checks both Working; unset Zapier correctly disabled. Handy card rendered with Windows guidance. Separate tests/2026-11-05-0418-codex-{chat,connections,handy}.md record exact scope and exclusions.
+## Next
+Fresh production UI verification after lead rebuild56. Continue Models presets/accounts/AutoRouter; Repos after zai securityfixes; SOUL/MEMORY; cron/away/allow-thread; goals;MCP;Look;freshinstaller. Preserve configuration and avoid duplicate ownership.
 
-## Concrete next checks
-Continue model-picker refresh and Models presets/accounts/Auto Router; then Repos approval flow, SOUL/MEMORY, cron, away setting, allow-for-thread, make_doc download, goals, MCP, Look, fresh installer. None of these full feature rows is claimed complete by this run. Preserve existing models, user data and provider configuration. UI left at Settings > This PC, Connections/Voice typing area.
+## Windows task blocker / Needs Kevin
+NativeWindows runner still requires dedicated OpenAI environment key matching applicationkey owner/org/project plus APIcredit. AskedKevin sign intoPlatform and confirmcredit; no response yet. Local subscription sign-ins are account-only, not native task support. CloudClaude signin previouslyverified; cloudtasks do not prove PCexecution. No credential changes.
+Remaining external prerequisites include Actions re-enable,Gmail/Zapier auth,Androiddevice,and real provider-account/preset cases. Board z.ai quota resetNov8 may constrain100%.
 
-## Blockers and ownership
-Executor still fails known environment authorization; cloud Claude signin previously confirmed separately. Lead owns PC/VPS rebuilds and merges; zai owns assigned review fixes/server verification. No heavy jobs, code edits, credential changes or service restarts this run.
-
-## Needs Kevin
-Existing executor-choice and Actions requests remain with lead; no repeated question sent. Account-specific Gmail/Zapier tests need their connections, not just a working Composio key.
-
-## Handoff
-Evidence pushed on team; lead updates TESTS.md. Hourly log in %LOCALAPPDATA%/Bops-team/codex-hourly.log. Release only own hourly lock at exit.
+## Estimates and logs
+Conditional active-team estimates80%=6-12h,85%=10-18h,90%=16-30h,95%=2-3workingdays;100%dependency-bound. Plan tests/0435-codex-target100-plan. These are not deadlines or verified scores.
+Lead rebuilds/score;zai #38/#39/server checks;Codex LivePC/executor. No heavy job remains owned; no restart/deploy by parent. User testfiles retained in Downloads.
