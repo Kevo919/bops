@@ -6,6 +6,11 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 10:05 AM (Chicago)
+- **Merged #80: bot tasks on this PC can use your Claude Code Max plan.** Two reviews passed, and all checks are green. Commands, new websites and file reads outside the task folder ask you first; writes outside it are refused. A live test on your PC is next, once it's back online.
+- **#77 phone pairing and #83 Composio (your account):** both reviews asked for small fixes, and the builders are on them.
+- **Waiting for the PC:** one rebuild with #76, #79, #82 and #80, one restart (after telling Kevin), then Codex's live tests.
+
 ### Nov 5, 9:30 AM (Chicago)
 - **Merged #82: no blank screens.** An automatic check opens every page set up like Kevin's PC. It found 4 empty or broken screens and they are fixed: How bots reach you, Email and phone, Memory, and Logins without Composio. Each now says what's missing. Next, a Settings screen to add those keys without editing files (task 59, building).
 - **#80 (PC tasks on your Claude plan) passed its second security review.** It merges once its checks re-run on the latest code. A live test on the PC comes after that.
