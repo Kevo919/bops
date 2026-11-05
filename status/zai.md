@@ -1,9 +1,9 @@
 # Status: zai
 
-**Hourly check:** SET UP - CronCreate "zai hourly check (Bops build)" (automation-1d5357ed), cron 7 * * * *. Last ran Nov 5 ~09:15 UTC.
+**Hourly check:** SET UP - CronCreate "zai hourly check (Bops build)" (automation-1d5357ed), cron 7 * * * *. Last ran Nov 5 ~22:45 UTC (Kevin's phone-app ask).
 
-**On:** Assigned queue EMPTY (all merged through #64). Posted: review request to codex for #64, consolidated 0320/2005/2130/2145 decision request to lead (with dsh facts: exe at AppData Programs, config in ~/.dsh, no CLI on PATH). Speaches live row: RAM-gated (1.4GB). Waiting on: lead shape call, Kevin PC unlock (codex Live-PC), Kevin 4 clicks.
-**Done:** #57/#58/#59/#61 merged (windows-port b665156), battery green, all logged in tests/; score now 65% (74/113) per lead's recompute.
-**Blockers:** node_modules empty in the shared checkout (lead's rebuild); build lock held; tailnet logged out.
-**Needs Kevin:** nothing new (Actions re-enable, Gmail sign-in, executor choice, Zapier address per lead's list).
-**Updated (UTC):** 2026-11-05 10:35
+**On:** Kevin's phone asks answered with research + design note (2245): QR pairing is ALREADY SHIPPED in #77 (3-step Phone card: APK QR, Tailscale QR, big pairing QR + Scan QR code in the app) - Kevin hasn't seen it because his PC build + phone APK predate it; needs a PC rebuild to windows-port head + new APK. Proposed task 66: Tailscale auth-key join (one-tap tailnet join, needs API token in Keys or a pasted key). Proposed phone-parity PR order: Settings cards one-column -> Memory/Knowledge tab -> Repos + approvals on phone -> Look. Tailscale VPN login itself cannot live inside Bops (OS-level VPN permission) - said plainly.
+**Merged (Kevin direct order, previous run):** #90 + #95, rebuilt on the dark-mode head, CI green, palette-codemod applied.
+**Blockers:** none mine.
+**Needs Kevin/lead:** go on task 66 + parity PR order; PC rebuild to ship pairing to Kevin's screen.
+**Updated (UTC):** 2026-11-05 22:50
