@@ -1,6 +1,7 @@
 package bot.bops.remote
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** What Scan QR code (and the camera app's link) may hand to the confirm screen: PairLink.parse. */
@@ -38,4 +39,21 @@ class PairLinkTest {
 
     @Test fun twoAddressesRefused() =
         assertEquals(PairLink.Bad(PairLink.NOT_BOPS), PairLink.parse(link("http://100.64.0.1:3210") + "&a=https%3A%2F%2Fevil.example.com"))
+
+    /** The Target server line: hidden (null) until there's a real address, never ":80". */
+    @Test fun noTargetUntilAnAddressIsTyped() {
+        assertNull(PairLink.targetOf(PairLink.entered("")))
+        assertNull(PairLink.targetOf(PairLink.entered("   ")))
+        assertNull(PairLink.targetOf(PairLink.entered("http://")))
+        assertNull(PairLink.targetOf(PairLink.entered("https://")))
+        assertNull(PairLink.targetOf(PairLink.entered("100.")))
+    }
+
+    @Test fun targetOnceTypedOrScanned() {
+        assertEquals("100.64.0.9:3210", PairLink.targetOf(PairLink.entered("100.64.0.9:3210")))
+        assertEquals("100.64.0.9:80", PairLink.targetOf(PairLink.entered("http://100.64.0.9")))
+        assertEquals("bops.example.com:443", PairLink.targetOf(PairLink.entered("https://bops.example.com/")))
+        val scanned = PairLink.parse(link("http://100.101.102.103:3210")) as PairLink.Ok
+        assertEquals("100.101.102.103:3210", PairLink.targetOf(PairLink.entered(scanned.address)))
+    }
 }

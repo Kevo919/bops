@@ -1,7 +1,9 @@
 // Tests for Settings, Your phone as a guided flow (components/app/setup.tsx PhoneCard, app/api/remote/route.ts):
 // three steps on one screen (Get the app, Tailscale, Pair), the app download as a QR code the server made, what to do
 // when this computer has no Tailscale address, a pairing QR big enough to scan at arm's length with its quiet zone,
-// and no dashes in what it shows.
+// and no dashes in what it shows. Settings has a top level Your phone place (right after How bots reach you) that opens
+// this flow, only where pairing works (the server answers /api/remote) and never in a shared workspace, and This PC no
+// longer has a second copy.
 //
 // The real route runs (its QR codes come from qrcode, as in the app) with the pairing store, the address lookup and
 // the window check stubbed: nothing is written, no network, and the code is a fake one.
@@ -53,8 +55,18 @@ process.emitWarning = (warning, ...rest) => (rest[0]?.code === "MODULE_TYPELESS_
 
 const { parseHTML } = await import("linkedom");
 const { window: win } = parseHTML("<!doctype html><html><body></body></html>");
-globalThis.window = win;
+win.HTMLElement.prototype.focus = function () {};
+win.HTMLElement.prototype.scrollIntoView = () => {};
+win.HTMLElement.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 });
+globalThis.window = globalThis;
+globalThis.addEventListener = () => {};
+globalThis.removeEventListener = () => {};
 globalThis.document = win.document;
+globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+globalThis.matchMedia = () => ({ matches: false });
+globalThis.EventSource = class {
+  close() {}
+};
 globalThis.location = { origin: "http://localhost:3210" };
 Object.defineProperty(globalThis, "navigator", { configurable: true, value: { userAgent: "test" } });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -64,14 +76,18 @@ const { createRoot } = await import("react-dom/client");
 const route = await import(pathToFileURL(`${root}/app/api/remote/route.ts`).href);
 const { APP_URL, TAILSCALE_ANDROID_URL, TAILSCALE_WINDOWS_URL } = await import(pathToFileURL(`${root}/lib/remote-links.ts`).href);
 const { PhoneCard } = await import(pathToFileURL(`${root}/components/app/setup.tsx`).href);
+const App = await import(pathToFileURL(`${root}/components/app/bops-app.tsx`).href);
 
 const TAILNET = { tailnet: ["http://100.64.0.7:3210"], home: ["http://192.168.1.20:3210"], public: null };
 const NONE = { tailnet: [], home: ["http://192.168.1.20:3210"], public: null };
 globalThis.__remote = { paired: false, addresses: TAILNET };
+// Whether this is the owner's own Bops window: when not, /api/remote says no (403), as the route's check does.
+let window_ = true;
 // The page's fetch goes straight to the real route handlers.
 globalThis.fetch = async (input, init = {}) => {
   const path = typeof input === "string" ? input : input.url;
   if (path !== "/api/remote") return new Response("{}", { status: 404 });
+  if (!window_) return new Response(JSON.stringify({ error: "A phone can only be paired in the Bops app." }), { status: 403 });
   const method = init.method ?? "GET";
   return route[method](new Request(`http://localhost:3210${path}`, { method }));
 };
@@ -220,6 +236,92 @@ await test("plain words: no dashes in anything shown, in every state", async () 
     assert.doesNotMatch(words(m.box), DASHES);
     await m.done();
   }
+});
+
+/* ---------------- Settings, Your phone ---------------- */
+
+const stateOf = (o = {}) => ({
+  account: { user: { id: "u_ava", name: "Ava Reed", email: "ava@example.test" } },
+  owner: { name: "Ava" },
+  host: "mac",
+  workspace: "ws_main",
+  workspaces: [{ id: "ws_main", name: "Main", createdAt: 1 }],
+  bots: [],
+  accounts: [],
+  vault: [],
+  brains: [],
+  chats: [],
+  sessions: [],
+  messages: [],
+  routines: [],
+  watches: [],
+  usage: [],
+  madeApps: [],
+  ...o,
+});
+const noop = () => {};
+const settings = (o = {}, props = {}) => h(App.Settings, { state: stateOf(o), onClose: noop, onShowScreen: noop, onOpenVault: noop, onOpenBot: noop, ...props });
+const navIds = (box) => [...box.querySelectorAll("[data-settings-nav]")].map((b) => b.getAttribute("data-settings-nav"));
+async function mountEl(el) {
+  const box = document.createElement("div");
+  document.body.appendChild(box);
+  const r = createRoot(box);
+  await act(async () => {
+    r.render(el);
+    await settle();
+  });
+  return { box, done: () => act(async () => r.unmount()).then(() => box.remove()) };
+}
+const press = (el) =>
+  act(async () => {
+    el.dispatchEvent(new win.Event("click", { bubbles: true, cancelable: true }));
+    await settle();
+  });
+
+await test("Settings has Your phone right after How bots reach you, and it opens the three step pairing flow", async () => {
+  window_ = true;
+  globalThis.__remote = { paired: false, addresses: TAILNET };
+  const m = await mountEl(settings());
+  const ids = navIds(m.box);
+  assert.equal(ids[ids.indexOf("reach") + 1], "phone", `Your phone right after How bots reach you: ${ids.join(", ")}`);
+  const item = m.box.querySelector('[data-settings-nav="phone"]');
+  assert.equal(item.textContent.trim(), "Your phone");
+  await press(item);
+  const main = m.box.querySelector('main[data-settings-pane="phone"]');
+  assert.ok(main, "the Your phone pane");
+  assert.match(main.textContent, /^Your phone/, "its heading first");
+  const list = main.querySelector('ol[aria-label="Set up your phone"]');
+  assert.ok(list, "the guided flow in the pane");
+  assert.equal(main.querySelector("[data-step]"), list.querySelector("[data-step]"), "the steps at the top, before anything else");
+  assert.ok([...main.querySelectorAll("button")].some((b) => b.textContent.trim() === "Pair a phone"));
+  assert.doesNotMatch(words(main), DASHES);
+  await m.done();
+});
+
+await test("This PC has no second copy of the pairing card", async () => {
+  window_ = true;
+  const m = await mountEl(settings());
+  await press(m.box.querySelector('[data-settings-nav="mac"]'));
+  const main = m.box.querySelector('main[data-settings-pane="mac"]');
+  assert.ok(main);
+  assert.equal(main.querySelector('ol[aria-label="Set up your phone"]'), null);
+  assert.ok(![...main.querySelectorAll("button")].some((b) => b.textContent.trim() === "Pair a phone"));
+  await m.done();
+});
+
+await test("no Your phone where pairing does not work: not the owner's window, or a shared workspace", async () => {
+  window_ = false;
+  let m = await mountEl(settings());
+  assert.ok(!navIds(m.box).includes("phone"), "the server said no");
+  await m.done();
+  window_ = true;
+  m = await mountEl(settings({ shared: { name: "Fernway", role: "editor" } }));
+  assert.ok(!navIds(m.box).includes("phone"), "a shared workspace");
+  await m.done();
+  // Asked to open at Your phone there anyway: it doesn't.
+  m = await mountEl(settings({ shared: { name: "Fernway", role: "editor" } }, { at: "phone" }));
+  assert.notEqual(m.box.querySelector("main[data-settings-pane]")?.getAttribute("data-settings-pane"), "phone");
+  await m.done();
 });
 
 console.log(`easy pairing: ${passed} passed`);

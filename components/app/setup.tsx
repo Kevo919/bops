@@ -639,7 +639,7 @@ export function ThisMacSettings({ state }: { state: AppState }) {
       </div>
       <Cards items={items} />
       <FullAccessCard items={items} />
-      <PhoneCard />
+      {/* Pairing the phone is its own place now, Settings, Your phone (PhoneCard): one copy of it, not two. */}
       <ModulesCard />
       <div id="settings-keys" className="scroll-mt-4">
         <KeysCard />
@@ -766,6 +766,26 @@ function Step({ n, title, done, children }: { n: number; title: string; done?: b
       </div>
     </li>
   );
+}
+
+/**
+ * Whether pairing a phone works here: /api/remote answers only the owner's own Bops window (or, on a server with no
+ * window, the same machine). Anywhere else (a paired phone, a shared workspace, a bot's browser) it's no, so Settings
+ * shows no Your phone there.
+ */
+export function usePhonePairable(ask = true) {
+  const [ok, setOk] = useState(false);
+  useEffect(() => {
+    if (!ask) return;
+    let live = true;
+    void fetch("/api/remote")
+      .then((x) => live && setOk(x.ok))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [ask]);
+  return ask && ok;
 }
 
 const link = "break-all font-medium text-ink underline underline-offset-2";

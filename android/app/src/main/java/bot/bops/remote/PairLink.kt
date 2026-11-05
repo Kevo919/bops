@@ -17,7 +17,7 @@ sealed class PairLink {
     data class Bad(val why: String) : PairLink()
 
     companion object {
-        const val NOT_BOPS = "That QR code isn't a Bops pairing code. In Bops on your computer, open Settings, then Your phone, and press Pair a phone."
+        const val NOT_BOPS = "That QR code isn't a Bops pairing code. In Bops on your computer, go to Settings, then Your phone, then Pair a phone, and scan the code it shows."
         const val NO_CODE = "That QR code has no pairing code in it. Press Pair a phone in Bops again and scan the new code."
         const val NO_ADDRESS = "That QR code has no address in it. Turn on Tailscale on your computer, then press Pair a phone in Bops again."
         const val UNSAFE = "That QR code points to an address that would send your code unencrypted. Use your computer's Tailscale address (100.x.y.z) or an https address."
@@ -43,6 +43,21 @@ sealed class PairLink {
             if (!Regex("^[A-Za-z0-9_-]{32,256}$").matches(code)) return Bad(NO_CODE)
             if (!safe(address)) return Bad(UNSAFE)
             return Ok(address, code)
+        }
+
+        /** What was typed in the Address box, as an address: http:// added when no scheme was typed. */
+        fun entered(value: String): String {
+            val raw = value.trim()
+            return ServerSafety.normalizeAddress(if (raw.startsWith("http://", true) || raw.startsWith("https://", true)) raw else "http://$raw")
+        }
+
+        /** host:port the code would go to, or null while there's no real host yet (an empty or half typed box). */
+        fun targetOf(address: String): String? {
+            val u = try { URI(address) } catch (_: Exception) { return null }
+            val scheme = u.scheme?.lowercase(Locale.ROOT)
+            if (scheme != "http" && scheme != "https") return null
+            val host = u.host?.takeIf { it.isNotBlank() && !it.startsWith(".") && !it.endsWith(".") } ?: return null
+            return "$host:${if (u.port != -1) u.port else if (scheme == "https") 443 else 80}"
         }
 
         private fun decode(s: String): String? = try { URLDecoder.decode(s, "UTF-8") } catch (_: Exception) { null }
