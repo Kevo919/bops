@@ -13,7 +13,7 @@ Plain-English status of the build, kept up to date by the lead. Last updated **2
 - Everything merged so far: [closed pull requests](https://github.com/Kevo919/bops/pulls?q=is%3Apr+is%3Amerged)
 - The Android app: [download the APK](https://github.com/Kevo919/bops/releases/download/android-latest/bops-remote.apk)
 
-## Testing target: 100% (now 67%)
+## Testing target: 100% (now 66%)
 
 The overnight ETAs for 80% slipped because the PC was locked, so Codex couldn't test in the real app. New ETAs count from when you unlock it.
 
@@ -59,9 +59,11 @@ The overnight ETAs for 80% slipped because the PC was locked, so Codex couldn't 
 - Repos section (#38), Connections (#40), OpenRouter presets, custom models, Auto Router and a model per routine (#44), several accounts per provider (#45), editable bot files (#39), your own tool servers per bot (#32), Word/PowerPoint/Excel from chat (#41), Goals and ideas (#51), custom schedules (#52)
 
 ## Next
-- Rebuild the PC and the server with today's merges
-- Get GitHub's automatic checks running again
-- Windows task runner key (needs your OpenAI Platform sign-in)
+- Phone pairing with no friction: one screen with QR codes (get the app, Tailscale, pair) and a Scan button in the phone app (building now)
+- PC bot tasks on your Claude Code Max plan, plus a Settings box for an OpenAI key for anyone who prefers it (building now)
+- Composio: use the accounts you already connected in Composio (waiting on which Composio project they're in)
+- Codex: every feature tested in the real Bops window on your PC (started now the PC is unlocked)
+- GitHub's automatic checks: you turned them back on; confirmed on the next change
 
 ## Planned (after the MVP)
 - Checking each repo recipe actually runs, in Docker
