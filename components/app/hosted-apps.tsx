@@ -108,8 +108,9 @@ export const OpenHostedApp = createContext<((ws: string, name: string) => void) 
 /** Open the task Add app started (bops-app.tsx: its thread, else its bot's chat); null where there's no window. */
 export const OpenAppTask = createContext<((a: AddAppAnswer) => void) | null>(null);
 
-/** Open Settings (bops-app.tsx), at its Domains when `at` says so; null where there's no window. */
-export const OpenSettings = createContext<((at?: "domains") => void) | null>(null);
+/** Open Settings (open-settings.ts, kept small so cards can import it without this file). */
+export { OpenSettings } from "./open-settings";
+import { OpenSettings } from "./open-settings";
 
 /** How often the list (and a running deploy's log) is read again while a deploy waits or runs. */
 const POLL_MS = 3000;

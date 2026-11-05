@@ -1,9 +1,8 @@
 import { computerWords } from "@/lib/computer-words";
 import "server-only";
-import { existsSync } from "node:fs";
 import type { MacState } from "@/lib/types";
 import { findCodex, installCodex, installStatus } from "./codex-cli";
-import { CHROME } from "./local";
+import { chromeExe } from "./local";
 import { loopHere, onPostgres } from "./persist";
 import { getState, stateReady, update } from "./store";
 
@@ -55,7 +54,7 @@ export async function checkMac() {
     const failed = installStatus()?.state === "failed" ? installStatus()?.error : undefined;
     next = "codex";
     reason = failed !== undefined ? `Couldn't install Codex. ${failed}` : "Installing Codex";
-  } else if (!existsSync(CHROME)) {
+  } else if (!chromeExe().found) {
     next = "chrome";
     reason = `Install Google Chrome so bots can work on ${here}`;
   } else ready = true;

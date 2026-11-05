@@ -51,7 +51,10 @@ export function MemorySheet({ state, onClose }: { state: AppState; onClose: () =
   const reload = useCallback(() => setTick((t) => t + 1), []);
   // Brought into view as it opens, under the line that asked for it.
   const box = useRef<HTMLElement>(null);
-  useEffect(() => box.current?.scrollIntoView?.({ block: "nearest" }), []);
+  // (In braces: a newer Chromium's scrollIntoView returns a promise, which React would call as the cleanup on close.)
+  useEffect(() => {
+    box.current?.scrollIntoView?.({ block: "nearest" });
+  }, []);
 
   return (
       <section

@@ -15,7 +15,8 @@ import { closeMirrors, mirroredTarget } from "./mirror";
 import { writeSkillFiles } from "./workspace-skills";
 import { userChrome, userHome } from "./store";
 import { bopsHome, chromeRoot } from "./user-paths";
-import { botChromesRunning, onWindows, stopBotChromes, windowsChrome, windowsChromeVersion, windowsHome, windowsUserAgent } from "./windows-host";
+import { botChromesRunning, onWindows, profileChromeRunning, stopBotChromes, windowsChromeFound, windowsChromeVersion, windowsHome, windowsUserAgent } from "./windows-host";
+import { activePort, ChromeStartError, chromeStartLog, chromeStartWords, pgrepInUse, startBotChrome } from "./chrome-start";
 
 /**
  * Local Mac host. Each bot's "screen" is its own background Chrome on the user's Mac, with its own
@@ -30,7 +31,9 @@ import { botChromesRunning, onWindows, stopBotChromes, windowsChrome, windowsChr
  * before another's bot uses its port.
  */
 
-export const CHROME = onWindows ? windowsChrome() : "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const MAC_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+/** Chrome's program and whether it's there, looked up now (one installed after Bops started counts). */
+export const chromeExe = () => (onWindows ? windowsChromeFound() : { path: MAC_CHROME, found: existsSync(MAC_CHROME) });
 /**
  * Where the signed-in user's Mac tasks keep their folders: ~/.bops/users/<id>/tasks, beside their
  * Chrome profiles' own folder (~/.bops/tasks on a self-hosted install running on its own key). Signed
@@ -75,14 +78,23 @@ const real = (p: string) => (existsSync(p) ? realpathSync(p) : p);
 /** The browser tools' package folder, at its real path: in the app, the server's node_modules links into the app bundle. */
 const nodeModules = () => real(join(process.cwd(), "node_modules"));
 
+/**
+ * A bot Chrome's port moved off its usual one, which another app held when it started (ensureChrome): the
+ * usual port, to the one it listens on. Everything that reaches that Chrome asks through cdpPort and
+ * macTaskPort, so it finds the moved one. In memory only: after a restart it tries its usual port again.
+ */
+const gm = globalThis as unknown as { bopsChromePorts?: Map<number, number> };
+const moved = (gm.bopsChromePorts ??= new Map<number, number>());
+const portOf = (usual: number) => moved.get(usual) ?? usual;
+
 /** One port per bot screen: 9300 + 10 per bot + screen index. */
-export const cdpPort = (botIndex: number, display: number) => 9300 + botIndex * 10 + DISPLAYS.indexOf(display);
+export const cdpPort = (botIndex: number, display: number) => portOf(9300 + botIndex * 10 + DISPLAYS.indexOf(display));
 
 /**
  * The port of a bot's Chrome for a task on the user's Mac (Session.macScreen 0 to 2): after its screens'
  * ports, so it never shares a Chrome with them, whether this Mac hosts the bots' screens or Orgo does.
  */
-export const macTaskPort = (botIndex: number, slot: number) => 9300 + botIndex * 10 + DISPLAYS.length + slot;
+export const macTaskPort = (botIndex: number, slot: number) => portOf(9300 + botIndex * 10 + DISPLAYS.length + slot);
 
 async function cdpUp(port: number) {
   try {
@@ -130,29 +142,59 @@ export async function quitBotChromes({ switching = true } = {}) {
   for (let i = 0; i < 20 && (await running()); i++) await new Promise((r) => setTimeout(r, 150));
 }
 
-/** Start the screen's Chrome if it isn't already running (for this user: one left running for another account closes first). */
-export async function ensureChrome(botId: string, port: number) {
+/**
+ * Whether a Chrome runs with this profile now (by its command line, as quitBotChromes finds them). Fails closed:
+ * pgrep finding none is exit 1; any other error (2 or 3, or no pgrep) reads as in use, so a lock is never removed
+ * from under a running Chrome.
+ */
+async function profileInUse(profile: string) {
+  if (onWindows) return profileChromeRunning(profile);
+  const pattern = `--user-data-dir=${profile.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( |$)`;
+  return new Promise<boolean>((r) => execFile("pgrep", ["-f", "--", pattern], (e) => r(pgrepInUse(e))));
+}
+
+/**
+ * Start the screen's Chrome if it isn't already running (for this user: one left running for another account
+ * closes first). Returns the port it answers on: `port`, or another when another app held that one (it then
+ * stays there: cdpPort and macTaskPort give it). When it can't start, the error says why in plain words
+ * (chrome-start.ts), and the server's log gets the facts: whether Chrome was found, the spawn error's code,
+ * the exit code or signal, how long it took. Never its arguments, profile, output or anything of the user's.
+ */
+export async function ensureChrome(botId: string, port: number): Promise<number> {
   // The bot's id names a folder below: only a plain id (letters, digits, _ and -) ever does.
   if (!/^[\w-]{1,80}$/.test(botId)) throw new Error("That isn't one of your bots.");
   const dir = userChrome();
   if (!dir) throw new Error("Sign in to Bops first.");
   const closes = quits();
+  // The profile keeps the port it was first made for in its name, wherever the Chrome listens now: its sign-ins stay.
+  const usual = [...moved].find(([, to]) => to === port)?.[0] ?? port;
+  const profile = join(dir, `${botId}-${usual}`);
   if (await cdpUp(port)) {
-    if (runningFor() === dir) return;
-    await quitBotChromes({ switching: false });
+    // This bot's own Chrome only: the one its profile names the port of (chrome-start.ts activePort), never another bot's on it.
+    if (runningFor() === dir && activePort(profile) === port) return port;
+    if (runningFor() !== dir) await quitBotChromes({ switching: false });
   }
   // The Chromes were closed meanwhile (a sign-out, or another account signing in): one started now
   // for this user would keep running, with their cookies, into the next account's.
   if (closes !== quits() || userChrome() !== dir) throw new Error("Bops is switching accounts.");
   mkdirSync(dir, { recursive: true });
   writeFileSync(RUNNING_FOR(), dir);
-  const profile = join(dir, `${botId}-${port}`);
   mkdirSync(profile, { recursive: true });
-  spawn(
-    CHROME,
-    [
+  const exe = chromeExe();
+  const where = computerWords("on your Mac", process.platform);
+  // A crashed Chrome's lock is cleared (only when no Chrome uses the profile), and a port another app holds gets one
+  // more try, on a port Chrome picks itself and its profile names.
+  const at = await startBotChrome({
+    exe: exe.path,
+    exeFound: exe.found,
+    port,
+    profile,
+    up: cdpUp,
+    inUse: () => profileInUse(profile),
+    note: (line) => console.warn(line),
+    args: (p) => [
       `--user-data-dir=${profile}`,
-      `--remote-debugging-port=${port}`,
+      `--remote-debugging-port=${p}`,
       "--no-first-run",
       "--no-default-browser-check",
       "--hide-crash-restore-bubble",
@@ -165,16 +207,15 @@ export async function ensureChrome(botId: string, port: number) {
       ...(process.env.BOPS_CHROME_WINDOWS ? [] : ["--headless=new", `--user-agent=${USER_AGENT}`]),
       "about:blank",
     ],
-    { detached: true, stdio: "ignore", windowsHide: true },
-  )
-    // No Chrome here: the wait below says so, rather than the server going down with it.
-    .on("error", () => {})
-    .unref();
-  for (let i = 0; i < 40; i++) {
-    if (await cdpUp(port)) return;
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  throw new Error(`Chrome on port ${port} didn't start`);
+  }).catch((e: unknown) => {
+    if (!(e instanceof ChromeStartError)) throw e;
+    // The facts only (chrome-start.ts chromeStartLog), and the thread gets the plain words.
+    console.warn(chromeStartLog(e.facts));
+    throw new Error(chromeStartWords(e.facts, where));
+  });
+  if (at === usual) moved.delete(usual);
+  else moved.set(usual, at);
+  return at;
 }
 
 /**

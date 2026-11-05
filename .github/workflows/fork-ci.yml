@@ -80,6 +80,8 @@ jobs:
         run: node scripts/test-connections-ui.mjs
       - name: Composio (your account) tests (For You MCP)
         run: node --conditions=react-server scripts/test-composio-for-you.mjs
+      - name: Services screen tests (service keys pasted in Settings)
+        run: node --conditions=react-server scripts/test-service-keys.mjs
       - name: Chat provider tests
         run: node --conditions=react-server scripts/test-chat-providers.mjs
       - name: Key check tests
