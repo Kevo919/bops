@@ -26,6 +26,8 @@ export function tabsShown(open: PanelTab[], state: AppState, o: { chatBotId: str
       .map((t) => (t.id === PROFILE_TAB && t.kind === "bot" ? { ...t, botId: o.chatBotId } : t))
       .filter((t) => !("botId" in t) || state.bots.some((b) => b.id === t.botId))
       .filter((t) => (t.kind !== "new" && t.kind !== "mac") || !state.shared)
+      // A pinned page of widgets is the owner's own, never a shared workspace's.
+      .filter((t) => t.kind !== "widgets" || !state.shared)
       .filter((t) => t.kind !== "crm" || (o.crm && t.ws === o.ws))
       // Skills are this Mac's folders and need no account, so a Knowledge tab on Skills stays without one.
       // Knowledge has no Apps any more (Apps are the apps bots make, in the footer): a tab saved on it closes.

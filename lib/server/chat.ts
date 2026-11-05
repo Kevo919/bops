@@ -45,6 +45,8 @@ import { offerProposal, PROPOSE_TOOL, sealProposals, type ProposeArgs } from "./
 import { createSkill, findSkill, readSkill, skillRefId, skillsNote, skillText, SkillError, updateSkill, READ_SKILL_TOOL } from "./workspace-skills";
 import { linksFor } from "./channels";
 import { changeLookFromChat } from "./look";
+import { changeWidgetsFromChat } from "./widgets";
+import { ACTIONS as WIDGET_ACTIONS, KIND_LIST as WIDGET_KIND_LIST } from "../widgets";
 import { REPO_TOOL_NAMES, repoTool, repoToolSpecs } from "./repos";
 import { saveIdea, setGoal, type GoalStep } from "./goals";
 import { botMcp, callMcp, mcpNote } from "./mcp";
@@ -863,6 +865,7 @@ const LOOKUPS = new Set([
   "deploy_app",
   "local_app",
   "change_look",
+  "change_widgets",
   "set_goal",
   "save_idea",
   "call_mcp",
@@ -1253,7 +1256,7 @@ type ChatPause = Omit<TurnOptions, "group" | "background" | "resume"> & {
  * it, talk in the chat, or ask a teammate. Those are for the user's own turns. (It can open and update
  * Orbit's issues.)
  */
-const NOT_IN_BACKGROUND = new Set(["react", "schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "remember", "make_page", "make_doc", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "hand_off", "tell_task", "ask_teammate", "create_bot", "set_goal", "save_idea", ...ORBIT_OWNER_ONLY]);
+const NOT_IN_BACKGROUND = new Set(["react", "schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "remember", "make_page", "make_doc", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "change_widgets", "hand_off", "tell_task", "ask_teammate", "create_bot", "set_goal", "save_idea", ...ORBIT_OWNER_ONLY]);
 
 /**
  * What a turn someone else started (an email, a text or a call from outside) never has: anything that sets
@@ -1266,7 +1269,7 @@ const SAMPLE_TOOLS = new Set(["find_app_actions", "use_app"]);
 
 // A teammate answers with its owner's memory and private conversation context. Outside senders cannot
 // reach those indirectly after their own turn's MEMORY.md has been withheld.
-const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "create_bot", "open_repo", "run_repo", "make_doc", "set_goal", "save_idea", "ask_teammate"]);
+const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "change_widgets", "create_bot", "open_repo", "run_repo", "make_doc", "set_goal", "save_idea", "ask_teammate"]);
 
 /**
  * What a member's turn (TurnOptions.member) never has: what sets up or changes what the bots do on their own
@@ -1278,14 +1281,14 @@ const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_w
  * The owner's drafts are left out with the tools themselves; the Connected apps and keys this bot has are there, asking
  * the owner before anything that changes something.
  */
-const NOT_FROM_MEMBER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "create_bot", "change_look", "call_mcp", "remember", "recall", "text_me", "set_goal", "save_idea", ...ORBIT_OWNER_ONLY]);
+const NOT_FROM_MEMBER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "create_bot", "change_look", "change_widgets", "call_mcp", "remember", "recall", "text_me", "set_goal", "save_idea", ...ORBIT_OWNER_ONLY]);
 /**
  * Not on a chat turn a computer's runner answers (runner-chat.ts): what writes parts of the state a computer may not
  * (routines, watches, skills, bots: cloud/computer-scope.ts would hold them back, and the bot would say it did what never
  * landed), what keeps files on the owner's Mac (pages, pictures, apps), and work handed to another bot, which may be on
  * another computer. Those wait for the owner's Mac.
  */
-const NOT_ON_RUNNER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "propose_skill_change", "create_bot", "change_look", "make_page", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "hand_off", "ask_teammate", "run_repo", "make_doc"]);
+const NOT_ON_RUNNER = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "propose_skill_change", "create_bot", "change_look", "change_widgets", "make_page", "make_image", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "hand_off", "ask_teammate", "run_repo", "make_doc"]);
 /** Tools that only read: calling them is nothing that can't be done twice (turn-context.ts noteActing). */
 const ONLY_READS = new Set(["find_app_actions", "recall", "check_email", "read_email", "web_fetch", "read_skill", "react", "list_repos", "open_repo", "repo_status"]);
 const notFromMember = (apps: boolean) => (apps ? NOT_FROM_MEMBER : new Set([...NOT_FROM_MEMBER, "make_app", "change_app", "work_on_app", "deploy_app", "local_app"]));
@@ -1834,7 +1837,16 @@ const ASKS_TO_CHANGE = /\b(?:make|build|create|change|add|update|fix|edit|put|re
 const NAMES_A_SITE = /\b(?:apps?|sites?|website|web ?pages?)\b/i;
 
 /** The owner's words about how the window looks (change_look): a theme, a color, the text size, spacing, styles. */
-export const ASKS_ABOUT_LOOK = /\b(?:look\w*|theme\w*|colou?r\w*|dark\w*|light\w*|font\w*|text size|bigger|smaller|larger|compact|roomy|spacing|css|style\w*|accent\w*|zoom|sidebar)\b/i;
+export const ASKS_ABOUT_LOOK = /\b(?:look\w*|theme\w*|colou?r\w*|dark\w*|light\w*|font\w*|text size|bigger|smaller|larger|compact|roomy|spacing|css|style\w*|accent\w*|zoom|sidebar|animat\w*|motion\w*|moving|movement|lively|subtle)\b/i;
+
+/** The owner's words about their widgets, pages or tabs (change_widgets). */
+export const ASKS_ABOUT_WIDGETS = /\b(?:widgets?|dashboards?|pages?|tabs?|home|homepage|clocks?|notes?|sticky|checklists?|to ?do|counters?|countdowns?|bookmarks?|links?|routines?|quick ask|status|needs you|pin\w*|unpin\w*|reorder|resize|move|remove|delete)\b/i;
+
+/** Whether the owner's own latest message is about their widgets (change_widgets), on the same terms as the look's. */
+function ownerAskedForWidgets(chatId: string): boolean {
+  const mine = speakerSaid(chatId);
+  return !!mine && ASKS_ABOUT_WIDGETS.test(mine.text ?? "");
+}
 
 /**
  * Whether the owner's own latest message is about how the window looks (change_look). On the owner's
@@ -2388,8 +2400,56 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
               font_scale: { type: ["number", "null"], description: "How big the text is: 0.85 (85%, smaller) to 1.4 (140%, larger), 1 the usual. Null to keep." },
               density: { type: ["string", "null"], enum: ["compact", "normal", "roomy", null], description: "How much room the window's parts keep. Null to keep." },
               css: { type: ["string", "null"], description: 'Extra CSS for the window, at most 20 KB, plain styles only: no @import, no url() except url(data:image/...), no javascript:, no "<". Null to keep, "" to clear.' },
+              motion: { type: ["string", "null"], enum: ["off", "subtle", "normal", "lively", null], description: "How much the window animates: off, subtle, normal or lively. Null to keep. Off is also used whenever the computer asks for less motion." },
+              motion_speed: { type: ["string", "null"], enum: ["slow", "normal", "fast", null], description: "How fast animations play. Null to keep." },
               summary: { type: "string", description: "One short line saying what changed, shown under the change in the chat (\"Dark green accents, slightly bigger text\")." },
             }),
+          ]),
+      // The owner's widgets, pages and pinned tabs (lib/server/widgets.ts), on the same terms as the look: the owner's
+      // own turn only, every change checked (lib/widgets.ts), all or nothing, and undone with the look's Undo.
+      ...(opts.outside || member || bg || opts.call
+        ? []
+        : [
+            fn(
+              "change_widgets",
+              `Change ${owner}'s widgets, pages and pinned tabs in the Bops window, when ${owner} asks ("add a clock widget to my home", "make a page called Rentals with a checklist and my routines", "remove the notes widget", "add a tab for Rentals"). Widgets are built in kinds with settings only: ${WIDGET_KIND_LIST.join(", ")}. Home always exists; other pages show in the sidebar. Give every change in order in one call (make a page, then add its widgets with page set to its name), then say what changed. ${owner} can Undo it in the chat.`,
+              {
+                changes: {
+                  type: "array",
+                  description: "The changes, made in order, all or none.",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["action", "page", "widget", "kind", "size", "title", "name", "position", "to_page", "time_zone", "text", "bot", "links", "value", "step", "items", "date", "tab"],
+                    properties: {
+                      action: { type: "string", enum: [...WIDGET_ACTIONS] },
+                      page: { type: ["string", "null"], description: "The page by name (Home, or one of theirs). Null: Home, or for a widget, wherever it is." },
+                      widget: { type: ["string", "null"], description: "update, move, remove, pin_tab: the widget by its title or kind (\"notes\", \"clock\"). Null otherwise." },
+                      kind: { type: ["string", "null"], enum: [...WIDGET_KIND_LIST, null], description: "add_widget: its kind." },
+                      size: { type: ["string", "null"], enum: ["small", "medium", "wide", null], description: "How much room it takes. Null to keep or for its usual." },
+                      title: { type: ["string", "null"], description: "A widget's own title, at most 40 characters. Null to keep." },
+                      name: { type: ["string", "null"], description: "add_page, rename_page: the page's name (at most 30 characters). pin_tab: the tab's label. Null otherwise." },
+                      position: { type: ["integer", "null"], description: "Where on the page, counted from 1. Null for the end, or to keep." },
+                      to_page: { type: ["string", "null"], description: "move_widget: the page to move it to. Null to stay on its page." },
+                      time_zone: { type: ["string", "null"], description: "clock: an IANA time zone like America/Chicago. Null for this computer's." },
+                      text: { type: ["string", "null"], description: "note: what it says, at most 1000 characters." },
+                      bot: { type: ["string", "null"], description: "routines, bot-status, quick-ask: the bot by name. Null for every bot (routines) or the main bot." },
+                      links: {
+                        type: ["array", "null"],
+                        description: "links: at most 12, each a label and an http, https or mailto address.",
+                        items: { type: "object", additionalProperties: false, required: ["label", "url"], properties: { label: { type: "string" }, url: { type: "string" } } },
+                      },
+                      value: { type: ["integer", "null"], description: "counter: where it's at." },
+                      step: { type: ["integer", "null"], description: "counter: how much each press adds, 1 to 1000." },
+                      items: { type: ["array", "null"], description: "checklist: its items, at most 30, each at most 120 characters.", items: { type: "string" } },
+                      date: { type: ["string", "null"], description: "countdown: the day, like 2026-12-25." },
+                      tab: { type: ["string", "null"], description: "unpin_tab: the tab's label." },
+                    },
+                  },
+                },
+                summary: { type: "string", description: "One short line saying what changed, shown under the change in the chat." },
+              },
+            ),
           ]),
       // GitHub repos (lib/server/repos.ts): every bot lists, opens and checks them; run_repo only on the owner's own
       // turn (never someone else's, a member's, a routine's run or a call), and it asks the owner before a plan's first run.
@@ -2817,6 +2877,11 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
         if (outsideRead) return `Not changed: this turn read something from outside Bops (a page, an email, an app or data), and that can't change how the window looks. Ask ${owner} to say it themselves in the chat.`;
         if (!ownerAskedForLook(chatId)) return `Not changed: ${owner}'s own message didn't ask about how the window looks, so it stays as it is. Ask ${owner} to say it themselves in the chat.`;
         return changeLookFromChat(b, a, chatId);
+      }
+      if (name === "change_widgets") {
+        if (outsideRead) return `Not changed: this turn read something from outside Bops (a page, an email, an app or data), and that can't change the widgets. Ask ${owner} to say it themselves in the chat.`;
+        if (!ownerAskedForWidgets(chatId)) return `Not changed: ${owner}'s own message didn't ask about widgets, pages or tabs, so they stay as they are. Ask ${owner} to say it themselves in the chat.`;
+        return changeWidgetsFromChat(b, a, chatId);
       }
       if (name === "deploy_app") {
         // An app goes on the public web: on a turn that read something from outside Bops, only when the user's own words asked to deploy it.

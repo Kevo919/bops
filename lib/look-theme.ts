@@ -1,6 +1,7 @@
-import type { Look, LookDensity, LookTheme } from "./types";
+import type { Look, LookDensity, LookTheme, MotionLevel, MotionSpeed } from "./types";
+import { layoutUsed, normalizeLayout } from "./widgets";
 
-export type { Look, LookDensity, LookTheme };
+export type { Look, LookDensity, LookTheme, MotionLevel, MotionSpeed };
 
 /**
  * How the Bops window looks, checked and turned into CSS (Look, AppState.look). Pure, so the server
@@ -17,6 +18,8 @@ export const FONT_SCALE_MIN = 0.85;
 export const FONT_SCALE_MAX = 1.4;
 export const LOOK_THEMES: readonly LookTheme[] = ["light", "dark", "system"];
 export const LOOK_DENSITIES: readonly LookDensity[] = ["compact", "normal", "roomy"];
+export const MOTION_LEVELS: readonly MotionLevel[] = ["off", "subtle", "normal", "lively"];
+export const MOTION_SPEEDS: readonly MotionSpeed[] = ["slow", "normal", "fast"];
 
 /** A look couldn't be kept: `message` says why in plain words, for the owner and for the bot that asked. */
 export class LookError extends Error {}
@@ -97,7 +100,7 @@ function accentOf(v: unknown): string {
  * something) refuses the whole change with why, so nothing half-checked is ever kept.
  */
 export function validateLook(input: unknown): Look {
-  if (!input || typeof input !== "object") throw new LookError("A look change needs at least one of theme, accent, font_scale, density or css.");
+  if (!input || typeof input !== "object") throw new LookError("A look change needs at least one of theme, accent, font_scale, density, css, motion or motion_speed.");
   const raw = input as Record<string, unknown>;
   const out: Look = {};
   let named = 0;
@@ -129,7 +132,17 @@ export function validateLook(input: unknown): Look {
     out.css = !raw.css.trim() ? "" : sanitizeCss(raw.css);
     named++;
   }
-  if (!named) throw new LookError("A look change needs at least one of theme, accent, font_scale, density or css.");
+  if (raw.motion !== undefined && raw.motion !== null) {
+    if (!MOTION_LEVELS.includes(raw.motion as MotionLevel)) throw new LookError(`The animations must be off, subtle, normal or lively, not "${String(raw.motion)}".`);
+    out.motion = raw.motion as MotionLevel;
+    named++;
+  }
+  if (raw.motion_speed !== undefined && raw.motion_speed !== null) {
+    if (!MOTION_SPEEDS.includes(raw.motion_speed as MotionSpeed)) throw new LookError(`The animation speed must be slow, normal or fast, not "${String(raw.motion_speed)}".`);
+    out.motionSpeed = raw.motion_speed as MotionSpeed;
+    named++;
+  }
+  if (!named) throw new LookError("A look change needs at least one of theme, accent, font_scale, density, css, motion or motion_speed.");
   return out;
 }
 
@@ -152,6 +165,14 @@ export function normalizeLook(input: unknown): Look {
     if (n !== 1) out.fontScale = n;
   }
   if (LOOK_DENSITIES.includes(raw.density as LookDensity)) out.density = raw.density as LookDensity;
+  // The usual motion is no field at all, like the usual text size.
+  if (MOTION_LEVELS.includes(raw.motion as MotionLevel) && raw.motion !== "normal") out.motion = raw.motion as MotionLevel;
+  if (MOTION_SPEEDS.includes(raw.motionSpeed as MotionSpeed) && raw.motionSpeed !== "normal") out.motionSpeed = raw.motionSpeed as MotionSpeed;
+  // The widgets, checked whole (lib/widgets.ts), and kept only when there's something in them.
+  if (raw.layout !== undefined) {
+    const layout = normalizeLayout(raw.layout);
+    if (layoutUsed(layout)) out.layout = layout;
+  }
   if (typeof raw.css === "string" && raw.css.trim())
     try {
       out.css = sanitizeCss(raw.css);
@@ -165,6 +186,29 @@ export function normalizeLook(input: unknown): Look {
 export function normalizeLookState(input: unknown): { current: Look; history: Look[] } {
   const raw = (input && typeof input === "object" ? input : {}) as { current?: unknown; history?: unknown };
   return { current: normalizeLook(raw.current), history: (Array.isArray(raw.history) ? raw.history : []).slice(0, LOOK_HISTORY).map(normalizeLook) };
+}
+
+/**
+ * How much and how fast the window moves (Look.motion, Look.motionSpeed), as the variables every motion-
+ * class in globals.css reads: --motion-time scales how long each takes, --motion-reach how far it travels.
+ * Off stops them all: every motion- class, the mascots' loops and the animate- ones, transitions too. The
+ * system's own ask for less motion stops them whatever this says (globals.css's reduced motion blocks,
+ * and the same rule here once more, so nothing a look says can start them again).
+ */
+const MOTION_TIME: Record<MotionLevel, number> = { off: 0, subtle: 0.75, normal: 1, lively: 1.2 };
+const MOTION_REACH: Record<MotionLevel, number> = { off: 0, subtle: 0.4, normal: 1, lively: 1.8 };
+const SPEED_TIME: Record<MotionSpeed, number> = { slow: 1.6, normal: 1, fast: 0.6 };
+const MOVING = '[class*="motion-"], [class*="mascot-"], [class*="animate-"], [class*="boppy-"]';
+const STILL = `${MOVING.split(", ").map((s) => `${s}, ${s}::before, ${s}::after`).join(", ")} {\n  animation: none !important;\n  transition: none !important;\n}`;
+
+export function motionCss(level: MotionLevel = "normal", speed: MotionSpeed = "normal"): string {
+  if (level === "off") return `:root {\n  --motion-time: 0;\n  --motion-reach: 0;\n}\n${STILL}`;
+  const lines: string[] = [];
+  const time = Math.round(MOTION_TIME[level] * SPEED_TIME[speed] * 100) / 100;
+  const reach = MOTION_REACH[level];
+  if (time !== 1 || reach !== 1) lines.push(`:root {\n  --motion-time: ${time};\n  --motion-reach: ${reach};\n}`);
+  if (lines.length) lines.push(`@media (prefers-reduced-motion: reduce) {\n${STILL}\n}`);
+  return lines.join("\n");
 }
 
 /** The dark palette over the app's own (globals.css): the window's papers and inks, turned over. */
@@ -198,6 +242,8 @@ export function lookCssText(input: unknown): string {
   // Text size: the window sizes its text in pixels, so the base font size moves nothing; zoom is the
   // one lever that scales every piece of text, and the layout with it, as "bigger text" should.
   if (look.fontScale !== undefined && look.fontScale !== 1) lines.push(`body {\n  zoom: ${look.fontScale};\n}`);
+  const motion = motionCss(look.motion, look.motionSpeed);
+  if (motion) lines.push(motion);
   if (look.css) lines.push(look.css);
   return lines.join("\n");
 }

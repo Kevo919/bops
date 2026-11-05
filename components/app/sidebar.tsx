@@ -1,5 +1,6 @@
 "use client";
 
+import { PagesNav } from "./widgets";
 import { useComputerWords } from "./computer-words";
 
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
@@ -94,6 +95,8 @@ export function Sidebar({
   onCollapse,
   search = null,
   workspaces = false,
+  onOpenPage,
+  pageOpen = null,
 }: {
   state: AppState;
   chatId: string;
@@ -127,6 +130,10 @@ export function Sidebar({
   search?: string | null;
   /** The workspace switcher open from the start (expanded from the rail's workspace). */
   workspaces?: boolean;
+  /** Open a page of the owner's widgets (widgets.tsx): Home or one they made. None in a workspace shared with them. */
+  onOpenPage?: (pageId: string) => void;
+  /** The page of widgets open now, if one is. */
+  pageOpen?: string | null;
 }) {
   const [query, setQuery] = useState<string | null>(search);
   const q = query?.trim().toLowerCase();
@@ -286,6 +293,8 @@ export function Sidebar({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {/* What needs you and what you pinned: over everything, and gone while you search. */}
+        {/* The owner's pages of widgets: Home, then theirs (widgets.tsx). */}
+        {!q && onOpenPage && <PagesNav state={state} open={pageOpen} onOpen={onOpenPage} />}
         {!q && <FavoritesSection state={state} attention={attention.count} onAttention={openAttention} onOpenMemory={onOpenMemory} />}
         {/*
           The main bot's row first (it runs the team), then the rest by latest activity; the bots that work on one
