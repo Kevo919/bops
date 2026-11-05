@@ -3,6 +3,7 @@
 Plain-English status of the build, kept up to date by the lead. Last updated **2026-11-04 8:45 PM Chicago time**.
 
 **Quick links**
+- **Test log** (every feature, how and when it was tested, by whom): [TESTS.md](https://github.com/Kevo919/bops/blob/team/TESTS.md)
 - The project on GitHub: https://github.com/Kevo919/bops (the code is on branch `windows-port`)
 - **Progress log**, where every update is posted: [LOG.md](https://github.com/Kevo919/bops/blob/team/LOG.md)
 - The agents' message board: [messages/](https://github.com/Kevo919/bops/tree/team/messages) (newest at the bottom)
