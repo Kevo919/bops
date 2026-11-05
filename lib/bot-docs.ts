@@ -1,5 +1,5 @@
 import { howIWork } from "@/cloud/style";
-import { MAX_BOT_DOC_CHARS, MAX_PERSONA_CHARS, type Bot } from "./types";
+import { MAX_BOT_DOC_CHARS, MAX_MEMORY_PROMPT_CHARS, MAX_PERSONA_CHARS, type Bot } from "./types";
 
 /**
  * A bot's two documents, SOUL.md (who it is: persona, tone, rules) and MEMORY.md (long-lived facts: what's
@@ -88,14 +88,15 @@ export function soulBlock(owner: string, b: Pick<Bot, "soul" | "persona">, spoke
   ].join("\n");
 }
 
-/** The bot's MEMORY.md for its prompt, next to what its memory knows; empty when the owner wrote none. */
+/** The bot's MEMORY.md for its prompt, next to what its memory knows; empty when the owner wrote none. The
+ *  file itself keeps up to MAX_BOT_DOC_CHARS, but a prompt carries at most MAX_MEMORY_PROMPT_CHARS of it. */
 export function memoryDocBlock(owner: string, b: Pick<Bot, "memoryDoc">): string {
   const doc = b.memoryDoc?.trim();
   if (!doc) return "";
   return [
     `Your MEMORY.md, long-lived facts ${owner} keeps for you. Use it so they don't have to repeat themselves; it can be out of date, and what they say now wins. Don't recite it back to them. You can't change it yourself; ${owner} edits it in Bops.`,
     '"""',
-    doc.slice(0, MAX_BOT_DOC_CHARS),
+    doc.slice(0, MAX_MEMORY_PROMPT_CHARS),
     '"""',
   ].join("\n");
 }

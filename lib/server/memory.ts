@@ -273,13 +273,15 @@ async function card(b: Binding) {
 /**
  * What a bot should know about the user for this message or task: their card, plus what Honcho has
  * learned that's relevant to `about` (unless `search` is false: just the card, which is quick), and, for a
- * bot (MemoryScope.for), its MEMORY.md when the owner wrote one. Empty when memory is off or too slow and
- * there's no MEMORY.md.
+ * bot (MemoryScope.for), its MEMORY.md when the owner wrote one — unless opts.doc is false, for the turns
+ * that must not see it: someone from outside Bops and an app a bot made answering over its own data, whose
+ * answers can reach further than the owner's own chats. Empty when memory is off or too slow and there's
+ * no MEMORY.md.
  */
-export async function memoryBlock(where: Where, about: string, ms = 2500, opts: { search?: boolean } = {}): Promise<string> {
+export async function memoryBlock(where: Where, about: string, ms = 2500, opts: { search?: boolean; doc?: boolean } = {}): Promise<string> {
   const sc = scopeIn(where);
   // Its MEMORY.md (lib/bot-docs.ts), from the state: there with memory off too, and never held up by Honcho.
-  const reading = sc.for ? bot(sc.for) : undefined;
+  const reading = opts.doc === false ? undefined : sc.for ? bot(sc.for) : undefined;
   const doc = reading ? memoryDocBlock(ownerName(), reading) : "";
   const known = await knownBlock(sc, about, ms, opts);
   return [known, doc].filter(Boolean).join("\n");
