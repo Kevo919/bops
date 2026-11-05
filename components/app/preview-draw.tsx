@@ -77,7 +77,7 @@ export async function composite(page: string, shapes: readonly Shape[], css: { w
   return blob ? new File([blob], "drawing.png", { type: "image/png" }) : null;
 }
 
-const TOOL = "flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium leading-4 text-[#3A3A38] hover:bg-[#F2F2F0] aria-pressed:bg-ink aria-pressed:text-white";
+const TOOL = "flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium leading-4 text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)] aria-pressed:bg-[color:var(--hb-0a0a0a)] aria-pressed:text-[color:var(--bops-on-fill)]";
 const PENS: { id: Pen; name: string }[] = [
   { id: "pen", name: "Pen" },
   { id: "arrow", name: "Arrow" },
@@ -143,13 +143,13 @@ export function DrawLayer({ onDone, onCancel, error }: { onDone: (shapes: Shape[
         }}
         onPointerCancel={() => setNow(null)}
       />
-      <div className="absolute left-1/2 top-3 flex -translate-x-1/2 cursor-default items-center gap-0.5 rounded-full bg-white p-1 shadow-[0_0_0_1px_#E6E6E3,0_8px_24px_-12px_#00000059]">
+      <div className="absolute left-1/2 top-3 flex -translate-x-1/2 cursor-default items-center gap-0.5 rounded-full bg-white p-1 shadow-[0_0_0_1px_var(--h-e6e6e3),0_8px_24px_-12px_var(--h-00000059)]">
         {PENS.map((p) => (
           <button key={p.id} data-draw-pen={p.id} aria-pressed={pen === p.id} onClick={() => setPen(p.id)} className={TOOL}>
             {p.name}
           </button>
         ))}
-        <span className="mx-1 h-4 w-px bg-[#E6E6E3]" />
+        <span className="mx-1 h-4 w-px bg-[color:var(--hb-e6e6e3)]" />
         <button disabled={!shapes.length || busy} onClick={() => setShapes(shapes.slice(0, -1))} className={`${TOOL} disabled:opacity-30`}>
           Undo
         </button>
@@ -164,13 +164,13 @@ export function DrawLayer({ onDone, onCancel, error }: { onDone: (shapes: Shape[
             await onDone(shapes, size);
             setBusy(false);
           }}
-          className="flex h-7 items-center rounded-full bg-ink px-3 text-[12px] font-semibold leading-4 text-white disabled:bg-[#E6E6E3] disabled:text-[#9A9A98]"
+          className="flex h-7 items-center rounded-full bg-[color:var(--hb-0a0a0a)] px-3 text-[12px] font-semibold leading-4 text-[color:var(--bops-on-fill)] disabled:bg-[color:var(--hb-e6e6e3)] disabled:text-[color:var(--ht-9a9a98)]"
         >
           {busy ? "Adding…" : "Done"}
         </button>
       </div>
       {error && (
-        <span role="alert" className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-white px-3 py-1.5 text-[12px] leading-4 text-[#B42318] shadow-[0_0_0_1px_#FECDCA]">
+        <span role="alert" className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-white px-3 py-1.5 text-[12px] leading-4 text-[color:var(--ht-b42318)] shadow-[0_0_0_1px_var(--h-fecdca)]">
           {error}
         </span>
       )}

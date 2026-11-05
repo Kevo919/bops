@@ -2,7 +2,7 @@ import "server-only";
 import OpenAI from "openai";
 import type { Response, ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
 import type { AgentRoute } from "@/lib/agents";
-import { chatKeyName, providerOf } from "@/lib/chat-models";
+import { chatKeyName, chatModels, providerOf } from "@/lib/chat-models";
 import { llms } from "@/lib/agents";
 import { accountKeyName, accountWord } from "@/lib/accounts";
 import { accountKey } from "./provider-accounts";
@@ -28,7 +28,8 @@ const whoOf = (provider: AgentRoute, acct?: string) => `${LABELS[provider]}${acc
  *
  * Ollama ("ollama/qwen2.5:3b") is free and runs on this server: no key (OLLAMA_API_KEY is sent as Bearer if set,
  * for one behind a proxy), at OLLAMA_BASE_URL (default http://127.0.0.1:11434/v1). A small model that can't take
- * tools says so with a 400; the call is made again once without them, and that model is sent none from then on.
+ * tools says so with a 400; the call is made again once without them (that model, on that account, is sent none for a
+ * few minutes), and the reply is marked (toolsDropped) so the chat tells the user nothing was done.
  */
 
 type Params = ResponseCreateParamsNonStreaming;
@@ -54,8 +55,26 @@ export const OLLAMA_DEFAULT_BASE = "http://127.0.0.1:11434/v1";
 /** Where this server's Ollama answers (OLLAMA_BASE_URL, without a trailing slash). */
 export const ollamaBase = () => (process.env.OLLAMA_BASE_URL?.trim() || OLLAMA_DEFAULT_BASE).replace(/\/+$/, "");
 const chatUrl = (provider: AgentRoute) => (provider === "ollama" ? `${ollamaBase()}/chat/completions` : CHAT_URLS[provider]);
-/** Ollama and OpenRouter models that said they can't take tools: sent none from then on (until Bops restarts). */
-const noTools = new Set<string>();
+/**
+ * Ollama and OpenRouter models that said they can't take tools, by provider, account and model, for a short while
+ * (NO_TOOLS_MS): sent none until then, so each turn doesn't pay for a refused call. One account's no is never another's
+ * (an OpenRouter account's privacy or provider settings decide which endpoints it gets), and it's forgotten soon, as a
+ * provider may start taking tools for that model. A reply made without them says so (toolsDropped), never silently.
+ */
+const noTools = new Map<string, number>();
+const NO_TOOLS_MS = 10 * 60 * 1000;
+const noToolsKey = (provider: AgentRoute, acct: string | undefined, model: string) => `${provider}\n${acct ?? ""}\n${model}`;
+function toollessNow(k: string) {
+  const at = noTools.get(k);
+  if (at !== undefined && Date.now() - at > NO_TOOLS_MS) noTools.delete(k);
+  return noTools.has(k);
+}
+/** For tests: forget which models said no to tools. */
+export const forgetNoTools = () => noTools.clear();
+/** Set on a reply (createOnProvider) that was made without the tools it was given: the model can't take them. */
+const TOOLS_DROPPED = "bops_tools_dropped";
+/** Whether a reply was made without the tools the turn offered, because its model can't take them. */
+export const toolsDropped = (r: unknown) => !!(r && typeof r === "object" && (r as Record<string, unknown>)[TOOLS_DROPPED]);
 const toolsRefused = (e: unknown) => e instanceof ChatProviderError && e.status === 400 && /tool/i.test(e.said ?? "");
 /**
  * OpenRouter's "No endpoints found that support tool use" (a 404, or a 400): many free models (ids ending in :free)
@@ -298,16 +317,21 @@ async function callChat(provider: AgentRoute, model: string, system: string, tur
   const headers = { ...(key ? { authorization: `Bearer ${key}` } : {}), ...extra };
   const go = (withTools: boolean) => send(provider, chatUrl(provider)!, headers, body(withTools), key, model, signal, acct) as Promise<ChatJson>;
   let json: ChatJson;
-  const toolless = `${provider}/${model}`;
-  if ((ollama || provider === "openrouter") && noTools.has(toolless)) json = await go(false);
-  else
+  // Whether this reply was made without the tools it was given (the caller is told: never a silent loss).
+  let dropped = false;
+  const toolless = noToolsKey(provider, acct, model);
+  if (functions.length && (ollama || provider === "openrouter") && toollessNow(toolless)) {
+    dropped = true;
+    json = await go(false);
+  } else
     try {
       json = await go(true);
     } catch (e) {
       // A small local model, or an OpenRouter one (often a :free one), that can't take tools: once more without them,
-      // and none for it from then on.
+      // so a question still gets an answer; the reply is marked so the chat says nothing was done (chat.ts).
       if (!functions.length || !((ollama && toolsRefused(e)) || (provider === "openrouter" && openRouterNoTools(e)))) throw e;
-      noTools.add(toolless);
+      noTools.set(toolless, Date.now());
+      dropped = true;
       json = await go(false);
     }
   // OpenRouter can answer 200 with an error in place of a reply (a free model's provider failed midway).
@@ -318,7 +342,7 @@ async function callChat(provider: AgentRoute, model: string, system: string, tur
   }
   const m = json.choices?.[0]?.message ?? {};
   const calls = (m.tool_calls ?? []).map((c, i) => ({ id: c.id || `call_${i}_${Math.random().toString(36).slice(2, 10)}`, name: String(c.function?.name ?? ""), arguments: c.function?.arguments || "{}" }));
-  return { text: typeof m.content === "string" ? m.content : "", calls, input: json.usage?.prompt_tokens ?? 0, output: json.usage?.completion_tokens ?? 0 };
+  return { text: typeof m.content === "string" ? m.content : "", calls: dropped ? [] : calls, input: json.usage?.prompt_tokens ?? 0, output: json.usage?.completion_tokens ?? 0, dropped };
 }
 
 /* ---------------- Sending, and what a no means ---------------- */
@@ -435,6 +459,7 @@ export async function createOnProvider(params: Params, opts: { timeoutMs?: numbe
     ...got.calls.map((c) => ({ type: "function_call", id: newId("fc"), call_id: c.id, name: c.name, arguments: c.arguments, status: "completed" })),
   ];
   return {
+    ...("dropped" in got && got.dropped ? { [TOOLS_DROPPED]: true } : {}),
     id,
     object: "response",
     created_at: Math.floor(Date.now() / 1000),
@@ -445,6 +470,18 @@ export async function createOnProvider(params: Params, opts: { timeoutMs?: numbe
     usage: { input_tokens: got.input, output_tokens: got.output, total_tokens: got.input + got.output, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } },
   } as unknown as Response;
 }
+
+/**
+ * A chat model that can run tasks and tools, by name, to suggest when `current` can't: Your LLMs first, then the built
+ * in ones (chatModels), one whose key is set here when there is one. Never Ollama's or a free OpenRouter model's.
+ */
+export function modelWithTools(current: string): string | undefined {
+  const can = chatModels().filter((m) => m.id !== current && m.provider !== "ollama" && !m.preset && !/:free$/.test(m.id));
+  const keyed = (m: (typeof can)[number]) => !!accountKey(chatKeyName(m.provider), m.account).key;
+  return (can.find(keyed) ?? can[0])?.name;
+}
+/** A chat model's name for people, from Your LLMs or the built in ones; else its id. */
+export const chatModelName = (id: string) => chatModels().find((m) => m.id === id)?.name ?? id;
 
 /** One OpenAI client per account key (config/llms.yaml account: on an openai LLM), made when first used. */
 const accountClients = new Map<string, OpenAI>();

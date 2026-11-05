@@ -25,7 +25,7 @@ function check(name, fn) {
 
 check("L4: the picker's Custom starts from chips (the routine's own chip included)", () => {
   const s = read("components/app/cadence-picker.tsx");
-  assert.match(s, /const \[custom, setCustom\] = useState\(\(\) => !chips\.some/, "custom opens only when the value matches no chip at all");
+  assert.match(s, /const \[custom, setCustom\] = useState\(\(\) => value\.kind === "cron" \|\| !chips\.some/, "custom opens for a cron, or when the value matches no chip at all");
   assert.match(s, /crawl L4/, "the why is written down");
 });
 

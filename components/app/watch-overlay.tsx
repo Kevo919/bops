@@ -63,11 +63,11 @@ export function WatchOverlay({ watch: w, small = false, rounded = "rounded-[22px
       {!small && anchor && <AnchoredPill watch={w} anchor={anchor} away={away} ago={ago} />}
       {!small && !anchor && (
         <div
-          className={`absolute left-3 top-3 flex items-center gap-1.5 overflow-hidden rounded-full bg-white/95 py-[3px] pl-1 shadow-[0_0_0_1px_#0000000F,0_6px_16px_-8px_#00000059] backdrop-blur transition-[max-width,padding] duration-300 ${
+          className={`absolute left-3 top-3 flex items-center gap-1.5 overflow-hidden rounded-full bg-white/95 py-[3px] pl-1 shadow-[0_0_0_1px_var(--h-0000000f),0_6px_16px_-8px_var(--h-00000059)] backdrop-blur transition-[max-width,padding] duration-300 ${
             w.alert || away ? "max-w-[75%] pr-2.5" : "max-w-[30px] pr-1 group-hover/screen:max-w-[75%] group-hover/screen:pr-2.5"
           }`}
         >
-          <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full text-white" style={{ background: w.alert ? "#0A0A0A" : away ? "#9A9A98" : WATCH }}>
+          <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full text-[color:var(--bops-on-fill)]" style={{ background: w.alert ? "#0A0A0A" : away ? "#9A9A98" : WATCH }}>
             <WatchEye size={13} blink={!w.alert && !away} color={w.alert ? "#E8FF3A" : "#FFFFFF"} />
           </span>
           <span className="min-w-0 truncate text-[12px] leading-4 text-ink">
@@ -89,7 +89,7 @@ function AnchoredPill({ watch: w, anchor: a, away, ago }: { watch: Watch; anchor
   return (
     <>
       <span
-        className={`absolute flex max-w-[70%] -translate-y-1/2 items-center rounded-full bg-white/95 py-[3px] pl-2.5 pr-2.5 text-[12px] leading-4 text-ink shadow-[0_0_0_1px_#0000000F,0_6px_16px_-8px_#00000059] backdrop-blur transition-opacity duration-200 ${
+        className={`absolute flex max-w-[70%] -translate-y-1/2 items-center rounded-full bg-white/95 py-[3px] pl-2.5 pr-2.5 text-[12px] leading-4 text-ink shadow-[0_0_0_1px_var(--h-0000000f),0_6px_16px_-8px_var(--h-00000059)] backdrop-blur transition-opacity duration-200 ${
           w.alert || away ? "opacity-100" : "opacity-0 group-hover/screen:opacity-100"
         }`}
         style={{ left: `calc(${pct(a.left + a.width)} + 5px)`, top: pct(a.top + a.height / 2) }}
@@ -120,7 +120,7 @@ function PillText({ watch: w, away, ago }: { watch: Watch; away: boolean; ago: s
   return away ? (
     <>
       <span className="font-semibold">Paused</span>
-      <span className="text-[#6B6B6B]"> · {watchName(w)} isn&rsquo;t showing here right now</span>
+      <span className="text-[color:var(--ht-6b6b6b)]"> · {watchName(w)} isn&rsquo;t showing here right now</span>
     </>
   ) : w.alert ? (
     <>
@@ -130,7 +130,7 @@ function PillText({ watch: w, away, ago }: { watch: Watch; away: boolean; ago: s
     <>
       <span className="font-semibold">Watching</span> for {w.lookFor.charAt(0).toLowerCase()}
       {w.lookFor.slice(1)}
-      <span className="text-[#9A9A98]"> · looked {ago}</span>
+      <span className="text-[color:var(--ht-9a9a98)]"> · looked {ago}</span>
     </>
   );
 }
@@ -139,7 +139,7 @@ function PillText({ watch: w, away, ago }: { watch: Watch; away: boolean; ago: s
 export function WatchBadge({ watch: w }: { watch: Watch }) {
   return (
     <span
-      className="absolute left-1 top-1 z-10 flex size-[18px] items-center justify-center rounded-full shadow-[0_0_0_1.5px_#FFFFFF]"
+      className="absolute left-1 top-1 z-10 flex size-[18px] items-center justify-center rounded-full shadow-[0_0_0_1.5px_var(--h-ffffff)]"
       style={{ background: w.alert ? "#E8FF3A" : w.away ? "#9A9A98" : WATCH }}
       title={w.alert ? `New: ${w.alert.text}` : w.away ? `Paused: ${watchName(w)} isn't showing right now` : `Watching for ${w.lookFor}`}
     >

@@ -6,11 +6,19 @@ import { sharedOpen } from "@/lib/server/shared";
 import { currentWorkspaceId, setChainBot } from "@/lib/server/workspaces";
 import type { MemoryGroup } from "@/lib/types";
 import { notReady } from "@/lib/server/ready";
+import { cloudOn, cloudSession } from "@/lib/server/cloud";
 
 /** A workspace's memory, for the Memory sheet; with ?bot=, a bot's Memory tab (?q= searches, ?mine=1 is what it learned). */
 export async function GET(request: Request) {
   const u = new URL(request.url).searchParams;
   const botId = u.get("bot");
+  // No memory service here (no Honcho key on a self-hosted Bops): a bot's Memory tab says so, not a failed fetch.
+  // Signed in with Orgo, whether memory is on is the cloud session's: read it first (as the apps catalog does), or a
+  // fresh start would say "off" before the session has come.
+  if (botId) {
+    if (cloudOn()) await cloudSession().catch(() => null);
+    if (!memoryOn()) return Response.json({ off: true, workspace: "", ws: "", card: [], facts: [] });
+  }
   try {
     if (botId) return Response.json(await memoryFor(botId, { q: u.get("q") ?? undefined, mine: u.get("mine") === "1" }));
     return Response.json(await memoryInfo(u.get("ws") ?? currentWorkspaceId()));

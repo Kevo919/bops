@@ -80,7 +80,7 @@ function AddCredit({ url, surface }: { url: string; surface: "account" | "comput
         trackEvent("bops_add_credit_clicked", { surface });
         window.open(url, "_blank");
       }}
-      className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white"
+      className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)]"
     >
       Add credit on Orgo
     </button>
@@ -109,7 +109,7 @@ export function PickComputer({ view, onDone }: { view: SizeView; onDone: () => v
     <div className="fixed inset-0 z-[60] flex flex-col bg-desk text-ink" data-pick-computer>
       <div className="h-11 shrink-0 [-webkit-app-region:drag]" />
       <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-6 pb-16">
-        <div className="flex w-[440px] max-w-full animate-[call-in_220ms_ease-out] flex-col items-center rounded-[22px] bg-white px-8 pb-7 pt-9 shadow-[0_0_0_1px_#0000000F,0_30px_70px_-28px_#00000038]">
+        <div className="flex w-[440px] max-w-full animate-[call-in_220ms_ease-out] flex-col items-center rounded-[22px] bg-white px-8 pb-7 pt-9 shadow-[0_0_0_1px_var(--h-0000000f),0_30px_70px_-28px_var(--h-00000038)]">
           <Mascot botId="boppy" color="#0A0A0A" size={56} />
           <div className="flex flex-col items-center gap-1.5 pb-5 pt-5 text-center">
             <span className="text-[20px] font-semibold leading-6 tracking-[-0.01em]">{PICK_WORDS.title}</span>
@@ -127,17 +127,17 @@ export function PickComputer({ view, onDone }: { view: SizeView; onDone: () => v
                   aria-checked={on}
                   disabled={!!busy}
                   onClick={() => setPick(s.key)}
-                  className={`flex w-full flex-col gap-0.5 rounded-[14px] px-4 py-3 text-left disabled:opacity-60 ${on ? "shadow-[0_0_0_1.5px_#0A0A0A]" : "shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#FCFCFB]"}`}
+                  className={`flex w-full flex-col gap-0.5 rounded-[14px] px-4 py-3 text-left disabled:opacity-60 ${on ? "shadow-[0_0_0_1.5px_var(--h-0a0a0a)]" : "shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-fcfcfb)]"}`}
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="text-[13.5px] font-semibold leading-5">{w.name}</span>
                     <span className="flex items-center gap-2">
-                      {view.current === s.key && <span className="rounded-full bg-[#F2F2F0] px-2 py-0.5 text-[11px] font-medium leading-4 text-[#3A3A38]">Current</span>}
+                      {view.current === s.key && <span className="rounded-full bg-[color:var(--hb-f2f2f0)] px-2 py-0.5 text-[11px] font-medium leading-4 text-[color:var(--ht-3a3a38)]">Current</span>}
                       {w.price && <span className="text-[13px] font-medium leading-5 tabular-nums">{w.price}</span>}
                     </span>
                   </span>
-                  {w.specs && <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">{w.specs}</span>}
-                  <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">
+                  {w.specs && <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{w.specs}</span>}
+                  <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-6b6b6b)]">
                     {w.lasts}
                     {w.blurb ? ` ${w.blurb}` : ""}
                   </span>
@@ -148,21 +148,21 @@ export function PickComputer({ view, onDone }: { view: SizeView; onDone: () => v
           <span className="pt-3 text-center text-[12px] leading-4 text-pencil">{PICK_WORDS.ai}</span>
           <span className="pb-5 pt-1 text-center text-[12px] leading-4 text-pencil">{PICK_WORDS.later}</span>
           {switching && (
-            <span className="pb-3 text-center text-[12.5px] leading-[18px] text-[#3A3A38]" data-pick-restart>
+            <span className="pb-3 text-center text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]" data-pick-restart>
               {RESTART_WORDS}
             </span>
           )}
           <button
             disabled={!!busy}
             onClick={() => void go(offer)}
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-full bg-ink text-[13.5px] font-medium text-white disabled:opacity-50"
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-full bg-[color:var(--hb-0a0a0a)] text-[13.5px] font-medium text-[color:var(--bops-on-fill)] disabled:opacity-50"
           >
             {busy && <Spinner size={13} color="#FFFFFF" />}
             {busy ? PHASE_WORDS[phase] : PICK_WORDS.action}
           </button>
           {said && !said.ok && (
             <div className="flex w-full flex-col items-center gap-2 pt-3 text-center">
-              <span className="text-[12.5px] leading-[18px] text-[#B42318]">{said.text}</span>
+              <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-b42318)]">{said.text}</span>
               {said.topUpUrl && <AddCredit url={said.topUpUrl} surface="computer" />}
               {kept && kept.key !== pick && (
                 <button disabled={!!busy} onClick={() => void go(kept)} className="text-[12.5px] font-medium text-ink underline underline-offset-2 disabled:opacity-50">
@@ -221,7 +221,7 @@ export function YourComputer({ usage }: { usage: UsageTerms }) {
   const shown = busy ? (sizes.find((s) => s.key === busy) ?? now) : now;
   const pending = change === null;
   return (
-    <div className="flex flex-col gap-2 rounded-[14px] p-4 shadow-[0_0_0_1px_#E6E6E3]" data-your-computer>
+    <div className="flex flex-col gap-2 rounded-[14px] p-4 shadow-[0_0_0_1px_var(--h-e6e6e3)]" data-your-computer>
       <Segmented
         title="Your computer"
         hint={settingsHint(shown, change)}
@@ -233,7 +233,7 @@ export function YourComputer({ usage }: { usage: UsageTerms }) {
           setAsking(sizes.find((s) => s.key === k) ?? null);
         }}
       />
-      {pending && <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">{SIZE_REFUSED.pending}</span>}
+      {pending && <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-6b6b6b)]">{SIZE_REFUSED.pending}</span>}
       {asking &&
         (() => {
           const w = confirmWords(asking, change);
@@ -253,14 +253,14 @@ export function YourComputer({ usage }: { usage: UsageTerms }) {
           );
         })()}
       {busy && (
-        <span className="flex items-center gap-1.5 text-[12.5px] leading-[18px] text-[#3A3A38]">
+        <span className="flex items-center gap-1.5 text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">
           <Spinner size={11} color="#6B6B6B" />
           {PHASE_WORDS[phase]}
         </span>
       )}
       {said && (
         <div className="flex flex-col items-start gap-2">
-          <span className={`text-[12.5px] leading-[18px] ${said.ok ? "text-[#3A3A38]" : "text-[#B42318]"}`}>{said.text}</span>
+          <span className={`text-[12.5px] leading-[18px] ${said.ok ? "text-[color:var(--ht-3a3a38)]" : "text-[color:var(--ht-b42318)]"}`}>{said.text}</span>
           {!said.ok && said.topUpUrl && <AddCredit url={said.topUpUrl} surface="account" />}
         </div>
       )}

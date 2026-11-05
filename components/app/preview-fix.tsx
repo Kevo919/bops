@@ -19,9 +19,9 @@ import { AskInPlace, post } from "./ui";
  * Fix it and going back are the owner's only. A Bops without those routes yet says so in plain words.
  */
 
-const DARK = "whitespace-nowrap rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-semibold leading-4 text-white disabled:bg-[#E6E6E3] disabled:text-[#9A9A98]";
-const LIGHT = "whitespace-nowrap rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E2E2DF] hover:bg-[#F7F7F6] disabled:text-[#9A9A98]";
-const QUIET = "whitespace-nowrap rounded-full px-2.5 py-1.5 text-[12.5px] font-medium leading-4 text-[#6B6B6B] hover:bg-[#F2F2F0] disabled:opacity-40";
+const DARK = "whitespace-nowrap rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-semibold leading-4 text-[color:var(--bops-on-fill)] disabled:bg-[color:var(--hb-e6e6e3)] disabled:text-[color:var(--ht-9a9a98)]";
+const LIGHT = "whitespace-nowrap rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e2e2df)] hover:bg-[color:var(--hb-f7f7f6)] disabled:text-[color:var(--ht-9a9a98)]";
+const QUIET = "whitespace-nowrap rounded-full px-2.5 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--hb-f2f2f0)] disabled:opacity-40";
 
 /** What a Bops without a route says (it isn't in this version yet). */
 const NOT_HERE = "Going back isn't in this version of Bops yet.";
@@ -125,19 +125,19 @@ export function FixPanel({
 
   const n = plan?.later.length ?? 0;
   return (
-    <div data-preview-fix={ask.lines.length ? "lines" : "plain"} className="flex w-full max-w-[520px] flex-col gap-2.5 rounded-2xl bg-white px-4 py-3.5 text-left shadow-[0_0_0_1px_#E6E6E3,0_12px_32px_-16px_#0000004D]">
+    <div data-preview-fix={ask.lines.length ? "lines" : "plain"} className="flex w-full max-w-[520px] flex-col gap-2.5 rounded-2xl bg-white px-4 py-3.5 text-left shadow-[0_0_0_1px_var(--h-e6e6e3),0_12px_32px_-16px_var(--h-0000004d)]">
       <span data-preview-fix-title className="text-[13.5px] font-semibold leading-5 text-ink">
         {ask.title}
       </span>
       {ask.lines.length > 0 && (
-        <pre data-preview-fix-lines className="max-h-[132px] overflow-auto whitespace-pre rounded-lg bg-[#F7F7F6] px-3 py-2 font-mono text-[11.5px] leading-[17px] text-[#3A3A38]">
+        <pre data-preview-fix-lines className="max-h-[132px] overflow-auto whitespace-pre rounded-lg bg-[color:var(--hb-f7f7f6)] px-3 py-2 font-mono text-[11.5px] leading-[17px] text-[color:var(--ht-3a3a38)]">
           {ask.lines.join("\n")}
         </pre>
       )}
       {plan && back ? (
         plan.blocked ? (
           <div className="flex flex-wrap items-center gap-2">
-            <span role="alert" className="min-w-0 flex-1 text-[12.5px] leading-[17px] text-[#3A3A38]">
+            <span role="alert" className="min-w-0 flex-1 text-[12.5px] leading-[17px] text-[color:var(--ht-3a3a38)]">
               {undash(plan.blocked)}
             </span>
             <button onClick={() => setPlan(null)} className={QUIET}>
@@ -159,15 +159,15 @@ export function FixPanel({
               <ul data-preview-undoes className="flex flex-col gap-0.5">
                 {/* As a change card lists what restoring undoes (app-change.tsx): its short id, its line, who. */}
                 {plan.later.slice(0, 5).map((c) => (
-                  <li key={c.id} className="flex min-w-0 gap-1.5 text-[12px] leading-4 text-[#3A3A38]">
-                    <span className="shrink-0 font-mono text-[11px] text-[#9A9A98]">{short(c.id)}</span>
+                  <li key={c.id} className="flex min-w-0 gap-1.5 text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">
+                    <span className="shrink-0 font-mono text-[11px] text-[color:var(--ht-9a9a98)]">{short(c.id)}</span>
                     <span className="min-w-0 truncate">
                       {undash(c.title) || "A change"}
-                      {c.author ? <span className="text-[#9A9A98]"> · {c.author}</span> : null}
+                      {c.author ? <span className="text-[color:var(--ht-9a9a98)]"> · {c.author}</span> : null}
                     </span>
                   </li>
                 ))}
-                {n > 5 && <li className="text-[12px] leading-4 text-[#9A9A98]">and {n - 5} more</li>}
+                {n > 5 && <li className="text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">and {n - 5} more</li>}
               </ul>
             )}
           </AskInPlace>
@@ -176,7 +176,7 @@ export function FixPanel({
         <>
           {/* The loop breaker: when it last worked, in its own line, so the button stays short enough for a narrow panel. */}
           {own && back && (
-            <span data-preview-worked className="text-[12.5px] leading-[17px] text-[#3A3A38]">
+            <span data-preview-worked className="text-[12.5px] leading-[17px] text-[color:var(--ht-3a3a38)]">
               {`It last worked ${ago(msOf(back.when))}, at ${short(back.at)}.`}
             </span>
           )}
@@ -207,12 +207,12 @@ export function FixPanel({
         </>
       )}
       {said && (
-        <span role="status" className="text-[12px] leading-4 text-[#6B6B6B]">
+        <span role="status" className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
           {said}
         </span>
       )}
       {error && (
-        <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}

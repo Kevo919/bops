@@ -46,9 +46,9 @@ type WebviewElement = HTMLElement & {
   executeJavaScript: (code: string, userGesture?: boolean) => Promise<unknown>;
 };
 
-const BUTTON = "flex size-7 shrink-0 items-center justify-center rounded-lg text-[#3A3A38] hover:bg-[#F2F2F0] disabled:opacity-30 disabled:hover:bg-transparent";
-const PILL = "shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-[#3A3A38] hover:bg-[#F2F2F0] disabled:opacity-50";
-const TOGGLE = `${BUTTON} aria-pressed:bg-ink aria-pressed:text-white aria-pressed:hover:bg-ink`;
+const BUTTON = "flex size-7 shrink-0 items-center justify-center rounded-lg text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)] disabled:opacity-30 disabled:hover:bg-transparent";
+const PILL = "shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)] disabled:opacity-50";
+const TOGGLE = `${BUTTON} aria-pressed:bg-[color:var(--hb-0a0a0a)] aria-pressed:text-[color:var(--bops-on-fill)] aria-pressed:hover:bg-[color:var(--hb-0a0a0a)]`;
 /** An address longer than this many characters keeps its last TAIL in sight, giving way in its middle. */
 const TAIL_AFTER = 24;
 const TAIL = 12;
@@ -419,11 +419,11 @@ export function PreviewTab({
         {/* How it is: a dot and a word (in a narrow panel the dot alone, the word on hover). */}
         <span data-tip={s.tip ?? s.word} className="ml-1 flex shrink-0 items-center gap-1.5">
           <span className={`size-1.5 shrink-0 rounded-full ${s.dot}`} />
-          <span data-preview-state className="text-[12px] leading-4 text-[#6B6B6B] @max-md:sr-only">
+          <span data-preview-state className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)] @max-md:sr-only">
             {s.word}
           </span>
         </span>
-        <span data-preview-address data-tip={at} className="mx-1.5 flex min-w-0 flex-1 overflow-hidden rounded-full bg-[#F2F2F0] px-3 py-1 font-mono text-[11.5px] leading-4 text-[#6B6B6B]">
+        <span data-preview-address data-tip={at} className="mx-1.5 flex min-w-0 flex-1 overflow-hidden rounded-full bg-[color:var(--hb-f2f2f0)] px-3 py-1 font-mono text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
           <span className="min-w-0 truncate">{head}</span>
           {tail && <span className="shrink-0 whitespace-pre">{tail}</span>}
         </span>
@@ -442,15 +442,15 @@ export function PreviewTab({
         )}
         {place === "local" && (
           <span data-tip={screen?.error ?? (screen?.said ? undefined : "Open it on its computer's screen")} className="flex shrink-0">
-            <button data-preview-screen disabled={!!screen?.busy} onClick={() => void toScreen()} className={`${PILL} ${screen?.error ? "text-[#B42318]" : ""}`}>
+            <button data-preview-screen disabled={!!screen?.busy} onClick={() => void toScreen()} className={`${PILL} ${screen?.error ? "text-[color:var(--ht-b42318)]" : ""}`}>
               {screen?.busy ? "Opening…" : (screen?.said ?? "On its screen")}
             </button>
           </span>
         )}
       </div>
       {/* (Which one, then its tools and widths at the end: together on a line of their own under it in a narrow panel, never over it or past the edge.) */}
-      <div className="flex min-h-9 shrink-0 flex-wrap items-center gap-1 border-b border-[#F0F0EE] px-2.5 py-1">
-        <div role="group" aria-label="Which one to show" data-preview-places className="flex shrink-0 items-center rounded-full bg-[#F2F2F0] p-0.5">
+      <div className="flex min-h-9 shrink-0 flex-wrap items-center gap-1 border-b border-[color:var(--h-f0f0ee)] px-2.5 py-1">
+        <div role="group" aria-label="Which one to show" data-preview-places className="flex shrink-0 items-center rounded-full bg-[color:var(--hb-f2f2f0)] p-0.5">
           {PLACES.map((p) => (
             <span key={p} data-tip={places[p].why} className="flex">
               <button
@@ -458,7 +458,7 @@ export function PreviewTab({
                 aria-pressed={place === p}
                 disabled={!places[p].url}
                 onClick={() => void toPlace(p)}
-                className="rounded-full px-2.5 py-0.5 text-[12px] font-medium leading-4 text-[#6B6B6B] hover:text-ink disabled:text-[#ADADAA] disabled:hover:text-[#ADADAA] aria-pressed:bg-white aria-pressed:text-ink aria-pressed:shadow-[0_0_0_1px_#E6E6E3]"
+                className="rounded-full px-2.5 py-0.5 text-[12px] font-medium leading-4 text-[color:var(--ht-6b6b6b)] hover:text-ink disabled:text-[color:var(--ht-adadaa)] disabled:hover:text-[color:var(--ht-adadaa)] aria-pressed:bg-white aria-pressed:text-ink aria-pressed:shadow-[0_0_0_1px_var(--h-e6e6e3)]"
               >
                 {PLACE_NAMES[p]}
               </button>
@@ -495,12 +495,12 @@ export function PreviewTab({
                   <path d="M10.8 2.7l2.5 2.5-7.6 7.6-3.2.7.7-3.2 7.6-7.6z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
                 </svg>
               </button>
-              <span className="mx-1 h-4 w-px bg-[#E6E6E3]" />
+              <span className="mx-1 h-4 w-px bg-[color:var(--hb-e6e6e3)]" />
             </>
           )}
           <div role="group" aria-label="Width" className="flex shrink-0 items-center gap-0.5">
             {WIDTHS.map((w) => (
-              <button key={w.id} data-preview-width={w.id} aria-label={w.name} aria-pressed={width === w.id} onClick={() => setWidth(w.id)} className={`${BUTTON} aria-pressed:bg-[#F2F2F0] aria-pressed:text-ink`}>
+              <button key={w.id} data-preview-width={w.id} aria-label={w.name} aria-pressed={width === w.id} onClick={() => setWidth(w.id)} className={`${BUTTON} aria-pressed:bg-[color:var(--hb-f2f2f0)] aria-pressed:text-ink`}>
                 <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
                   {w.id === "full" ? (
                     <path d="M2 3.5h12v8H2zM6 14h4" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round" />
@@ -515,23 +515,23 @@ export function PreviewTab({
           </div>
         </span>
       </div>
-      <div className={`relative flex min-h-0 flex-1 justify-center ${px ? "bg-[#F7F7F6] p-3" : ""}`}>
-        <div data-preview-frame={width} className={`relative flex min-h-0 w-full flex-col ${px ? "overflow-hidden rounded-xl bg-white shadow-[0_0_0_1px_#E6E6E3]" : ""}`} style={px ? { maxWidth: px } : undefined}>
+      <div className={`relative flex min-h-0 flex-1 justify-center ${px ? "bg-[color:var(--hb-f7f7f6)] p-3" : ""}`}>
+        <div data-preview-frame={width} className={`relative flex min-h-0 w-full flex-col ${px ? "overflow-hidden rounded-xl bg-white shadow-[0_0_0_1px_var(--h-e6e6e3)]" : ""}`} style={px ? { maxWidth: px } : undefined}>
           {/* (Only in the Mac app: a plain browser opens it in a tab of its own, never a frame on Bops' own origin.) */}
           {showView && createElement("webview", { ref: setView, src, partition, allowpopups: "true", className: "min-h-0 flex-1" })}
           {words && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/95 px-8 text-center">
               {x?.state === "starting" && <Spinner size={16} color="#9A9A98" />}
-              <span data-preview-words className="max-w-[420px] text-[13px] leading-5 text-[#6B6B6B]">
+              <span data-preview-words className="max-w-[420px] text-[13px] leading-5 text-[color:var(--ht-6b6b6b)]">
                 {words}
               </span>
               {action && (
-                <button data-preview-start disabled={busy} onClick={() => void start()} className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-semibold leading-4 text-white disabled:bg-[#E6E6E3] disabled:text-[#9A9A98]">
+                <button data-preview-start disabled={busy} onClick={() => void start()} className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-semibold leading-4 text-[color:var(--bops-on-fill)] disabled:bg-[color:var(--hb-e6e6e3)] disabled:text-[color:var(--ht-9a9a98)]">
                   {busy ? "Starting…" : action}
                 </button>
               )}
               {error && (
-                <span role="alert" className="max-w-[420px] text-[12px] leading-4 text-[#B42318]">
+                <span role="alert" className="max-w-[420px] text-[12px] leading-4 text-[color:var(--ht-b42318)]">
                   {error}
                 </span>
               )}
@@ -542,7 +542,7 @@ export function PreviewTab({
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/95 px-6">
               {panel}
               {error && (
-                <span role="alert" className="max-w-[420px] text-[12px] leading-4 text-[#B42318]">
+                <span role="alert" className="max-w-[420px] text-[12px] leading-4 text-[color:var(--ht-b42318)]">
                   {error}
                 </span>
               )}
@@ -551,7 +551,7 @@ export function PreviewTab({
           {/* Its page answered 5xx: the page stays readable, the panel at its foot. */}
           {ask && !failed && hid !== page && <div className="absolute inset-x-3 bottom-3 flex justify-center">{panel}</div>}
           {tool === "select" && (
-            <span data-preview-hint className="pointer-events-none absolute left-1/2 top-3 w-max max-w-[calc(100%-24px)] -translate-x-1/2 rounded-full bg-ink px-3 py-1.5 text-center text-[12px] leading-4 text-white shadow-[0_8px_24px_-12px_#00000080]">
+            <span data-preview-hint className="pointer-events-none absolute left-1/2 top-3 w-max max-w-[calc(100%-24px)] -translate-x-1/2 rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-center text-[12px] leading-4 text-[color:var(--bops-on-fill)] shadow-[0_8px_24px_-12px_var(--h-00000080)]">
               Click what you mean. Cmd click adds more. Esc to stop.
             </span>
           )}

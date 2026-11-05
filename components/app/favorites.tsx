@@ -119,7 +119,7 @@ export function SideMenu({ x, y, label, items, onClose }: { x: number; y: number
           e.stopPropagation();
           go();
         }}
-        className="motion-menu-in fixed z-50 flex min-w-[188px] origin-top-left flex-col rounded-[14px] bg-white p-1.5 shadow-[0_0_0_1px_#0000000F,0_18px_40px_-14px_#00000047]"
+        className="motion-menu-in fixed z-50 flex min-w-[188px] origin-top-left flex-col rounded-[14px] bg-white p-1.5 shadow-[0_0_0_1px_var(--h-0000000f),0_18px_40px_-14px_var(--h-00000047)]"
       >
         {items.map((item) => (
           <button
@@ -130,7 +130,7 @@ export function SideMenu({ x, y, label, items, onClose }: { x: number; y: number
               onClose();
               item.onPick();
             }}
-            className="flex h-8 items-center rounded-lg px-2.5 text-left text-[13px] leading-4 text-ink outline-none hover:bg-[#F2F2F0] focus-visible:bg-[#F2F2F0] disabled:text-[#C9C9C6] disabled:hover:bg-transparent"
+            className="flex h-8 items-center rounded-lg px-2.5 text-left text-[13px] leading-4 text-ink outline-none hover:bg-[color:var(--hb-f2f2f0)] focus-visible:bg-[color:var(--hb-f2f2f0)] disabled:text-[color:var(--ht-c9c9c6)] disabled:hover:bg-transparent"
           >
             {item.label}
           </button>

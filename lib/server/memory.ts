@@ -47,7 +47,7 @@ const ownBank = (ws: string): Binding =>
     ? { bank: `bops-${clean(ws)}`, peer: "user" }
     : cloudOn()
       ? { bank: "bops", peer: "user" }
-      : { bank: process.env.HONCHO_WORKSPACE_ID ?? "bops", peer: process.env.HONCHO_USER_PEER ?? "user" };
+      : { bank: process.env.HONCHO_WORKSPACE_ID?.trim() ? process.env.HONCHO_WORKSPACE_ID : "bops", peer: process.env.HONCHO_USER_PEER?.trim() ? process.env.HONCHO_USER_PEER : "user" };
 
 /**
  * Whose memory a save or a read is (lib/chain.ts): a workspace's, the team's bank its bots share; or one bot's own
@@ -917,6 +917,8 @@ function sessionsOf(botId: string) {
  * learned (from its chats and tasks). Memory is the workspace's: every bot on the team shares it.
  */
 export async function memoryFor(botId: string, opts: { q?: string; mine?: boolean } = {}) {
+  // A disabled service must not construct an SDK client (even stale/invalid bindings may exist).
+  if (!on()) return { on: false, error: "Memory is not set up yet. Connect memory in Settings to use it.", workspace: "this workspace", ws: wsOf(botId), card: [], facts: [] };
   // Its scope: its own bank while it keeps its memory to itself (the tab says so), else its workspace's.
   const sc = scopeOf(botId);
   const ws = sc.ws;

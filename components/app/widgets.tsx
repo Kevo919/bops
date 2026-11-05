@@ -85,7 +85,7 @@ export function PagesNav({ state, open, onOpen }: { state: AppState; open: strin
       onClick={() => onOpen(p.id)}
       data-page-row={p.id}
       aria-current={open === p.id ? "page" : undefined}
-      className={`group/page flex h-[34px] items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[14px] leading-[18px] max-md:h-11 ${open === p.id ? "bg-black/[0.05] font-medium text-ink" : "text-ink hover:bg-black/[0.03]"}`}
+      className={`group/page flex h-[34px] items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[14px] leading-[18px] max-md:h-11 ${open === p.id ? "bg-[color:var(--bops-tint)]/[0.05] font-medium text-ink" : "text-ink hover:bg-[color:var(--bops-tint)]/[0.03]"}`}
     >
       <span className="flex size-5 shrink-0 items-center justify-center text-pencil">{p.id === HOME ? <HomeIcon /> : <WidgetsIcon size={13} />}</span>
       <span className="min-w-0 flex-1 truncate">{p.name}</span>
@@ -104,7 +104,7 @@ export function PagesNav({ state, open, onOpen }: { state: AppState; open: strin
             }}
             title="New page"
             aria-label="New page"
-            className="flex size-6 items-center justify-center rounded-full text-pencil hover:bg-black/[0.05] hover:text-ink max-md:size-10"
+            className="flex size-6 items-center justify-center rounded-full text-pencil hover:bg-[color:var(--bops-tint)]/[0.05] hover:text-ink max-md:size-10"
           >
             <svg width="11" height="11" viewBox="0 0 14 14" aria-hidden>
               <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -133,7 +133,7 @@ export function PagesNav({ state, open, onOpen }: { state: AppState; open: strin
             aria-label="New page's name"
             className="h-[34px] rounded-full bg-white px-3.5 text-[13px] text-ink shadow-[0_0_0_1px_var(--color-rule)] outline-none placeholder:text-pencil"
           />
-          {error && <span className="px-2 text-[12px] leading-4 text-[#B42318]">{error}</span>}
+          {error && <span className="px-2 text-[12px] leading-4 text-[color:var(--ht-b42318)]">{error}</span>}
         </form>
       )}
     </div>
@@ -177,11 +177,11 @@ export function WidgetPageView({ state, pageId, onClose, onGone, links, covered 
   if (!page) return null;
   const pinned = layout.tabs.find((t) => t.page === page.id && !t.widget);
   const act = async (ops: LayoutOp[]) => setError((await change(ops)) ?? "");
-  const pill = "rounded-full px-3 py-1 text-[12px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_var(--color-rule)] hover:bg-black/[0.04] disabled:opacity-40 max-md:min-h-10";
+  const pill = "rounded-full px-3 py-1 text-[12px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_var(--color-rule)] hover:bg-[color:var(--bops-tint)]/[0.04] disabled:opacity-40 max-md:min-h-10";
   return (
     <div className="motion-fade-in flex min-h-0 w-full flex-1 flex-col bg-desk" data-widget-page={page.id}>
       <div className="flex shrink-0 flex-wrap items-center gap-2 px-6 pb-3 pt-5 max-md:px-4">
-        <span className="flex size-8 items-center justify-center rounded-full bg-ink text-highlighter">{page.id === HOME ? <HomeIcon size={15} /> : <WidgetsIcon size={14} />}</span>
+        <span className="flex size-8 items-center justify-center rounded-full bg-[color:var(--hb-0a0a0a)] text-highlighter">{page.id === HOME ? <HomeIcon size={15} /> : <WidgetsIcon size={14} />}</span>
         {renaming !== null ? (
           <form
             onSubmit={(e) => {
@@ -195,7 +195,7 @@ export function WidgetPageView({ state, pageId, onClose, onGone, links, covered 
           <h1 className="min-w-0 truncate text-[20px] font-semibold leading-7 text-ink">{page.name}</h1>
         )}
         <span className="min-w-0 flex-1" />
-        <button onClick={() => setEditing(!editing)} className={`${pill} ${editing ? "bg-ink text-white hover:bg-ink" : ""}`} data-edit-widgets>
+        <button onClick={() => setEditing(!editing)} className={`${pill} ${editing ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)] hover:bg-[color:var(--hb-0a0a0a)]" : ""}`} data-edit-widgets>
           {editing ? "Done" : "Edit"}
         </button>
         {pinned ? (
@@ -218,19 +218,19 @@ export function WidgetPageView({ state, pageId, onClose, onGone, links, covered 
                 void act([{ action: "remove_page", page: page.id }]);
               }}
               onBlur={() => setConfirmRemove(false)}
-              className={`${pill} ${confirmRemove ? "bg-[#B42318] text-white hover:bg-[#B42318]" : ""}`}
+              className={`${pill} ${confirmRemove ? "bg-[color:var(--hb-b42318)] text-[color:var(--bops-on-fill)] hover:bg-[color:var(--hb-b42318)]" : ""}`}
             >
               {confirmRemove ? "Remove for sure?" : "Remove page"}
             </button>
           </>
         )}
-        <button onClick={onClose} aria-label="Close the page" title="Close" className="flex size-8 items-center justify-center rounded-full text-ink hover:bg-black/[0.05] max-md:size-10">
+        <button onClick={onClose} aria-label="Close the page" title="Close" className="flex size-8 items-center justify-center rounded-full text-ink hover:bg-[color:var(--bops-tint)]/[0.05] max-md:size-10">
           <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden>
             <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </button>
       </div>
-      {error && <div className="px-6 pb-2 text-[12px] leading-4 text-[#B42318] max-md:px-4">{error}</div>}
+      {error && <div className="px-6 pb-2 text-[12px] leading-4 text-[color:var(--ht-b42318)] max-md:px-4">{error}</div>}
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-8 max-md:px-4">
         {page.widgets.length === 0 && !editing && (
           <div className="mb-4 rounded-[16px] bg-white px-4 py-3.5 text-[13px] leading-5 text-pencil shadow-[0_0_0_1px_var(--color-rule)]" data-widgets-empty>
@@ -257,7 +257,7 @@ function Gallery({ page, onError }: { page: WidgetPage; onError: (e: string) => 
             disabled={full}
             data-add-widget={kind}
             onClick={() => void change([{ action: "add_widget", page: page.id, kind }]).then((e) => onError(e ?? ""))}
-            className="flex flex-col items-start gap-0.5 rounded-[14px] bg-white px-3 py-2.5 text-left shadow-[0_0_0_1px_var(--color-rule)] hover:bg-black/[0.02] disabled:opacity-40"
+            className="flex flex-col items-start gap-0.5 rounded-[14px] bg-white px-3 py-2.5 text-left shadow-[0_0_0_1px_var(--color-rule)] hover:bg-[color:var(--bops-tint)]/[0.02] disabled:opacity-40"
           >
             <span className="text-[13px] font-semibold leading-4 text-ink">{WIDGET_KINDS[kind].name}</span>
             <span className="text-[12px] leading-4 text-pencil">{WIDGET_KINDS[kind].about}</span>
@@ -299,7 +299,7 @@ function WidgetCard({ state, page, widget: w, index, editing, links }: { state: 
     return !e;
   };
   const edit = (more: Omit<LayoutOp, "action" | "page" | "widget">, quiet = false) => act([{ action: "update_widget", page: page.id, widget: w.id, ...more }], quiet);
-  const icon = "flex size-7 items-center justify-center rounded-full text-ink hover:bg-black/[0.06] disabled:opacity-30 max-md:size-10";
+  const icon = "flex size-7 items-center justify-center rounded-full text-ink hover:bg-[color:var(--bops-tint)]/[0.06] disabled:opacity-30 max-md:size-10";
   return (
     <section className="motion-widget-in flex h-full min-h-[132px] flex-col rounded-[16px] bg-white p-3.5 shadow-[0_0_0_1px_var(--color-rule)]" data-widget={w.kind} data-widget-id={w.id} aria-label={w.title ?? WIDGET_KINDS[w.kind].name}>
       {/* In Edit the title takes a line of its own, in full, with the tools under it: a small card's name isn't cut short. */}
@@ -319,7 +319,7 @@ function WidgetCard({ state, page, widget: w, index, editing, links }: { state: 
                 <path d="M2 1.5L6.5 6 2 10.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
-            <button className={`${icon} ${setup ? "bg-black/[0.06]" : ""}`} onClick={() => setSetup(!setup)} aria-label="Set it up" title="Set it up">
+            <button className={`${icon} ${setup ? "bg-[color:var(--bops-tint)]/[0.06]" : ""}`} onClick={() => setSetup(!setup)} aria-label="Set it up" title="Set it up">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
                 <path d="M3 4.5h10M3 8h10M3 11.5h10" strokeLinecap="round" />
                 <circle cx="6" cy="4.5" r="1.4" fill="var(--color-white)" />
@@ -328,7 +328,7 @@ function WidgetCard({ state, page, widget: w, index, editing, links }: { state: 
               </svg>
             </button>
             <button
-              className={`${icon} ${confirm ? "bg-[#B42318] text-white hover:bg-[#B42318]" : ""}`}
+              className={`${icon} ${confirm ? "bg-[color:var(--hb-b42318)] text-[color:var(--bops-on-fill)] hover:bg-[color:var(--hb-b42318)]" : ""}`}
               onClick={() => (confirm ? void act([{ action: "remove_widget", page: page.id, widget: w.id }]) : setConfirm(true))}
               onBlur={() => setConfirm(false)}
               aria-label={confirm ? "Remove for sure" : "Remove"}
@@ -342,9 +342,9 @@ function WidgetCard({ state, page, widget: w, index, editing, links }: { state: 
         )}
       </div>
       {editing && (
-        <div role="radiogroup" aria-label="Size" className="mb-2 flex w-fit gap-0.5 rounded-full bg-black/[0.05] p-[3px]">
+        <div role="radiogroup" aria-label="Size" className="mb-2 flex w-fit gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[3px]">
           {SIZES.map((s) => (
-            <button key={s} role="radio" aria-checked={w.size === s} onClick={() => w.size !== s && void edit({ size: s })} className={`rounded-full px-2.5 py-0.5 text-[12px] leading-4 ${w.size === s ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F]" : "text-pencil hover:text-ink"}`}>
+            <button key={s} role="radio" aria-checked={w.size === s} onClick={() => w.size !== s && void edit({ size: s })} className={`rounded-full px-2.5 py-0.5 text-[12px] leading-4 ${w.size === s ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "text-pencil hover:text-ink"}`}>
               {SIZE_WORD[s]}
             </button>
           ))}
@@ -354,7 +354,7 @@ function WidgetCard({ state, page, widget: w, index, editing, links }: { state: 
       <div className="flex min-h-0 flex-1 flex-col">
         <WidgetBody state={state} widget={w} edit={edit} links={links} />
       </div>
-      {error && <div className="pt-1.5 text-[12px] leading-4 text-[#B42318]">{error}</div>}
+      {error && <div className="pt-1.5 text-[12px] leading-4 text-[color:var(--ht-b42318)]">{error}</div>}
     </section>
   );
 }
@@ -373,7 +373,7 @@ function WidgetSetup({ state, widget: w, edit }: { state: AppState; widget: Widg
   const [linkLabel, setLinkLabel] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   return (
-    <div className="mb-2 flex flex-col gap-2 rounded-[12px] bg-black/[0.03] p-2.5" data-widget-setup>
+    <div className="mb-2 flex flex-col gap-2 rounded-[12px] bg-[color:var(--bops-tint)]/[0.03] p-2.5" data-widget-setup>
       <label className="flex flex-col gap-1">
         <span className={label}>Title</span>
         <input defaultValue={w.title ?? ""} maxLength={TITLE_MAX} placeholder={WIDGET_KINDS[w.kind].name} onBlur={(e) => e.target.value.trim() !== (w.title ?? "") && void edit({ title: e.target.value.trim() })} className={field} />
@@ -433,7 +433,7 @@ function WidgetSetup({ state, widget: w, edit }: { state: AppState; widget: Widg
           <input value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} maxLength={TITLE_MAX} placeholder="Name, like Zillow" aria-label="Link's name" className={field} />
           <div className="flex gap-1">
             <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="zillow.com" aria-label="Link's address" className={field} />
-            <button type="submit" className="shrink-0 rounded-full bg-ink px-3 text-[12px] font-semibold text-white">
+            <button type="submit" className="shrink-0 rounded-full bg-[color:var(--hb-0a0a0a)] px-3 text-[12px] font-semibold text-[color:var(--bops-on-fill)]">
               Add
             </button>
           </div>
@@ -509,7 +509,7 @@ function Note({ widget: w, edit }: { widget: Widget; edit: Edit }) {
       maxLength={1000}
       placeholder="Write something to remember"
       aria-label="Note"
-      className="min-h-[72px] w-full flex-1 resize-none rounded-[10px] bg-[#FFF9C4] p-2.5 text-[13.5px] leading-5 text-[#3A3320] outline-none placeholder:text-[#8A8060]"
+      className="min-h-[72px] w-full flex-1 resize-none rounded-[10px] bg-[color:var(--hb-fff9c4)] p-2.5 text-[13.5px] leading-5 text-[color:var(--ht-3a3320)] outline-none placeholder:text-[color:var(--ht-8a8060)]"
     />
   );
 }
@@ -564,7 +564,7 @@ function NeedsYou({ state, onOpenChat }: { state: AppState; onOpenChat: (chatId:
             const b = team.find((x) => x.id === id);
             return b ? [b] : [];
           }).map((b) => (
-            <button key={b.id} onClick={() => onOpenChat(botChatId(b.id))} className="flex items-center gap-1.5 rounded-full bg-highlighter px-2 py-0.5 text-[12px] font-medium leading-4 text-[#0a0a0a]">
+            <button key={b.id} onClick={() => onOpenChat(botChatId(b.id))} className="flex items-center gap-1.5 rounded-full bg-highlighter px-2 py-0.5 text-[12px] font-medium leading-4 text-[color:var(--ht-0a0a0a)]">
               {b.name}
             </button>
           ))}
@@ -592,7 +592,7 @@ function BotStatus({ state, widget: w, onOpenChat }: { state: AppState; widget: 
   const working = state.sessions.filter((s) => s.botId === b.id && live(s));
   const waiting = state.sessions.some((s) => s.botId === b.id && live(s) && s.blocker);
   return (
-    <button onClick={() => onOpenChat(botChatId(b.id))} className="flex flex-1 items-center gap-2.5 rounded-[12px] text-left hover:bg-black/[0.02]">
+    <button onClick={() => onOpenChat(botChatId(b.id))} className="flex flex-1 items-center gap-2.5 rounded-[12px] text-left hover:bg-[color:var(--bops-tint)]/[0.02]">
       <Mascot botId={b.id} color={b.color} size={36} />
       <span className="flex min-w-0 flex-col">
         <span className="truncate text-[14px] font-semibold leading-[18px] text-ink">{b.name}</span>
@@ -628,7 +628,7 @@ function QuickAsk({ state, widget: w, onOpenChat }: { state: AppState; widget: W
     >
       <div className="flex items-center gap-1.5 rounded-full bg-desk py-1 pl-3.5 pr-1 focus-within:shadow-[0_0_0_1.5px_var(--color-ink)]">
         <input value={text} onChange={(e) => setText(e.target.value)} placeholder={`Ask ${b.name} something`} aria-label={`Ask ${b.name}`} className="min-w-0 flex-1 bg-transparent py-1 text-[13.5px] text-ink outline-none placeholder:text-pencil" />
-        <button type="submit" disabled={!text.trim() || busy} className="shrink-0 rounded-full bg-ink px-3 py-1.5 text-[12px] font-semibold leading-4 text-white disabled:opacity-40">
+        <button type="submit" disabled={!text.trim() || busy} className="shrink-0 rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12px] font-semibold leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-40">
           Ask
         </button>
       </div>
@@ -663,12 +663,12 @@ function Links({ widget: w, edit, onOpenLink }: { widget: Widget; edit: Edit; on
               e.preventDefault();
               open(l.url);
             }}
-            className="flex min-w-0 flex-1 items-center gap-2 rounded-[8px] px-1.5 py-1 text-[13.5px] leading-5 text-ink hover:bg-black/[0.04]"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-[8px] px-1.5 py-1 text-[13.5px] leading-5 text-ink hover:bg-[color:var(--bops-tint)]/[0.04]"
           >
             <span className="size-1.5 shrink-0 rounded-full bg-highlighter shadow-[0_0_0_1px_var(--color-ink)]" />
             <span className="truncate">{l.label}</span>
           </a>
-          <button onClick={() => void edit({ links: list.filter((_, j) => j !== i) })} aria-label={`Remove ${l.label}`} className="flex size-6 shrink-0 items-center justify-center rounded-full text-pencil opacity-0 hover:bg-black/[0.05] group-hover/link:opacity-100">
+          <button onClick={() => void edit({ links: list.filter((_, j) => j !== i) })} aria-label={`Remove ${l.label}`} className="flex size-6 shrink-0 items-center justify-center rounded-full text-pencil opacity-0 hover:bg-[color:var(--bops-tint)]/[0.05] group-hover/link:opacity-100">
             <svg width="8" height="8" viewBox="0 0 12 12" aria-hidden>
               <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
@@ -682,7 +682,7 @@ function Links({ widget: w, edit, onOpenLink }: { widget: Widget; edit: Edit; on
 function Counter({ widget: w, edit }: { widget: Widget; edit: Edit }) {
   const value = w.value ?? 0;
   const step = w.step ?? 1;
-  const round = "flex size-9 items-center justify-center rounded-full text-[18px] font-semibold text-ink shadow-[0_0_0_1px_var(--color-rule)] hover:bg-black/[0.04]";
+  const round = "flex size-9 items-center justify-center rounded-full text-[18px] font-semibold text-ink shadow-[0_0_0_1px_var(--color-rule)] hover:bg-[color:var(--bops-tint)]/[0.04]";
   return (
     <div className="flex flex-1 items-center justify-between gap-2">
       <button className={round} onClick={() => void edit({ value: value - step }, true)} aria-label={`Take away ${step}`}>
@@ -712,10 +712,10 @@ function Checklist({ widget: w, edit }: { widget: Widget; edit: Edit }) {
       {items.length > 0 && <span className="text-[12px] leading-4 text-pencil">{done} of {items.length} done</span>}
       <ul className="flex flex-col">
         {items.map((it, i) => (
-          <li key={`${i}:${it.text}`} className="group/item flex items-center gap-2 rounded-[8px] px-1 py-0.5 hover:bg-black/[0.03]">
+          <li key={`${i}:${it.text}`} className="group/item flex items-center gap-2 rounded-[8px] px-1 py-0.5 hover:bg-[color:var(--bops-tint)]/[0.03]">
             <input type="checkbox" checked={it.done} onChange={() => void put(items.map((x, j) => (j === i ? { ...x, done: !x.done } : x)))} aria-label={it.text} className="size-4 shrink-0 accent-[var(--color-ink)]" />
             <span className={`min-w-0 flex-1 truncate text-[13.5px] leading-5 ${it.done ? "text-pencil line-through" : "text-ink"}`}>{it.text}</span>
-            <button onClick={() => void put(items.filter((_, j) => j !== i))} aria-label={`Remove ${it.text}`} className="flex size-6 shrink-0 items-center justify-center rounded-full text-pencil opacity-0 hover:bg-black/[0.05] group-hover/item:opacity-100">
+            <button onClick={() => void put(items.filter((_, j) => j !== i))} aria-label={`Remove ${it.text}`} className="flex size-6 shrink-0 items-center justify-center rounded-full text-pencil opacity-0 hover:bg-[color:var(--bops-tint)]/[0.05] group-hover/item:opacity-100">
               <svg width="8" height="8" viewBox="0 0 12 12" aria-hidden>
                 <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
@@ -766,10 +766,10 @@ export function WidgetTab({ state, pageId, widgetId, links, onOpenPage, onUnpin 
     <div className="motion-fade-in flex min-h-0 flex-1 flex-col bg-desk" data-widget-tab={pageId}>
       <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-4">
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-5 text-ink">{widgetId ? (shown.widgets[0]?.title ?? (shown.widgets[0] ? WIDGET_KINDS[shown.widgets[0].kind].name : page.name)) : page.name}</span>
-        <button onClick={() => onOpenPage(page.id)} className="rounded-full px-2.5 py-1 text-[12px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_var(--color-rule)] hover:bg-black/[0.04]">
+        <button onClick={() => onOpenPage(page.id)} className="rounded-full px-2.5 py-1 text-[12px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_var(--color-rule)] hover:bg-[color:var(--bops-tint)]/[0.04]">
           Open page
         </button>
-        <button onClick={onUnpin} className="rounded-full px-2.5 py-1 text-[12px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_var(--color-rule)] hover:bg-black/[0.04]">
+        <button onClick={onUnpin} className="rounded-full px-2.5 py-1 text-[12px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_var(--color-rule)] hover:bg-[color:var(--bops-tint)]/[0.04]">
           Unpin
         </button>
       </div>

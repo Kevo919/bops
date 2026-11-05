@@ -1,6 +1,7 @@
 "use client";
 
 import { PagesNav } from "./widgets";
+import { InProgress } from "./in-progress";
 import { useComputerWords } from "./computer-words";
 
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
@@ -135,6 +136,7 @@ export function Sidebar({
   /** The page of widgets open now, if one is. */
   pageOpen?: string | null;
 }) {
+  const computerWords = useComputerWords();
   const [query, setQuery] = useState<string | null>(search);
   const q = query?.trim().toLowerCase();
   // A workspace shared with the user is read only: no bot menu, and nothing new is made in it.
@@ -265,16 +267,16 @@ export function Sidebar({
             // Clicking away from an empty search closes it (not when the click is on the search button, which toggles it).
             onBlur={(e) => !query.trim() && e.relatedTarget?.getAttribute("aria-label") !== "Search" && setQuery(null)}
             placeholder={categoriesOpen(state) ? "Search bots, chats, threads, people" : "Search bots, chats, threads"}
-            className="motion-fade-in mr-2 h-[34px] min-w-0 flex-1 rounded-full bg-white px-3.5 text-[13px] shadow-[0_0_0_1px_#E6E6E3] outline-none placeholder:text-[#9A9A98]"
+            className="motion-fade-in mr-2 h-[34px] min-w-0 flex-1 rounded-full bg-white px-3.5 text-[13px] shadow-[0_0_0_1px_var(--h-e6e6e3)] outline-none placeholder:text-[color:var(--ht-9a9a98)]"
           />
         )}
         <div className="flex items-center gap-2">
           {onCollapse && (
             <button
               onClick={onCollapse}
-              title="Collapse the sidebar (⌘\)"
+              title={computerWords("Collapse the sidebar (⌘\\)")}
               aria-label="Collapse the sidebar"
-              className="flex size-[34px] shrink-0 items-center justify-center rounded-full hover:bg-black/[0.05]"
+              className="flex size-[34px] shrink-0 items-center justify-center rounded-full hover:bg-[color:var(--bops-tint)]/[0.05]"
             >
               <SideToggleIcon side="left" open />
             </button>
@@ -294,7 +296,11 @@ export function Sidebar({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {/* What needs you and what you pinned: over everything, and gone while you search. */}
         {/* The owner's pages of widgets: Home, then theirs (widgets.tsx). */}
-        {!q && onOpenPage && <PagesNav state={state} open={pageOpen} onOpen={onOpenPage} />}
+        {!q && onOpenPage && (
+          <InProgress id="widgets-by-chat">
+            <PagesNav state={state} open={pageOpen} onOpen={onOpenPage} />
+          </InProgress>
+        )}
         {!q && <FavoritesSection state={state} attention={attention.count} onAttention={openAttention} onOpenMemory={onOpenMemory} />}
         {/*
           The main bot's row first (it runs the team), then the rest by latest activity; the bots that work on one
@@ -322,8 +328,8 @@ export function Sidebar({
 
         {/* A search looks in Knowledge too: one row that opens it with the search filled in. */}
         {!!q && categoriesOpen(state) && (
-          <button onClick={() => onOpenMemory({ query: query ?? "" })} className="mt-1 flex h-[38px] items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[14px] leading-[18px] text-[#3A3A38] hover:bg-black/[0.03]">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#F2F2F0] text-[#3A3A38]">
+          <button onClick={() => onOpenMemory({ query: query ?? "" })} className="mt-1 flex h-[38px] items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[14px] leading-[18px] text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--bops-tint)]/[0.03]">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--hb-f2f2f0)] text-[color:var(--ht-3a3a38)]">
               <KnowledgeIcon size={13} />
             </span>
             <span className="min-w-0 flex-1 truncate">
@@ -334,7 +340,7 @@ export function Sidebar({
 
         {found.length > 0 && (
           <div className="flex flex-col pt-4">
-            <div className="px-2.5 pb-1.5 text-[13px] font-medium leading-4 text-[#9A9A98]">Threads</div>
+            <div className="px-2.5 pb-1.5 text-[13px] font-medium leading-4 text-[color:var(--ht-9a9a98)]">Threads</div>
             {found.map((s) => (
               <ThreadRow key={s.id} session={s} onClick={() => onOpenThread(s)} readOnly={!!state.shared} okWait={okWaits.has(s.id)} />
             ))}
@@ -347,7 +353,7 @@ export function Sidebar({
         Skills in it) open from the footer.
       */}
       {!!query?.trim() && (
-        <div className="-mx-2.5 shrink-0 border-t border-[#ECECEA] px-2.5 empty:hidden">
+        <div className="-mx-2.5 shrink-0 border-t border-[color:var(--h-ececea)] px-2.5 empty:hidden">
           <AutopilotSections state={state} query={query} onOpen={onOpenAutopilot} onOpenWatch={onOpenWatch} />
         </div>
       )}
@@ -438,7 +444,7 @@ export function SidebarFooter({
   if (vertical)
     return (
       // Each slot held to a circle (your initials too, however wide).
-      <div data-footer-column className="flex flex-col items-center gap-2 pt-3 [&_button[aria-pressed=true]]:bg-[#EEEEEC] [&>[data-footer-key]]:w-9">
+      <div data-footer-column className="flex flex-col items-center gap-2 pt-3 [&_button[aria-pressed=true]]:bg-[color:var(--hb-eeeeec)] [&>[data-footer-key]]:w-9">
         {pages}
         {you(false)}
       </div>
@@ -482,8 +488,8 @@ export function KnowledgeButton({ state, expanded, pressed, news: given, onOpen 
 function NewDot() {
   return (
     <span data-new-dot className="motion-dot-in pointer-events-none absolute -right-px -top-px flex size-2.5">
-      <span className="motion-new-pulse absolute inset-0 rounded-full bg-[#2F7BFF] motion-reduce:hidden" />
-      <span className="relative size-2.5 rounded-full bg-[#2F7BFF] shadow-[0_0_0_2px_#F9F9F8,0_0_0_4px_#2F7BFF2E]" />
+      <span className="motion-new-pulse absolute inset-0 rounded-full bg-[color:var(--hb-2f7bff)] motion-reduce:hidden" />
+      <span className="relative size-2.5 rounded-full bg-[color:var(--hb-2f7bff)] shadow-[0_0_0_2px_var(--h-f9f9f8),0_0_0_4px_var(--h-2f7bff2e)]" />
     </span>
   );
 }
@@ -513,7 +519,7 @@ function AppStack({ state }: { state: AppState }) {
   return (
     <span className="flex shrink-0 items-center">
       {apps.map((a, i) => (
-        <span key={a.app} className={`flex rounded-[5px] bg-white shadow-[0_0_0_1.5px_#FFFFFF] ${i ? "-ml-2" : ""}`}>
+        <span key={a.app} className={`flex rounded-[5px] bg-white shadow-[0_0_0_1.5px_var(--h-ffffff)] ${i ? "-ml-2" : ""}`}>
           <AppLogo app={a.app} name={a.appName} size={18} />
         </span>
       ))}
@@ -589,7 +595,7 @@ export function YouMenuView({
     shut();
     fn();
   };
-  const item = "flex h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[14px] font-medium hover:bg-black/[0.04]";
+  const item = "flex h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[14px] font-medium hover:bg-[color:var(--bops-tint)]/[0.04]";
   const name = user?.name?.trim() || user?.email || state.owner?.name?.trim() || "You";
   const others = teamWords(team);
   return (
@@ -600,7 +606,7 @@ export function YouMenuView({
         aria-label={`${name}: team, account and settings${others ? `, ${others}` : ""}`}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`flex h-9 w-full min-w-0 items-center justify-center overflow-hidden rounded-full px-2.5 text-[13px] font-semibold max-md:h-11 outline-none transition-[background-color,color,transform] duration-150 ease-out focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] active:scale-[.96] motion-reduce:transition-none ${open ? "bg-ink text-highlighter" : "bg-[#EEEEEC] text-[#6B6B6B] hover:bg-[#E6E6E3]"}`}
+        className={`flex h-9 w-full min-w-0 items-center justify-center overflow-hidden rounded-full px-2.5 text-[13px] font-semibold max-md:h-11 outline-none transition-[background-color,color,transform] duration-150 ease-out focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] active:scale-[.96] motion-reduce:transition-none ${open ? "bg-[color:var(--hb-0a0a0a)] text-highlighter" : "bg-[color:var(--hb-eeeeec)] text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--hb-e6e6e3)]"}`}
       >
         <span className="shrink-0">{initialsOf(state)}</span>
         <span aria-hidden className={`motion-footer-label min-w-0 truncate whitespace-nowrap text-[13.5px] font-medium ${open ? "text-highlighter" : "text-ink"} ${expanded ? "max-w-[160px] translate-x-0 pl-1.5 opacity-100" : "max-w-0 -translate-x-1 pl-0 opacity-0"}`}>
@@ -618,19 +624,19 @@ export function YouMenuView({
           }}
           title={computerWords("Something on this Mac needs you")}
           aria-label={computerWords("Something on this Mac needs you")}
-          className="motion-dot-in absolute -bottom-0.5 -left-0.5 rounded-full shadow-[0_0_0_2px_#F9F9F8]"
+          className="motion-dot-in absolute -bottom-0.5 -left-0.5 rounded-full shadow-[0_0_0_2px_var(--h-f9f9f8)]"
         >
           <NeedsYouDot />
         </button>
       )}
       {open && (
         // Over the chat column's own sheets (z-40, z-50) when it opens from the rail, past the column's edge.
-        <div role="menu" aria-label="Your account" className="motion-menu-in absolute bottom-[calc(100%+8px)] left-0 z-[60] flex w-[248px] origin-bottom-left flex-col rounded-[14px] bg-white p-1.5 shadow-[0_0_0_1px_#E6E6E3,0_12px_32px_rgba(0,0,0,0.12)]">
+        <div role="menu" aria-label="Your account" className="motion-menu-in absolute bottom-[calc(100%+8px)] left-0 z-[60] flex w-[248px] origin-bottom-left flex-col rounded-[14px] bg-white p-1.5 shadow-[0_0_0_1px_var(--h-e6e6e3),0_12px_32px_rgba(0,0,0,0.12)]">
           <div className="flex flex-col gap-0.5 px-2.5 pb-2 pt-1.5">
             <span className="truncate text-[14px] font-semibold leading-[18px]">{user?.name || state.owner?.name || "You"}</span>
-            <span className="truncate text-[12px] leading-4 text-[#9A9A98]">{user ? (user.email ?? "Signed in with Orgo") : "Not signed in"}</span>
+            <span className="truncate text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{user ? (user.email ?? "Signed in with Orgo") : "Not signed in"}</span>
           </div>
-          <div className="mx-2 mb-1 h-px bg-[#ECECEA]" />
+          <div className="mx-2 mb-1 h-px bg-[color:var(--hb-ececea)]" />
           {onTeam && (
             <button role="menuitem" data-menu-team onClick={pick(onTeam)} className={item}>
               <svg width="15" height="15" viewBox="0 0 16 16" className="shrink-0" aria-hidden>
@@ -639,7 +645,7 @@ export function YouMenuView({
                 <path d="M10.4 3.5a2.4 2.4 0 010 4.4M12 9.9c1.2.4 2 1.5 2.3 3.3" fill="none" stroke="#0A0A0A" strokeWidth="1.4" strokeLinecap="round" />
               </svg>
               <span className="flex-1">Team</span>
-              {!!team && <span className="shrink-0 text-[12px] font-normal tabular-nums text-[#8A8A88]">{team}</span>}
+              {!!team && <span className="shrink-0 text-[12px] font-normal tabular-nums text-[color:var(--ht-8a8a88)]">{team}</span>}
             </button>
           )}
           <button role="menuitem" onClick={pick(onSettings)} className={item}>
@@ -677,10 +683,10 @@ export function YouMenuView({
             ))}
           {user && (
             <>
-              <div className="mx-2 my-1 h-px bg-[#ECECEA]" />
+              <div className="mx-2 my-1 h-px bg-[color:var(--hb-ececea)]" />
               {/* Asked in place when changes haven't reached Bops Cloud; else the app goes to the sign in screen. */}
               {leaving.ask ?? (
-                <button role="menuitem" disabled={leaving.busy} onClick={() => void leaving.signOut()} className={`${item} text-[#6B6B6B] hover:text-[#B42318] disabled:opacity-50`}>
+                <button role="menuitem" disabled={leaving.busy} onClick={() => void leaving.signOut()} className={`${item} text-[color:var(--ht-6b6b6b)] hover:text-[color:var(--ht-b42318)] disabled:opacity-50`}>
                   <span className="w-[15px] shrink-0" />
                   Sign out
                 </button>
@@ -703,7 +709,7 @@ export function MainStar({ selected }: { selected: boolean }) {
       role="img"
       aria-label="Runs the team"
       title="Runs the team"
-      className={`absolute -bottom-px -right-px flex size-4 items-center justify-center rounded-full bg-highlighter ${selected ? "shadow-[inset_0_0_0_1px_#0A0A0A,0_0_0_2px_#EEEEEC]" : "shadow-[inset_0_0_0_1px_#0A0A0A,0_0_0_2px_#F9F9F8] group-hover/chat:shadow-[inset_0_0_0_1px_#0A0A0A,0_0_0_2px_#F2F2F1]"}`}
+      className={`absolute -bottom-px -right-px flex size-4 items-center justify-center rounded-full bg-highlighter ${selected ? "shadow-[inset_0_0_0_1px_var(--h-0a0a0a),0_0_0_2px_var(--h-eeeeec)]" : "shadow-[inset_0_0_0_1px_var(--h-0a0a0a),0_0_0_2px_var(--h-f9f9f8)] group-hover/chat:shadow-[inset_0_0_0_1px_var(--h-0a0a0a),0_0_0_2px_var(--h-f2f2f1)]"}`}
     >
       <svg width="11" height="11" viewBox="0 0 24 24" aria-hidden>
         <path
@@ -772,7 +778,7 @@ function ChatRow({
         : `${members.map((m) => m.name).join(", ")}${state.shared ? "" : " and you"}`;
 
   return (
-    <button onClick={onClick} onContextMenu={onMenu} className={`group/chat flex items-center gap-3 rounded-[14px] p-2.5 text-left ${selected ? "bg-[#EEEEEC]" : "hover:bg-black/[0.03]"} ${menuOpen ? "shadow-[inset_0_0_0_1.5px_#0A0A0A]" : ""}`}>
+    <button onClick={onClick} onContextMenu={onMenu} className={`group/chat flex items-center gap-3 rounded-[14px] p-2.5 text-left ${selected ? "bg-[color:var(--hb-eeeeec)]" : "hover:bg-[color:var(--bops-tint)]/[0.03]"} ${menuOpen ? "shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)]" : ""}`}>
       {solo?.isMain ? (
         <span className="relative shrink-0">
           <ChatAvatar chat={c} bots={state.bots} size={44} />
@@ -790,18 +796,18 @@ function ChatRow({
             <span
               data-row-line={site ? "site" : "role"}
               title={site ? (solo.role ? `${solo.role}. Works on ${site}` : `Works on ${site}`) : solo.role}
-              className={`min-w-0 truncate rounded-[5px] px-1.5 py-px text-[11px] leading-[14px] text-[#6B6B6B] ${site && coder ? "font-mono " : ""}${selected ? "bg-white" : "bg-[#EEEEEC]"}`}
+              className={`min-w-0 truncate rounded-[5px] px-1.5 py-px text-[11px] leading-[14px] text-[color:var(--ht-6b6b6b)] ${site && coder ? "font-mono " : ""}${selected ? "bg-white" : "bg-[color:var(--hb-eeeeec)]"}`}
             >
               {site && coder && <CodeMark />}
               {site ?? solo.role}
             </span>
           )}
           <span className="flex-1" />
-          <span className="shrink-0 text-[12px] leading-4 text-[#9A9A98]">{last ? ago(last.at) : ""}</span>
+          <span className="shrink-0 text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{last ? ago(last.at) : ""}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`min-w-0 flex-1 truncate text-[13px] leading-[17px] ${unread ? "font-medium text-ink" : typing ? "text-[#6B6B6B] italic" : "text-[#6B6B6B]"}`}>{preview}</span>
-          {unread && <span data-tip="Unread" onAnimationEnd={dot.done} className={`size-[9px] shrink-0 rounded-full bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A] ${dot.pop ? "motion-dot-in" : ""}`} />}
+          <span className={`min-w-0 flex-1 truncate text-[13px] leading-[17px] ${unread ? "font-medium text-ink" : typing ? "text-[color:var(--ht-6b6b6b)] italic" : "text-[color:var(--ht-6b6b6b)]"}`}>{preview}</span>
+          {unread && <span data-tip="Unread" onAnimationEnd={dot.done} className={`size-[9px] shrink-0 rounded-full bg-highlighter shadow-[0_0_0_1.5px_var(--h-0a0a0a)] ${dot.pop ? "motion-dot-in" : ""}`} />}
           {trail}
         </div>
       </div>
@@ -1008,7 +1014,7 @@ export function WorkspaceSwitcher({
   const held = state.orgoMigration?.defaultRename;
   const heldNote = (wsId: string) =>
     wsId === MAIN_WORKSPACE && held ? (
-      <span data-held-name className="px-2.5 pb-1 text-[12px] leading-4 text-[#6B6B6B]">
+      <span data-held-name className="px-2.5 pb-1 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
         {heldNameNote(held.reason)}
       </span>
     ) : null;
@@ -1020,7 +1026,7 @@ export function WorkspaceSwitcher({
       <button
         onClick={() => (open ? close() : setOpen(true))}
         title="Switch workspace"
-        className="-ml-1.5 flex min-w-0 items-center gap-1.5 rounded-[10px] px-1.5 py-0.5 hover:bg-black/[0.04] max-md:min-h-10"
+        className="-ml-1.5 flex min-w-0 items-center gap-1.5 rounded-[10px] px-1.5 py-0.5 hover:bg-[color:var(--bops-tint)]/[0.04] max-md:min-h-10"
       >
         <span className="truncate text-[22px] font-semibold leading-7 tracking-[-0.02em]">{state.shared?.name ?? current?.name ?? "Main"}</span>
         <svg width="12" height="12" viewBox="0 0 12 12" className={`shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none ${open ? "rotate-180" : ""}`}>
@@ -1029,23 +1035,23 @@ export function WorkspaceSwitcher({
       </button>
       {/* Their role in a workspace shared with them, plainly. */}
       {state.shared && (
-        <span data-shared-role className="block truncate px-0 text-[12px] leading-4 text-[#9A9A98]">
+        <span data-shared-role className="block truncate px-0 text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">
           {roleHere(state.shared.role)}
         </span>
       )}
       {open && (
-        <div className="motion-menu-in absolute left-0 top-[calc(100%+6px)] z-30 flex w-[248px] origin-top-left flex-col rounded-[14px] bg-white p-1.5 shadow-[0_0_0_1px_#E6E6E3,0_12px_32px_rgba(0,0,0,0.12)]">
-          <div className="px-2.5 pb-1 pt-1.5 text-[12px] font-medium text-[#9A9A98]">Workspaces</div>
+        <div className="motion-menu-in absolute left-0 top-[calc(100%+6px)] z-30 flex w-[248px] origin-top-left flex-col rounded-[14px] bg-white p-1.5 shadow-[0_0_0_1px_var(--h-e6e6e3),0_12px_32px_rgba(0,0,0,0.12)]">
+          <div className="px-2.5 pb-1 pt-1.5 text-[12px] font-medium text-[color:var(--ht-9a9a98)]">Workspaces</div>
           {workspaces.map((w) =>
             naming?.id === w.id ? (
               <Fragment key={w.id}>
-                {problem && <span role="alert" className="px-2.5 pt-1 text-[12px] leading-4 text-[#B42318]">{problem}</span>}
+                {problem && <span role="alert" className="px-2.5 pt-1 text-[12px] leading-4 text-[color:var(--ht-b42318)]">{problem}</span>}
                 <NameInput value={naming.name} onChange={editName(w.id)} onSave={save} onCancel={() => setNaming(null)} />
                 {heldNote(w.id)}
               </Fragment>
             ) : (
               <Fragment key={w.id}>
-                <div className="group/ws flex items-center rounded-[10px] hover:bg-black/[0.04]">
+                <div className="group/ws flex items-center rounded-[10px] hover:bg-[color:var(--bops-tint)]/[0.04]">
                   <button
                     onClick={() => {
                       if (w.id !== current?.id) void post("/api/workspaces", { current: w.id }, "PATCH");
@@ -1061,7 +1067,7 @@ export function WorkspaceSwitcher({
                       )}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{w.name}</span>
-                    <span className="shrink-0 text-[12px] text-[#9A9A98]">
+                    <span className="shrink-0 text-[12px] text-[color:var(--ht-9a9a98)]">
                       {count(w.id)} bot{count(w.id) === 1 ? "" : "s"}
                     </span>
                   </button>
@@ -1069,7 +1075,7 @@ export function WorkspaceSwitcher({
                     onClick={() => setNaming({ id: w.id, name: w.name })}
                     title={`Rename ${w.name}`}
                     aria-label={`Rename ${w.name}`}
-                    className="mx-1 flex size-7 shrink-0 items-center justify-center rounded-md text-[#9A9A98] opacity-0 transition-opacity duration-150 ease-out hover:bg-black/[0.06] hover:text-ink focus-visible:opacity-100 group-hover/ws:opacity-100 group-has-[:focus-visible]/ws:opacity-100 motion-reduce:transition-none"
+                    className="mx-1 flex size-7 shrink-0 items-center justify-center rounded-md text-[color:var(--ht-9a9a98)] opacity-0 transition-opacity duration-150 ease-out hover:bg-[color:var(--bops-tint)]/[0.06] hover:text-ink focus-visible:opacity-100 group-hover/ws:opacity-100 group-has-[:focus-visible]/ws:opacity-100 motion-reduce:transition-none"
                   >
                     <svg width="12" height="12" viewBox="0 0 16 16">
                       <path d="M3 13l1-3.5L11 2.5l2.5 2.5L6.5 12 3 13z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
@@ -1080,7 +1086,7 @@ export function WorkspaceSwitcher({
                       onClick={() => void askDelete(w.id)}
                       title={`Delete ${w.name}`}
                       aria-label={`Delete ${w.name}`}
-                      className="mr-1 flex size-7 shrink-0 items-center justify-center rounded-md text-[#9A9A98] opacity-0 transition-opacity duration-150 ease-out hover:bg-black/[0.06] hover:text-[#B42318] focus-visible:opacity-100 group-hover/ws:opacity-100 group-has-[:focus-visible]/ws:opacity-100 motion-reduce:transition-none"
+                      className="mr-1 flex size-7 shrink-0 items-center justify-center rounded-md text-[color:var(--ht-9a9a98)] opacity-0 transition-opacity duration-150 ease-out hover:bg-[color:var(--bops-tint)]/[0.06] hover:text-[color:var(--ht-b42318)] focus-visible:opacity-100 group-hover/ws:opacity-100 group-has-[:focus-visible]/ws:opacity-100 motion-reduce:transition-none"
                     >
                       <svg width="9" height="9" viewBox="0 0 12 12">
                         <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -1095,13 +1101,13 @@ export function WorkspaceSwitcher({
           {deleting && <DeleteConfirm name={workspaces.find((w) => w.id === deleting.id)?.name ?? "this workspace"} {...deleting} onCancel={() => setDeleting(null)} onDelete={() => void confirmDelete()} />}
           {sharedRows.length > 0 && (
             <>
-              <div className="px-2.5 pb-1 pt-2.5 text-[12px] font-medium text-[#9A9A98]">Shared with you</div>
+              <div className="px-2.5 pb-1 pt-2.5 text-[12px] font-medium text-[color:var(--ht-9a9a98)]">Shared with you</div>
               {sharedRows.map((x) => (
                 <button
                   key={x.projectId}
                   data-shared={x.projectId}
                   onClick={() => void openShared(x.projectId)}
-                  className="flex min-h-9 items-center gap-2 rounded-[10px] py-1.5 pl-2.5 pr-2 text-left hover:bg-black/[0.04]"
+                  className="flex min-h-9 items-center gap-2 rounded-[10px] py-1.5 pl-2.5 pr-2 text-left hover:bg-[color:var(--bops-tint)]/[0.04]"
                 >
                   <span className="flex size-[18px] shrink-0 items-center justify-center">
                     {x.projectId === state.shared?.projectId && (
@@ -1112,13 +1118,13 @@ export function WorkspaceSwitcher({
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-[14px] font-medium">{x.name}</span>
-                    <span className="truncate text-[12px] leading-4 text-[#9A9A98]">{sharedBy(x)}</span>
+                    <span className="truncate text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{sharedBy(x)}</span>
                   </span>
-                  <span className="shrink-0 text-[12px] text-[#9A9A98]">{roleLabel(x.role)}</span>
+                  <span className="shrink-0 text-[12px] text-[color:var(--ht-9a9a98)]">{roleLabel(x.role)}</span>
                 </button>
               ))}
               {problem && !naming && (
-                <span role="alert" className="px-2.5 pb-1 text-[12px] leading-4 text-[#B42318]">
+                <span role="alert" className="px-2.5 pb-1 text-[12px] leading-4 text-[color:var(--ht-b42318)]">
                   {problem}
                 </span>
               )}
@@ -1126,20 +1132,20 @@ export function WorkspaceSwitcher({
           )}
           {/* After each workspace became an Orgo workspace of its own: names Orgo already had (until dismissed). */}
           {renamed.length > 0 && (
-            <div className="flex flex-col gap-0.5 px-2.5 pt-1 text-[12px] leading-4 text-[#6B6B6B]">
+            <div className="flex flex-col gap-0.5 px-2.5 pt-1 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
               {renamed.map((r) => (
                 <span key={r.wsId}>
                   {r.from} is {r.to} in Orgo: you already had an Orgo workspace named {r.from}.
                 </span>
               ))}
               {renamed.length > 0 && (
-                <button onClick={() => void post("/api/workspaces", { noticeSeen: true }, "PATCH").catch(() => {})} className="self-start text-[12px] font-medium text-[#0A0A0A] hover:underline">
+                <button onClick={() => void post("/api/workspaces", { noticeSeen: true }, "PATCH").catch(() => {})} className="self-start text-[12px] font-medium text-[color:var(--ht-0a0a0a)] hover:underline">
                   Dismiss
                 </button>
               )}
             </div>
           )}
-          <div className="mx-2 my-1 h-px bg-[#ECECEA]" />
+          <div className="mx-2 my-1 h-px bg-[color:var(--hb-ececea)]" />
           {/* The open workspace's org chart, below the list so it never reads as a workspace of its own; never one shared with the user. */}
           {onTeamChart && !state.shared && current && (
             <button
@@ -1149,22 +1155,22 @@ export function WorkspaceSwitcher({
                 close();
                 onTeamChart();
               }}
-              className="flex h-9 items-center gap-2 rounded-[10px] pl-2.5 pr-2.5 text-left text-[14px] font-medium hover:bg-black/[0.04]"
+              className="flex h-9 items-center gap-2 rounded-[10px] pl-2.5 pr-2.5 text-left text-[14px] font-medium hover:bg-[color:var(--bops-tint)]/[0.04]"
             >
-              <span className="flex size-[18px] items-center justify-center text-[#3A3A38]">
+              <span className="flex size-[18px] items-center justify-center text-[color:var(--ht-3a3a38)]">
                 <ChartIcon size={14} />
               </span>
               Org chart
-              <span className="ml-auto truncate pl-3 text-[12px] font-normal text-[#9A9A98]">{current.name}</span>
+              <span className="ml-auto truncate pl-3 text-[12px] font-normal text-[color:var(--ht-9a9a98)]">{current.name}</span>
             </button>
           )}
           {naming && !naming.id ? (
             <>
-              {problem && <span role="alert" className="px-2.5 pb-1 text-[12px] leading-4 text-[#B42318]">{problem}</span>}
+              {problem && <span role="alert" className="px-2.5 pb-1 text-[12px] leading-4 text-[color:var(--ht-b42318)]">{problem}</span>}
               <NameInput value={naming.name} placeholder="Name the workspace" onChange={editName()} onSave={save} onCancel={() => setNaming(null)} />
             </>
           ) : (
-            <button onClick={() => setNaming({ name: "" })} className="flex h-9 items-center gap-2 rounded-[10px] pl-2.5 text-left text-[14px] font-medium hover:bg-black/[0.04]">
+            <button onClick={() => setNaming({ name: "" })} className="flex h-9 items-center gap-2 rounded-[10px] pl-2.5 text-left text-[14px] font-medium hover:bg-[color:var(--bops-tint)]/[0.04]">
               <span className="flex size-[18px] items-center justify-center">
                 <svg width="12" height="12" viewBox="0 0 16 16">
                   <path d="M8 3v10M3 8h10" fill="none" stroke="#0A0A0A" strokeWidth="1.6" strokeLinecap="round" />
@@ -1210,7 +1216,7 @@ export function DeleteConfirm({ name, preview, error, busy, onCancel, onDelete }
     !preview.issues?.length;
   const team = preview?.memory ? "Its bots, chats and memory go" : "Its bots and chats go";
   return (
-    <div className="mx-1 my-1 flex flex-col gap-1.5 rounded-[10px] bg-[#F7F7F5] p-2.5 text-[12px] leading-4 text-[#6B6B6B]">
+    <div className="mx-1 my-1 flex flex-col gap-1.5 rounded-[10px] bg-[color:var(--hb-f7f7f5)] p-2.5 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
       <span className="text-[13px] font-medium text-ink">Delete {name}?</span>
       {!preview && !error && <span>Checking what&apos;s in it&hellip;</span>}
       {preview && (
@@ -1232,16 +1238,16 @@ export function DeleteConfirm({ name, preview, error, busy, onCancel, onDelete }
         </>
       )}
       {error && (
-        <span role="alert" className="text-[#B42318]">
+        <span role="alert" className="text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}
       <div className="flex justify-end gap-1.5 pt-0.5">
-        <button onClick={onCancel} className="h-7 rounded-md px-2 text-[12px] font-medium text-ink hover:bg-black/[0.06]">
+        <button onClick={onCancel} className="h-7 rounded-md px-2 text-[12px] font-medium text-ink hover:bg-[color:var(--bops-tint)]/[0.06]">
           Cancel
         </button>
         {preview && (
-          <button onClick={onDelete} disabled={busy} className="h-7 rounded-md bg-[#B42318] px-2 text-[12px] font-medium text-white disabled:opacity-50">
+          <button onClick={onDelete} disabled={busy} className="h-7 rounded-md bg-[color:var(--hb-b42318)] px-2 text-[12px] font-medium text-[color:var(--bops-on-fill)] disabled:opacity-50">
             {busy ? "Deleting" : "Delete"}
           </button>
         )}
@@ -1266,9 +1272,9 @@ export function NameInput({ value, placeholder, onChange, onSave, onCancel }: { 
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), onCancel())}
-        className="h-8 min-w-0 flex-1 rounded-[8px] bg-[#F4F4F2] px-2.5 text-[14px] outline-none placeholder:text-[#9A9A98] focus:shadow-[0_0_0_1.5px_#0A0A0A]"
+        className="h-8 min-w-0 flex-1 rounded-[8px] bg-[color:var(--hb-f4f4f2)] px-2.5 text-[14px] outline-none placeholder:text-[color:var(--ht-9a9a98)] focus:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
       />
-      <button type="submit" disabled={!value.trim()} className="h-8 shrink-0 rounded-[8px] bg-ink px-3 text-[13px] font-medium text-white disabled:opacity-30">
+      <button type="submit" disabled={!value.trim()} className="h-8 shrink-0 rounded-[8px] bg-[color:var(--hb-0a0a0a)] px-3 text-[13px] font-medium text-[color:var(--bops-on-fill)] disabled:opacity-30">
         {placeholder ? "Create" : "Save"}
       </button>
     </form>

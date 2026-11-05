@@ -5,11 +5,12 @@ import { MAX_BOT_DOC_CHARS, waitsForOk, workspaceOf, type AppState, type Bot, ty
 import { entryOf, teamIn } from "@/lib/chain";
 import { MEMORY_FILE, renderMemoryDoc, renderSoul, SOUL_FILE } from "@/lib/bot-docs";
 import { MemorySheet } from "./memory-sheet";
-import { ago, memberAnswers, post, quietNothing, StatusIcon } from "./ui";
+import { ago, memberAnswers, post, quietNothing, StatusIcon, useSelfHosted } from "./ui";
+import { OpenSettings } from "./open-settings";
 import { you } from "@/lib/shared";
 
 type Fact = { id: string; text: string; private: boolean; at?: number; source?: string };
-type Data = { workspace: string; ws: string; own?: boolean; card: Fact[]; facts: Fact[]; error?: string; unreachable?: boolean };
+type Data = { workspace: string; ws: string; own?: boolean; card: Fact[]; facts: Fact[]; error?: string; unreachable?: boolean; off?: boolean };
 /** The bot whose own memory the tab shows (it keeps its memory to itself: lib/chain.ts), so a change goes to its own bank. */
 const OwnMemoryOf = createContext<string | undefined>(undefined);
 /** Each bot's Memory tab as last loaded, so opening it again is instant (then it refreshes). */
@@ -23,6 +24,8 @@ type Answer = { answer: string; based: { id: string; text: string; source: strin
  * pin or delete it. Memory belongs to the workspace, so the whole team shares it (Manage, at the end).
  */
 export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bot: Bot; onOpenThread: (s: Session) => void }) {
+  const selfHosted = useSelfHosted();
+  const openSettings = useContext(OpenSettings);
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
   // What the tab showed last time for this bot shows at once; the fresh copy replaces it when it lands.
@@ -95,9 +98,9 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
     <OwnMemoryOf.Provider value={data?.own ? b.id : undefined}>
     <div className="mx-auto flex w-full max-w-[640px] flex-col gap-7 pb-6">
       {!state.shared && (
-        <div role="tablist" aria-label="Memory views" className="flex gap-0.5 self-start rounded-full bg-[#F2F2F0] p-0.5 text-[12.5px] leading-4">
+        <div role="tablist" aria-label="Memory views" className="flex gap-0.5 self-start rounded-full bg-[color:var(--hb-f2f2f0)] p-0.5 text-[12.5px] leading-4">
           {(["memory", "edit"] as const).map((v) => (
-            <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`rounded-full px-3 py-1 ${view === v ? "bg-white font-medium text-ink shadow-[0_0_0_1px_#0000000F]" : "text-[#6B6B6B] hover:text-ink"}`}>
+            <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`rounded-full px-3 py-1 ${view === v ? "bg-white font-medium text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "text-[color:var(--ht-6b6b6b)] hover:text-ink"}`}>
               {v === "memory" ? "Memory" : "Edit"}
             </button>
           ))}
@@ -105,6 +108,23 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
       )}
       {editing ? (
         <BotDocs state={state} bot={b} pinned={(data?.card ?? []).map((l) => l.text)} />
+      ) : data?.off ? (
+        <div data-memory-off className="flex flex-col gap-1.5 rounded-[18px] bg-[color:var(--hb-f7f7f6)] px-5 py-4 text-[13.5px] leading-5">
+          <span className="font-medium">Memory isn&apos;t set up on this computer yet.</span>
+          <span className="text-[color:var(--ht-6b6b6b)]">
+            So {b.name} doesn&apos;t learn about you from your chats on its own.{" "}
+            {state.shared
+              ? "The workspace's owner can turn it on."
+              : selfHosted
+                ? "To turn it on, paste a Honcho key in Settings, Services, then restart Bops. Until then, use Edit to write down what it should remember."
+                : "Bops Cloud runs memory for you while you're signed in with Orgo, and it isn't on for your account right now. Until then, use Edit to write down what it should remember."}
+          </span>
+          {selfHosted && !state.shared && openSettings && (
+            <button data-open-service="memory" onClick={() => openSettings("services", { service: "memory" })} className="self-start rounded-full bg-paper px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_var(--color-rule)] hover:bg-desk">
+              Add a Honcho key
+            </button>
+          )}
+        </div>
       ) : (
       <>
       <form
@@ -112,9 +132,9 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
           e.preventDefault();
           void ask();
         }}
-        className="flex items-center gap-2 rounded-full bg-[#F7F7F6] py-1 pl-3.5 pr-1 focus-within:bg-white focus-within:shadow-[inset_0_0_0_1.5px_#0A0A0A]"
+        className="flex items-center gap-2 rounded-full bg-[color:var(--hb-f7f7f6)] py-1 pl-3.5 pr-1 focus-within:bg-white focus-within:shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)]"
       >
-        <svg width="14" height="14" viewBox="0 0 16 16" className="shrink-0 text-[#9A9A98]" aria-hidden>
+        <svg width="14" height="14" viewBox="0 0 16 16" className="shrink-0 text-[color:var(--ht-9a9a98)]" aria-hidden>
           <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
           <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
@@ -136,10 +156,10 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
             setResults(null);
           }}
           placeholder={`Ask ${b.name} what it knows about ${you(state)}`}
-          className="h-8 min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[#9A9A98]"
+          className="h-8 min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[color:var(--ht-9a9a98)]"
         />
         {searching && (
-          <button disabled={asking} className="h-7 shrink-0 rounded-full bg-[#0A0A0A] px-3 text-[12.5px] font-medium text-white disabled:opacity-50">
+          <button disabled={asking} className="h-7 shrink-0 rounded-full bg-[color:var(--hb-0a0a0a)] px-3 text-[12.5px] font-medium text-[color:var(--bops-on-fill)] disabled:opacity-50">
             {asking ? "Thinking…" : "Ask"}
           </button>
         )}
@@ -148,9 +168,9 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
       {searching ? (
         <div className="-mt-3 flex flex-col gap-6">
           {(asking || answer) && (
-            <div className="flex flex-col gap-3 rounded-[18px] bg-[#F7F7F6] px-5 py-4">
+            <div className="flex flex-col gap-3 rounded-[18px] bg-[color:var(--hb-f7f7f6)] px-5 py-4">
               {asking ? (
-                <div className="text-[13.5px] text-[#9A9A98]">Thinking back…</div>
+                <div className="text-[13.5px] text-[color:var(--ht-9a9a98)]">Thinking back…</div>
               ) : (
                 answer && (
                   <>
@@ -158,11 +178,11 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
                       <Bold text={answer.answer} />
                     </div>
                     {answer.based.length > 0 && (
-                      <div className="flex flex-col gap-1.5 border-t border-black/[0.06] pt-3">
+                      <div className="flex flex-col gap-1.5 border-t border-[color:var(--bops-tint)]/[0.06] pt-3">
                         {answer.based.map((f) => (
-                          <div key={f.id} className="flex items-baseline gap-3 text-[12.5px] leading-[18px] text-[#6B6B6B]">
+                          <div key={f.id} className="flex items-baseline gap-3 text-[12.5px] leading-[18px] text-[color:var(--ht-6b6b6b)]">
                             <span className="min-w-0 flex-1">{sentence(f.text)}</span>
-                            <span className="shrink-0 text-[#9A9A98]">{f.source}</span>
+                            <span className="shrink-0 text-[color:var(--ht-9a9a98)]">{f.source}</span>
                           </div>
                         ))}
                       </div>
@@ -195,9 +215,9 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
           <Section
             title="Recently learned"
             right={
-              <div className="flex gap-0.5 rounded-full bg-[#F2F2F0] p-0.5 text-[12px] leading-4">
+              <div className="flex gap-0.5 rounded-full bg-[color:var(--hb-f2f2f0)] p-0.5 text-[12px] leading-4">
                 {[false, true].map((m) => (
-                  <button key={String(m)} onClick={() => setMine(m)} className={`rounded-full px-2.5 py-1 ${mine === m ? "bg-white font-medium text-ink shadow-[0_0_0_1px_#0000000F]" : "text-[#6B6B6B] hover:text-ink"}`}>
+                  <button key={String(m)} onClick={() => setMine(m)} className={`rounded-full px-2.5 py-1 ${mine === m ? "bg-white font-medium text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "text-[color:var(--ht-6b6b6b)] hover:text-ink"}`}>
                     {m ? `From ${b.name}` : "All"}
                   </button>
                 ))}
@@ -219,16 +239,16 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
               <>
                 <div className="flex flex-col">
                   {(allWork ? done : done.slice(0, 3)).map((s) => (
-                    <button key={s.id} onClick={() => onOpenThread(s)} className="-mx-2.5 flex items-start gap-2.5 rounded-[12px] px-2.5 py-2 text-left hover:bg-[#F7F7F6]">
+                    <button key={s.id} onClick={() => onOpenThread(s)} className="-mx-2.5 flex items-start gap-2.5 rounded-[12px] px-2.5 py-2 text-left hover:bg-[color:var(--hb-f7f7f6)]">
                       <span className="mt-0.5">
                         <StatusIcon session={s} owner={!!state.shared && !memberAnswers(state, s)} member={memberAnswers(state, s)} okWait={waitsForOk(s, state)} />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-baseline gap-2">
                           <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-5">{s.title}</span>
-                          <span className="shrink-0 text-[12px] text-[#9A9A98]">{ago(s.endedAt ?? s.createdAt)}</span>
+                          <span className="shrink-0 text-[12px] text-[color:var(--ht-9a9a98)]">{ago(s.endedAt ?? s.createdAt)}</span>
                         </span>
-                        {s.answer && <span className="line-clamp-1 text-[13px] leading-[18px] text-[#6B6B6B]">{s.answer.replace(/\*\*|\[|\]\([^)]*\)/g, "")}</span>}
+                        {s.answer && <span className="line-clamp-1 text-[13px] leading-[18px] text-[color:var(--ht-6b6b6b)]">{s.answer.replace(/\*\*|\[|\]\([^)]*\)/g, "")}</span>}
                       </span>
                     </button>
                   ))}
@@ -241,12 +261,12 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
           </Section>
 
           {data.own ? (
-            <div className="text-center text-[12px] leading-4 text-[#9A9A98]">{b.name} keeps its memory to itself: only it reads this.</div>
+            <div className="text-center text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{b.name} keeps its memory to itself: only it reads this.</div>
           ) : (
-            <div className="text-center text-[12px] leading-4 text-[#9A9A98]">
+            <div className="text-center text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">
               Everyone on the {data.workspace} team shares this memory.{" "}
               {!manage && (
-                <button onClick={() => setManage(true)} aria-expanded={manage} className="font-medium text-[#6B6B6B] underline decoration-[#D9D9D6] underline-offset-2 hover:text-ink">
+                <button onClick={() => setManage(true)} aria-expanded={manage} className="font-medium text-[color:var(--ht-6b6b6b)] underline decoration-[color:var(--h-d9d9d6)] underline-offset-2 hover:text-ink">
                   Manage
                 </button>
               )}
@@ -295,11 +315,11 @@ function BotDocs({ state, bot: b, pinned }: { state: AppState; bot: Bot; pinned:
   const memory: DocView = docs?.memory ?? { text: b.memoryDoc ?? null, generated: renderMemoryDoc(b, owner, pinned) };
   return (
     <div data-bot-docs className="flex flex-col gap-7">
-      <div className="rounded-[18px] bg-[#F7F7F6] px-5 py-4 text-[13px] leading-5 text-[#6B6B6B]">
+      <div className="rounded-[18px] bg-[color:var(--hb-f7f7f6)] px-5 py-4 text-[13px] leading-5 text-[color:var(--ht-6b6b6b)]">
         {b.name} reads both at the start of every chat turn, task and call. <b className="font-medium text-ink">{SOUL_FILE}</b> is who it is: its tone and its rules; saved, it takes the place of How I work on its profile. <b className="font-medium text-ink">{MEMORY_FILE}</b> is what you want it to keep in mind for good, next to what it learns on its own. What you say in a chat still wins, and Bops&apos; own rules (approvals) still apply.
-        {docs?.dir ? <span className="block pt-1 text-[12px] text-[#9A9A98]">Copies are kept at {docs.dir}; edits there do nothing, edit here.</span> : null}
+        {docs?.dir ? <span className="block pt-1 text-[12px] text-[color:var(--ht-9a9a98)]">Copies are kept at {docs.dir}; edits there do nothing, edit here.</span> : null}
       </div>
-      {docs?.error && <div role="alert" className="text-[13px] text-[#B42318]">{docs.error}</div>}
+      {docs?.error && <div role="alert" className="text-[13px] text-[color:var(--ht-b42318)]">{docs.error}</div>}
       <DocEditor bot={b} field="soul" file={SOUL_FILE} doc={soul} max={docs?.max ?? MAX_BOT_DOC_CHARS} onSaved={setDocs} />
       <DocEditor bot={b} field="memoryDoc" file={MEMORY_FILE} doc={memory} max={docs?.max ?? MAX_BOT_DOC_CHARS} onSaved={setDocs} />
     </div>
@@ -334,7 +354,7 @@ function DocEditor({ bot: b, field, file, doc, max, onSaved }: { bot: Bot; field
     <section data-doc={file} className="flex flex-col gap-2.5">
       <div className="flex h-6 items-center justify-between">
         <h3 className="text-[15px] font-semibold tracking-[-0.01em]">{file}</h3>
-        <span className="text-[12px] leading-4 text-[#9A9A98]">{doc.text === null ? "Generated" : "Yours"}</span>
+        <span className="text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{doc.text === null ? "Generated" : "Yours"}</span>
       </div>
       <textarea
         aria-label={file}
@@ -343,19 +363,19 @@ function DocEditor({ bot: b, field, file, doc, max, onSaved }: { bot: Bot; field
         maxLength={max}
         spellCheck={false}
         rows={12}
-        className="min-h-[200px] w-full resize-y rounded-[14px] bg-[#F7F7F6] px-4 py-3 font-mono text-[12.5px] leading-[19px] outline-none focus:bg-white focus:shadow-[inset_0_0_0_1.5px_#0A0A0A]"
+        className="min-h-[200px] w-full resize-y rounded-[14px] bg-[color:var(--hb-f7f7f6)] px-4 py-3 font-mono text-[12.5px] leading-[19px] outline-none focus:bg-white focus:shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)]"
       />
       <div className="flex items-center gap-2">
-        <button disabled={busy || !changed} onClick={() => void send(text)} className="h-7 rounded-full bg-[#0A0A0A] px-3 text-[12.5px] font-medium text-white disabled:opacity-40">
+        <button disabled={busy || !changed} onClick={() => void send(text)} className="h-7 rounded-full bg-[color:var(--hb-0a0a0a)] px-3 text-[12.5px] font-medium text-[color:var(--bops-on-fill)] disabled:opacity-40">
           Save
         </button>
         {(doc.text !== null || changed) && (
-          <button disabled={busy} onClick={() => void send(null)} className="h-7 rounded-full bg-[#F2F2F0] px-3 text-[12.5px] font-medium text-ink hover:bg-[#EAEAE7] disabled:opacity-50">
+          <button disabled={busy} onClick={() => void send(null)} className="h-7 rounded-full bg-[color:var(--hb-f2f2f0)] px-3 text-[12.5px] font-medium text-ink hover:bg-[color:var(--hb-eaeae7)] disabled:opacity-50">
             Reset to generated
           </button>
         )}
-        {error && <span role="alert" className="text-[12px] text-[#B42318]">{error}</span>}
-        <span className="ml-auto shrink-0 text-[12px] tabular-nums leading-4 text-[#9A9A98]">{left === 1 ? "1 character left" : `${left.toLocaleString("en-US")} characters left`}</span>
+        {error && <span role="alert" className="text-[12px] text-[color:var(--ht-b42318)]">{error}</span>}
+        <span className="ml-auto shrink-0 text-[12px] tabular-nums leading-4 text-[color:var(--ht-9a9a98)]">{left === 1 ? "1 character left" : `${left.toLocaleString("en-US")} characters left`}</span>
       </div>
     </section>
   );
@@ -374,17 +394,17 @@ function KeptApart({ bot: b, onDone }: { bot: Bot; onDone: () => void }) {
     onDone();
   };
   return (
-    <div data-kept-apart className="flex flex-col items-center gap-2 text-center text-[12px] leading-4 text-[#6B6B6B]">
+    <div data-kept-apart className="flex flex-col items-center gap-2 text-center text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
       <span>What {b.name} kept to itself is kept apart: nothing reads it.</span>
       <span className="flex gap-2">
-        <button disabled={busy} onClick={() => void act("bring-in")} className="rounded-full bg-[#F2F2F0] px-3 py-1 font-medium text-ink hover:bg-[#EAEAE7] disabled:opacity-50">
+        <button disabled={busy} onClick={() => void act("bring-in")} className="rounded-full bg-[color:var(--hb-f2f2f0)] px-3 py-1 font-medium text-ink hover:bg-[color:var(--hb-eaeae7)] disabled:opacity-50">
           Bring it in
         </button>
-        <button disabled={busy} onClick={() => void act("drop-own")} className="rounded-full bg-[#F2F2F0] px-3 py-1 font-medium text-[#B42318] hover:bg-[#EAEAE7] disabled:opacity-50">
+        <button disabled={busy} onClick={() => void act("drop-own")} className="rounded-full bg-[color:var(--hb-f2f2f0)] px-3 py-1 font-medium text-[color:var(--ht-b42318)] hover:bg-[color:var(--hb-eaeae7)] disabled:opacity-50">
           Delete it
         </button>
       </span>
-      {error && <span role="alert" className="text-[#B42318]">{error}</span>}
+      {error && <span role="alert" className="text-[color:var(--ht-b42318)]">{error}</span>}
     </div>
   );
 }
@@ -401,11 +421,11 @@ function Section({ title, right, children }: { title: string; right?: React.Reac
   );
 }
 
-const Quiet = ({ children }: { children: React.ReactNode }) => <div className="py-2 text-[13.5px] leading-5 text-[#9A9A98]">{children}</div>;
+const Quiet = ({ children }: { children: React.ReactNode }) => <div className="py-2 text-[13.5px] leading-5 text-[color:var(--ht-9a9a98)]">{children}</div>;
 
 function More({ open, onClick, count }: { open: boolean; onClick: () => void; count: number }) {
   return (
-    <button onClick={onClick} className="self-start text-[13px] font-medium text-[#6B6B6B] hover:text-ink">
+    <button onClick={onClick} className="self-start text-[13px] font-medium text-[color:var(--ht-6b6b6b)] hover:text-ink">
       {open ? "Show less" : `Show all ${count}`}
     </button>
   );
@@ -465,20 +485,20 @@ function ContactCard({ ws, lines, onChange }: { ws: string; lines: Fact[]; onCha
     })
     .filter((x) => x.rows.length);
   return (
-    <div className="flex flex-col rounded-[18px] px-5 py-1 shadow-[0_0_0_1px_#ECECEA]">
+    <div className="flex flex-col rounded-[18px] px-5 py-1 shadow-[0_0_0_1px_var(--h-ececea)]">
       {groups.map(({ g, rows }) => (
-        <div key={g} className="flex flex-col gap-2 border-b border-[#F0F0EE] py-4 last:border-b-0">
-          <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-[#B0B0AD]">{g}</div>
+        <div key={g} className="flex flex-col gap-2 border-b border-[color:var(--h-f0f0ee)] py-4 last:border-b-0">
+          <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-[color:var(--ht-b0b0ad)]">{g}</div>
           {rows.map(([label, items]) => (
             <div key={label} className="flex gap-4 text-[13.5px] leading-[21px]">
-              {g !== "Notes" && <span className="w-[116px] shrink-0 truncate text-[#9A9A98]" title={label}>{label}</span>}
+              {g !== "Notes" && <span className="w-[116px] shrink-0 truncate text-[color:var(--ht-9a9a98)]" title={label}>{label}</span>}
               <span className="min-w-0 flex-1">
                 {items.map((l, i) => (
                   <span key={l.id}>
-                    {i > 0 && (stacked(items) ? <br /> : <span className="text-[#C9C9C6]"> · </span>)}
+                    {i > 0 && (stacked(items) ? <br /> : <span className="text-[color:var(--ht-c9c9c6)]"> · </span>)}
                     <Editable ws={ws} item={l} onChange={onChange}>
                       {l.value}
-                      {l.note && <span className="text-[#9A9A98]"> {l.note}</span>}
+                      {l.note && <span className="text-[color:var(--ht-9a9a98)]"> {l.note}</span>}
                     </Editable>
                   </span>
                 ))}
@@ -488,11 +508,11 @@ function ContactCard({ ws, lines, onChange }: { ws: string; lines: Fact[]; onCha
         </div>
       ))}
       {hidden.length > 0 && (
-        <div className="border-t border-[#F0F0EE] py-3.5 first:border-t-0">
+        <div className="border-t border-[color:var(--h-f0f0ee)] py-3.5 first:border-t-0">
           <button onClick={() => setShowPrivate((x) => !x)} className="flex w-full items-center gap-2.5 text-left">
             <LockIcon />
             <span className="flex-1 text-[13.5px] leading-5">
-              {hidden.length} private details <span className="text-[#9A9A98]">· hidden from bots while they work</span>
+              {hidden.length} private details <span className="text-[color:var(--ht-9a9a98)]">· hidden from bots while they work</span>
             </span>
             <svg width="10" height="10" viewBox="0 0 12 12" className={`shrink-0 transition-transform ${showPrivate ? "rotate-90" : ""}`}>
               <path d="M4.5 3l3 3-3 3" fill="none" stroke="#9A9A98" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -502,12 +522,12 @@ function ContactCard({ ws, lines, onChange }: { ws: string; lines: Fact[]; onCha
             <div className="mt-2.5 flex flex-col gap-1.5 pl-[22px]">
               {hidden.map((l) => (
                 <div key={l.id} className="flex gap-4 text-[13.5px] leading-[21px]">
-                  <span className="w-[116px] shrink-0 truncate text-[#9A9A98]" title={l.label}>{/ Address$/.test(l.label) ? "Address" : l.label || "Note"}</span>
+                  <span className="w-[116px] shrink-0 truncate text-[color:var(--ht-9a9a98)]" title={l.label}>{/ Address$/.test(l.label) ? "Address" : l.label || "Note"}</span>
                   <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                     <Editable ws={ws} item={l} onChange={onChange}>
                       {l.value}
-                      {l.note && <span className="text-[#9A9A98]"> {l.note}</span>}
-                      {/ Address$/.test(l.label) && <span className="text-[#9A9A98]"> · {l.label.replace(/ Address$/, "")}</span>}
+                      {l.note && <span className="text-[color:var(--ht-9a9a98)]"> {l.note}</span>}
+                      {/ Address$/.test(l.label) && <span className="text-[color:var(--ht-9a9a98)]"> · {l.label.replace(/ Address$/, "")}</span>}
                     </Editable>
                   </span>
                 </div>
@@ -534,7 +554,7 @@ function FactList({ ws, facts, onChange, pinnable }: { ws: string; facts: Fact[]
             </Editable>
           </span>
           {f.source && (
-            <span className="text-[12px] leading-4 text-[#9A9A98]">
+            <span className="text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">
               {f.source}
               {f.at ? ` · ${ago(f.at)}` : ""}
             </span>
@@ -589,11 +609,11 @@ function Editable({ ws, item, onChange, pinnable, children }: { ws: string; item
           onChange={(e) => setEditing(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && (e.preventDefault(), setEditing(null))}
           onBlur={() => setEditing(null)}
-          className="h-7 min-w-0 flex-1 rounded-[8px] px-2 text-[13.5px] shadow-[inset_0_0_0_1.5px_#0A0A0A] outline-none"
+          className="h-7 min-w-0 flex-1 rounded-[8px] px-2 text-[13.5px] shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)] outline-none"
         />
       </form>
     );
-  const pill = "rounded-full px-2.5 py-1 text-[12.5px] font-medium leading-4 hover:bg-[#F2F2F0]";
+  const pill = "rounded-full px-2.5 py-1 text-[12.5px] font-medium leading-4 hover:bg-[color:var(--hb-f2f2f0)]";
   return (
     <span ref={box} className="relative">
       <span
@@ -601,13 +621,13 @@ function Editable({ ws, item, onChange, pinnable, children }: { ws: string; item
         tabIndex={0}
         onClick={() => setMenu((m) => !m)}
         onKeyDown={(e) => e.key === "Enter" && setMenu((m) => !m)}
-        className={`-mx-1 rounded-[6px] px-1 transition-colors ${menu ? "bg-[#F2F2F0]" : "hover:bg-[#F7F7F6]"}`}
+        className={`-mx-1 rounded-[6px] px-1 transition-colors ${menu ? "bg-[color:var(--hb-f2f2f0)]" : "hover:bg-[color:var(--hb-f7f7f6)]"}`}
       >
         {children}
       </span>
-      {error && <span className="ml-2 text-[12px] text-[#B42318]">{error}</span>}
+      {error && <span className="ml-2 text-[12px] text-[color:var(--ht-b42318)]">{error}</span>}
       {menu && (
-        <span className="absolute left-0 top-[calc(100%+4px)] z-20 flex items-center gap-0.5 rounded-full bg-white p-1 shadow-[0_0_0_1px_#0000000F,0_10px_24px_-10px_#00000059]">
+        <span className="absolute left-0 top-[calc(100%+4px)] z-20 flex items-center gap-0.5 rounded-full bg-white p-1 shadow-[0_0_0_1px_var(--h-0000000f),0_10px_24px_-10px_var(--h-00000059)]">
           <button
             onClick={() => {
               setMenu(false);
@@ -627,7 +647,7 @@ function Editable({ ws, item, onChange, pinnable, children }: { ws: string; item
               setGone(true);
               void act({ action: "forget", id: item.id });
             }}
-            className={`${pill} text-[#B42318] hover:bg-[#FBEAEA]`}
+            className={`${pill} text-[color:var(--ht-b42318)] hover:bg-[color:var(--hb-fbeaea)]`}
           >
             Delete
           </button>

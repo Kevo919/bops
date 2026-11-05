@@ -23,9 +23,9 @@ export function Segmented<V extends string>({
     <div className="flex w-full items-center gap-3" data-setting={title}>
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="text-[13px] font-semibold leading-4">{title}</span>
-        {hint && <span className="text-[12px] leading-4 text-[#6B6B6B]">{hint}</span>}
+        {hint && <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{hint}</span>}
       </div>
-      <div role="radiogroup" aria-label={title} className="flex shrink-0 gap-0.5 rounded-full bg-black/[0.05] p-[3px]">
+      <div role="radiogroup" aria-label={title} className="flex shrink-0 gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[3px]">
         {options.map(([v, label]) => (
           <button
             key={v}
@@ -34,7 +34,7 @@ export function Segmented<V extends string>({
             aria-checked={value === v}
             disabled={disabled}
             onClick={() => value !== v && onPick(v)}
-            className={`rounded-full px-2.5 py-1 text-[12px] leading-4 disabled:opacity-60 ${value === v ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F]" : "text-[#6B6B6B] hover:text-ink"}`}
+            className={`rounded-full px-2.5 py-1 text-[12px] leading-4 disabled:opacity-60 ${value === v ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "text-[color:var(--ht-6b6b6b)] hover:text-ink"}`}
           >
             {label}
           </button>

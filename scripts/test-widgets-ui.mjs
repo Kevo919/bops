@@ -283,6 +283,8 @@ try {
     assert.match(await p.locator('[data-widget="routines"]').innerText(), /Morning brief[\s\S]*Check rent payments/);
     assert.match(await p.locator('[data-widget="countdown"]').innerText(), /12[\s\S]*days until/);
     assert.match(await p.locator('[data-widget="checklist"]').innerText(), /1 of 3 done/);
+    // Built and reviewed, not yet live tested: Pages is marked "Being tested" with its percent (lib/feature-status.ts).
+    assert.match(await p.locator('[data-in-progress="widgets-by-chat"]').first().innerText(), /Being tested[\s\S]*85%/);
     await shot(p, "home-desktop");
   });
   await check("using a widget: the counter counts, the checklist ticks, kept", async () => {
@@ -350,6 +352,7 @@ try {
     await p.locator("nav[aria-label='Settings']").getByText("Look", { exact: true }).click();
     await p.locator("[data-animations]").waitFor();
     await shot(p, "settings-look-animations");
+    assert.match(await p.locator('[data-in-progress="animations-setting"]').innerText(), /Being tested[\s\S]*85%/);
     await p.locator("[data-animations]").getByRole("radio", { name: "Off" }).click();
     await settle(p);
     const st = await fetch(`${BASE}/api/state`, { headers: owner }).then((r) => r.json());
@@ -385,6 +388,16 @@ try {
     assert.notEqual(bg, "rgb(255, 255, 255)", "the cards take the dark palette");
     await noBlanks(p, "Home dark");
     await shot(p, "home-dark");
+    await p.locator("[data-edit-widgets]").click();
+    await settle(p);
+    await shot(p, "home-edit-dark");
+    await p.locator("[data-edit-widgets]").click();
+    await p.getByRole("button", { name: "Close the page" }).click();
+    await settle(p);
+    await p.locator("div[title='Rentals']").first().click();
+    await p.locator('[data-widget-tab="p_rent"]').waitFor();
+    await settle(p);
+    await shot(p, "rentals-tab-dark");
     await look({ action: "set", look: { theme: "light" } });
   });
   await check("the server refuses a paired phone's change, a script link and an unknown kind", async () => {
@@ -414,6 +427,11 @@ try {
     assert.ok(Math.abs(box.width - 412) < 2, `the page takes the width (${box.width})`);
     await noBlanks(pp, "phone Home");
     await shot(pp, "home-phone");
+    await look({ action: "set", look: { theme: "dark" } });
+    await settle(pp, 900);
+    await noBlanks(pp, "phone Home dark");
+    await shot(pp, "home-phone-dark");
+    await look({ action: "set", look: { theme: "light" } });
     assert.deepEqual(phoneCtx.errors, []);
   });
 } finally {

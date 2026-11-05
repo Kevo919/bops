@@ -66,7 +66,7 @@ export function BotMenu({ state, bot: b, x, y, onClose, actions }: { state: AppS
     f();
   };
 
-  const row = "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] leading-4 text-ink hover:bg-[#F2F2F0]";
+  const row = "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] leading-4 text-ink hover:bg-[color:var(--hb-f2f2f0)]";
   const quick = "flex flex-1 flex-col items-center gap-1.5 rounded-xl py-2.5 text-[11.5px] font-medium leading-[14px]";
 
   return (
@@ -78,15 +78,15 @@ export function BotMenu({ state, bot: b, x, y, onClose, actions }: { state: AppS
         role="menu"
         aria-label={`${b.name}`}
         style={{ left: at.left, top: at.top }}
-        className="fixed z-50 flex w-[284px] flex-col rounded-2xl bg-white p-1.5 shadow-[0_0_0_1px_#0000000F,0_18px_40px_-14px_#00000047]"
+        className="fixed z-50 flex w-[284px] flex-col rounded-2xl bg-white p-1.5 shadow-[0_0_0_1px_var(--h-0000000f),0_18px_40px_-14px_var(--h-00000047)]"
       >
         <div className="flex items-center gap-3 px-2.5 pb-3 pt-2.5">
           <Mascot botId={b.id} color={b.color} size={42} />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <span className="truncate text-[16px] font-semibold leading-5 tracking-[-0.01em]">{b.name}</span>
-            <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] leading-4 text-[#6B6B6B]">
+            <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
               {status.dot && (
-                <span className={`size-[7px] shrink-0 rounded-full ${status.dot === "needs" ? "bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A]" : "bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A] animate-pulse"}`} />
+                <span className={`size-[7px] shrink-0 rounded-full ${status.dot === "needs" ? "bg-highlighter shadow-[0_0_0_1.5px_var(--h-0a0a0a)]" : "bg-highlighter shadow-[0_0_0_1.5px_var(--h-0a0a0a)] animate-pulse"}`} />
               )}
               <span className="truncate">{status.text}</span>
             </span>
@@ -94,38 +94,38 @@ export function BotMenu({ state, bot: b, x, y, onClose, actions }: { state: AppS
         </div>
 
         <div className="flex gap-1.5 px-1 pb-2">
-          <button role="menuitem" onClick={go(() => actions.onChat(b.id))} className={`${quick} bg-ink text-white`}>
+          <button role="menuitem" onClick={go(() => actions.onChat(b.id))} className={`${quick} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]`}>
             <ChatGlyph />
             Chat
           </button>
-          <button role="menuitem" onClick={go(() => actions.onCall(b.id))} className={`${quick} bg-[#F2F2F0] text-ink hover:bg-[#EAEAE7]`}>
+          <button role="menuitem" onClick={go(() => actions.onCall(b.id))} className={`${quick} bg-[color:var(--hb-f2f2f0)] text-ink hover:bg-[color:var(--hb-eaeae7)]`}>
             <CallGlyph />
             Call
           </button>
-          <button role="menuitem" onClick={go(() => actions.onComputer(b.id))} className={`${quick} bg-[#F2F2F0] text-ink hover:bg-[#EAEAE7]`}>
+          <button role="menuitem" onClick={go(() => actions.onComputer(b.id))} className={`${quick} bg-[color:var(--hb-f2f2f0)] text-ink hover:bg-[color:var(--hb-eaeae7)]`}>
             <ComputerGlyph />
             Computer
           </button>
-          <button role="menuitem" onClick={go(() => actions.onProfile(b.id))} className={`${quick} bg-[#F2F2F0] text-ink hover:bg-[#EAEAE7]`}>
+          <button role="menuitem" onClick={go(() => actions.onProfile(b.id))} className={`${quick} bg-[color:var(--hb-f2f2f0)] text-ink hover:bg-[color:var(--hb-eaeae7)]`}>
             <ProfileGlyph />
             Profile
           </button>
         </div>
 
-        <div className="mx-1.5 mb-1 h-px bg-[#ECECEA]" />
+        <div className="mx-1.5 mb-1 h-px bg-[color:var(--hb-ececea)]" />
         <button role="menuitem" onClick={go(() => actions.onNewTask(b.id))} className={row}>
           <span className="flex-1">New task for {b.name}…</span>
         </button>
         <button role="menuitem" onClick={go(() => actions.onProfile(b.id, "routines"))} className={row}>
           <span className="flex-1">Routines</span>
-          <span className="truncate text-[12px] text-[#9A9A98]">{routines.length ? `${routines.filter((r) => r.enabled).length} on` : "None yet"}</span>
+          <span className="truncate text-[12px] text-[color:var(--ht-9a9a98)]">{routines.length ? `${routines.filter((r) => r.enabled).length} on` : "None yet"}</span>
         </button>
         <button role="menuitem" onClick={go(() => actions.onProfile(b.id, "phone"))} className={row}>
           <span className="flex-1">Phone and email</span>
-          <span className="truncate text-[12px] text-[#9A9A98]">{reach || "Set up"}</span>
+          <span className="truncate text-[12px] text-[color:var(--ht-9a9a98)]">{reach || "Set up"}</span>
         </button>
 
-        <div className="mx-1.5 my-1 h-px bg-[#ECECEA]" />
+        <div className="mx-1.5 my-1 h-px bg-[color:var(--hb-ececea)]" />
         <button
           role="menuitemcheckbox"
           aria-checked={!!b.autoApprove}
@@ -134,21 +134,21 @@ export function BotMenu({ state, bot: b, x, y, onClose, actions }: { state: AppS
         >
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span>Just do it</span>
-            <span className="text-[11.5px] leading-[14px] text-[#9A9A98]">Acts without asking, except to pay</span>
+            <span className="text-[11.5px] leading-[14px] text-[color:var(--ht-9a9a98)]">Acts without asking, except to pay</span>
           </span>
-          <span className={`flex h-[18px] w-[30px] shrink-0 items-center rounded-full p-0.5 transition-colors ${b.autoApprove ? "justify-end bg-ink" : "justify-start bg-[#D9D9D6]"}`}>
-            <span className="size-[14px] rounded-full bg-white shadow-[0_1px_2px_#00000033]" />
+          <span className={`flex h-[18px] w-[30px] shrink-0 items-center rounded-full p-0.5 transition-colors ${b.autoApprove ? "justify-end bg-[color:var(--hb-0a0a0a)]" : "justify-start bg-[color:var(--hb-d9d9d6)]"}`}>
+            <span className="size-[14px] rounded-full bg-white shadow-[0_1px_2px_var(--h-00000033)]" />
           </span>
         </button>
         <button role="menuitem" aria-expanded={thinking} onClick={() => setThinking(!thinking)} className={row}>
           <span className="flex-1">Thinking</span>
-          <span className="text-[12px] capitalize text-[#9A9A98]">{effort}</span>
-          <svg width="8" height="8" viewBox="0 0 8 8" className={`shrink-0 text-[#9A9A98] transition-transform ${thinking ? "rotate-90" : ""}`} aria-hidden>
+          <span className="text-[12px] capitalize text-[color:var(--ht-9a9a98)]">{effort}</span>
+          <svg width="8" height="8" viewBox="0 0 8 8" className={`shrink-0 text-[color:var(--ht-9a9a98)] transition-transform ${thinking ? "rotate-90" : ""}`} aria-hidden>
             <path d="M2.5 1.5 5.5 4l-3 2.5" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
         {thinking && (
-          <div className="mx-1 mb-1 flex flex-col rounded-xl bg-[#F7F7F6] p-1">
+          <div className="mx-1 mb-1 flex flex-col rounded-xl bg-[color:var(--hb-f7f7f6)] p-1">
             {EFFORTS.map((e) => (
               <button
                 key={e}
@@ -167,11 +167,11 @@ export function BotMenu({ state, bot: b, x, y, onClose, actions }: { state: AppS
 
         {!b.isMain && (
           <>
-            <div className="mx-1.5 my-1 h-px bg-[#ECECEA]" />
+            <div className="mx-1.5 my-1 h-px bg-[color:var(--hb-ececea)]" />
             {confirm ? (
               <DeleteBot state={state} bot={b} onCancel={() => setConfirm(false)} onDone={onClose} />
             ) : (
-              <button role="menuitem" onClick={() => setConfirm(true)} className={`${row} text-[#B42318] hover:bg-[#FEF3F2]`}>
+              <button role="menuitem" onClick={() => setConfirm(true)} className={`${row} text-[color:var(--ht-b42318)] hover:bg-[color:var(--hb-fef3f2)]`}>
                 Delete {b.name}…
               </button>
             )}
@@ -213,17 +213,17 @@ function DeleteBot({ state, bot: b, onCancel, onDone }: { state: AppState; bot: 
     <div className="px-1 pb-1">
       <AskInPlace compact danger focus="cancel" title={`Delete ${b.name}?`} line="This can't be undone." action={`Delete ${b.name}`} busy={busy} error={error} onConfirm={() => void remove()} onCancel={onCancel}>
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] font-medium tracking-[0.06em] text-[#B42318]">GOES WITH {b.name.toUpperCase()}</span>
+          <span className="font-mono text-[10.5px] font-medium tracking-[0.06em] text-[color:var(--ht-b42318)]">GOES WITH {b.name.toUpperCase()}</span>
           {goes.map((g) => (
             <span key={g} className="text-[12.5px] leading-[17px] text-ink">
               {g}
             </span>
           ))}
         </div>
-        <div className="flex flex-col gap-1 border-t border-[#FECDCA] pt-2">
-          <span className="font-mono text-[10.5px] font-medium tracking-[0.06em] text-[#6B6B6B]">STAYS</span>
-          <span className="text-[12.5px] leading-[17px] text-[#3A3A38]">{stays.join(", ").replace(/^./, (c) => c.toUpperCase())}</span>
-          {madeApps && <span className="text-[12.5px] leading-[17px] text-[#3A3A38]">{madeApps}</span>}
+        <div className="flex flex-col gap-1 border-t border-[color:var(--h-fecdca)] pt-2">
+          <span className="font-mono text-[10.5px] font-medium tracking-[0.06em] text-[color:var(--ht-6b6b6b)]">STAYS</span>
+          <span className="text-[12.5px] leading-[17px] text-[color:var(--ht-3a3a38)]">{stays.join(", ").replace(/^./, (c) => c.toUpperCase())}</span>
+          {madeApps && <span className="text-[12.5px] leading-[17px] text-[color:var(--ht-3a3a38)]">{madeApps}</span>}
         </div>
       </AskInPlace>
     </div>

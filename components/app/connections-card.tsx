@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { OpenSettings } from "./open-settings";
 import type { AppState } from "@/lib/types";
 import type { KeyCheckResult } from "@/lib/server/key-check";
+import { InProgress } from "./in-progress";
 
 /*
  * Settings → This Mac → Connections: the outside accounts Bops can use, one row each, in plain words. Composio (your
- * connected apps: Gmail, Slack, Notion, Google Sheets…), Zapier (the actions on your Zapier MCP server) and
+ * connected apps: Gmail, Slack, Notion, Google Sheets…), Composio (your account: the apps connected in Composio's
+ * For You, over its MCP address; shown only masked), Zapier (the actions on your Zapier MCP server) and
  * OpenRouter (hundreds of AI models, some free). Each row says whether its key is set, and after Check whether it
  * works; where to get the key, and what to paste where. Keys are added by hand in .env.local, as on the Keys card:
  * nothing here reads, shows or saves one. The status comes from /api/key-check (the same as Keys): only whether a
@@ -31,6 +34,14 @@ export const CONNECTIONS: Row[] = [
     paste: "Sign in at composio.dev, open Settings, Project Settings, and copy the project key under API Keys (it starts with ak_). Put it in .env.local as COMPOSIO_API_KEY=your_key, then restart Bops.",
   },
   {
+    key: "COMPOSIO_MCP_URL",
+    name: "Composio (your account)",
+    what: "Lets your bots use the apps you already connected yourself in Composio's For You area (like Gmail and Google Drive), in your own chats in Bops. Reading runs right away; anything that sends, changes, deletes or pays asks you first.",
+    getKey: { label: "Open Composio", href: "https://composio.dev" },
+    paste: "In Composio, open For You, then Connect my agent, copy the address, paste it here: in .env.local, add a line COMPOSIO_MCP_URL= followed by the address. If that page shows a key too (it starts with ck_), add a line COMPOSIO_MCP_KEY= followed by the key. Then restart Bops and press Check.",
+    more: "Only in your own chats in the Bops app: not for team members, Telegram, Discord, Slack, texts, emails, routines, or the bots' cloud computers.",
+  },
+  {
     key: "ZAPIER_MCP_URL",
     name: "Zapier",
     what: "Lets your bots run the Zapier actions you pick, in your own chats in Bops. Anything that could change something asks you first.",
@@ -47,7 +58,10 @@ export const CONNECTIONS: Row[] = [
   },
 ];
 
-const DOT: Record<string, string> = { ok: "bg-[#12B76A]", set: "bg-[#F5B83D]", error: "bg-[#D92D20]", off: "bg-[#C9C9C6]" };
+/** The row in Settings, Services where each one's key is pasted (services.tsx), so nobody edits .env.local by hand. */
+const SERVICE_ROW: Record<string, "apps" | "composio-account" | "zapier"> = { COMPOSIO_API_KEY: "apps", COMPOSIO_MCP_URL: "composio-account", ZAPIER_MCP_URL: "zapier" };
+
+const DOT: Record<string, string> = { ok: "bg-[color:var(--hb-12b76a)]", set: "bg-[color:var(--hb-f5b83d)]", error: "bg-[color:var(--hb-d92d20)]", off: "bg-[color:var(--hb-c9c9c6)]" };
 
 /** A row's status, in plain words, and its dot. */
 export function statusOf(r: KeyCheckResult | undefined, checking: boolean): { tone: keyof typeof DOT; words: string } {
@@ -59,12 +73,13 @@ export function statusOf(r: KeyCheckResult | undefined, checking: boolean): { to
   return { tone: "error", words: why[r.status] ?? "Not working" };
 }
 
-const light = "rounded-full px-3 py-1 text-[12px] font-medium leading-4 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F2F2F0] disabled:opacity-40";
+const light = "rounded-full px-3 py-1 text-[12px] font-medium leading-4 shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f2f2f0)] disabled:opacity-40";
 
 /** Settings, Logins, where connected apps are added (bops-app.tsx's Settings nav). */
 const openLogins = () => document.querySelector<HTMLButtonElement>('[data-settings-nav="logins"]')?.click();
 
 export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> }) {
+  const openSettings = useContext(OpenSettings);
   const [rows, setRows] = useState<KeyCheckResult[] | null>(null);
   const [busy, setBusy] = useState<string | null>("refresh");
   const [error, setError] = useState<string | null>(null);
@@ -121,35 +136,41 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
     return s && s !== "not set";
   }).length;
   return (
-    <div data-connections className="flex flex-col rounded-[14px] bg-white p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+    <div data-connections className="flex flex-col rounded-[14px] bg-white p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
       <div className="flex items-center gap-3">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-[13.5px] font-semibold leading-[18px]">Connections</span>
           <span className="text-[12px] leading-4 text-pencil">Outside accounts your bots can use. Keys go in .env.local on the computer running Bops, like the ones on the Keys card; they are never shown here.</span>
-          <span className="pt-0.5 text-[12px] leading-4 text-[#3A3A38]">{busy === "refresh" ? "Reading…" : rows ? `${on} of ${CONNECTIONS.length} set up` : "Status unavailable"}</span>
+          <span className="pt-0.5 text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">{busy === "refresh" ? "Reading…" : rows ? `${on} of ${CONNECTIONS.length} set up` : "Status unavailable"}</span>
         </div>
         <button className={light} disabled={busy !== null} onClick={() => { setBusy("refresh"); setError(null); void load(); }}>Refresh</button>
       </div>
       <div className="flex flex-col gap-2 pt-3" aria-live="polite">
-        {error && <p role="alert" className="text-[12px] text-[#B00020]">{error}</p>}
+        {error && <p role="alert" className="text-[12px] text-[color:var(--ht-b00020)]">{error}</p>}
         {CONNECTIONS.map((c) => {
           const r = rows?.find((x) => x.key === c.key);
           const s = statusOf(r, busy === c.key);
           const checked = r && r.status !== "set" && r.status !== "not set";
-          return (
-            <div key={c.key} data-connection={c.key} className="flex flex-col gap-1 rounded-md px-2.5 py-2 shadow-[0_0_0_1px_#E6E6E3]">
+          const row = (
+            <div key={c.key} data-connection={c.key} className="flex flex-col gap-1 rounded-md px-2.5 py-2 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
               <div className="flex items-center gap-2">
                 <span data-dot={s.tone} className={`size-[8px] shrink-0 rounded-full ${DOT[s.tone]}`} />
                 <span className="min-w-0 flex-1 text-[12.5px] font-medium">{c.name}</span>
                 <button className={light} disabled={busy !== null || !r || r.status === "not set"} aria-label={`Check ${c.name}`} onClick={() => void check(c.key)}>Check</button>
               </div>
-              <div data-status className="text-[12px] text-[#3A3A38]">{s.words}</div>
+              <div data-status className="text-[12px] text-[color:var(--ht-3a3a38)]">{s.words}</div>
               {checked && r.message && <div data-message className="text-[12px] text-pencil">{r.message}</div>}
+              {r?.shown && <div data-shown className="text-[12px] text-pencil">Saved: {r.shown}</div>}
               <p className="text-[12px] text-pencil">{c.what}</p>
               <p className="text-[12px] text-pencil">{c.paste}</p>
               {c.more && <p className="text-[12px] text-pencil">{c.more}</p>}
               <div className="flex flex-wrap items-center gap-3 text-[12px]">
                 <a className="underline" href={c.getKey.href} target="_blank" rel="noopener noreferrer">{c.getKey.label}</a>
+                {SERVICE_ROW[c.key] && openSettings && (
+                  <button data-open-service={SERVICE_ROW[c.key]} className="underline" onClick={() => openSettings("services", { service: SERVICE_ROW[c.key] })}>
+                    Paste it in Settings, Services
+                  </button>
+                )}
                 {c.key === "COMPOSIO_API_KEY" && (
                   <button data-open-apps className="underline" onClick={openLogins}>
                     Connected apps{apps ? ` (${apps})` : ""}: add Gmail, Slack, Notion… in Logins
@@ -157,6 +178,14 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
                 )}
               </div>
             </div>
+          );
+          // Being tested (lib/feature-status.ts): usable, marked with its percent until its live check passes.
+          return c.key === "COMPOSIO_MCP_URL" ? (
+            <InProgress key={c.key} id="composio-for-you">
+              {row}
+            </InProgress>
+          ) : (
+            row
           );
         })}
         <a className="text-[12px] underline" href="https://github.com/Kevo919/bops/blob/windows-port/docs/connections.md" target="_blank" rel="noopener noreferrer">Step by step: connecting Composio, Zapier and OpenRouter</a>

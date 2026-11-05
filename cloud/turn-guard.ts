@@ -15,7 +15,7 @@ import { recordTokens } from "./usage.ts";
  * So:
  *
  * - A turn starts only with room for its first seconds on top of everything already held and
- *   starting for the user (admitTurn, claimed at once so a burst of starts can't share one balance).
+ *   starting for the user (admitTurn, decided one at a time so a burst of starts can't share one balance).
  *   The proxy names each session that gets work (watchSession, before the work is sent on, so a Mac
  *   that hangs up can't skip it).
  * - Every few seconds the cloud reads each watched session's turns with its own key: all of them the
@@ -164,30 +164,52 @@ function release(userId: string, claim: Claim) {
 /**
  * Let a turn start for the user (a new task, or work for one): they must have room for its first
  * seconds (startReserve) on top of what's held for their running turns and what's starting, and fewer
- * than `perUser` sessions watched or starting (a session already watched doesn't count again). The
- * reserve is taken at once, before anything is awaited, so starts at the same moment each see the
- * others'. 402 with none left, 403 with too little, 429 past the count. The reserve lapses once the
- * guard has read the start's session (it holds the turn itself then), or a minute on.
+ * than `perUser` sessions watched or starting (a session already watched doesn't count again). A
+ * user's starts are decided one at a time (inTurn), each against the reserves of the starts let through
+ * before it, so of a burst at once the credit's room goes to the first ones and no two share it. (Taking
+ * every reserve at once and checking them all after one read of the balance counted the starts that
+ * were about to be refused too: of a burst, all could be refused though the credit covered one.) 402
+ * with none left, 403 with too little, 429 past the count. The reserve lapses once the guard has read
+ * the start's session (it holds the turn itself then), or a minute on.
  */
 export async function admitTurn(userId: string, session: string | undefined, model: string | null | undefined): Promise<Start> {
   if (!creditsOn()) return { release: () => {}, session: () => {} };
-  const known = !!session && watched.has(session);
-  const unwatched = startingFor(userId).filter((c) => !c.session || !watched.has(c.session)).length;
-  if (!known && usersWatched(userId).length + unwatched >= guardTiming.perUser)
-    throw new HttpError(429, "Too many tasks are running at once. Wait for one to finish.");
-  const claim: Claim = { micros: startReserve(session, model), at: guardClock.now(), session };
-  starting.set(userId, (starting.get(userId) ?? new Set()).add(claim));
-  setTimeout(() => release(userId, claim), 60_000).unref?.();
-  try {
-    const left = await creditLeft(userId);
-    if (left <= 0) throw outOfCredit(await billingFor(userId));
-    const held = usersWatched(userId).reduce((sum, w) => sum + w.held, 0) + startingFor(userId).reduce((sum, c) => sum + c.micros, 0);
-    if (held > left) throw shortOfCredit(await billingFor(userId));
-  } catch (e) {
-    release(userId, claim);
-    throw e;
-  }
-  return { release: () => release(userId, claim), session: (id) => (claim.session ??= id) };
+  return inTurn(userId, async () => {
+    const known = !!session && watched.has(session);
+    const unwatched = startingFor(userId).filter((c) => !c.session || !watched.has(c.session)).length;
+    if (!known && usersWatched(userId).length + unwatched >= guardTiming.perUser)
+      throw new HttpError(429, "Too many tasks are running at once. Wait for one to finish.");
+    const claim: Claim = { micros: startReserve(session, model), at: guardClock.now(), session };
+    starting.set(userId, (starting.get(userId) ?? new Set()).add(claim));
+    setTimeout(() => release(userId, claim), 60_000).unref?.();
+    try {
+      const left = await creditLeft(userId);
+      if (left <= 0) throw outOfCredit(await billingFor(userId));
+      const held = usersWatched(userId).reduce((sum, w) => sum + w.held, 0) + startingFor(userId).reduce((sum, c) => sum + c.micros, 0);
+      if (held > left) throw shortOfCredit(await billingFor(userId));
+    } catch (e) {
+      release(userId, claim);
+      throw e;
+    }
+    return { release: () => release(userId, claim), session: (id) => (claim.session ??= id) };
+  });
+}
+
+/** Each user's starts being decided: the last one's end, which the next waits for. */
+const deciding = new Map<string, Promise<void>>();
+
+/** Run `decide` once the user's starts before it are decided (let through or refused), and none of theirs meanwhile. */
+function inTurn<T>(userId: string, decide: () => Promise<T>): Promise<T> {
+  const run = (deciding.get(userId) ?? Promise.resolve()).then(decide);
+  const ended = run.then(
+    () => {},
+    () => {},
+  );
+  deciding.set(userId, ended);
+  void ended.then(() => {
+    if (deciding.get(userId) === ended) deciding.delete(userId);
+  });
+  return run;
 }
 
 /** A session that got work: its turns are held to the user's credit until it's been idle a while. */

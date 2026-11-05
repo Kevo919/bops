@@ -10,14 +10,14 @@ import { trackServerEvent } from "./analytics";
 import type { BopsEventProps } from "@/cloud/analytics-rules";
 import { openaiClient } from "./openai-client";
 import type { ChildProcess } from "node:child_process";
-import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { AI_CREDIT_EMPTY, AI_CREDIT_LOW } from "@/cloud/protocol";
 import { BLOCKER_LABEL, botChatId, BRAINS_ON, CLI_NAMES, COMPACTED, computerStaysDown, DISPLAYS, isScreenWatch, live, MAIN_WORKSPACE, MAX_SCREENS, memberOf, memberThread, othersThread, outsideThread, ownerSent, pausedForOk, routineSent, threadCompactBlocked, threadCompacts, threadRunner, waitsForOk, workBot, workspaceOf, type AppApproval, type Bot, type CliKind, type MemberSaid, type Routine, type Session, type Takeover, type TaskRoute, type ThreadReply } from "@/lib/types";
 import type { MemberWho } from "@/lib/member-access";
 import { CloudError, creditsOut, executorKey, noteOutOfCredit, outOfCreditWords, outOfCreditError, shortOfCredit } from "./cloud";
-import { browserMcp, cdpPort, cuaDriverHere, currentUrl, ensureChrome, MAC_BROWSER_TOOLS, MAC_UI_TOOLS, macTaskPort, macUiMcp, navigate, startExecutor, stopExecutor, taskDir, taskSockets } from "./local";
+import { asNode, browserMcp, cdpPort, cuaDriverHere, currentUrl, ensureChrome, MAC_BROWSER_TOOLS, MAC_UI_TOOLS, macTaskPort, macUiMcp, navigate, prepareTaskDir, startExecutor, stopExecutor, taskDir, taskSockets } from "./local";
 import { relayNewComputer } from "./relay";
 import { computerAsleepError, computerWakingError, madeByThisServer, madeReady, orgo, OrgoError, screenId, wakeWaitMs, type OrgoScreen } from "./orgo";
 import { forgetPlan, holdFreeAgain, limitText, makeMainComputer, makeOwnComputer, orgoPlan, PlanLimit } from "./plan";
@@ -37,7 +37,7 @@ import { ASKING, tidyAnswer, withBriefing, WRITING } from "./style";
 import { accountsOf, APP_TOOLS, appsKeyFor, bopsAddress, composioOn, findAppActions, runAppAction } from "./composio";
 import { askFor, declined, NeedsOk, Paused, stopAsks, takeAnswer, type AskSpec } from "./permission";
 import { appsNote, placesNote } from "./skills";
-import { copySkillsToComputer, countUse, findSkill, skillsFor, skillsIndexNote, skillsNote, skillText } from "./workspace-skills";
+import { copySkillsToComputer, countUse, findSkill, skillsFor, skillsIndexNote, skillsNote, skillText, writeSkillFiles } from "./workspace-skills";
 import { appMcp, appsComputerGone, askDeploy, changeCardAfterTask, deployAfterTask, previewAfterTask, readyAppForTask } from "./hosted-apps";
 import { DATA_TOOL_NAMES, DATA_TOOLS, dataNote, dataOn, runDataTool } from "./treg";
 import { REPO_TOOL_NAMES, repoTaskTools, repoTool } from "./repos";
@@ -62,7 +62,10 @@ import { builtinSkills } from "@/lib/builtin-skills";
 import { watching } from "./presence";
 import { computerOutOfCredit, freeHoursUsed, sayInUse, START_SAY_MS, wakeForUser } from "./free-hours";
 import { brainById, ensureBrainTools, signInStatus } from "./brains";
-import { alsoSpec, brainName, BrainStopped, cliCompact, cliDriver, cliTurn, closeCli, closeTerminal, limitPick, openRun, openShell, openTerminal, signInWords, stoppedWords } from "./cli-agents";
+import { alsoSpec, brainName, BrainStopped, claudeDriver, cliCompact, cliDriver, cliTurn, closeCli, closeTerminal, limitPick, openRun, openShell, openTerminal, pcClaudeThreads, signInWords, stoppedWords } from "./cli-agents";
+import { claudeMcpConfig, claudeSupportsTasks, claudeTaskCommand, executorWords, PC_WORDS, runClaudeTurn } from "./pc-task-runner";
+import { pcRunnerNow } from "./pc-task-setting";
+import { localSubscriptionRuntime } from "./local-subscriptions";
 import { aiOf, hasProfile, hasTerminal, isCli, pickAgent, threadAgent, type AgentRun } from "@/lib/agents";
 
 /**
@@ -2218,6 +2221,103 @@ function agentBrief(
     .join("\n\n");
 }
 
+/* ---------------- A task on this PC on the owner's Claude plan ---------------- */
+
+/**
+ * The turns of a task on this PC that runs on the owner's Claude plan (Settings, Bot tasks on this PC; pc-task-runner.ts):
+ * the official Claude Code CLI they signed in to (AI subscriptions, This PC), `claude -p` once per turn in the task's
+ * workspace folder (its first turn begins a session of its own, later ones in this run pick it up), with Bops' briefing,
+ * the bot's Chrome through Bops' browser tools, and an approve tool that asks the owner in Bops (approveTool) before
+ * the shell, a file outside the folder, or a click or typing in the browser. Its events become the thread's steps as a
+ * cloud brain's do (cli-agents.ts claudeDriver). What it can't do here (the owner's other apps, the desktop) it's told,
+ * and says. Nothing of it is on AI credit, and no key goes to it: it runs on the plan's own sign in.
+ */
+/** An executor's own failure (executor-lifecycle.ts: "Local executor ...") in words that say what to do; any other error as it was, its class kept. */
+function withExecutorWords(e: unknown) {
+  if (e instanceof Error && /^Local executor/.test(e.message)) e.message = executorWords(e.message);
+  return e;
+}
+
+async function pcClaudeTurns(sessionId: string, o: { s: Session; b: Bot; folder: string; port: number; display: number; full: boolean; onMac: boolean; outside: boolean }) {
+  const claude = localSubscriptionRuntime("claude");
+  if (!claude.file) throw new Error(PC_WORDS.noClaude);
+  // An older Claude Code without the flags that keep a task to its folder and its asks isn't run at all.
+  if (!claudeSupportsTasks(claude.file, claude.env)) throw new Error(PC_WORDS.update);
+  prepareTaskDir(sessionId, o.folder, false);
+  try {
+    writeSkillFiles(o.b.id, join(/*turbopackIgnore: true*/ o.folder, "workspace/capabilities/skills"));
+  } catch (e) {
+    console.warn(`[skills] ${sessionId}: ${(e as Error).message}`);
+  }
+  const workspace = join(/*turbopackIgnore: true*/ o.folder, "workspace");
+  const conf = join(/*turbopackIgnore: true*/ o.folder, "claude");
+  mkdirSync(/*turbopackIgnore: true*/ conf, { recursive: true, mode: 0o700 });
+  const browser = browserMcp(o.port, o.folder);
+  const nodeEnv: Record<string, string> = asNode ? { ELECTRON_RUN_AS_NODE: "1" } : {};
+  const mcpConfig = join(/*turbopackIgnore: true*/ conf, "mcp.json");
+  writeFileSync(
+    /*turbopackIgnore: true*/ mcpConfig,
+    JSON.stringify(
+      claudeMcpConfig({
+        browser,
+        nodeEnv,
+        node: process.execPath,
+        approveScript: join(/*turbopackIgnore: true*/ process.cwd(), "vm/pc-approve-mcp.mjs"),
+        approve: { url: `http://127.0.0.1:${process.env.PORT ?? "3210"}/api/apps/call`, session: sessionId, key: appsKeyFor(o.b.id) },
+      }),
+    ),
+    { mode: 0o600 },
+  );
+  const promptFile = join(/*turbopackIgnore: true*/ conf, "prompt.md");
+  const owner = ownerName();
+  const brief = agentBrief(o.s, o.b, { mac: true, display: o.display, apps: false, appTools: false, dataTools: false, full: o.full, onMac: o.onMac, vaultTool: false, ui: false, outside: o.outside, memory: "", count: true, brain: true });
+  writeFileSync(
+    /*turbopackIgnore: true*/ promptFile,
+    `${brief}\n\nYou run as Claude Code on ${owner}'s PC, for Bops, on ${owner}'s Claude plan. Your working folder is this task's own: keep your files there. Read, Edit and Write work there by themselves, and can't change files anywhere else; the shell (Bash), reading a file elsewhere, WebFetch or opening a new website, and a click, typing or a form in the browser ask ${owner} in Bops first and wait for their answer; if they say no, don't do it another way. Your browser tools (mcp__browser__*) drive the bot's own Chrome on this PC. You can't see or control ${owner}'s other apps or the desktop here: if the task needs that, say so plainly in your answer and don't pretend it was done.`,
+    { mode: 0o600 },
+  );
+  const cli = randomUUID();
+  let began = false;
+  pcClaudeThreads.set(sessionId, { workspace, origins: new Set(), note: (text) => step(sessionId, "note", text) });
+  // The turn running now, if any: the run's end waits for it (and everything it started) to be gone before its folder goes.
+  let current: { ac: AbortController; done: Promise<unknown> } | undefined;
+  return {
+    close: async () => {
+      current?.ac.abort();
+      await current?.done.catch(() => {});
+      pcClaudeThreads.delete(sessionId);
+    },
+    turn: async (input: string) => {
+      const ac = new AbortController();
+      interrupts.set(sessionId, () => ac.abort());
+      if (stopped.has(sessionId)) ac.abort();
+      try {
+        const running = runClaudeTurn({
+          cmd: claudeTaskCommand({ claude: claude.file!, env: claude.env, workspace, mcpConfig, promptFile, session: cli, resume: began }),
+          input,
+          parse: claudeDriver.parse,
+          signal: ac.signal,
+          onDenied: (tools) => step(sessionId, "note", `Not approved, so not done: ${tools.join(", ")}`),
+          onEvent: (ev) => {
+            if (ev.type === "started") {
+              began = true;
+              if (ev.failed.includes("browser")) step(sessionId, "note", "The browser tools didn't start on this PC, so this works without them.");
+            } else if (ev.type === "tool") step(sessionId, ev.tool, ev.detail ?? describe(ev.tool, ev.args));
+            else if (ev.type === "thinking") patchSession(sessionId, { activity: ev.text.slice(0, 80) });
+          },
+        });
+        current = { ac, done: running };
+        const out = await running;
+        began = true;
+        return out.text || "Done.";
+      } finally {
+        current = undefined;
+        interrupts.delete(sessionId);
+      }
+    },
+  };
+}
+
 /* ---------------- A thread on its bot's brain ---------------- */
 
 /**
@@ -2989,7 +3089,7 @@ async function run(sessionId: string) {
   const mac = onMac || s.host === "mac";
   // Full access on this Mac (MacState.fullAccess): its executor runs outside the sandbox, with a shell, the user's files and apps.
   const full = mac && fullAccessOn();
-  const port = onMac ? macTaskPort(getState().bots.indexOf(b), s.macScreen ?? 0) : cdpPort(getState().bots.indexOf(b), display);
+  let port = onMac ? macTaskPort(getState().bots.indexOf(b), s.macScreen ?? 0) : cdpPort(getState().bots.indexOf(b), display);
   // On the Mac, a folder of the task's own, under the signed-in user's (local.ts taskDir): the only place
   // its executor can write (executorCommand). Kept from here, so the one it made is the one removed at
   // the end, even when the user has signed out meanwhile.
@@ -3031,10 +3131,16 @@ async function run(sessionId: string) {
   try {
     if (mac) folder = taskDir(sessionId);
     const workspace = folder ? join(folder, "workspace") : "/workspace";
-    // Out of AI credit: it doesn't start (the chat shows that, with Upgrade). A brain's run isn't on AI credit.
-    if (!brain && (await creditsOut())) throw outOfCreditError();
+    // On this PC: the owner's Claude plan, or the OpenAI key (Settings, Bot tasks on this PC: pc-task-setting.ts).
+    // Neither set up, or the one chosen not ready: it doesn't start, and says what to do.
+    const pcPick = mac ? await pcRunnerNow() : undefined;
+    if (pcPick && !pcPick.runner) throw new Error(pcPick.error);
+    const pcClaude = pcPick?.runner === "claude";
+    // Out of AI credit: it doesn't start (the chat shows that, with Upgrade). A brain's run isn't on AI credit, nor one on the owner's Claude plan.
+    if (!brain && !pcClaude && (await creditsOut())) throw outOfCreditError();
     step(sessionId, "setup", mac ? computerWords("Getting a browser ready on your Mac", process.platform) : "Getting the computer ready");
-    if (mac) await ensureChrome(b.id, port);
+    // Another app held its port: its Chrome is on another now (local.ts ensureChrome), and the browser tools go there.
+    if (mac) port = await ensureChrome(b.id, port);
     else {
       // On a computer's runner, which reads the user's state now and then: they may have taken this screen over on a Mac
       // of theirs since (AppState.driving). Read now, and another screen it is (or theirs once they hand it back).
@@ -3112,7 +3218,10 @@ async function run(sessionId: string) {
     // And one made before its apps and data were function tools Bops answers (Session.env.fn: they were MCP tools
     // that couldn't pause for the user's OK).
     // A brain's thread picks its CLI session back up where the CLI began it, on the same computer.
-    const resuming = brain
+    // A task on the owner's Claude plan starts its own Claude Code session each run, with the task and where it got to (freshStart).
+    const resuming = pcClaude
+      ? false
+      : brain
       ? brainResumes(s, brain, computerId)
       : onComputerTool
       ? !!s.responseId
@@ -3142,6 +3251,12 @@ async function run(sessionId: string) {
       // A brain's call that needs the OK is held, never paused (composio.ts held): it has no resume of its own.
       turn = (input) => onBrainTurns.turn(input ?? "");
       compact = onBrainTurns.compact;
+    } else if (pcClaude) {
+      // The owner's other apps (Cua Driver) aren't Claude Code's here: said once, plainly, never done another way.
+      if (macUi) step(sessionId, "note", PC_WORDS.noScreen);
+      const onPc = await pcClaudeTurns(sessionId, { s, b, folder: folder!, port, display, full, onMac, outside: !!outside });
+      closeBrain = () => onPc.close();
+      turn = (input) => onPc.turn(input ?? "");
     } else if (onComputerTool) {
       const onTool = await computerToolTurns(sessionId, { computerId, display, sharedWith: c.id !== b.id ? c.name : undefined, resuming, model: bopsModel });
       turn = onTool;
@@ -3234,7 +3349,9 @@ async function run(sessionId: string) {
       if (folder) {
         // Its skills go in its skills folder as the executor makes the folders fresh; one going on in the same agent
         // session (picked up again after a pause for the user's OK) keeps what it made there.
-        executor = await startExecutor(sessionId, env.id, env.remoteUrl, port, folder, full, b.id, resuming);
+        executor = await startExecutor(sessionId, env.id, env.remoteUrl, port, folder, full, b.id, resuming).catch((e: unknown) => {
+          throw withExecutorWords(e);
+        });
       }
       else {
         // Its skills and apps go onto its computer first (capabilities/skills), so the agent finds them there.
@@ -3252,6 +3369,8 @@ async function run(sessionId: string) {
       }, () => {
         interrupts.get(sessionId)?.();
         void cancelTurn(agentSessionId);
+      }).catch((e: unknown) => {
+        throw folder ? withExecutorWords(e) : e;
       });
     }
     step(sessionId, "setup", "At the computer");
@@ -4195,8 +4314,7 @@ export async function takeOverMacChrome(botId: string, macScreen: number) {
     if (working) stopSession(working.id, "Paused while you took over");
     if (working) addMessage({ chatId: working.chatId, role: "system", text: `You took over from ${bot(working.botId)?.name} · paused ${working.title}` });
   }
-  const port = macTaskPort(getState().bots.findIndex((b) => b.id === botId), macScreen);
-  await ensureChrome(botId, port);
+  const port = await ensureChrome(botId, macTaskPort(getState().bots.findIndex((b) => b.id === botId), macScreen));
   if ((await currentUrl(port)) === "about:blank") await navigate(port, "https://www.google.com");
 }
 

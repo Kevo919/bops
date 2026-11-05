@@ -86,7 +86,7 @@ export function CloudUnreachable({ onRetry }: { onRetry: () => void }) {
     <div className="flex h-screen flex-col bg-desk text-ink">
       <div className="h-11 shrink-0 [-webkit-app-region:drag]" />
       <div className="flex flex-1 flex-col items-center justify-center px-6 pb-16">
-        <div className="flex w-[400px] animate-[call-in_220ms_ease-out] flex-col items-center rounded-[22px] bg-white px-8 pb-7 pt-9 shadow-[0_0_0_1px_#0000000F,0_30px_70px_-28px_#00000038]">
+        <div className="flex w-[400px] animate-[call-in_220ms_ease-out] flex-col items-center rounded-[22px] bg-white px-8 pb-7 pt-9 shadow-[0_0_0_1px_var(--h-0000000f),0_30px_70px_-28px_var(--h-00000038)]">
           <Mascot botId="boppy" color="#0A0A0A" size={56} />
           <Heading title="Can't reach Bops Cloud" line="Bops can't reach Bops Cloud to load your chats. Check your internet connection." />
           <button
@@ -130,10 +130,10 @@ type Step =
 /** The system browser (desktop/main.cjs hands every window.open to it). */
 const openInBrowser = (url: string) => void window.open(url, "_blank", "noopener");
 
-const primary = "flex h-10 w-full items-center justify-center gap-2 rounded-full bg-ink text-[13.5px] font-medium text-white disabled:opacity-50";
+const primary = "flex h-10 w-full items-center justify-center gap-2 rounded-full bg-[color:var(--hb-0a0a0a)] text-[13.5px] font-medium text-[color:var(--bops-on-fill)] disabled:opacity-50";
 const secondary =
-  "flex h-10 w-full items-center justify-center gap-2 rounded-full text-[13.5px] font-medium shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#FCFCFB] disabled:opacity-50";
-const link = "font-medium text-ink underline underline-offset-2 hover:text-[#3A3A38] disabled:opacity-50";
+  "flex h-10 w-full items-center justify-center gap-2 rounded-full text-[13.5px] font-medium shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-fcfcfb)] disabled:opacity-50";
+const link = "font-medium text-ink underline underline-offset-2 hover:text-[color:var(--ht-3a3a38)] disabled:opacity-50";
 
 export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
   const [step, setStep] = useState<Step>({ kind: "idle" });
@@ -224,7 +224,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
       {/* The window's title bar: drag it like any other. */}
       <div className="h-11 shrink-0 [-webkit-app-region:drag]" />
       <div className="flex flex-1 flex-col items-center justify-center px-6 pb-16">
-        <div className="flex w-[400px] animate-[call-in_220ms_ease-out] flex-col items-center rounded-[22px] bg-white px-8 pb-7 pt-9 shadow-[0_0_0_1px_#0000000F,0_30px_70px_-28px_#00000038]">
+        <div className="flex w-[400px] animate-[call-in_220ms_ease-out] flex-col items-center rounded-[22px] bg-white px-8 pb-7 pt-9 shadow-[0_0_0_1px_var(--h-0000000f),0_30px_70px_-28px_var(--h-00000038)]">
           <span className={step.kind === "waiting" || step.kind === "starting" || step.kind === "saving" ? "animate-[bob_2.4s_ease-in-out_infinite] motion-reduce:animate-none" : ""}>
             <Mascot botId="boppy" color="#0A0A0A" size={56} />
           </span>
@@ -370,21 +370,21 @@ function Waiting({ step, way, onReopen, onCancel }: { step: Extract<Step, { kind
       <Heading title="Finish in your browser" line={FINISH[way]} />
       <button
         onClick={copy}
-        className="group flex w-full flex-col items-center gap-1 rounded-[14px] bg-[#F7F7F6] py-4 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F3F3F1]"
+        className="group flex w-full flex-col items-center gap-1 rounded-[14px] bg-[color:var(--hb-f7f7f6)] py-4 shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f3f3f1)]"
       >
         <span className="font-mono text-[26px] font-semibold leading-8 tracking-[0.12em]">{step.code.userCode}</span>
         <span className="text-[11.5px] leading-4 text-pencil">{copied ? "Copied" : "Click to copy"}</span>
       </button>
       <div className="flex w-full flex-col gap-2 pb-5 pt-4">
         <div className="flex items-center justify-between text-[12.5px] leading-4">
-          <span className="flex items-center gap-2 text-[#3A3A38]">
+          <span className="flex items-center gap-2 text-[color:var(--ht-3a3a38)]">
             <Spinner size={12} color="#3A3A38" />
             Waiting for you to approve
           </span>
           <span className="tabular-nums text-pencil">{clock}</span>
         </div>
         <div className="h-[3px] w-full overflow-hidden rounded-full bg-rule">
-          <div className="h-full rounded-full bg-ink transition-[width] duration-1000 ease-linear" style={{ width: `${(left / step.total) * 100}%` }} />
+          <div className="h-full rounded-full bg-[color:var(--hb-0a0a0a)] transition-[width] duration-1000 ease-linear" style={{ width: `${(left / step.total) * 100}%` }} />
         </div>
       </div>
       <div className="flex w-full flex-col gap-2">

@@ -94,7 +94,7 @@ export function BotGroupBlock({
   };
   return (
     <section role="group" aria-label={`${name}, ${W.bots(n)}`} data-bot-group={group.key} className="flex flex-col gap-0.5">
-      <div data-group-head title={W.on(name, group.host?.name)} className="flex h-[30px] shrink-0 items-center gap-1.5 rounded-[10px] pl-2.5 pr-1 text-[13px] font-medium leading-4 text-[#9A9A98]">
+      <div data-group-head title={W.on(name, group.host?.name)} className="flex h-[30px] shrink-0 items-center gap-1.5 rounded-[10px] pl-2.5 pr-1 text-[13px] font-medium leading-4 text-[color:var(--ht-9a9a98)]">
         {editing !== null ? (
           <input
             type="text"
@@ -117,7 +117,7 @@ export function BotGroupBlock({
               }
             }}
             onBlur={() => end(editing)}
-            className="h-[26px] min-w-0 flex-1 rounded-[7px] bg-white px-2 text-[13px] font-medium text-ink shadow-[0_0_0_1.5px_#0A0A0A] outline-none placeholder:text-[#9A9A98]"
+            className="h-[26px] min-w-0 flex-1 rounded-[7px] bg-white px-2 text-[13px] font-medium text-ink shadow-[0_0_0_1.5px_var(--h-0a0a0a)] outline-none placeholder:text-[color:var(--ht-9a9a98)]"
           />
         ) : onRename ? (
           <button
@@ -126,7 +126,7 @@ export function BotGroupBlock({
             onClick={start}
             aria-label={W.rename(name)}
             data-tip={W.rename(name)}
-            className="min-w-0 truncate rounded-[6px] px-0.5 text-left outline-none hover:text-[#6B6B6B] focus-visible:shadow-[0_0_0_1.5px_#0A0A0A]"
+            className="min-w-0 truncate rounded-[6px] px-0.5 text-left outline-none hover:text-[color:var(--ht-6b6b6b)] focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
           >
             {name}
           </button>
@@ -136,11 +136,11 @@ export function BotGroupBlock({
           </span>
         )}
         {editing === null && (
-          <span data-group-count aria-hidden className="shrink-0 rounded-full bg-[#EEEEEC] px-1.5 text-[11.5px] leading-4 tabular-nums text-[#6B6B6B]">
+          <span data-group-count aria-hidden className="shrink-0 rounded-full bg-[color:var(--hb-eeeeec)] px-1.5 text-[11.5px] leading-4 tabular-nums text-[color:var(--ht-6b6b6b)]">
             {n}
           </span>
         )}
-        {editing === null && folded && waiting && <span data-group-waiting role="img" aria-label={W.needsYou} title={W.needsYou} className="size-[7px] shrink-0 rounded-full bg-[#E59A0B]" />}
+        {editing === null && folded && waiting && <span data-group-waiting role="img" aria-label={W.needsYou} title={W.needsYou} className="size-[7px] shrink-0 rounded-full bg-[color:var(--hb-e59a0b)]" />}
         <span className="flex-1" />
         {editing === null && (
           <button
@@ -150,14 +150,14 @@ export function BotGroupBlock({
             aria-expanded={!folded}
             aria-label={folded ? W.unfold(name) : W.fold(name)}
             data-tip={folded ? W.unfold(name) : W.fold(name)}
-            className="flex size-6 shrink-0 items-center justify-center rounded-full outline-none hover:bg-black/[0.05] hover:text-[#6B6B6B] focus-visible:shadow-[inset_0_0_0_1.5px_#0A0A0A]"
+            className="flex size-6 shrink-0 items-center justify-center rounded-full outline-none hover:bg-[color:var(--bops-tint)]/[0.05] hover:text-[color:var(--ht-6b6b6b)] focus-visible:shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)]"
           >
             <Chevron open={!folded} />
           </button>
         )}
       </div>
       {failed && (
-        <span role="alert" className="px-3 pb-1 text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="px-3 pb-1 text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {W.saveFailed}
         </span>
       )}
@@ -281,7 +281,7 @@ export function WorksOnRow({ state, bot: b, readOnly, className = "" }: { state:
           value={value}
           disabled={busy}
           onChange={(e) => void pick(e.target.value)}
-          className="max-w-[60%] appearance-none truncate bg-transparent text-right text-[13px] font-semibold leading-4 outline-none disabled:text-[#9A9A98]"
+          className="max-w-[60%] appearance-none truncate bg-transparent text-right text-[13px] font-semibold leading-4 outline-none disabled:text-[color:var(--ht-9a9a98)]"
         >
           <option value="">{W.none}</option>
           {value === "gone" && <option value="gone">{W.siteGone}</option>}
@@ -291,16 +291,16 @@ export function WorksOnRow({ state, bot: b, readOnly, className = "" }: { state:
             </option>
           ))}
         </select>
-        <span aria-hidden className="text-[10px] text-[#9A9A98]">
+        <span aria-hidden className="text-[10px] text-[color:var(--ht-9a9a98)]">
           ▾
         </span>
       </label>
       {error ? (
-        <span role="alert" className="px-1 text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="px-1 text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       ) : (
-        link && <span className="px-1 text-[12px] leading-4 text-[#6B6B6B]">{W.worksOnHint}</span>
+        link && <span className="px-1 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{W.worksOnHint}</span>
       )}
     </div>
   );

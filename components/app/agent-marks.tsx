@@ -105,7 +105,7 @@ export function AgentMark({ kind, size = 16, state }: { kind: AgentKind; size?: 
       {state && (
         <span
           aria-hidden
-          className="absolute -bottom-0.5 -right-0.5 rounded-full shadow-[0_0_0_1.5px_#FFFFFF]"
+          className="absolute -bottom-0.5 -right-0.5 rounded-full shadow-[0_0_0_1.5px_var(--h-ffffff)]"
           style={{ width: Math.max(6, Math.round(size * 0.42)), height: Math.max(6, Math.round(size * 0.42)), background: DOT[state] }}
         />
       )}
@@ -117,9 +117,9 @@ export function AgentMark({ kind, size = 16, state }: { kind: AgentKind; size?: 
  * An agent as a small chip: its mark and "Claude Code · Opus 5.5" (`label`: its name in its bot's profile, when
  * that tells it from another of its kind). `title`: more about it on hover (how it pays).
  */
-export function AgentChip({ agent, label, title, className = "bg-[#F2F2F0]" }: { agent: Pick<BotAgent, "kind" | "model">; label?: string; title?: string; className?: string }) {
+export function AgentChip({ agent, label, title, className = "bg-[color:var(--hb-f2f2f0)]" }: { agent: Pick<BotAgent, "kind" | "model">; label?: string; title?: string; className?: string }) {
   return (
-    <span title={title ?? label ?? agentLabel(agent)} className={`inline-flex shrink-0 items-center gap-1 rounded-full py-px pl-1 pr-1.5 text-[11px] leading-[14px] text-[#3A3A38] ${className}`}>
+    <span title={title ?? label ?? agentLabel(agent)} className={`inline-flex shrink-0 items-center gap-1 rounded-full py-px pl-1 pr-1.5 text-[11px] leading-[14px] text-[color:var(--ht-3a3a38)] ${className}`}>
       <AgentMark kind={agent.kind} size={12} />
       {label ?? agentLabel(agent)}
     </span>
