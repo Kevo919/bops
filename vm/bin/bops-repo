@@ -212,8 +212,17 @@ case "$CMD" in
     [ -n "$C" ] || fail bad-command
     envv "$ENVB"
     rm -f "$K/$NAME.exit" "$K/$NAME.log"
-    # Detached (this script again, as _run): Bops polls it, so no Orgo call waits on a long install.
-    setsid nohup "$0" _run "$ID" "$U" "$NAME" "$SECS" "$ENVB" "$CMDB" > /dev/null 2>&1 < /dev/null &
+    # Detached (this script again, as _run): Bops polls it, so no Orgo call waits on a long install —
+    # and Bops restarting (or dying) doesn't take the step with it. at(1) when atd is running: the job
+    # is the same script with the same validated arguments (name, secs and user are regex-checked here
+    # and again in _run; env and command stay base64), so atd adds no new input, and the step outlives
+    # this process tree. No atd: setsid, which still outlives Bops, just not a computer reboot.
+    JOB="\"$0\" _run \"$ID\" \"$U\" \"$NAME\" \"$SECS\" \"$ENVB\" \"$CMDB\""
+    if command -v at >/dev/null 2>&1 && echo "$JOB" | at now >/dev/null 2>&1; then
+      :
+    else
+      setsid nohup "$0" _run "$ID" "$U" "$NAME" "$SECS" "$ENVB" "$CMDB" > /dev/null 2>&1 < /dev/null &
+    fi
     echo "BOPS_REPO_BEGUN=$NAME"
     ;;
   _run)

@@ -424,11 +424,49 @@ const runOf = (runId: string) => repoState().runs?.find((r) => r.id === runId);
 /** Runs going in this process now: one in a step state that isn't here was cut off (a restart). */
 const goingHere = new Set<string>();
 
-/** Every run, with ones a restart cut off marked failed. */
+/** Every run, with the ones a restart cut off resolved against the computer instead of failed at once
+ *  (the step runs detached — bops-repo begin, at now — so after a restart it may still be going, or have
+ *  finished on its own): what the poll says is the truth, within the step's own time limit. */
 export function repoRuns(): RepoRun[] {
-  const cut = (repoState().runs ?? []).filter((r) => RUN_ACTIVE.has(r.state) && r.state !== "running" && !goingHere.has(r.id) && Date.now() - r.updatedAt > 2 * 60_000);
-  for (const r of cut) patchRun(r.id, { state: "failed", error: "Bops restarted while this was running. Run it again." });
+  const stale = (repoState().runs ?? []).filter((r) => RUN_ACTIVE.has(r.state) && r.state !== "running" && !goingHere.has(r.id) && Date.now() - r.updatedAt > 2 * 60_000);
+  for (const r of stale) {
+    goingHere.add(r.id);
+    void reconcile(r.id, r.computerId, r.repoId).finally(() => goingHere.delete(r.id));
+  }
   return repoState().runs ?? [];
+}
+
+/** Ask the computer what became of a step the restart cut off; settle the run by its answer. */
+async function reconcile(runId: string, computerId: string, repoId: string) {
+  const until = Date.now() + repoTiming.serverSecs + 2 * 60_000;
+  for (;;) {
+    await repoDeps.sleep(repoTiming.pollMs);
+    if (runOf(runId)?.state === "stopped") return;
+    let out = "";
+    try {
+      out = await sh(computerId, `${REPO_BIN} poll ${repoId} run`);
+    } catch {
+      // The computer is gone (deleted, or unreachable longer than the step's own limit would allow).
+    }
+    const code = out.match(/^BOPS_REPO_POLL=exit=(\d+)/m)?.[1];
+    const run = runOf(runId);
+    if (!run || !RUN_ACTIVE.has(run.state) || run.state === "running") return;
+    if (code !== undefined) {
+      patchRun(runId, {
+        state: "failed",
+        error: Number(code) === 0 ? "The step finished while Bops was restarting; run it again to continue." : `It stopped by itself while Bops was restarting (exit ${code}); run it again.`,
+        tail: tailOf(out),
+      });
+      await sh(computerId, `${REPO_BIN} stop ${repoId} ${repoUser(repoId, hash)}`, 30).catch(() => "");
+      return;
+    }
+    patchRun(runId, { tail: tailOf(out) });
+    if (Date.now() > until) {
+      patchRun(runId, { state: "failed", error: "Bops restarted and lost track of this step past its own time limit; run it again." });
+      await sh(computerId, `${REPO_BIN} stop ${repoId} ${repoUser(repoId, hash)}`, 30).catch(() => "");
+      return;
+    }
+  }
 }
 
 /* ---------------- On the computer ---------------- */
