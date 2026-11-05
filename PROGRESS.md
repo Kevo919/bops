@@ -13,6 +13,8 @@ Plain-English status of the build, kept up to date by the lead. Last updated **2
 - Everything merged so far: [closed pull requests](https://github.com/Kevo919/bops/pulls?q=is%3Apr+is%3Amerged)
 - The Android app: [download the APK](https://github.com/Kevo919/bops/releases/download/android-latest/bops-remote.apk)
 
+**Connections tally:** [CONNECTIONS.md](CONNECTIONS.md): every account and app Bops can reach.
+
 ## Testing target: 100% (now 66%)
 
 The overnight ETAs for 80% slipped because the PC was locked, so Codex couldn't test in the real app. New ETAs count from when you unlock it.

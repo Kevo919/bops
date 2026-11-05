@@ -52,3 +52,7 @@ How:
 - A message asking you something: answer it with a new message, so the thread reads in order.
 - Never put keys, tokens or passwords here. This repository is public.
 - If you're blocked on something only Kevin can do, say so in your status file under **Needs Kevin**. The lead brings it to him.
+
+
+## Connections tally (all agents)
+When you add, remove or check any outside connection (Composio app, Zapier, a provider key, an MCP server), update CONNECTIONS.md in the same push: name, where it's set, status, date and who checked. Never secrets.
