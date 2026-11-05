@@ -73,9 +73,9 @@ try {
     assert.equal(await checkKey("https://attacker.invalid"), null);
     assert.equal(calls.length, 0);
   });
-  await test("both OpenAI keys use one tiny fixed-host generation, no overrides", async () => {
+  await test("the application OpenAI key uses one tiny fixed-host generation, no overrides", async () => {
     process.env.OPENAI_BASE_URL = "https://attacker.invalid";
-    for (const key of ["OPENAI_API_KEY", "OPENAI_EXECUTOR_API_KEY"]) {
+    for (const key of ["OPENAI_API_KEY"]) {
       calls = [];
       const result = await resultOf(key, 200, { choices: [{ message: { content: "Hi" } }] });
       assert.equal(result.status, "works");
@@ -87,6 +87,38 @@ try {
       assert.equal(options.redirect, "error");
       assert.equal(options.cache, "no-store");
       assert.ok(options.signal instanceof AbortSignal);
+    }
+  });
+  await test("executor checks report presence only, never fetch or expose a secret", async () => {
+    const key = "OPENAI_EXECUTOR_API_KEY";
+    const saved = process.env[key];
+    try {
+      reply = () => { throw new Error("executor check must not fetch"); };
+      for (const value of [undefined, "", "   "]) {
+        if (value === undefined) delete process.env[key]; else process.env[key] = value;
+        assert.equal((await checkKey(key)).status, "not set");
+      }
+      process.env[key] = "SYNTHETIC_SECRET_EXECUTOR";
+      const result = await checkKey(key);
+      assert.equal(result.status, "set");
+      assert.match(result.message, /connection permission has not been verified/);
+      assert.match(result.message, /dedicated OpenAI environment key/);
+      assert.ok(!JSON.stringify(result).includes("SYNTHETIC_SECRET"));
+      reply = () => Response.json({ choices: [{ message: { content: "Hi" } }] });
+      assert.equal((await checkKey(key)).status, "set", "a generation response cannot prove executor access");
+      process.env.OPENAI_EXECUTOR_API_KEY__WORK = "SYNTHETIC_SECRET_OTHER";
+      assert.equal(await checkKey("OPENAI_EXECUTOR_API_KEY__WORK"), null);
+      assert.ok(!keyCheckList().some(row => row.key === "OPENAI_EXECUTOR_API_KEY__WORK"));
+      const response = await route.POST(request("POST", {}, { key }));
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("cache-control"), "no-store");
+      const body = await response.json();
+      assert.equal(body.result.status, "set");
+      assert.ok(!JSON.stringify(body).includes("SYNTHETIC_SECRET"));
+      assert.equal(calls.length, 0);
+    } finally {
+      if (saved === undefined) delete process.env[key]; else process.env[key] = saved;
+      delete process.env.OPENAI_EXECUTOR_API_KEY__WORK;
     }
   });
   await test("models/key-info/capacity use fixed URLs, correct credentials and no generation", async () => {
@@ -154,6 +186,7 @@ try {
     for (const headers of [{}, { "x-bops-window": "wrong" }, { "x-bops-window": "é".repeat(17) }, { "x-bops-window": "window-test-token", "x-bops-remote": "phone" }, { "x-bops-window": "window-test-token", cookie: "bops_remote=phone" }]) {
       assert.equal((await route.GET(request("GET", headers))).status, 403);
       assert.equal((await route.POST(request("POST", headers, { key: "OPENAI_API_KEY" }))).status, 403);
+      assert.equal((await route.POST(request("POST", headers, { key: "OPENAI_EXECUTOR_API_KEY" }))).status, 403);
     }
     assert.equal(calls.length, 0);
     assert.equal((await route.GET(request("GET", { "x-bops-window": "window-test-token" }))).status, 200);
