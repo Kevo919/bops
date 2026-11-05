@@ -6,6 +6,12 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 4, 11:50 PM (Chicago)
+- **Testing score: 66%** (rising through the night; see [TESTS.md](TESTS.md)).
+- **Merged since 10 PM (each tested, logged in tests/):** #56 the PC task-runner status, #57 + #62 bot memory kept away from outsiders, #58 + #59 + #61 + #63 the Repos security fixes (approval tied to the exact plan, private repos owner-only, default-deny firewall), #60 Windows fixes for previews and hosted apps.
+- **Running:** PC and server rebuilding with all of it; a robot crawl clicking every screen and button; Codex's live tests on the real app.
+- **Still needs Kevin:** Gmail sign-in in Logins, GitHub Actions re-enable, a choice for PC bot tasks, the phone.
+
 ### Nov 4, 10:15 PM (Chicago)
 - **Testing score: 57%** (64.5 of 113 checks; see [TESTS.md](TESTS.md)). Target: 100%.
 - **Merged:** #55 (fixes from the post-merge review: Goals, OpenAI accounts, tool servers), #54 (Word/Excel downloads in the desktop app), #53 (4 repo recipes checked in Docker; a paperless-ngx bug found and fixed).
