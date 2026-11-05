@@ -13,13 +13,15 @@ Plain-English status of the build, kept up to date by the lead. Last updated **2
 - Everything merged so far: [closed pull requests](https://github.com/Kevo919/bops/pulls?q=is%3Apr+is%3Amerged)
 - The Android app: [download the APK](https://github.com/Kevo919/bops/releases/download/android-latest/bops-remote.apk)
 
-## Testing target: 100% (now 57%)
+## Testing target: 100% (now 67%)
+
+The overnight ETAs for 80% slipped because the PC was locked, so Codex couldn't test in the real app. New ETAs count from when you unlock it.
 
 | Score | What gets it there | Who | ETA (Chicago) |
 |---|---|---|---|
-| 80% | Every feature tested in the real app on your PC | Codex | ~1:30 AM Nov 5 |
-| 85% | Every feature tested on the server | z.ai | ~3 AM Nov 5 |
-| 90% | The last review fixes (Repos, bot memory files) merged and re-tested; a bot task on the cloud computer | z.ai + lead | ~9 AM Nov 5 |
+| 70% | Server results for the latest version (done), z.ai's Memory and Repos sandbox fixes merged and re-tested | z.ai + lead | ~10 AM Nov 5 |
+| 80% | Every feature tested in the real app on your PC | Codex | ~2 hours after you unlock the PC |
+| 90% | The last review fixes merged and re-tested; a bot task on the cloud computer | z.ai + lead + Codex | ~4 hours after you unlock the PC |
 | 95% | Your items: Gmail sign-in, GitHub checks back on, phone set up, a fix chosen for PC bot tasks | Kevin, then the agents | ~1 hour after you do them |
 | 100% | Zapier address, a real OpenRouter preset and second key, ChatGPT plan sign-in, the other 10 repo recipes, the z.ai China quota (resets Nov 8) | Kevin + agents | Nov 8 |
 
