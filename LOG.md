@@ -171,3 +171,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 19:30 lead: merged #96 (credit-race fix + AgentPhone test wait) at a204785 after independent review (approve w/ nits) and all checks green. Tasks 68-69 to its builder.
 - 19:40 lead: #90 independent review = REQUEST CHANGES (D3 incomplete). Notes in messages/2026-11-05-1945. #85 dark mode pushed fab9002, update-branch + merge-when-green running.
 - 19:45 lead: merged #85 dark mode at 55db629 (all checks green; builder's dark 61/0, light 58/0 screenshot runs). #86 builder resumed for codemod + registry swap.
+- 19:58 lead: PC rebuilt+restarted at 55db629 (build osd4t7mlrAnn76r154pAC, health OK; Kevin told first). Server updated to 55db629, active; server-tests3 rerunning. Codex queue: messages/2026-11-05-2000.
