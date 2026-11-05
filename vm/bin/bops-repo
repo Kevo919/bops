@@ -6,9 +6,10 @@
 # HOME a fresh temp folder, its working folder /srv/bops-repos/<id>/src (its user's alone), an
 # environment with only PATH, LANG, HOME/TMPDIR and the plain settings Bops passes (never a key),
 # ulimits, and a time limit on every step. Its network is the public internet, its own ports on this
-# computer and DNS: the ports anything else here listens on (the bots' Chrome DevTools, Bops' own
-# services, other repos), private and link-local addresses and the tailnet are refused to it by
-# iptables. Before anything of the repo runs, a probe AS THAT USER checks it can't read the bots'
+# computer and DNS: everything else on this computer (the bots' Chrome DevTools, Bops' own services,
+# other repos, whatever starts listening later), private and link-local addresses and the tailnet
+# are refused to it by iptables' default-deny — never by a snapshot of what happens to be listening.
+# Before anything of the repo runs, a probe AS THAT USER checks it can't read the bots'
 # folders (/root, /root/.bops, the agents' and Chrome profiles' folders, /workspace), can't reach
 # the Docker socket or an X display, and can't connect to the ports it was refused; anything else
 # fails the run closed (BOPS_REPO_FAIL=...).
@@ -77,7 +78,9 @@ as_user() { # <user> <secs> <command>
     exec bash -c "$2"' bash "$SRC" "$3" < /dev/null
 }
 
-# The firewall for the user: the ports others listen on here, private ranges and the tailnet are refused.
+# The firewall for the user: default-deny on this computer — only the ports the run declares and DNS
+# are answered. Nothing is decided by a snapshot of what happens to be listening now: whatever starts
+# later is refused too. Private ranges and the tailnet are refused with it.
 FWFAIL=0
 ipt() { "$@" 2>/dev/null || FWFAIL=1; }
 firewall() { # <user> <ports csv>
@@ -87,29 +90,25 @@ firewall() { # <user> <ports csv>
     "$t" -w -N "$chain" 2>/dev/null || true
     "$t" -w -F "$chain" || fail firewall "$t couldn't set up its rules."
     "$t" -w -C OUTPUT -m owner --uid-owner "$u" -j "$chain" 2>/dev/null || "$t" -w -I OUTPUT 1 -m owner --uid-owner "$u" -j "$chain" || fail firewall "$t couldn't add its rule."
-    # Its own ports on this computer, and DNS.
+    # Its own ports on this computer, and DNS: the only local things allowed past the deny below.
     local p
     for p in ${own//,/ }; do ipt "$t" -w -A "$chain" -p tcp -m addrtype --dst-type LOCAL --dport "$p" -j RETURN; done
     ipt "$t" -w -A "$chain" -p udp --dport 53 -j RETURN
     ipt "$t" -w -A "$chain" -p tcp -m addrtype --dst-type LOCAL --dport 53 -j RETURN
   done
-  # Every port anything not its own listens on now, and Bops' own ranges (Chrome DevTools, the home screen, screens).
-  local ports
-  ports=$( { ss -Htlnpe 2>/dev/null | awk -v uid="$(id -u "$u")" '{ if ($0 !~ ("uid:" uid " ")) { n=split($4, a, ":"); print a[n] } }'; ss -Hulnpe 2>/dev/null | awk -v uid="$(id -u "$u")" '{ if ($0 !~ ("uid:" uid " ")) { n=split($4, a, ":"); print a[n] } }'; } | grep -E '^[0-9]+$' | grep -vx 53 | sort -un)
-  for p in $ports; do
-    case ",$own," in *",$p,"*) continue ;; esac
-    ipt iptables -w -A "$chain" -m addrtype --dst-type LOCAL -p tcp --dport "$p" -j REJECT
-    ipt iptables -w -A "$chain" -m addrtype --dst-type LOCAL -p udp --dport "$p" -j REJECT
-    ipt ip6tables -w -A "$chain" -m addrtype --dst-type LOCAL -p tcp --dport "$p" -j REJECT
-    ipt ip6tables -w -A "$chain" -m addrtype --dst-type LOCAL -p udp --dport "$p" -j REJECT
-  done
-  for r in 5900:6099 7600:7699 9200:9399; do
-    ipt iptables -w -A "$chain" -m addrtype --dst-type LOCAL -p tcp --dport "$r" -j REJECT
-    ipt ip6tables -w -A "$chain" -m addrtype --dst-type LOCAL -p tcp --dport "$r" -j REJECT
-  done
+  # The deny itself: every other local port, tcp and udp, v4 and v6 (Chrome DevTools, Bops' own
+  # services, the screens, other repos — whatever is listening now or starts later).
+  ipt iptables -w -A "$chain" -m addrtype --dst-type LOCAL -p tcp -j REJECT
+  ipt iptables -w -A "$chain" -m addrtype --dst-type LOCAL -p udp -j REJECT
+  ipt ip6tables -w -A "$chain" -m addrtype --dst-type LOCAL -p tcp -j REJECT
+  ipt ip6tables -w -A "$chain" -m addrtype --dst-type LOCAL -p udp -j REJECT
   for n in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 100.64.0.0/10; do ipt iptables -w -A "$chain" -d "$n" -j REJECT; done
   for n in fc00::/7 fe80::/10; do ipt ip6tables -w -A "$chain" -d "$n" -j REJECT; done
   [ "$FWFAIL" = 0 ] || fail firewall "A rule couldn't be added (iptables' owner or addrtype match missing?)."
+  # For the probe only, never a policy input: the ports others listen on right now, so the probe can
+  # check the deny holds against what is live on this computer today.
+  local ports
+  ports=$( { ss -Htlnpe 2>/dev/null | awk -v uid="$(id -u "$u")" '{ if ($0 !~ ("uid:" uid " ")) { n=split($4, a, ":"); print a[n] } }'; ss -Hulnpe 2>/dev/null | awk -v uid="$(id -u "$u")" '{ if ($0 !~ ("uid:" uid " ")) { n=split($4, a, ":"); print a[n] } }'; } | grep -E '^[0-9]+$' | grep -vx 53 | sort -un)
   echo "$ports" | tr '\n' ',' > "$K/refused-ports"
 }
 

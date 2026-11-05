@@ -6,15 +6,18 @@
 // changed while the ask waited asks again), the run goes step by
 // step on a computer (installed, running, its health check) and is said in the chat, a private repo's tarball comes
 // through the key broker and only its bytes reach the computer (no token, no download address, no key name's value in
-// any command, env or log), a repo's output is kept with keys taken out, open_repo reads a private repo only on the
-// owner's own turn (a member's is refused before anything of it is read; a public repo anyone may open), two bots
-// each see their own, the window's Run refuses a plan that changed, the tools are offered on the owner's chat turn
-// (run_repo not on a member's or someone else's), and the bots' briefing line says what's installed.
+// any command, env or log), the computer's firewall for the repo is default-deny (only the plan's declared ports and
+// DNS get through, and nothing is decided by what happens to be listening at the time), a repo's output is kept with
+// keys taken out, open_repo reads a private repo only on the owner's own turn (a member's is refused before anything
+// of it is read; a public repo anyone may open), two bots each see their own, the window's Run refuses a plan that
+// changed, the tools are offered on the owner's chat turn (run_repo not on a member's or someone else's), and the
+// bots' briefing line says what's installed.
 //
 // The computer is a fake that answers bops-repo's lines; GitHub, Orgo's broker and OpenAI are fakes too; the state
 // lives in a throwaway folder: nothing reaches a real service.
 // Usage: node --conditions=react-server scripts/test-repos.mjs
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
@@ -396,6 +399,66 @@ await check("a failed safety check on the computer fails the run closed, said in
   } finally {
     fail = null;
   }
+});
+
+/* ---------------- The firewall on the computer ---------------- */
+
+// The firewall() of vm/bin/bops-repo, run for real in a sandbox: iptables, ip6tables, ss and id are
+// stubbed bash functions that record what they're asked (no root, no network, nothing touched).
+const repoScript = () => readFileSync(join(rootPath, "vm", "bin", "bops-repo"), "utf8").replace(/\r\n/g, "\n");
+const firewallOf = (script) => script.slice(script.indexOf("FWFAIL=0"), script.indexOf("\n}\n", script.indexOf("firewall() {")) + 3);
+const bashPath = (p) => p.replace(/^([A-Za-z]):[\\/]/, (_m, d) => `/${d.toLowerCase()}/`).replace(/\\/g, "/");
+
+function runFirewall(script, listenLines, own) {
+  const dir = mkdtempSync(join(tmpdir(), "bops-test-fw-"));
+  try {
+    const rules = bashPath(join(dir, "rules.log"));
+    const body = [
+      `fail() { echo "BOPS_REPO_FAIL=$1"; exit 1; }`,
+      `iptables() { printf '%s\\n' "iptables $*" >> '${rules}'; }`,
+      `ip6tables() { printf '%s\\n' "ip6tables $*" >> '${rules}'; }`,
+      `ss() { printf '%s' "$BOPS_TEST_FW_SS"; }`,
+      `id() { echo 4242; }`,
+      `command -v sha1sum >/dev/null 2>&1 || sha1sum() { printf 'd8f2aa0a8d8f2aa0a8d8f2aa0a8d8f2aa0a8d8f2  -\\n'; }`,
+      `K=$(mktemp -d)`,
+      firewallOf(script),
+      `firewall repo-test '${own}'`,
+    ].join("\n");
+    const r = spawnSync("bash", ["-c", body], { encoding: "utf8", cwd: tmpdir(), env: { ...process.env, BOPS_TEST_FW_SS: listenLines.join("\n") } });
+    assert.equal(r.status, 0, `firewall failed: ${r.stderr || r.stdout}`);
+    return readFileSync(join(dir, "rules.log"), "utf8").trim().split("\n");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const LISTENERS = [
+  'LISTEN 0 511 0.0.0.0:8222 0.0.0.0:* users:(("other",pid=1,fd=3)) uid:99 ino:1',
+  'LISTEN 0 511 [::]:9229 [::]:* users:(("node",pid=2,fd=3)) uid:0 ino:2',
+  'LISTEN 0 511 0.0.0.0:53 0.0.0.0:* users:(("dns",pid=3,fd=3)) uid:0 ino:3',
+  'LISTEN 0 511 127.0.0.1:4173 0.0.0.0:* users:(("dev",pid=4,fd=3)) uid:0 ino:4',
+];
+
+await check("the repo firewall is default-deny: the plan's declared ports and DNS alone get through, and nothing is decided by what happens to be listening", () => {
+  const script = repoScript();
+  const a = runFirewall(script, LISTENERS, "4173,3000");
+  const b = runFirewall(script, [...LISTENERS, 'UNCONN 0 0 0.0.0.0:8333 0.0.0.0:* users:(("x",pid=5,fd=3)) uid:0 ino:5'], "4173,3000");
+  assert.deepEqual(b, a, "the same plan builds the same rules whatever is listening at the time");
+  const denied = a.filter((r) => r.includes("--dst-type LOCAL") && !r.includes("--dport") && r.endsWith("REJECT"));
+  for (const t of ["iptables", "ip6tables"])
+    for (const proto of ["tcp", "udp"])
+      assert.ok(denied.some((r) => r.startsWith(`${t} `) && r.includes(`-p ${proto}`)), `a default-deny on ${t}/${proto}`);
+  const firstDeny = a.indexOf(denied[0]);
+  for (const port of ["4173", "3000"]) {
+    const ok = a.findIndex((r) => r.includes(`--dport ${port} `) && r.endsWith("RETURN"));
+    assert.ok(ok >= 0, `the declared port ${port} is allowed`);
+    assert.ok(ok < firstDeny, `the declared port ${port} is allowed before the deny`);
+  }
+  assert.ok(a.some((r) => r.includes("--dport 53 ") && r.endsWith("RETURN")), "DNS is allowed");
+  for (const port of ["8222", "9229", "8333"])
+    assert.ok(a.every((r) => !r.includes(`--dport ${port} `)), `a port only the snapshot knows (${port}) is never named in a rule`);
+  for (const net of ["10.0.0.0/8", "169.254.0.0/16", "100.64.0.0/10"]) assert.ok(a.some((r) => r.includes(`-d ${net} `)), `${net} is refused`);
+  assert.equal(spawnSync("bash", ["-n"], { input: script, encoding: "utf8" }).status, 0, "the script is sound shell");
 });
 
 /* ---------------- A private repo ---------------- */
