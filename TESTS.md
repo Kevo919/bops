@@ -5,14 +5,14 @@ Every feature, how it was tested, when, by whom, and the result. **Kevin: read t
 Legend: ✅ passed · ⚠️ passed with a known limit · ❌ failed · ⏳ not yet tested this way.
 Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an independent agent read the code for bugs and security), **Live PC** (on Kevin's PC, real app), **Live server** (on the Hostinger server), **Live phone**, **Real account** (with Kevin's real provider account).
 
-**Tested: 57%** (64.5 of 113 checks that apply have passed; a pass with a known limit counts as half). Updated 2026-11-05 04:15 UTC (Nov 4 10:15 PM Chicago).
+**Tested: 59%** (66.5 of 113 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
 
 | Feature | Unit/CI | Review | Live PC | Live server | Real account / phone | Notes |
 |---|---|---|---|---|---|---|
 | Windows app starts, health check | ✅ Nov 3 codex | ✅ Nov 3 lead | ✅ Nov 4 lead (build V2Lm2…) | n/a | n/a |  |
 | Windows installer (#15, #33) | ✅ Nov 3 codex | ✅ Nov 3 reviewer | ⚠️ Nov 3 codex: upgrade kept data; launching the new install not tested | n/a | n/a |  |
 | Chat with a real model (OpenRouter) | ✅ Nov 3 | ✅ Nov 3 reviewer | ✅ Nov 3 lead: Boppy answered on DeepSeek V3.1 | ⏳ | ✅ Nov 3 lead: OpenRouter key 200 |  |
-| Chat model picker + refresh (#46) | ✅ Nov 3 | ✅ Nov 3 | ⚠️ Nov 3 lead (needed Ctrl+R before #46) | ⏳ | n/a |  |
+| Chat model picker + refresh (#46) | ✅ Nov 3 | ✅ Nov 3 | ✅ Nov 5 codex: edit-label refresh without reload | ⏳ | n/a |  |
 | Chat box layout (#42) | ✅ Nov 3 lead | ✅ Nov 3 lead | ✅ Nov 3 lead | n/a | n/a |  |
 | Models: presets, any id, Auto Router, routine model (#31, #44) | ✅ Nov 3-4 | ✅ Nov 5 reviewer | ⏳ | ⏳ | ⏳ Kevin's real presets |  |
 | Several accounts per provider (#45, #55) | ✅ Nov 5 (#55 tests) | ✅ Nov 5 reviewer + fix | ⏳ | ⏳ | ⏳ a second real key |  |
@@ -21,17 +21,17 @@ Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an indepen
 | Bot tasks on the cloud computer (Claude Code, Max plan) | ✅ | ✅ | ⏳ | n/a | ⏳ one real task |  |
 | Composio connected apps (#40) | ✅ Nov 3 | ✅ Nov 3 reviewer | ⚠️ Nov 4 lead: key accepted; Gmail not connected yet | ⏳ | ⏳ Gmail via Composio (Kevin's sign-in) |  |
 | Zapier MCP (#40) | ✅ Nov 3 | ✅ Nov 3 reviewer | ⏳ | ⏳ | ⏳ needs Kevin's Zapier address |  |
-| Repos section + run_repo (#38) | ✅ (20+7) | ⚠️ Nov 3 reviewer: 4 findings, fixes in progress (zai) | ⏳ | ⏳ | n/a |  |
+| Repos section + run_repo (#38) | ✅ (20+7) | ⚠️ Nov 5: plan binding fixed (#59, merged); member reads fix #58 held; OS crontab/at fix asked; firewall ⏳ | ⏳ | ⏳ | n/a |  |
 | Repo recipes (#21, #53) | ✅ Nov 5 zai (16 recipes valid) | ✅ | ✅ Nov 5 zai: n8n, Stirling-PDF, twenty, paperless-ngx healthy in Docker; REA Nov 3 codex | ⏳ | n/a | paperless-ngx bug found and fixed (#53); other 10 recipes T |
-| Editable SOUL.md / MEMORY.md (#39) | ✅ (11+5) | ⚠️ Nov 3 reviewer: MEMORY.md reaches outside turns (fix next, zai) | ⏳ | ⏳ | n/a |  |
+| Editable SOUL.md / MEMORY.md (#39) | ✅ (11+5) | ⚠️ Nov 5: fix #57 held (ask_teammate still leaks teammate MEMORY.md on outside turns) | ⏳ | ⏳ | n/a |  |
 | Custom schedules / cron (#52) | ✅ Nov 4 lead | ✅ Nov 3 reviewer | ⏳ | ⏳ | n/a |  |
 | Pause routines when away (#19) | ✅ Nov 3 | ✅ reviewer + lead fix | ⏳ | ⏳ | n/a |  |
 | Allow for this conversation (#27) | ✅ Nov 3 | ✅ reviewer + lead fix | ⏳ | ⏳ | n/a |  |
 | Own tool servers per bot / MCP (#32, #55) | ✅ Nov 5 (mcp 17) | ✅ Nov 5 reviewer + fix | ⏳ | ⏳ | ⏳ a real MCP server | Windows run T |
-| Word/PowerPoint/Excel from chat (#41, #54) | ✅ Nov 5 zai (docs 6, proxy) | ✅ Nov 3 reviewer + fix | ⏳ | ⏳ | n/a |  |
-| Goals and ideas (#51, #55) | ✅ Nov 5 (goals 12) | ✅ Nov 5 reviewer + fix | ⏳ | ⏳ | n/a |  |
+| Word/PowerPoint/Excel from chat (#41, #54) | ✅ Nov 5 zai (docs 6, proxy) | ✅ Nov 3 reviewer + fix | ⚠️ Nov 5 codex: docx/xlsx/pptx download and content OK; a 1-slide deck came out as 2 | ⏳ | n/a |  |
+| Goals and ideas (#51, #55) | ✅ Nov 5 (goals 12) | ✅ Nov 5 reviewer + fix | ⚠️ Nov 5 codex: Ideas park/reopen/dismiss pass; goal creation ⏳ | ⏳ | n/a |  |
 | Change the look by chat (#4) | ✅ | ✅ Nov 3 | ⏳ | ⏳ | n/a |  |
-| Voice typing card / Handy (#34) | ✅ | ✅ | ⏳ | n/a | n/a |  |
+| Voice typing card / Handy (#34) | ✅ | ✅ | ⚠️ Nov 5 codex: card renders (partial) | n/a | n/a |  |
 | Keys card + key checks (#10) | ✅ | ✅ | ⏳ | ⏳ | ⚠️ OpenRouter + Composio keys accepted |  |
 | Hostinger server, Tailscale-only (#12, #16) | ✅ | ✅ | n/a | ✅ Nov 5 lead: updated to af98afe, active, health OK | n/a | #54/#55 not on it yet |
 | Ollama chat (#28) | ✅ | ✅ | n/a | ⚠️ Nov 3 lead: works, too slow | n/a |  |
