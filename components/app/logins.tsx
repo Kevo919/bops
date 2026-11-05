@@ -719,7 +719,9 @@ function LoginPanel({
     setError(null);
     try {
       const res = await post(url, body, method);
-      if (!res.ok) setError(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "That didn't work. Try again.");
+      // A paired phone is refused on purpose and retrying can't change it (crawl L2): say where this works.
+      if (res.status === 403) setError("Open the Bops desktop app to do this - a paired phone can't.");
+      else if (!res.ok) setError(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "That didn't work. Try again.");
       return res.ok;
     } catch {
       setError("Couldn't reach Bops. Try again.");

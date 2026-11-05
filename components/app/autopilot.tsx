@@ -24,7 +24,7 @@ import {
 } from "./side-group";
 import { watchName } from "./watch-overlay";
 import { AppLogo, BotChip, botApps, rowTrashBtn, TrashIcon } from "./apps";
-import { asCadence, asSchedule, CadencePicker, sameCadence, suggestedOf, tidy, type Cadence } from "./cadence-picker";
+import { asCadence, asSchedule, CadencePicker, cronError, sameCadence, suggestedOf, tidy, type Cadence } from "./cadence-picker";
 import { CloseButton, currentWorkspace, needsYou, post, ReadOnlyLine, teamOf } from "./ui";
 import { FooterButton } from "./sidebar-footer";
 import { deleteQuestion, RoutineWeek, useClock, weekPlan, WeekLegend, WeekLetters } from "./routine-week";
@@ -1062,18 +1062,20 @@ function ScheduleEdit({
     ...(model !== (r.model ?? "") ? { model: model || null } : {}),
   };
   const changed = Object.keys(edit).length > 0;
+  // A half-typed cron is the picker's own red state; saving it is the server's 400 (crawl L3), so Save waits.
+  const cronBad = when.schedule.kind === "cron" ? cronError(when.schedule.expr) : undefined;
   const field = "w-full rounded-xl bg-[#F7F7F6] px-3 py-2 text-[13px] leading-[18px] outline-none focus:bg-white focus:shadow-[0_0_0_1.5px_#0A0A0A]";
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (changed && !busy) onSave(edit);
+        if (changed && !busy && !cronBad) onSave(edit);
       }}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.preventDefault();
           if (!busy) onCancel();
-        } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && changed && !busy) {
+        } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && changed && !busy && !cronBad) {
           e.preventDefault();
           onSave(edit);
         }
@@ -1100,7 +1102,7 @@ function ScheduleEdit({
         <RoutineModelPick routine={r} state={state} value={model} disabled={busy} onChange={setModel} />
       </div>
       <div className="-ml-2.5 flex items-center gap-0.5">
-        <button type="submit" disabled={!changed || busy} className="rounded-full bg-ink px-3 py-1 text-[12px] font-medium leading-4 text-white disabled:opacity-40">
+        <button type="submit" disabled={!changed || busy || !!cronBad} className="rounded-full bg-ink px-3 py-1 text-[12px] font-medium leading-4 text-white disabled:opacity-40">
           {busy ? "Saving…" : "Save"}
         </button>
         <button type="button" onClick={onCancel} disabled={busy} className={small("plain")}>
@@ -1153,6 +1155,7 @@ function WhenChange({ routine: r, state, tz, busy, onSave, onCancel }: { routine
   const when = useWhen(r, tz);
   const ctx = whenContext(r, state);
   const changed = Object.keys(when.edit).length > 0;
+  const cronBad = when.schedule.kind === "cron" ? cronError(when.schedule.expr) : undefined;
   return (
     <div
       onKeyDown={(e) => {
@@ -1169,7 +1172,7 @@ function WhenChange({ routine: r, state, tz, busy, onSave, onCancel }: { routine
     >
       <CadencePicker value={when.schedule} onChange={when.setSchedule} zone={when.zone} ownerZone={tz} onZone={when.setZone} presets={ctx.presets} calendar={ctx.calendar} disabled={busy} />
       <div className="-ml-2.5 flex items-center gap-0.5">
-        <button type="button" onClick={() => onSave(when.edit)} disabled={!changed || busy} className="rounded-full bg-ink px-3 py-1 text-[12px] font-medium leading-4 text-white disabled:opacity-40">
+        <button type="button" onClick={() => onSave(when.edit)} disabled={!changed || busy || !!cronBad} className="rounded-full bg-ink px-3 py-1 text-[12px] font-medium leading-4 text-white disabled:opacity-40">
           {busy ? "Saving…" : "Save"}
         </button>
         <button type="button" onClick={onCancel} disabled={busy} className={small("plain")}>
