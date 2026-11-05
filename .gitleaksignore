@@ -29,3 +29,5 @@ d3d39c26007b4a6ac6355edd2b7c09ba131a810c:scripts/test-repo-recipes.mjs:generic-a
 6a4ab46cf162a293dbeebc144b2c8ad456e654c0:scripts/test-repos.mjs:generic-api-key:219
 # Reviewer note (team branch): a made-up HONCHO_API_KEY used in an offline probe; the PC has no Honcho key (checked by hash). Redacted on the board after.
 dde234dc68b82239e236be9d193b93d185e425fd:tests/2026-11-05-1158-reviewer-pr69-pr72.md:generic-api-key:12
+# PR #80 test fixture: a planted fake CLAUDE_CODE_OAUTH_TOKEN the test proves is stripped.
+588d2a741ea8a443417116bf5259ec65f97a5f17:scripts/test-pc-task-runner.mjs:generic-api-key:25
