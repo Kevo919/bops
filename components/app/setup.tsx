@@ -17,6 +17,7 @@ import { ModelsCard } from "./models-card";
 import { ConnectionsCard } from "./connections-card";
 import { HandyCard } from "./handy-card";
 import { checkVoiceAddress } from "@/lib/voice-address";
+import { claudeLocalLine } from "@/lib/local-plan-words";
 import { APP_URL, TAILSCALE_ANDROID_URL, TAILSCALE_WINDOWS_URL } from "@/lib/remote-links";
 
 /*
@@ -46,6 +47,7 @@ export function AiSubscriptionsCard({ state, onShowScreen, onOpenVault }: { stat
   const localAvailable = selfHosted && desktop;
   const [target, setTarget] = useState<"pc" | "cloud">("pc");
   const localSelected = localAvailable && target === "pc";
+  const [pcView, setPcView] = useState<PcRunnerView | null>(null);
   const bots = teamOf(state).filter((b) => state.host !== "mac" && b.runsOn !== "mac");
   const [selected, setSelected] = useState("");
   const b = bots.find((x) => x.id === selected) ?? bots[0];
@@ -60,8 +62,8 @@ export function AiSubscriptionsCard({ state, onShowScreen, onOpenVault }: { stat
       </div>
       {localSelected ? <>
         <p className="text-[12px] leading-5 text-[#6B6B6B]">Sign in through the official CLI in your normal browser. Its login stays on this PC across restarts. No bot computer or AI profile is needed to connect. Once Claude is signed in here, bot tasks on this PC can run on your Claude plan: choose that below.</p>
-        <LocalSubscriptions />
-        <PcTaskRunnerCard />
+        <LocalSubscriptions runner={pcView?.runner} />
+        <PcTaskRunnerCard onView={setPcView} />
         <div className="rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]"><h3 className="font-semibold">z.ai GLM Coding Plan</h3><p className="my-2">Connect with a key from your Coding Plan account in Keys. This is not a browser sign-in; a saved Z.ai key alone does not verify a subscription.</p><button type="button" onClick={onOpenVault} className={light}>Manage Coding Plan key</button></div>
       </> : <>
         <p className="text-[12px] leading-5 text-[#6B6B6B]">Cloud subscriptions power tasks on the selected bot&apos;s computer. Sign-in opens on that computer&apos;s screen. This does not connect the subscription on your PC.</p>
@@ -86,7 +88,7 @@ type PcRunnerView = { choice: "claude" | "openai" | null; runner: "claude" | "op
  * Bot tasks on this PC: who runs them, your Claude plan (signed in above) or an OpenAI key, and that key. The key
  * goes to this PC's .env.local through the server; it's never shown again, only that it's saved and how it ends.
  */
-export function PcTaskRunnerCard() {
+export function PcTaskRunnerCard({ onView }: { /** Each answer, for the Claude card's line above (LocalSubscriptions). Keep it stable (a state setter): it's a dependency of the first fetch. */ onView?: (view: PcRunnerView) => void } = {}) {
   const [view, setView] = useState<PcRunnerView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -98,6 +100,7 @@ export function PcTaskRunnerCard() {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Couldn't reach Bops.");
       setView(j as PcRunnerView);
+      onView?.(j as PcRunnerView);
       setError(null);
       return true;
     } catch (e) {
@@ -106,7 +109,7 @@ export function PcTaskRunnerCard() {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [onView]);
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => { if (!cancelled) void send(); });
@@ -149,7 +152,7 @@ const loginLink = (value?: string) => {
 };
 
 /** Only non-secret CLI metadata is read; the server opens and supervises official login. */
-export function LocalSubscriptions() {
+export function LocalSubscriptions({ runner }: { /** Who runs bot tasks on this PC now (/api/pc-task-runner), undefined until it answers. */ runner?: PcRunnerView["runner"] } = {}) {
   const [rows, setRows] = useState<LocalSubscription[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -211,7 +214,7 @@ export function LocalSubscriptions() {
       const link = kind === "codex" && s?.state === "connecting" ? loginLink(s.loginUrl) : undefined;
       return <div key={kind} className="flex flex-col gap-2 rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]">
         <h3 className="text-[13px] font-semibold">{kind === "codex" ? "ChatGPT Plus/Pro" : "Claude Pro/Max"} · This PC</h3>
-        <p>{kind === "codex" ? "Connect the official Codex account on this PC. ChatGPT subscription chat and local subscription tasks are not enabled yet." : "Connect Claude Code's own subscription on this PC. Local subscription tasks are not enabled yet. Claude subscriptions do not power Bops chat."}</p>
+        <p>{kind === "codex" ? "Connect the official Codex account on this PC. ChatGPT subscription chat and local subscription tasks are not enabled yet." : claudeLocalLine(!!s?.connected, runner)}</p>
         <p role="status">{!s ? "Status not checked yet." : s.state === "missing" ? `${kind === "codex" ? "Codex" : "Claude Code"} CLI was not found on this PC.` : s.state === "connecting" ? "Finish signing in in your normal browser. Bops will check automatically." : s.state === "error" ? "The subscription could not be confirmed." : s.connected ? `Connected: your ${provider}${knownPlan ? ` ${knownPlan}` : ""} subscription` : "Not signed in on this PC."}</p>
         {s?.error && <p role="alert" className="text-[#B00020]">{s.error}</p>}
         {s?.state === "missing" && <p>{kind === "codex" ? "Install the official Codex CLI on this PC" : "Install Claude Code using its official native installer (the npm claude.cmd launcher is not used)"}, then check the connection again.</p>}
