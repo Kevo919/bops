@@ -310,7 +310,8 @@ export function LoginsPage({
           )}
 
           {!all.length ? (
-            editing !== "new" && <QuickStart onPick={(app) => setPicking({ app })} />
+            // (Not while Connect's picker is open above: it has the same apps, or says the same when none can connect.)
+            editing !== "new" && !picking && <QuickStart onPick={(app) => setPicking({ app })} />
           ) : !hits.length && !others.length ? (
             <div className="py-10 text-center text-[13.5px] leading-5 text-[#6B6B6B]">{term ? <>Nothing matches &ldquo;{q.trim()}&rdquo;.</> : only === "attention" ? "Nothing needs you." : `No logins in ${wsName} yet.`}</div>
           ) : (
