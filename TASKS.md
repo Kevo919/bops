@@ -117,6 +117,8 @@ Shared rules for 35–38:
 | 58 | In-progress features show in the app grayed out, with red "not set up yet" text and a completion percent (one registry the lead updates; a reusable component; placeholders for widgets, animations, Composio account, PC tasks, phone) | lead's builder | IN PROGRESS (feature/in-progress-badges) | | Kevin, Nov 5 [CLOUD] build + screenshots; [PC] live look |
 | 59 | A Settings screen to add service keys (texting, email, memory, Composio) without editing files, so the "not set up yet" notes link to a place that sets them up | unassigned | BACKLOG | | [CLOUD] build; [PC] live. From #82's "needs a decision" |
 | 60 | #80 follow-ups: Windows Job Object so nothing Claude Code started is left running; Glob/Grep check the pattern too; exact CLI version check | unassigned | TODO | | [CLOUD] build; [PC] live |
+| 61 | Chat says a bot task started when no task session was created (found live by codex): never claim a start without a session id; show the real error | codex diagnosing, then builder | DOING | | [PC] diagnose; [CLOUD] fix. HIGH |
+| 62 | Copy: "Works on" says "Your Mac" on Windows; stale "Claude local subscription not enabled" text in Profile | unassigned | TODO | | [CLOUD] S |
 
 ## Merged 2026-11-03 (lead, with Kevin's OK)
 #3, #1, #2, #10, #14, #13, #9, #6, #4, #12, #16. windows-port = 7c52c29. Post-merge checks: tsc 0; bot-ai 25, cli-agents 40, chat-providers 18, chat-tools 84, look 20, config 15, key-check 8, llms 11.
