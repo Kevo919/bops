@@ -169,3 +169,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 ### Nov 3, morning
 - Bops installed on the Hostinger server (Tailscale-only). Android APK published. Subscriptions card, Models section and installer merged. A big push with 5 builders in parallel.
 - 19:30 lead: merged #96 (credit-race fix + AgentPhone test wait) at a204785 after independent review (approve w/ nits) and all checks green. Tasks 68-69 to its builder.
+- 19:40 lead: #90 independent review = REQUEST CHANGES (D3 incomplete). Notes in messages/2026-11-05-1945. #85 dark mode pushed fab9002, update-branch + merge-when-green running.
