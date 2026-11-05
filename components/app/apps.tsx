@@ -18,19 +18,27 @@ import { ago, post, teamOf } from "./ui";
 /** One app the picker can offer (from /api/apps/catalog). */
 type CatalogApp = { app: string; name: string; about?: string; tags: string[]; auth: "oauth" | "key" | "open"; tools?: number };
 
-let catalogOnce: Promise<CatalogApp[]> | null = null;
+let catalogOnce: Promise<{ apps: CatalogApp[]; off?: boolean }> | null = null;
+/** The catalog, once per window; `off`: no Composio on this computer, so no app can connect. */
 function useCatalog() {
   const [apps, setApps] = useState<CatalogApp[] | null>(null);
+  const [off, setOff] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let gone = false;
     catalogOnce ??= fetch("/api/apps/catalog")
-      .then((r) => r.json() as Promise<{ apps: CatalogApp[]; error?: string }>)
+      .then((r) => r.json() as Promise<{ apps: CatalogApp[]; off?: boolean; error?: string }>)
       .then((j) => {
         if (j.error && !j.apps.length) throw new Error(j.error);
-        return j.apps;
+        return j;
       });
-    catalogOnce.then((a) => !gone && setApps(a)).catch((e: Error) => {
+    catalogOnce.then((j) => {
+      if (gone) return;
+      setApps(j.apps);
+      setOff(!!j.off);
+      // Off is read again next time (a key added and Bops restarted), not kept for the window's life.
+      if (j.off) catalogOnce = null;
+    }).catch((e: Error) => {
       catalogOnce = null;
       if (!gone) setError(e.message);
     });
@@ -38,7 +46,19 @@ function useCatalog() {
       gone = true;
     };
   }, []);
-  return { apps, error };
+  return { apps, off, error };
+}
+
+/** What Connect says on a computer with no Composio: connecting apps isn't set up here, and what it takes. */
+function AppsOff() {
+  return (
+    <div data-apps-off className="flex flex-col gap-1 text-[12.5px] leading-[18px]">
+      <span className="font-medium text-ink">Connecting apps isn&apos;t set up on this computer yet.</span>
+      <span className="text-[#6B6B6B]">
+        To turn it on, add a Composio key (COMPOSIO_API_KEY) to the .env.local file in your Bops folder, then restart Bops. Keys and website logins work without it, and your bots can still use any app on their computer.
+      </span>
+    </div>
+  );
 }
 
 /** An app's real logo on a white tile; its first letter if the logo won't load. A vault key (STRIPE_SECRET_KEY) is a key. */
@@ -128,7 +148,13 @@ export function Connecting({ state }: { state: AppState }) {
 
 /** Nothing connected yet: the apps most teams start with, one tap each. */
 export function QuickStart({ onPick }: { onPick: (app: string) => void }) {
-  const { apps } = useCatalog();
+  const { apps, off } = useCatalog();
+  if (off)
+    return (
+      <div className="flex flex-col gap-2.5 rounded-2xl px-4 py-4 shadow-[0_0_0_1px_#ECECEA]">
+        <AppsOff />
+      </div>
+    );
   // Once the catalog is in, only apps it offers (signed in with Orgo, the ones that can connect through Bops Cloud).
   const pick = (apps ? FEATURED_APPS.map((a) => apps.find((x) => x.app === a)).filter((x): x is CatalogApp => !!x) : FEATURED_APPS.map((a) => ({ app: a, name: a }))).slice(0, 8);
   return (
@@ -512,7 +538,7 @@ function search(apps: CatalogApp[], q: string) {
  * Connect asked for it (logins.tsx), as A website login's form is, never a dialog over the app.
  */
 export function AppPicker({ state, start, replaces, onClose }: { state: AppState; start?: string; replaces?: string; onClose: () => void }) {
-  const { apps, error } = useCatalog();
+  const { apps, off, error } = useCatalog();
   const [q, setQ] = useState("");
   const [cursor, setCursor] = useState(0);
   const [chosen, setChosen] = useState<string | undefined>(start);
@@ -543,7 +569,16 @@ export function AppPicker({ state, start, replaces, onClose }: { state: AppState
         data-app-picker
         className="motion-rise-in flex max-h-[min(560px,70vh)] w-full flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_0_0_1px_#E6E6E3,0_12px_32px_-18px_#00000040]"
       >
-        {info ? (
+        {off && !info ? (
+          <div className="flex items-start gap-3 px-4 py-4">
+            <div className="min-w-0 flex-1">
+              <AppsOff />
+            </div>
+            <button onClick={onClose} className="shrink-0 rounded-full bg-[#F2F2F0] px-3 py-1.5 text-[12.5px] font-medium leading-4 hover:bg-[#EAEAE7]">
+              Close
+            </button>
+          </div>
+        ) : info ? (
           <ConnectStep state={state} app={info} replaces={replaces} onBack={start ? onClose : () => setChosen(undefined)} onDone={onClose} hasOne={connected.has(info.app)} />
         ) : (
           <>
