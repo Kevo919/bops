@@ -182,20 +182,35 @@ export async function migrate(): Promise<string[]> {
  */
 export async function ownObject(userId: string, provider: string, kind: string, objectId: string, model?: string, botId?: string) {
   const atProvider = STORED_AT_PROVIDER.has(`${provider}:${kind}`);
-  const run = <T extends pg.QueryResultRow>(text: string, values: unknown[]) =>
-    // What a delete deletes at a provider waits out a delete's step holding the state row, however long
-    // it takes (bounded only by lock_timeout): cut at the statement timeout, it wouldn't be recorded
-    // though the state row is still there, so the delete's last step couldn't see it and it would be
-    // left at the provider.
-    atProvider ? tx(async (c) => (await c.query(`SET LOCAL statement_timeout = 0; SET LOCAL lock_timeout = ${config.dbLockWaitMs()}`), c.query<T>(text, values))) : query<T>(text, values);
-  await run(
-    `INSERT INTO bops.cloud_objects (object_id, provider, kind, user_id, model, bot_id, used_at)
+  const sql = `INSERT INTO bops.cloud_objects (object_id, provider, kind, user_id, model, bot_id, used_at)
      SELECT $1, $2, $3, $4, $5, $6, CASE WHEN $3 = 'agent_session' THEN now() END
      WHERE NOT EXISTS (SELECT 1 FROM bops.deleted_users WHERE user_id = $4)
         OR ($7 AND EXISTS (SELECT 1 FROM bops.app_state WHERE user_id = $4 FOR KEY SHARE))
-     ON CONFLICT (provider, object_id) DO NOTHING`,
-    [objectId, provider, kind, userId, model ?? null, botId ?? null, atProvider],
-  );
+     ON CONFLICT (provider, object_id) DO NOTHING`;
+  const values = [objectId, provider, kind, userId, model ?? null, botId ?? null, atProvider];
+  if (!atProvider) return void (await query(sql, values));
+  // What a delete deletes at a provider waits out a delete's step holding the state row (bounded by
+  // lock_timeout, not the statement timeout): cut short, it wouldn't be recorded though the state row
+  // is still there, so the delete's last step couldn't see it and it would be left at the provider.
+  // A wait past lock_timeout (55P03) is tried once more; then it's logged whole, to be deleted at the
+  // provider by hand, and the call fails as before.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await tx(async (c) => {
+        await c.query(`SET LOCAL statement_timeout = 0; SET LOCAL lock_timeout = ${config.dbLockWaitMs()}`);
+        await c.query(sql, values);
+      });
+      return;
+    } catch (e) {
+      if ((e as { code?: unknown }).code !== "55P03") throw e;
+      if (attempt < 2) {
+        console.warn(`[db] ${provider} ${kind} ${objectId} for ${userId} waited past the lock wait, trying once more`);
+        continue;
+      }
+      console.error(`[db] NOT OWNED (delete it at ${provider} by hand if ${userId} is deleted): ${JSON.stringify({ userId, provider, kind, objectId })}`);
+      throw e;
+    }
+  }
 }
 
 /** The objects a delete deletes at their provider too (delete-user.ts), as `provider:kind`: the rest are only records here. */

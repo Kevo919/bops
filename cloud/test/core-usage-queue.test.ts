@@ -460,13 +460,88 @@ test("a torn last line is left for the next pass while it may be an append under
   await rm(`${spoolPath()}.bad`);
 });
 
-test("a use seen again after its price changed pays nothing more; one that grew pays only its growth", async () => {
+/* What a ref is paid (usage.ts recordUsageFor): only a larger count, up to what it costs. cost_micros is what was paid for it. */
+
+const tokens = (cached: number) => ({
+  model: "gpt-6.1-sol",
+  source: "agent",
+  input: 1_000,
+  cached,
+  output: 100,
+});
+const costRow = async (ref: string, kind: string) =>
+  (
+    await query<{ units: number; cost: number; cached: string | null }>(
+      "SELECT units::float8 AS units, cost_micros::float8 AS cost, detail->>'cached' AS cached FROM bops.cloud_usage WHERE user_id = $1 AND kind = $2 AND detail->>'ref' = $3",
+      [alice, kind, ref],
+    )
+  ).rows;
+
+test("sightings of the same count with other detail (A, B, A) are paid once, and the row stays as first seen", async () => {
+  const { recordUsageFor } = await import("../usage.ts");
+  const { costOf } = await import("../pricing.ts");
+  const ref = `turn_aba_${Date.now()}`;
+  const a = costOf("openai.tokens", 1_100, tokens(0));
+  const b = costOf("openai.tokens", 1_100, tokens(900));
+  assert.ok(a > b, "uncached costs more");
+  await recordUsageFor(alice, "openai.tokens", ref, 1_100, tokens(0)); // A
+  await recordUsageFor(alice, "openai.tokens", ref, 1_100, tokens(900)); // B
+  await recordUsageFor(alice, "openai.tokens", ref, 1_100, tokens(0)); // A
+  await recordUsageFor(alice, "openai.tokens", ref, 1_100, tokens(900)); // B
+  await recordUsageFor(alice, "openai.tokens", ref, 1_100, tokens(0)); // A
+  assert.deepEqual(await costRow(ref, "openai.tokens"), [
+    { units: 1_100, cost: a, cached: "0" },
+  ]);
+});
+
+test("growth is still paid: up to what the largest sighting costs, never more", async () => {
+  const { recordUsageFor } = await import("../usage.ts");
+  const { costOf } = await import("../pricing.ts");
+  const ref = `call_grow_${Date.now()}`;
+  await recordUsageFor(alice, "openai.live_seconds", ref, 30, {
+    transport: "webrtc",
+  });
+  assert.equal(
+    (await costRow(ref, "openai.live_seconds"))[0].cost,
+    costOf("openai.live_seconds", 30, { transport: "webrtc" }),
+  );
+  await recordUsageFor(alice, "openai.live_seconds", ref, 90, {
+    transport: "webrtc",
+  });
+  const [row] = await costRow(ref, "openai.live_seconds");
+  assert.deepEqual(
+    [row.units, row.cost],
+    [90, costOf("openai.live_seconds", 90, { transport: "webrtc" })],
+  );
+  // Tokens that grow, with less cached in the larger one: paid up to the larger's cost.
+  const t = `turn_grow_${Date.now()}`;
+  await recordUsageFor(alice, "openai.tokens", t, 1_100, tokens(900));
+  const bigger = { ...tokens(0), input: 2_000 };
+  await recordUsageFor(alice, "openai.tokens", t, 2_100, bigger);
+  assert.deepEqual(await costRow(t, "openai.tokens"), [
+    { units: 2_100, cost: costOf("openai.tokens", 2_100, bigger), cached: "0" },
+  ]);
+});
+
+test("a lower sighting replayed later (a spooled one after reconcile) charges nothing and changes nothing", async () => {
+  const { recordUsageFor } = await import("../usage.ts");
+  const { costOf } = await import("../pricing.ts");
+  const ref = `turn_low_${Date.now()}`;
+  const big = { ...tokens(0), input: 2_000 };
+  await recordUsageFor(alice, "openai.tokens", ref, 2_100, big);
+  await recordUsageFor(alice, "openai.tokens", ref, 1_100, tokens(900));
+  assert.deepEqual(await costRow(ref, "openai.tokens"), [
+    { units: 2_100, cost: costOf("openai.tokens", 2_100, big), cached: "0" },
+  ]);
+});
+
+test("a retry after the price changed charges nothing; growth then pays only what's not paid yet", async () => {
   const { recordUsageFor } = await import("../usage.ts");
   const ref = `use_price_${Date.now()}`;
   await recordUsageFor(alice, "agentphone.sms", ref, 2, { direction: "out" });
   const [{ cost }] = await rowsOf(ref);
   assert.ok(cost > 0, "texts cost something");
-  // As if it was paid when texts cost less: seen again, the same count, at today's higher price.
+  // As if it was paid when texts cost half: the retry, at today's price, the same count.
   await query(
     "UPDATE bops.cloud_usage SET cost_micros = cost_micros / 2 WHERE user_id = $1 AND detail->>'ref' = $2",
     [alice, ref],
@@ -474,14 +549,56 @@ test("a use seen again after its price changed pays nothing more; one that grew 
   await recordUsageFor(alice, "agentphone.sms", ref, 2, { direction: "out" });
   assert.deepEqual(
     await rowsOf(ref),
-    [{ units: 2, cost: Math.floor(cost / 2) }],
+    [{ units: 2, cost: cost / 2 }],
     "nothing more charged for the price change",
   );
-  // Grown by one segment: that segment is paid, at today's price.
+  // Grown to 3 segments: paid up to what 3 cost today, less what was paid.
   await recordUsageFor(alice, "agentphone.sms", ref, 3, { direction: "out" });
-  assert.deepEqual(await rowsOf(ref), [
-    { units: 3, cost: Math.floor(cost / 2) + cost / 2 },
-  ]);
+  assert.deepEqual(await rowsOf(ref), [{ units: 3, cost: (cost / 2) * 3 }]);
+});
+
+test("an object whose wait on a delete runs past the lock wait is tried once more, then logged whole for cleanup", async () => {
+  await query(
+    "INSERT INTO bops.deleted_users (user_id) VALUES ($1) ON CONFLICT DO NOTHING",
+    [bob],
+  );
+  process.env.BOPS_DB_LOCK_WAIT_MS = "300";
+  const blocker = new pg.Client({ connectionString: TEST_DATABASE_URL });
+  await blocker.connect();
+  const logged: string[] = [];
+  const error = console.error;
+  const warn = console.warn;
+  console.error = (...a: unknown[]) => void logged.push(a.join(" "));
+  console.warn = (...a: unknown[]) => void logged.push(a.join(" "));
+  try {
+    await blocker.query("BEGIN");
+    await blocker.query(
+      "SELECT 1 FROM bops.app_state WHERE user_id = $1 FOR UPDATE",
+      [bob],
+    );
+    const id = `ca_uq_late_${Date.now()}`;
+    await assert.rejects(
+      ownObject(bob, "composio", "connected_account", id),
+      (e: Error & { code?: string }) => e.code === "55P03",
+    );
+    assert.ok(
+      logged.some((l) => l.includes("trying once more") && l.includes(id)),
+      logged.join("\n"),
+    );
+    assert.ok(
+      logged.some(
+        (l) => l.includes("NOT OWNED") && l.includes(id) && l.includes(bob),
+      ),
+      logged.join("\n"),
+    );
+  } finally {
+    console.error = error;
+    console.warn = warn;
+    delete process.env.BOPS_DB_LOCK_WAIT_MS;
+    await blocker.query("ROLLBACK").catch(() => {});
+    await blocker.end();
+    await query("DELETE FROM bops.deleted_users WHERE user_id = $1", [bob]);
+  }
 });
 
 // Last: a stop is for good (no use is retried after it).
