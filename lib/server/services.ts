@@ -10,6 +10,7 @@ import { phoneOn } from "./phone";
 import { getState } from "./store";
 import { fromBopsWindow } from "./ui-token";
 import { checkZapier, zapierOn } from "./zapier";
+import { checkComposioMcp, composioMcpKeyProblem, composioMcpOn, composioMcpUrl, maskedComposioMcp } from "./composio-mcp";
 
 /*
  * Settings, Services: the four outside services a self-hosted Bops needs a key for, set from the app so nobody edits
@@ -39,6 +40,8 @@ type Service = {
   probe?: Probe;
   check?: () => Promise<CheckWords>;
   on: () => boolean;
+  /** A one-line masked summary of what's in use, the service's own (never a key). */
+  summary?: () => string | undefined;
   /** Only on a self-hosted Bops (Bops Cloud doesn't run it): not listed when signed in with Orgo. */
   selfOnly?: boolean;
   /** Not finished in this build: shown in the in-progress style, its boxes not offered (services.tsx). */
@@ -46,8 +49,8 @@ type Service = {
 };
 
 /*
- * Composio (your account) and Zapier: MCP addresses, validated as PR #83 (composio-mcp.ts) and zapier.ts do, copied
- * here so this screen doesn't depend on #83's code: https only, on the service's own host, no user or other port.
+ * Zapier's MCP address, validated as zapier.ts does: https only, on zapier.com, no user or other port. (Composio
+ * (your account) uses composio-mcp.ts's own, below.)
  */
 const onHost = (v: string, ok: (host: string) => boolean) => {
   if (/[\s=]/.test(v) || v.length > 1000) return false;
@@ -59,16 +62,11 @@ const onHost = (v: string, ok: (host: string) => boolean) => {
     return false;
   }
 };
-export const looksLikeComposioMcpUrl = (v: string) => onHost(v, (h) => h === "connect.composio.dev");
+/** Composio (your account): #83's own rules (composio-mcp.ts), so this screen and the chat agree on what's usable. */
+export const looksLikeComposioMcpUrl = (v: string) => !/[\s=]/.test(v) && !!composioMcpUrl(v);
 export const looksLikeZapierMcpUrl = (v: string) => onHost(v, (h) => h === "zapier.com" || h.endsWith(".zapier.com"));
-/** A For You consumer key (ck_…), never a Platform project key (ak_…: that's COMPOSIO_API_KEY's). */
-export const composioMcpKeyProblem = (v: string) =>
-  /^ak_/i.test(v) ? "That's a Platform project key (it starts with ak_): it goes in Connected apps above. For You has its own key: in Composio, open For You, then Settings, Sessions & API Key, and copy the key that starts with ck_." : null;
-/**
- * Whether Bops in this build uses COMPOSIO_MCP_URL (PR #83). Until #83 is in windows-port, the row shows in the
- * in-progress style; when it lands, set this to true (one line) and the boxes appear.
- */
-export const COMPOSIO_ACCOUNT_IN_THIS_BUILD = false;
+export { composioMcpKeyProblem };
+
 
 const key = (name: string, provider: string): Field => ({ name, label: `${provider} key`, secret: true, hint: "Paste the whole key", valid: looksLikeKey });
 
@@ -130,9 +128,16 @@ export const SERVICES: Service[] = [
       { name: "COMPOSIO_MCP_KEY", label: "Composio key (starts with ck_)", secret: true, hint: "Paste the key that starts with ck_", valid: looksLikeKey, problem: composioMcpKeyProblem, optional: true },
     ],
     getKey: { href: "https://composio.dev", label: "Where to get these (Composio, For You, Connect my agent)" },
-    on: () => !!process.env.COMPOSIO_MCP_URL?.trim() && looksLikeComposioMcpUrl(process.env.COMPOSIO_MCP_URL.trim()),
+    // composio-mcp.ts's own check (MCP initialize and tools/list), on what this server started with.
+    check: async () => {
+      const c = await checkComposioMcp();
+      const status = c.status === "rate limited" ? "busy" : c.status;
+      return { ok: c.status === "works", status, words: c.status === "works" ? "Composio answered." : c.status === "invalid" ? "Composio turned this address or key down. Copy them again from For You, Connect my agent, and save them here." : c.status === "not set" ? "Restart Bops first, then press Check." : "Couldn't reach Composio just now. Try Check again later." };
+    },
+    on: composioMcpOn,
+    /** How it shows once in use: composio-mcp.ts's own masked summary (host, and whether a ck_ key is saved). */
+    summary: maskedComposioMcp,
     selfOnly: true,
-    ...(COMPOSIO_ACCOUNT_IN_THIS_BUILD ? {} : { pending: { percent: 70, why: "The boxes are built; Bops starts using this address once its Composio (your account) update (PR #83) is in." } }),
   },
   {
     id: "zapier",
@@ -229,7 +234,7 @@ function viewOf(s: Service, owner: boolean, cloud: boolean): ServiceView {
   let words: string;
   if (current && (current.status === "invalid" || current.status === "no credit")) [status, words] = ["broken", `Key saved but not working. ${current.words}`];
   else if (!missing.length && waiting) [status, words] = ["restart", "Saved. Restart Bops to use it."];
-  else if (!missing.length) [status, words] = ["on", "Set up."];
+  else if (!missing.length) [status, words] = ["on", s.summary?.() ? `Set up: ${s.summary()}.` : "Set up."];
   else if (missing.length < s.fields.filter((f) => !f.optional).length) [status, words] = ["off", `Not set up: add the ${missing.map((f) => f.label.toLowerCase()).join(" and ")} too.`];
   else [status, words] = ["off", "Not set up."];
   return {

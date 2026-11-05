@@ -187,19 +187,36 @@ await test("newline and = injection refused, with the file untouched", async () 
   assert.throws(() => envLocal.setEnvLocal(envFile, "HONCHO_API_KEY=X", KEYS.HONCHO_API_KEY), /isn't a setting/);
 });
 
-await test("Composio (your account): https on connect.composio.dev only, a Platform ak_ key refused; behind in-progress until #83", async () => {
+await test("Composio (your account): #83's own rules (https on connect.composio.dev only, a Platform ak_ key refused), saved and masked", async () => {
   assert.ok(services.looksLikeComposioMcpUrl("https://connect.composio.dev/mcp"));
-  for (const bad of ["http://connect.composio.dev/mcp", "https://evil.example/mcp", "https://connect.composio.dev:8443/mcp", "https://a:b@connect.composio.dev/mcp", "https://connect.composio.dev.evil.example/mcp"])
+  for (const bad of ["http://connect.composio.dev/mcp", "https://evil.example/mcp", "https://connect.composio.dev:8443/mcp", "https://a:b@connect.composio.dev/mcp", "https://connect.composio.dev.evil.example/mcp", "https://connect.composio.dev/mcp?x=1"])
     assert.ok(!services.looksLikeComposioMcpUrl(bad), bad);
-  assert.match(services.composioMcpKeyProblem(["ak", "x".repeat(12)].join("_")), /Platform project key/);
-  assert.equal(services.composioMcpKeyProblem(["ck", "x".repeat(12)].join("_")), null);
-  const v = await call(route.GET);
-  const row = v.json.services.find((s) => s.id === "composio-account");
-  if (!services.COMPOSIO_ACCOUNT_IN_THIS_BUILD) {
-    assert.ok(row.pending && row.pending.percent > 0 && row.pending.percent < 100, "in progress, with a percent");
-    assert.equal(row.fields, undefined, "no boxes while it's in progress");
-    assert.equal((await save("composio-account", "COMPOSIO_MCP_URL", "https://connect.composio.dev/mcp")).status, 400, "and nothing saved for it");
-  }
+  const ak = ["ak", "x".repeat(12)].join("_");
+  const ck = ["ck", "x".repeat(12), "K9z8"].join("_");
+  assert.match(services.composioMcpKeyProblem(ak), /Platform project key/);
+  assert.equal(services.composioMcpKeyProblem(ck), null);
+  const row = (await call(route.GET)).json.services.find((s) => s.id === "composio-account");
+  assert.equal(row.pending, undefined, "no longer in progress");
+  assert.equal(row.canCheck, true);
+  const refused = await save("composio-account", "COMPOSIO_MCP_KEY", ak);
+  assert.equal(refused.status, 400);
+  assert.match(refused.json.error, /Platform project key/);
+  assert.equal((await save("composio-account", "COMPOSIO_MCP_URL", "https://evil.example/mcp")).status, 400);
+  assert.equal((await save("composio-account", "COMPOSIO_MCP_URL", "https://connect.composio.dev/mcp")).status, 200);
+  assert.equal((await save("composio-account", "COMPOSIO_MCP_KEY", ck)).status, 200);
+  const after = (await call(route.GET)).json.services.find((s) => s.id === "composio-account");
+  assert.equal(after.status, "restart", "saved, in use after a restart");
+  assert.deepEqual(after.fields.map((f) => f.shown), ["connect.composio.dev/•••", "ends in K9z8"]);
+  assert.match((await services.checkService("composio-account")).words, /Restart Bops first/, "its own check reads what Bops started with");
+  // Once Bops runs with them: composio-mcp.ts's own masked summary, never the key.
+  process.env.COMPOSIO_MCP_URL = "https://connect.composio.dev/mcp";
+  process.env.COMPOSIO_MCP_KEY = ck;
+  const on = (await call(route.GET)).json.services.find((s) => s.id === "composio-account");
+  assert.equal(on.status, "on");
+  assert.match(on.words, /connect\.composio\.dev\/mcp, key ck_•+ saved/);
+  delete process.env.COMPOSIO_MCP_URL;
+  delete process.env.COMPOSIO_MCP_KEY;
+  globalThis.__ck = ck;
 });
 
 await test("masked display: a key shows as 'ends in' its last four, an address with a token by its host only", async () => {
@@ -264,7 +281,6 @@ await test("Check: the saved key at the provider's fixed address; a turned-down 
   // Zapier's own check reads what Bops started with: a value saved since says to restart first.
   r = await services.checkService("zapier");
   assert.match(r.words, /Restart Bops first/);
-  assert.equal(await services.checkService("composio-account"), null, "no Check while it's in progress");
 });
 
 await test("signed in with Orgo: status from Bops Cloud, no boxes, no self-hosted-only rows", async () => {
@@ -278,7 +294,7 @@ await test("signed in with Orgo: status from Bops Cloud, no boxes, no self-hoste
 });
 
 await test("keys never in any answer, log line or the state", async () => {
-  const secrets = [...Object.values(KEYS), fake("fake", "mail", "y".repeat(8), "N9e0"), ZAPIER_URL];
+  const secrets = [...Object.values(KEYS), fake("fake", "mail", "y".repeat(8), "N9e0"), ZAPIER_URL, globalThis.__ck];
   const everything = [...answers, ...logs, JSON.stringify(fakeState)].join("\n");
   for (const k of secrets) assert.ok(!everything.includes(k), `a key leaked (one ending ${k.slice(-4)})`);
   assert.ok(answers.length > 20, "every answer above was looked at");
