@@ -2,7 +2,7 @@
 // Windows PC (BOPS_SELF_HOSTED=1, the desktop window's token, no texting, email or memory service, no Composio key), at
 // 1280x800, against the real built app. For each screen it fails if:
 //  (a) its pane has nothing under its header: under ~20 characters of visible text, or no visible control;
-//  (b) its visible text says "undefined", "NaN", "[object Object]" or raw JSON ({"), or an error page shows;
+//  (b) its visible text says "undefined", "NaN", "[object Object]", raw JSON ({") or raw error words ("fetch failed", "Failed to fetch", ECONNREFUSED, a TypeError…), or an error page shows;
 //  (c) the page threw or logged a console error, or an /api call answered 5xx;
 // and it warns (only) when (d) a visible button is disabled with nothing near it saying why.
 // The screens: every place in Settings' nav (Account and Workspace: Profile, Plan and credit, Usage, How bots reach you,
@@ -264,7 +264,8 @@ const LOOK = ([sel, headSel]) => {
   const overlay = !!document.querySelector("nextjs-portal") || /Application error: a client-side exception/.test(document.body.innerText);
   return { text, under, controls: controls.length, quiet, overlay };
 };
-const BAD = [/\bundefined\b/, /\bNaN\b/, /\[object Object\]/, /\{"/];
+// Raw error words a person should never read: a fetch's own failure, a server's stack, JSON that didn't parse.
+const BAD = [/\bundefined\b/, /\bNaN\b/, /\[object Object\]/, /\{"/, /fetch failed/i, /Failed to fetch/, /NetworkError/, /ECONNREFUSED|ETIMEDOUT|ENOTFOUND/, /Internal Server Error/, /Unexpected token/, /is not valid JSON/, /\bTypeError\b/, /\bSyntaxError\b/];
 
 /** One screen, judged: what `sel` holds (past `head`), and what the page did meanwhile. */
 async function judge(name, sel, head) {
@@ -336,16 +337,91 @@ try {
     await judge("settings-logins-connect-app", "[data-app-picker]");
   });
 
-  // How bots reach you, with neither set up: its one button goes to This PC, which says how each one stands.
-  await check("Settings, How bots reach you: its button opens This PC, which names what to add", async () => {
+  // Each "not set up yet" note opens Settings, Services at its own row, with the cursor in that row's key box.
+  const landsOn = async (id) => {
+    const pane = page.locator('main[data-settings-pane="services"]');
+    await pane.waitFor({ state: "visible" });
+    const row = pane.locator(`#service-${id}`);
+    await row.waitFor({ state: "visible" });
+    await page.waitForFunction((rid) => document.activeElement?.closest(`#service-${rid}`) != null, id, { timeout: 5000 });
+    assert.ok(await row.locator("input").first().isVisible(), `${id}: its key box is there`);
+  };
+  for (const [id, label] of [["phone", "Set up texting"], ["mail", "Set up email"]])
+    await check(`Settings, How bots reach you: "${label}" opens Services at its row`, async () => {
+      await fresh();
+      await openSettings();
+      await page.locator('[data-settings-nav="reach"]').click();
+      await page.getByRole("button", { name: label, exact: true }).click();
+      await landsOn(id);
+    });
+  await check("Settings, Email and phone: its note opens Services at texting's row", async () => {
     await fresh();
     await openSettings();
-    await page.locator('[data-settings-nav="reach"]').click();
-    await page.getByRole("button", { name: /See what's set up in This PC/ }).click();
-    const pc = page.locator('main[data-settings-pane="mac"]');
-    await pc.waitFor({ state: "visible" });
-    await pc.getByText(/Off\. Add AGENTPHONE_API_KEY/).waitFor({ state: "attached" });
-    await pc.getByText(/Off\. Add AGENTMAIL_API_KEY/).waitFor({ state: "attached" });
+    await page.locator('[data-settings-nav="email"]').click();
+    await page.locator('main[data-settings-pane="email"] [data-open-service="phone"]').first().click();
+    await landsOn("phone");
+  });
+  await check("Settings, This PC: the Phone card's Set up texting opens Services at its row", async () => {
+    await fresh();
+    await openSettings();
+    await page.locator('[data-settings-nav="mac"]').click();
+    await page.locator('main[data-settings-pane="mac"]').getByRole("button", { name: "Set up texting", exact: true }).click();
+    await landsOn("phone");
+  });
+  await check("Settings, Logins, Connect an app: Add a Composio key opens Services at its row", async () => {
+    await fresh();
+    await openSettings();
+    await page.locator('[data-settings-nav="logins"]').click();
+    await button("Connect").click();
+    await page.getByRole("button", { name: /^An app/ }).click();
+    await page.locator("[data-app-picker] [data-open-service=apps]").click();
+    await landsOn("apps");
+  });
+  await check("Boppy's profile, Memory: Add a Honcho key opens Services at its row", async () => {
+    await fresh();
+    await row("Boppy").click();
+    await button("Boppy's profile").click();
+    await page.locator("section[data-panel]").getByRole("button", { name: /^Memory$/i }).first().click();
+    await page.locator("[data-memory-off] [data-open-service=memory]").click();
+    await landsOn("memory");
+  });
+  // Services, the whole pane at the desktop width (every row, and what isn't built yet).
+  await check("Settings, Services: every row, the whole pane", async () => {
+    await fresh();
+    await openSettings();
+    await page.locator('[data-settings-nav="services"]').click();
+    const pane = page.locator('main[data-settings-pane="services"]');
+    await pane.locator("[data-service]").first().waitFor({ state: "visible" });
+    const rows = await pane.locator("[data-service]").evaluateAll((els) => els.map((e) => e.getAttribute("data-service")));
+    assert.deepEqual(rows, ["phone", "mail", "memory", "apps", "composio-account", "zapier"]);
+    assert.ok((await pane.locator("[data-in-progress]").count()) >= 1, "what isn't built yet shows as in progress");
+    // A tall window, so one picture holds the whole pane (an element shot of a scrolling pane cuts off).
+    await page.setViewportSize({ width: 1280, height: 2300 });
+    try {
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: join(shots, "settings-services-full.png") });
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 800 });
+    }
+  });
+  // Services at a phone's width (412 wide): every row and its boxes fit, nothing scrolls sideways.
+  await check("Settings, Services at 412 wide", async () => {
+    await page.setViewportSize({ width: 412, height: 915 });
+    try {
+      await fresh();
+      await button(/team, account and settings/, false).click();
+      await page.getByRole("menuitem", { name: "Settings", exact: true }).first().click();
+      await page.locator('[data-settings-nav="services"]').click();
+      await page.locator('main[data-settings-pane="services"] [data-service]').first().waitFor({ state: "visible" });
+      await judge("settings-services-412", 'main[data-settings-pane="services"]', "[data-pane-head]");
+      const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      assert.ok(wide <= 0, `the page scrolls sideways by ${wide}px`);
+      await page.setViewportSize({ width: 412, height: 3000 });
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: join(shots, "settings-services-412-full.png") });
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 800 });
+    }
   });
 
   // How bots reach you while the server hasn't answered yet: "Checking", not a blank pane.

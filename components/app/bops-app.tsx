@@ -5,7 +5,7 @@ import { useComputerWords } from "./computer-words";
 import { APPS_NAME, appsOwnShown, appsShown } from "@/lib/apps-access";
 import { screenMap } from "@/lib/screens";
 import { chatAsks } from "@/lib/asks";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { accountIn, botChatId, BRAINS_ON, isScreenWatch, live, sharesComputer, siteBotOf, siteLoginIn, workBot, workspaceOf, type AppState, type Host, type Session, type Watch } from "@/lib/types";
 import { appCoders, copyBotOf } from "@/lib/hosted-apps";
 import { initialsOf, PlanAndCredit, UsageSection } from "./account";
@@ -59,6 +59,7 @@ import { MacPreviews } from "./mac-tab";
 import { OPEN_MAC_KEY } from "./mac-pip";
 import { MacComputer } from "./mac-computer";
 import { RestartButton, RestartIcon, useCanRestart } from "./restart";
+import { ServicesSettings, type ServiceRow } from "./services";
 import { RunsOnSettings } from "./runs-on";
 import { chatInWorkspace, currentWorkspace, option, post, radio, SideToggleIcon, teamOf, useAppState, useSelfHosted, useStateRefused } from "./ui";
 import { viewOnly } from "./view-only";
@@ -245,8 +246,8 @@ function Bops({ state }: { state: AppState | null }) {
   // from your initials, Plan and credit from an upgrade, This Mac from the setup badge, the Org chart at a bot (`chartBot`),
   // Domains from an app's All domains; `keysFor`: the bot a key is being added for. `atAt` makes each opening go to its
   // place again, even the one it's at. Only here, in this window: nothing of it is saved.
-  const [settings, setSettings] = useState<false | { at?: SettingsPane; keysFor?: string; chartBot?: string; atAt: number }>(false);
-  const openSettings = (at?: SettingsPane, more: { keysFor?: string; chartBot?: string } = {}) => setSettings({ ...(at ? { at } : {}), ...more, atAt: Date.now() });
+  const [settings, setSettings] = useState<false | { at?: SettingsPane; keysFor?: string; chartBot?: string; service?: ServiceRow; atAt: number }>(false);
+  const openSettings = (at?: SettingsPane, more: { keysFor?: string; chartBot?: string; service?: ServiceRow } = {}) => setSettings({ ...(at ? { at } : {}), ...more, atAt: Date.now() });
   // A bot's full settings page (bot-settings.tsx), over the whole window, at a section; `atAt` makes each opening a new page.
   const [botPage, setBotPage] = useState<{ botId: string; at?: SettingsSection; atAt: number } | null>(null);
   // What had focus as the page opened (the panel's Open full settings, or one of its rows), and whether closing gives it
@@ -1058,7 +1059,7 @@ function Bops({ state }: { state: AppState | null }) {
     <OpenCrm.Provider value={openCrm}>
     <OpenMadeApp.Provider value={openMadeApp}>
     <OpenHostedApp.Provider value={openHostedApp}>
-    <OpenSettings.Provider value={(at) => openSettings(at)}>
+    <OpenSettings.Provider value={(at, more) => openSettings(at, more)}>
     <OpenAppTask.Provider value={openAppTask}>
     <OpenBotComputer.Provider value={openBotComputer}>
     <OpenPreview.Provider value={openPreview}>
@@ -1483,6 +1484,7 @@ function Bops({ state }: { state: AppState | null }) {
                 atAt={settings.atAt}
                 keysFor={settings.keysFor}
                 chartBot={settings.chartBot}
+                service={settings.service}
                 onPane={(at) => setSettings((x) => (x && x.at !== at ? { ...x, at } : x))}
                 onOpenWatch={leavePages(showWatch)}
                 onOpenBot={(botId) => {
@@ -1628,7 +1630,7 @@ function MailSettings() {
       <span className="text-[13px] font-semibold">Email</span>
       <div className="flex flex-col gap-2.5 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
         {!info.on ? (
-          <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">Off. Add AGENTMAIL_API_KEY to .env.local and every bot gets its own email address.</span>
+          <SetUpHere service="mail" line="Off. Add an AgentMail key and every bot gets its own email address." button="Set up email" />
         ) : (
           <>
             <span className="flex items-center gap-1.5 text-[12.5px] leading-[18px] text-[#3A3A38]">
@@ -1745,11 +1747,33 @@ function MobileRows({ info, onInfo }: { info: PhoneInfo; onInfo: (p: PhoneInfo) 
 }
 
 /**
- * What a self-hosted Bops with neither texting nor email set up says in How bots reach you (and Email and phone): what
- * the place is for, that neither is set up on this computer, what it takes, and This PC, where each one's state shows.
+ * A service that isn't set up, in a line, and a button that opens Settings, Services at its row (services.tsx), where
+ * its key is pasted. Never "edit .env.local".
  */
-function ReachNotSetUp({ title = "How your bots reach you", intro, onOpenPC }: { title?: string; intro: string; onOpenPC?: () => void }) {
-  const computerWords = useComputerWords();
+function SetUpHere({ service, line, button }: { service: ServiceRow; line: string; button: string }) {
+  const openSettings = useContext(OpenSettings);
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12.5px] leading-[18px] text-[#6B6B6B]">
+      {line}
+      {openSettings && (
+        <button data-open-service={service} onClick={() => openSettings("services", { service })} className="rounded-full bg-[#F2F2F0] px-3 py-1 text-[12.5px] font-medium leading-4 text-ink hover:bg-[#EAEAE7]">
+          {button}
+        </button>
+      )}
+    </span>
+  );
+}
+
+/**
+ * What a Bops with neither texting nor email on says in How bots reach you (and Email and phone): what the place is
+ * for, that neither is on here, and the way on. Self-hosted, a button for each opens Settings, Services at its row,
+ * where its key is pasted. Signed in with Orgo, Bops Cloud runs both, so there's nothing to add: it says so.
+ */
+function ReachNotSetUp({ title = "How your bots reach you", intro }: { title?: string; intro: string }) {
+  const selfHosted = useSelfHosted();
+  const openSettings = useContext(OpenSettings);
+  const open = (service: ServiceRow) => openSettings?.("services", { service });
+  const btn = "rounded-full bg-[#F2F2F0] px-3 py-1.5 text-[12.5px] font-medium leading-4 hover:bg-[#EAEAE7]";
   return (
     <div data-reach-off className="flex flex-col gap-2 px-[22px] pt-4">
       <div className="flex flex-col gap-0.5">
@@ -1759,13 +1783,28 @@ function ReachNotSetUp({ title = "How your bots reach you", intro, onOpenPC }: {
       <div className="flex flex-col gap-2 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
         <span className="text-[13px] font-medium leading-4">Texting and email to your bots aren&apos;t set up on this computer yet.</span>
         <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">
-          Texts and calls need an AgentPhone account and a public web address for texts to arrive at. Email needs an AgentMail account. Each one is a key you add to the .env.local file in your Bops folder (the Phone and Email parts of .env.example name them). Then restart Bops.
+          {selfHosted
+            ? "Texts and calls need an AgentPhone key and a public web address for texts to arrive at. Email needs an AgentMail key. Paste each one in Settings, Services, then restart Bops."
+            : "Bops Cloud runs texting and email for you while you're signed in with Orgo, and they aren't on for your account right now. There's nothing to add here."}
         </span>
         <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">Until then, your bots reach you here in the app.</span>
-        {onOpenPC && (
-          <button onClick={onOpenPC} className="self-start rounded-full bg-[#F2F2F0] px-3 py-1.5 text-[12.5px] font-medium leading-4 hover:bg-[#EAEAE7]">
-            See what&apos;s set up in {computerWords("This Mac")}
-          </button>
+        {openSettings && (
+          <div className="flex flex-wrap gap-1.5">
+            {selfHosted ? (
+              <>
+                <button data-open-service="phone" onClick={() => open("phone")} className={btn}>
+                  Set up texting
+                </button>
+                <button data-open-service="mail" onClick={() => open("mail")} className={btn}>
+                  Set up email
+                </button>
+              </>
+            ) : (
+              <button data-open-service="phone" onClick={() => open("phone")} className={btn}>
+                See how your services stand
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -1778,11 +1817,11 @@ function ReachNotSetUp({ title = "How your bots reach you", intro, onOpenPC }: {
  * Checking; each row says so when its own service isn't on, and the line at the top names only what
  * is. With neither on here, it says so and what it takes (ReachNotSetUp), never a blank place.
  */
-function ReachSettings({ onOpenPC }: { onOpenPC?: () => void }) {
+function ReachSettings() {
   const [phone, setPhone, phoneRead] = usePhoneInfo<PhoneInfo>();
   const [email, setEmail, emailRead] = useOwnerEmailInfo();
   if (phone?.on === false && email?.on === false)
-    return <ReachNotSetUp intro="This is where you list your mobile number and email addresses, so your bots know a text or email is from you, and can reach you back." onOpenPC={onOpenPC} />;
+    return <ReachNotSetUp intro="This is where you list your mobile number and email addresses, so your bots know a text or email is from you, and can reach you back." />;
   // Not known yet (or not read) counts as on: the rows below say how each stands.
   const texting = phone?.on !== false;
   const mailing = email?.on !== false;
@@ -1830,7 +1869,7 @@ function PhoneService() {
       <div className="flex flex-col gap-2 px-[22px] pt-4">
         <span className="text-[13px] font-semibold">Phone</span>
         <div className="flex flex-col gap-2.5 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
-          <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">Off. Add AGENTPHONE_API_KEY and BOPS_AGENTPHONE_HOOK_URL to .env.local and you can text and call your bots.</span>
+          <SetUpHere service="phone" line="Off. Add an AgentPhone key and the public address texts arrive at, and you can text and call your bots." button="Set up texting" />
         </div>
       </div>
     );
@@ -1984,7 +2023,7 @@ function WhereBotsWork({ state }: { state: AppState }) {
 }
 
 /** Settings' places: Account (yours, in every workspace), then Workspace (the one open now), then Orgo's team's own. */
-export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains" | "look" | "repos";
+export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains" | "look" | "repos" | "services";
 
 /** A place in Settings' nav: its name, its glyph, and a quiet value on the right. */
 type NavItem = { id: SettingsPane; name: string; icon: React.ReactNode; value?: string | number };
@@ -2012,6 +2051,7 @@ const GLYPHS: Record<SettingsPane, string> = {
   domains: "M8 14a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14M8 2C6.2 3.7 5.4 5.7 5.4 8s.8 4.3 2.6 6",
   look: "M8 2.5a5.5 5.5 0 0 0 0 11C9.4 13.5 10.5 12.4 10.5 11c0-1-.8-1.8-1.8-1.8 1 0 1.8-.8 1.8-1.8S10.7 5.6 9.7 5.6C10.7 5.6 11.5 4.8 11.5 3.8 11.5 3.1 10 2.5 8 2.5zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
   repos: "M3 3.5h4l1.2 1.5H13v7.5H3zM6 8.2l-1.3 1.3L6 10.8M10 8.2l1.3 1.3-1.3 1.3",
+  services: "M5.5 2v3M10.5 2v3M3.5 5h9v2.5a4.5 4.5 0 0 1-9 0zM8 12v2",
 };
 
 /** A pane's title and what it's for, above what it holds. */
@@ -2123,7 +2163,7 @@ function WorkspaceBots({ state, onOpenBot }: { state: AppState; onOpenBot?: (bot
 }
 
 /** Workspace, Email and phone: its bots' address (Pick or Change) and the number its main bot is texted and called at. */
-function WorkspaceReach({ state, onOpenPC }: { state: AppState; onOpenPC?: () => void }) {
+function WorkspaceReach({ state }: { state: AppState }) {
   const ws = currentWorkspace(state);
   const w = state.workspaces?.find((x) => x.id === ws);
   const main = state.bots.find((b) => b.isMain && workspaceOf(b) === ws);
@@ -2132,7 +2172,7 @@ function WorkspaceReach({ state, onOpenPC }: { state: AppState; onOpenPC?: () =>
   const [email] = useOwnerEmailInfo();
   // Neither texting nor email here (a self-hosted Bops without AgentPhone or AgentMail): no number or address will come.
   if (phone?.on === false && email?.on === false && !w?.line?.phone && !has)
-    return <ReachNotSetUp title="Texts, calls and email" intro={`This is where you see the address people email and the number they text to reach ${w?.name ?? "this workspace"}'s bots.`} onOpenPC={onOpenPC} />;
+    return <ReachNotSetUp title="Texts, calls and email" intro={`This is where you see the address people email and the number they text to reach ${w?.name ?? "this workspace"}'s bots.`} />;
   return (
     <>
       <EmailAddresses state={state} only={ws} />
@@ -2174,6 +2214,7 @@ export function Settings({
   atAt,
   keysFor,
   chartBot,
+  service,
   onPane,
   onOpenApp = () => {},
   onHold,
@@ -2192,6 +2233,8 @@ export function Settings({
   keysFor?: string;
   /** The bot whose card the Org chart opens at (from its profile). */
   chartBot?: string;
+  /** A "not set up yet" note asked for a service's row in Services (services.tsx). */
+  service?: ServiceRow;
   onPane?: (at: SettingsPane) => void;
   onOpenApp?: (ws: string, name: string) => void;
   onHold?: (held: boolean) => void;
@@ -2254,6 +2297,7 @@ export function Settings({
     ...(!selfHosted ? [item("privacy", "Privacy")] : []),
     item("look", "Look"),
     item("mac", computerWords("This Mac")),
+    item("services", "Services"),
   ];
   const workspace: NavItem[] = [
     item("general", "General"),
@@ -2340,7 +2384,7 @@ export function Settings({
     body = (
       <>
         <PaneHead title="How bots reach you" sub="Your numbers and emails: how your bots know it's you." />
-        <ReachSettings onOpenPC={() => go("mac")} />
+        <ReachSettings />
       </>
     );
   else if (pane === "ai" && BRAINS_ON)
@@ -2372,6 +2416,13 @@ export function Settings({
       <>
         <PaneHead title="Repos" sub="Ready to run GitHub repos. Run one on a bot's computer with a click, and every bot can use them." />
         <ReposSection />
+      </>
+    );
+  else if (pane === "services")
+    body = (
+      <>
+        <PaneHead title="Services" sub="Texting, email, memory and connected apps: the outside services your bots use, and their keys." />
+        <ServicesSettings focus={service && atAt ? { id: service, at: atAt } : undefined} />
       </>
     );
   else if (pane === "mac")
@@ -2416,7 +2467,7 @@ export function Settings({
     body = (
       <>
         <PaneHead title="Email and phone" sub={`How people reach ${wsName}'s bots.`} />
-        <WorkspaceReach state={state} onOpenPC={() => go("mac")} />
+        <WorkspaceReach state={state} />
       </>
     );
   else if (pane === "domains" && domains)

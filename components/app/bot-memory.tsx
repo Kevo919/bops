@@ -5,7 +5,8 @@ import { MAX_BOT_DOC_CHARS, waitsForOk, workspaceOf, type AppState, type Bot, ty
 import { entryOf, teamIn } from "@/lib/chain";
 import { MEMORY_FILE, renderMemoryDoc, renderSoul, SOUL_FILE } from "@/lib/bot-docs";
 import { MemorySheet } from "./memory-sheet";
-import { ago, memberAnswers, post, quietNothing, StatusIcon } from "./ui";
+import { ago, memberAnswers, post, quietNothing, StatusIcon, useSelfHosted } from "./ui";
+import { OpenSettings } from "./open-settings";
 import { you } from "@/lib/shared";
 
 type Fact = { id: string; text: string; private: boolean; at?: number; source?: string };
@@ -23,6 +24,8 @@ type Answer = { answer: string; based: { id: string; text: string; source: strin
  * pin or delete it. Memory belongs to the workspace, so the whole team shares it (Manage, at the end).
  */
 export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bot: Bot; onOpenThread: (s: Session) => void }) {
+  const selfHosted = useSelfHosted();
+  const openSettings = useContext(OpenSettings);
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
   // What the tab showed last time for this bot shows at once; the fresh copy replaces it when it lands.
@@ -109,9 +112,18 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
         <div data-memory-off className="flex flex-col gap-1.5 rounded-[18px] bg-[#F7F7F6] px-5 py-4 text-[13.5px] leading-5">
           <span className="font-medium">Memory isn&apos;t set up on this computer yet.</span>
           <span className="text-[#6B6B6B]">
-            So {b.name} doesn&apos;t learn about you from your chats on its own. To turn it on, add a Honcho key (HONCHO_API_KEY) to the .env.local file in your Bops folder, then restart Bops.
-            {!state.shared && " Until then, use Edit to write down what it should remember."}
+            So {b.name} doesn&apos;t learn about you from your chats on its own.{" "}
+            {state.shared
+              ? "The workspace's owner can turn it on."
+              : selfHosted
+                ? "To turn it on, paste a Honcho key in Settings, Services, then restart Bops. Until then, use Edit to write down what it should remember."
+                : "Bops Cloud runs memory for you while you're signed in with Orgo, and it isn't on for your account right now. Until then, use Edit to write down what it should remember."}
           </span>
+          {selfHosted && !state.shared && openSettings && (
+            <button data-open-service="memory" onClick={() => openSettings("services", { service: "memory" })} className="self-start rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F2F2F0]">
+              Add a Honcho key
+            </button>
+          )}
         </div>
       ) : (
       <>
