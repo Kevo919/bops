@@ -1,7 +1,7 @@
 import { trackCloudEvent } from "./analytics.ts";
 import type pg from "pg";
 import { config } from "./config.ts";
-import { query } from "./db.ts";
+import { query, queryWithin } from "./db.ts";
 import { HttpError } from "./http.ts";
 import { billingOf } from "./plans.ts";
 import { AI_CREDIT_EMPTY, AI_CREDIT_LOW, type BopsBilling } from "./protocol.ts";
@@ -63,9 +63,10 @@ export function creditWords(billing: BopsBilling = "plan") {
 /** How the user is billed, for the words only: "plan" when it can't be read (a refusal never fails on it). */
 export const billingFor = (userId: string): Promise<BopsBilling> => billingOf(userId).catch(() => "plan" as const);
 
-/** What the user has left, in micro-dollars (Free's $5 given first, if they never had it). */
-export async function creditLeft(userId: string): Promise<number> {
-  const r = await query<{ left: string | null }>("SELECT public.bops_ai_credit_balance($1::uuid) AS left", [userId]);
+/** What the user has left, in micro-dollars (Free's $5 given first, if they never had it); within `withinMs` when given (a read that takes longer throws). */
+export async function creditLeft(userId: string, withinMs?: number): Promise<number> {
+  const sql = "SELECT public.bops_ai_credit_balance($1::uuid) AS left";
+  const r = withinMs ? await queryWithin<{ left: string | null }>(withinMs, sql, [userId]) : await query<{ left: string | null }>(sql, [userId]);
   return Number(r.rows[0]?.left ?? 0);
 }
 

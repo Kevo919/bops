@@ -601,6 +601,36 @@ test("starts at the same moment share one balance: of many at once, only those t
   assert.deepEqual(kinds(task), ["message"]);
 });
 
+test("a balance read that hangs refuses that start (503) in bounded time, and doesn't hold up the user's next ones", async () => {
+  const u = await newUser(5_000_000);
+  const task = await newTask(u);
+  await sweep();
+  const was = guardTiming.balanceReadMs;
+  guardTiming.balanceReadMs = 300;
+  // Another session holds the ledger's grants table: the balance read (bops_ai_credit_balance) waits on it.
+  const blocker = new pg.Client({ connectionString: TEST_DATABASE_URL });
+  await blocker.connect();
+  try {
+    await blocker.query("BEGIN");
+    await blocker.query("LOCK TABLE public.bops_ai_credit_grants IN ACCESS EXCLUSIVE MODE");
+    const t0 = Date.now();
+    const tries = await Promise.all([0, 1].map(() => as(u, "POST", `/proxy/openai/v1/agents/sessions/${task}/events`, work())));
+    assert.deepEqual(
+      tries.map((t) => t.status),
+      [503, 503],
+    );
+    // One after the other (decided in turn), each cut at 300 ms: never the pool's 30 s.
+    assert.ok(Date.now() - t0 < 5_000, `took ${Date.now() - t0} ms`);
+    await blocker.query("ROLLBACK");
+    // Nothing of the refused starts is still held: the next one goes through.
+    assert.equal((await as(u, "POST", `/proxy/openai/v1/agents/sessions/${task}/events`, work())).status, 202);
+  } finally {
+    guardTiming.balanceReadMs = was;
+    await blocker.query("ROLLBACK").catch(() => {});
+    await blocker.end();
+  }
+});
+
 test("a message can't name a cheaper model for a task: it's held and paid at the model it was made with", async () => {
   const u = await newUser(5_000_000);
   const task = await newTask(u, { model: "gpt-6-astra" });

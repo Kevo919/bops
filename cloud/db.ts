@@ -17,13 +17,43 @@ export function db(): pg.Pool {
   if (pool) return pool;
   const url = config.databaseUrl();
   if (!url) throw new Error("BOPS_DATABASE_URL isn't set");
-  pool = new pg.Pool({ connectionString: url, max: 10, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 10_000, application_name: "bops-cloud" });
+  pool = new pg.Pool({
+    connectionString: url,
+    max: 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+    application_name: "bops-cloud",
+    // No statement runs on forever and keeps its connection (one of 10) and whatever waits on it: Postgres
+    // cancels it (57014). A wait that may rightly be long (a migration, a plan lock) lifts it (unbounded).
+    statement_timeout: config.dbStatementTimeoutMs(),
+  });
   pool.on("error", (e) => console.error(`[db] idle client: ${e.message}`));
   return pool;
 }
 
 export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(text: string, values: unknown[] = []): Promise<pg.QueryResult<T>> {
   return db().query<T>(text, values);
+}
+
+/**
+ * One statement that must answer within `ms` (Postgres cancels it after, 57014), tighter than the
+ * pool's statement timeout: for a read something else waits on, such as a start's balance (turn-guard.ts).
+ */
+export async function queryWithin<T extends pg.QueryResultRow = pg.QueryResultRow>(ms: number, text: string, values: unknown[] = []): Promise<pg.QueryResult<T>> {
+  return tx(async (c) => {
+    await c.query(`SET LOCAL statement_timeout = ${Math.max(1, Math.floor(ms))}`);
+    return c.query<T>(text, values);
+  });
+}
+
+/** A session's statement timeout lifted for a wait that may rightly be long (a lock another holds through slow work), then put back. */
+export async function unbounded<T>(c: pg.PoolClient, work: () => Promise<T>): Promise<T> {
+  await c.query("SET statement_timeout = 0");
+  try {
+    return await work();
+  } finally {
+    await c.query("RESET statement_timeout").catch(() => {});
+  }
 }
 
 /** Run `work` in one transaction (BEGIN … COMMIT, ROLLBACK on a throw). */
@@ -55,6 +85,8 @@ export async function migrate(): Promise<string[]> {
   const files = (await readdir(dir)).filter((f) => /^\d{4}_.+\.sql$/.test(f)).sort();
   const c = await db().connect();
   try {
+    // A migration may take a while, and so may waiting for another process's.
+    await c.query("SET statement_timeout = 0");
     await c.query("SELECT pg_advisory_lock($1)", [MIGRATION_LOCK]);
     const done = new Set<string>();
     try {
@@ -73,6 +105,7 @@ export async function migrate(): Promise<string[]> {
     return ran;
   } finally {
     await c.query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK]).catch(() => {});
+    await c.query("RESET statement_timeout").catch(() => {});
     c.release();
   }
 }
