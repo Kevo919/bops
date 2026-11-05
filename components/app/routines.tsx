@@ -8,7 +8,7 @@ import { onceDone, type AppState, type Bot, type Schedule, type Watch } from "@/
 import { AppLogo, botApps } from "./apps";
 import { appNameOf, askable, autopilotOf, filterRoutines, monitorNeedsYou, RoutineList, RoutinesEmpty, scheduleNeedsYou, SourceMark, TagChips, useOpenRow, zoneOf, type AutopilotSection } from "./autopilot";
 import { comingWhen, useClock } from "./routine-week";
-import { asCadence, asSchedule, CadencePicker, sameCadence, suggestedOf, tidy, type Cadence } from "./cadence-picker";
+import { asCadence, asSchedule, CadencePicker, cronError, sameCadence, suggestedOf, tidy, type Cadence } from "./cadence-picker";
 import { Mascot, Spinner } from "./mascot";
 import { Chevron, QuestionScope, small, undash } from "./side-group";
 import { post, teamOf, useNow } from "./ui";
@@ -448,6 +448,9 @@ function OfferRow({
             <CadencePicker
               value={schedule}
               onChange={(s) => {
+                // A half-typed cron isn't saved (the server would 400 it): the picker keeps the draft,
+                // and this fires again the moment it becomes a good one (crawl L3).
+                if (s.kind === "cron" && cronError(s.expr)) return;
                 onSchedule(s);
                 // Changing when it runs means it's wanted.
                 if (!ticked) onTick(true);
