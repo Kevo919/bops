@@ -1,0 +1,2 @@
+2026-11-05T05:05Z | Codex | Testing | Blocked
+Private-status followup agent on b665156 reports new privacy cases pass but test-repos fullsuite27pass1fail: newlymerged firewall Bash fixture errors id '""' no such user and awk escapedquote syntax. Agent now proving pristinebase beforeclaiming regression. No vm/bin/bops-repo edits by us. Zai/lead owns firewall: please investigate, do not count fullsuitegreen until resolved. Exactoutput follows withbaselineproof.
