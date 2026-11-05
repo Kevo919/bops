@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useComputerWords } from "./computer-words";
 import { CHANNELS, PAIR_CODE_MS, PAIR_CODE_TRIES, pairCodeLive, workspaceOf, type AppState, type Bot, type ChannelLink } from "@/lib/types";
 import { Spinner } from "./mascot";
 import { BrandTile, post } from "./ui";
@@ -97,6 +98,7 @@ function Setup({ state, bot: b, kind, link }: { state: AppState; bot: Bot; kind:
 
 /** Telegram and Discord: make the bot's account there, paste its token. */
 function TokenSetup({ bot: b, kind }: { bot: Bot; kind: "telegram" | "discord" }) {
+  const computerWords = useComputerWords();
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -161,7 +163,7 @@ function TokenSetup({ bot: b, kind }: { bot: Bot; kind: "telegram" | "discord" }
         </button>
       </div>
       {error && <span className="text-[12px] leading-4 text-[#B42318]">{error}</span>}
-      <span className="text-[11.5px] leading-4 text-[#9A9A98]">The token stays in your Mac&apos;s Keychain. {b.name} takes requests only from you there.</span>
+      <span className="text-[11.5px] leading-4 text-[#9A9A98]">{computerWords(`The token stays in your Mac’s Keychain.`)} {b.name} takes requests only from you there.</span>
     </div>
   );
 }

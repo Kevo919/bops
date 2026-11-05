@@ -466,6 +466,13 @@ await check("the picker: Custom (a cron expression) in How often starts at weekd
     root.render(h(Holder, { first: { kind: "every", minutes: 30 } }));
     await settle();
   });
+  // Every 30 minutes isn't a suggestion, so it opens picked on its own chip (crawl L4): Custom opens the fields.
+  assert.equal(box.querySelector("select"), null, "its own chip is picked, the fields stay closed");
+  const customChip = [...box.querySelectorAll('button[role="radio"]')].find((b) => b.textContent.trim() === "Custom");
+  await act(async () => {
+    customChip.dispatchEvent(new win.Event("click", { bubbles: true }));
+    await settle();
+  });
   const select = box.querySelector("select");
   assert.equal(select.value, "every");
   await choose(select, "cron");
