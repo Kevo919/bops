@@ -6,6 +6,8 @@ import { currentWorkspace, post } from "./ui";
 
 type Info = {
   on: boolean;
+  unreachable?: boolean;
+  error?: string;
   bank: string;
   own: boolean;
   sharedWith: { id: string; name: string }[];
@@ -76,6 +78,8 @@ export function MemorySheet({ state, onClose }: { state: AppState; onClose: () =
         <div className="flex flex-col gap-5 px-5 pb-5">
           {!info ? (
             <div className="py-6 text-center text-[13px] text-[#9A9A98]">Loading…</div>
+          ) : info.unreachable ? (
+            <div className="py-6 text-center text-[13px] text-[#9A9A98]">Can&rsquo;t reach the memory service right now. It&rsquo;s set up, but it didn&rsquo;t answer &mdash; try again in a moment.</div>
           ) : !info.on ? (
             <div className="py-6 text-center text-[13px] text-[#9A9A98]">Memory isn&rsquo;t on yet.</div>
           ) : (
