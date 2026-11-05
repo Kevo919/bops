@@ -23,15 +23,26 @@
 #   bops-repo poll <id> <name>                       BOPS_REPO_POLL running|exit=<n>, then its last lines
 #   bops-repo http <port> <path b64>                 BOPS_REPO_HTTP=<status> from http://127.0.0.1:<port><path>
 #   bops-repo status <id> <user>                     BOPS_REPO_STATUS procs=<n>, then the run's last lines
-#   bops-repo stop <id> <user>                       every process of the user ended
+#   bops-repo stop <id> <user>                       every process of the user ended, and anything it scheduled
+#
+# Nothing of a repo outlives its run: its user may not use cron or at (cron.deny/at.deny, and at.allow
+# where at was root-only already), its systemd user manager is masked and lingering is off, polkit says
+# no to it (so no systemd-run, no enable-linger), and every step's end and every stop clears its
+# crontab, its at jobs, its user timers and lingering again; stop then checks no process of it is left.
+#
+# Nothing Bops sends is parsed as shell here: every argument is checked against a strict pattern
+# (ids, names, digits, and base64 blobs ^[A-Za-z0-9+/=]+$ or -) before anything runs, and is only ever
+# passed on as a quoted argument.
 #
 # Answers are lines starting BOPS_REPO_; a tail is base64 on a BOPS_REPO_TAIL= line. What Bops keeps
 # here is root's alone: /root/.bops/repos/<id>/ (logs, exit codes, the HOME in use).
 set -uo pipefail
 umask 077
-BOPS_REPO_VERSION=1
+BOPS_REPO_VERSION=2
 BASE=${BOPS_REPO_BASE:-/srv/bops-repos}
 KEEP=${BOPS_REPO_KEEP:-/root/.bops/repos}
+ETC=${BOPS_REPO_ETC:-/etc}
+LINGER=${BOPS_REPO_LINGER:-/var/lib/systemd/linger}
 
 fail() {
   echo "BOPS_REPO_FAIL=$1"
@@ -48,6 +59,7 @@ K="$KEEP/$ID"
 mkdir -p "$KEEP" "$K" && chmod 700 "$KEEP" "$K"
 
 user_ok() { [[ "$1" =~ ^repo-[a-z0-9][a-z0-9-]{0,26}$ ]] || fail bad-user; }
+b64_ok() { [ "$1" = - ] || [[ "$1" =~ ^[A-Za-z0-9+/=]+$ ]]; }
 tail_of() { [ -f "$1" ] && echo "BOPS_REPO_TAIL=$(tail -c 4000 "$1" | base64 -w0)"; }
 
 # The environment a step gets: nothing of root's, only these and the plain settings Bops passed.
@@ -60,13 +72,15 @@ envv() {
     "NPM_CONFIG_PREFIX=$h/.npm-global" "npm_config_update_notifier=false" "PIP_DISABLE_PIP_VERSION_CHECK=1"
     "GIT_TERMINAL_PROMPT=0" "GIT_CONFIG_NOSYSTEM=1" "GIT_CONFIG_GLOBAL=/dev/null")
   if [ -n "${1:-}" ] && [ "$1" != - ]; then
-    local line
+    b64_ok "$1" || fail bad-env
+    local line dec
+    dec=$(printf %s "$1" | base64 -d 2>/dev/null) || fail bad-env
     while IFS= read -r line || [ -n "$line" ]; do
       [ -z "$line" ] && continue
       [[ "$line" =~ ^[A-Z_][A-Z0-9_]{0,63}=[^[:cntrl:]]*$ ]] || fail bad-env
-      case "${line%%=*}" in PATH|HOME|TMPDIR|LD_PRELOAD|LD_LIBRARY_PATH|BASH_ENV|ENV|*KEY*|*TOKEN*|*SECRET*|*PASSWORD*) fail bad-env "${line%%=*}" ;; esac
+      case "${line%%=*}" in PATH|HOME|TMPDIR|LD_*|BASH_ENV|BASH_FUNC_*|ENV|*KEY*|*TOKEN*|*SECRET*|*PASSWORD*) fail bad-env "${line%%=*}" ;; esac
       ENVV+=("$line")
-    done < <(printf %s "$1" | base64 -d)
+    done <<< "$dec"
   fi
 }
 
@@ -76,6 +90,72 @@ as_user() { # <user> <secs> <command>
     ulimit -c 0; ulimit -u 2048 2>/dev/null; ulimit -n 8192 2>/dev/null; ulimit -f 8388608 2>/dev/null
     cd "$1" || exit 97
     exec bash -c "$2"' bash "$SRC" "$3" < /dev/null
+}
+
+# No scheduling for the user: nothing of the repo may run later than its run, or after a stop.
+add_line() { # <file> <user>: the user listed in the file (made 644 root's if it wasn't there)
+  [ -f "$1" ] || { : > "$1" && chmod 644 "$1"; } || return 1
+  grep -qxF "$2" "$1" 2>/dev/null || printf '%s\n' "$2" >> "$1"
+}
+drop_line() { # <file> <user>: the user taken out of an allow list (same file, same mode)
+  [ -f "$1" ] || return 0
+  grep -qxF "$2" "$1" || return 0
+  local rest; rest=$(grep -vxF "$2" "$1")
+  printf '%s\n' "$rest" | grep -v '^$' > "$1"
+}
+deny_schedule() { # <user>
+  local u=$1 uid
+  # cron: an allow list, if there is one, never names it; and the deny list always does (Debian/Ubuntu
+  # cron lets everyone in when neither file is there, so the deny list only ever narrows it).
+  drop_line "$ETC/cron.allow" "$u"
+  add_line "$ETC/cron.deny" "$u" || fail no-deny "cron.deny couldn't be written."
+  # at: with neither file only root may use it; an at.allow of root alone keeps exactly that (and keeps
+  # it if the at package lays down an at.deny later). The deny list names the user either way.
+  if [ ! -f "$ETC/at.allow" ] && [ ! -f "$ETC/at.deny" ]; then
+    printf 'root\n' > "$ETC/at.allow" && chmod 644 "$ETC/at.allow" || fail no-deny "at.allow couldn't be written."
+  fi
+  drop_line "$ETC/at.allow" "$u"
+  add_line "$ETC/at.deny" "$u" || fail no-deny "at.deny couldn't be written."
+  # systemd: no lingering, its user manager masked (no user timers, no systemd-run --user), and polkit
+  # refusing it everything (enable-linger, systemd-run, ...). Missing systemd or polkit: nothing to deny.
+  uid=$(id -u "$u")
+  if command -v loginctl >/dev/null 2>&1; then loginctl disable-linger "$u" >/dev/null 2>&1 || true; fi
+  rm -f "$LINGER/$u" 2>/dev/null
+  if command -v systemctl >/dev/null 2>&1; then systemctl mask --now "user@$uid.service" >/dev/null 2>&1 || true; fi
+  if [ -d "$ETC/polkit-1/rules.d" ] && [ ! -f "$ETC/polkit-1/rules.d/49-bops-repo.rules" ]; then
+    printf '%s\n' '// Bops: a repo-<id> user (vm/bin/bops-repo) is refused every polkit action.' \
+      'polkit.addRule(function (action, subject) { if (/^repo-/.test(subject.user)) return polkit.Result.NO; });' \
+      > "$ETC/polkit-1/rules.d/49-bops-repo.rules" && chmod 644 "$ETC/polkit-1/rules.d/49-bops-repo.rules"
+  fi
+  return 0
+}
+
+# Whatever the user scheduled anyway, gone: its crontab, its at jobs, lingering, its user timers.
+unschedule() { # <user>
+  local u=$1 h j
+  id "$u" >/dev/null 2>&1 || return 0
+  if command -v crontab >/dev/null 2>&1; then crontab -r -u "$u" >/dev/null 2>&1 || true; fi
+  if command -v atq >/dev/null 2>&1; then
+    for j in $(atq 2>/dev/null | awk -v u="$u" '$NF == u && $1 ~ /^[0-9]+$/ { print $1 }'); do atrm "$j" >/dev/null 2>&1 || true; done
+  fi
+  if command -v loginctl >/dev/null 2>&1; then loginctl disable-linger "$u" >/dev/null 2>&1 || true; fi
+  if command -v systemctl >/dev/null 2>&1; then systemctl stop "user@$(id -u "$u").service" >/dev/null 2>&1 || true; fi
+  rm -f "$LINGER/$u" 2>/dev/null
+  h=$(cat "$K/home" 2>/dev/null || true)
+  [ -n "$h" ] && [[ "$h" == /tmp/bops-repo-* ]] && rm -rf -- "$h/.config/systemd/user"
+  return 0
+}
+
+# Every process of the user ended, and checked: none left, or it fails.
+kill_all() { # <user>
+  local u=$1 i
+  id "$u" >/dev/null 2>&1 || return 0
+  pkill -TERM -u "$u" 2>/dev/null; sleep 2; pkill -KILL -u "$u" 2>/dev/null
+  for i in 1 2 3 4 5; do
+    [ -z "$(pgrep -u "$u" 2>/dev/null)" ] && return 0
+    pkill -KILL -u "$u" 2>/dev/null; sleep 1
+  done
+  fail procs-left "$(pgrep -u "$u" 2>/dev/null | wc -l) of its processes wouldn't end."
 }
 
 # The firewall for the user: default-deny on this computer — only the ports the run declares and DNS
@@ -116,8 +196,14 @@ firewall() { # <user> <ports csv>
 probe() { # <user>
   local u=$1 out
   out=$(runuser -u "$u" -- env -i PATH=/usr/bin:/bin HOME=/nonexistent python3 -I - "$(cat "$K/refused-ports" 2>/dev/null)" <<'PY' 2>&1
-import os, socket, sys, glob
+import os, socket, sys, glob, shutil, subprocess
 bad = []
+# It can't schedule anything to run later (whatever this installs, unschedule clears right after).
+for tool, args, given in [("crontab", ["crontab", "-"], b""), ("at", ["at", "now + 1 year"], b"true\n"), ("systemd-run", ["systemd-run", "--user", "--on-active=365d", "/bin/true"], b"")]:
+    if shutil.which(tool):
+        try:
+            if subprocess.run(args, input=given, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10).returncode == 0: bad.append("can schedule with " + tool)
+        except Exception: pass
 for p in ["/root", "/root/.bops", "/root/.bops/agents", "/root/.bops/bots", "/root/profiles", "/root/.env", "/workspace", "/workspace/apps", "/etc/shadow"]:
     try:
         if os.path.isdir(p): os.listdir(p)
@@ -147,6 +233,7 @@ for p in ports:
 print("BOPS_PROBE=" + ("ok" if not bad else "; ".join(sorted(set(bad)))))
 PY
 )
+  unschedule "$u"
   case "$out" in *BOPS_PROBE=ok*) return 0 ;; esac
   local why; why=$(printf %s "$out" | grep -m1 '^BOPS_PROBE=' | sed 's/^BOPS_PROBE=//')
   fail unsafe "${why:-the safety check did not run}"
@@ -157,7 +244,7 @@ case "$CMD" in
     U=${3:-}; user_ok "$U"; PORTS=${4:--}
     [ "$PORTS" = - ] && PORTS=""
     [[ -z "$PORTS" || "$PORTS" =~ ^[0-9]{1,5}(,[0-9]{1,5}){0,7}$ ]] || fail bad-ports
-    for t in runuser iptables ip6tables ss python3 git tar timeout curl base64 sha256sum useradd pkill; do
+    for t in runuser iptables ip6tables ss python3 git tar timeout curl base64 sha256sum useradd pkill pgrep; do
       command -v "$t" >/dev/null 2>&1 || fail missing-tool "$t"
     done
     if ! id "$U" >/dev/null 2>&1; then
@@ -165,6 +252,8 @@ case "$CMD" in
     fi
     [ "$(id -nG "$U")" = "$U" ] || fail no-user "$U is in other groups: $(id -nG "$U")"
     [ "$(id -u "$U")" != 0 ] || fail no-user
+    deny_schedule "$U"
+    unschedule "$U"
     mkdir -p "$BASE" && chown root:root "$BASE" && chmod 711 "$BASE"
     mkdir -p "$DIR" && chown "$U:$U" "$DIR" && chmod 700 "$DIR"
     # A fresh HOME for this run: the old one goes.
@@ -180,7 +269,8 @@ case "$CMD" in
     ;;
   reset)
     U=${3:-}; user_ok "$U"
-    pkill -KILL -u "$U" 2>/dev/null; sleep 1
+    unschedule "$U"
+    kill_all "$U"
     rm -rf -- "$SRC" && mkdir -p "$SRC" && chown "$U:$U" "$SRC" && chmod 700 "$SRC" || fail reset
     echo "BOPS_REPO_RESET=1"
     ;;
@@ -208,20 +298,30 @@ case "$CMD" in
     U=${3:-}; user_ok "$U"; NAME=${4:-}; SECS=${5:-}; ENVB=${6:--}; CMDB=${7:-}
     [[ "$NAME" =~ ^[a-z][a-z0-9-]{0,20}$ ]] || fail bad-name
     [[ "$SECS" =~ ^[0-9]{1,6}$ ]] || fail bad-time
-    C=$(printf %s "$CMDB" | base64 -d) || fail bad-command
+    b64_ok "$ENVB" || fail bad-env
+    [ "$CMDB" != - ] && b64_ok "$CMDB" || fail bad-command
+    C=$(printf %s "$CMDB" | base64 -d 2>/dev/null) || fail bad-command
     [ -n "$C" ] || fail bad-command
     envv "$ENVB"
     rm -f "$K/$NAME.exit" "$K/$NAME.log"
     # Detached (this script again, as _run): Bops polls it, so no Orgo call waits on a long install.
+    # Every argument passes as an argument (checked above, checked again in _run): nothing is parsed.
     setsid nohup "$0" _run "$ID" "$U" "$NAME" "$SECS" "$ENVB" "$CMDB" > /dev/null 2>&1 < /dev/null &
     echo "BOPS_REPO_BEGUN=$NAME"
     ;;
   _run)
-    U=${3:-}; user_ok "$U"; NAME=${4:-}; SECS=${5:-}; ENVB=${6:--}; C=$(printf %s "${7:-}" | base64 -d)
+    U=${3:-}; user_ok "$U"; NAME=${4:-}; SECS=${5:-}; ENVB=${6:--}; CMDB=${7:-}
     [[ "$NAME" =~ ^[a-z][a-z0-9-]{0,20}$ ]] || fail bad-name
+    [[ "$SECS" =~ ^[0-9]{1,6}$ ]] || fail bad-time
+    b64_ok "$ENVB" || fail bad-env
+    [ "$CMDB" != - ] && b64_ok "$CMDB" || fail bad-command
+    C=$(printf %s "$CMDB" | base64 -d 2>/dev/null) || fail bad-command
     envv "$ENVB"
     as_user "$U" "$SECS" "$C" > "$K/$NAME.log" 2>&1
-    echo $? > "$K/$NAME.exit"
+    rc=$?
+    # The step is over: whatever it scheduled goes with it (its processes are stop's to end).
+    unschedule "$U"
+    echo "$rc" > "$K/$NAME.exit"
     ;;
   poll)
     NAME=${3:-}; [[ "$NAME" =~ ^[a-z][a-z0-9-]{0,20}$ ]] || fail bad-name
@@ -229,7 +329,9 @@ case "$CMD" in
     tail_of "$K/$NAME.log"
     ;;
   http)
-    PORT=$ID; P=$(printf %s "${3:-Lw==}" | base64 -d)
+    PORT=$ID; PB=${3:-Lw==}
+    [ "$PB" != - ] && b64_ok "$PB" || fail bad-path
+    P=$(printf %s "$PB" | base64 -d 2>/dev/null) || fail bad-path
     [[ "$PORT" =~ ^[0-9]{1,5}$ ]] || fail bad-port
     [[ "$P" =~ ^/[A-Za-z0-9._~/?=\&%-]*$ ]] || fail bad-path
     echo "BOPS_REPO_HTTP=$(curl -s -o /dev/null -m 5 --noproxy '*' -w '%{http_code}' "http://127.0.0.1:$PORT$P" 2>/dev/null || echo 000)"
@@ -242,9 +344,11 @@ case "$CMD" in
     ;;
   stop)
     U=${3:-}; user_ok "$U"
-    if id "$U" >/dev/null 2>&1; then
-      pkill -TERM -u "$U" 2>/dev/null; sleep 2; pkill -KILL -u "$U" 2>/dev/null
-    fi
+    # What it scheduled first (so nothing starts again while it's being ended), then its processes,
+    # then once more (a process ended mid-way may have left a crontab behind).
+    unschedule "$U"
+    kill_all "$U"
+    unschedule "$U"
     echo "BOPS_REPO_STOPPED=1"
     ;;
   *) fail usage ;;

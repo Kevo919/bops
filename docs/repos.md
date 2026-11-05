@@ -70,7 +70,12 @@ On the bot's computer each repo runs as its own Linux user (`repo-<id>`), never 
   later), private networks or your tailnet;
 - before anything of the repo runs, a check **as that user** confirms it can't read the bots' folders (`/root`,
   `/root/.bops`, the Chrome profiles, `/workspace`), open the screens' X displays or Docker, or connect to those ports.
-  If any check fails, the run stops there and says why.
+  If any check fails, the run stops there and says why;
+- nothing of it outlives its run: its user is denied cron and at (`/etc/cron.deny`, `/etc/at.deny`, and an `at.allow`
+  of root alone where at was root's only already), its systemd user manager is masked, lingering is off and polkit
+  refuses it (no user timers, no `systemd-run`), and the check above confirms it can't schedule. When a step ends its
+  crontab, at jobs, user timers and lingering are cleared again; when a run ends or is stopped all of its processes
+  are ended too, and the stop fails if any is left.
 
 Known limits of this version: a repo can't use your keys (a recipe that needs one says so), Docker repos can't run on a
 bot's computer, and other users' process names are visible to it (as on any Linux computer).

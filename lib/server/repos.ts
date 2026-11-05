@@ -423,11 +423,19 @@ const runOf = (runId: string) => repoState().runs?.find((r) => r.id === runId);
 
 /** Runs going in this process now: one in a step state that isn't here was cut off (a restart). */
 const goingHere = new Set<string>();
+/** A cut-off run's ending on its computer, by computer:repo: a new run there waits for it. */
+const ending = new Map<string, Promise<void>>();
 
 /** Every run, with ones a restart cut off marked failed. */
 export function repoRuns(): RepoRun[] {
   const cut = (repoState().runs ?? []).filter((r) => RUN_ACTIVE.has(r.state) && r.state !== "running" && !goingHere.has(r.id) && Date.now() - r.updatedAt > 2 * 60_000);
-  for (const r of cut) patchRun(r.id, { state: "failed", error: "Bops restarted while this was running. Run it again." });
+  for (const r of cut) {
+    patchRun(r.id, { state: "failed", error: "Bops restarted while this was running. Run it again." });
+    // Not picked up again (no reconciling a cut-off step): whatever it left on the computer is ended,
+    // before any new run of it there prepares (execute waits for this).
+    const key = `${r.computerId}:${r.repoId}`;
+    ending.set(key, (ending.get(key) ?? Promise.resolve()).then(() => endOnComputer(r.computerId, r.repoId)));
+  }
   return repoState().runs ?? [];
 }
 
@@ -437,6 +445,16 @@ export const REPO_BIN = "/usr/local/bin/bops-repo";
 const script = () => readFileSync(process.env.BOPS_REPO_SCRIPT || join(/*turbopackIgnore: true*/ process.cwd(), "vm/bin/bops-repo"));
 const scriptVersion = (body: string) => Number(body.match(/^BOPS_REPO_VERSION=(\d+)/m)?.[1] ?? 0);
 const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64");
+
+/**
+ * One bops-repo line, for root's shell on the computer: every argument checked against a plain pattern
+ * (ids, users, names, digits, base64 or -) before it is put in, so nothing of it can be parsed as shell.
+ */
+const SAFE_ARG = /^[A-Za-z0-9+/][A-Za-z0-9+/=,_-]*$|^-$/;
+export function repoLine(verb: string, ...args: (string | number)[]): string {
+  for (const a of [verb, ...args.map(String)]) if (!SAFE_ARG.test(a)) throw new RepoError("Not run: a value for the computer wasn't plain.", 409);
+  return [REPO_BIN, verb, ...args.map(String)].join(" ");
+}
 
 const FAILS: Record<string, string> = {
   unsafe: "Bops' safety check on the computer found the repo's user could reach something it mustn't",
@@ -489,12 +507,12 @@ const tailOf = (out: string) => {
 /** A step started on the computer and waited for (polled), as the repo's user. Its exit code and last lines. */
 async function job(p: RepoPlan, runId: string, name: string, command: string, secs: number): Promise<{ code: number; tail: string }> {
   const env = Object.entries(p.env).map(([k, v]) => `${k}=${v}`).join("\n");
-  await sh(p.computerId, `${REPO_BIN} begin ${p.repoId} ${p.user} ${name} ${secs} ${env ? b64(env) : "-"} ${b64(command)}`);
+  await sh(p.computerId, repoLine("begin", p.repoId, p.user, name, secs, env ? b64(env) : "-", b64(command)));
   const until = Date.now() + (secs + 60) * 1000;
   for (;;) {
     await repoDeps.sleep(repoTiming.pollMs);
     if (runOf(runId)?.state === "stopped") throw new RepoError("Stopped.", 409);
-    const out = await sh(p.computerId, `${REPO_BIN} poll ${p.repoId} ${name}`);
+    const out = await sh(p.computerId, repoLine("poll", p.repoId, name));
     const code = out.match(/^BOPS_REPO_POLL=exit=(\d+)/m)?.[1];
     if (code !== undefined) return { code: Number(code), tail: tailOf(out) };
     if (Date.now() > until) return { code: 124, tail: tailOf(out) };
@@ -510,9 +528,10 @@ async function sendTarball(p: RepoPlan, bytes: Buffer) {
   const n = Math.ceil(bytes.length / repoTiming.chunkBytes);
   for (let i = 0; i < n; i++) {
     const part = bytes.subarray(i * repoTiming.chunkBytes, (i + 1) * repoTiming.chunkBytes).toString("base64");
-    await sh(p.computerId, `printf %s ${part} | ${REPO_BIN} chunk ${p.repoId} ${i}`, 60);
+    if (!/^[A-Za-z0-9+/=]+$/.test(part)) throw new RepoError("Not run: a piece of the archive wasn't plain base64.", 409);
+    await sh(p.computerId, `printf %s ${part} | ${repoLine("chunk", p.repoId, i)}`, 60);
   }
-  await sh(p.computerId, `${REPO_BIN} unpack ${p.repoId} ${p.user} ${createHash("sha256").update(bytes).digest("hex")}`, 660);
+  await sh(p.computerId, repoLine("unpack", p.repoId, p.user, createHash("sha256").update(bytes).digest("hex")), 660);
 }
 
 /** The health check's address, as path and port on 127.0.0.1. */
@@ -525,7 +544,7 @@ const httpOf = (h: RepoHealth) => {
 async function httpHealth(p: RepoPlan, h: RepoHealth): Promise<{ ok: boolean; detail: string }> {
   const at = httpOf(h);
   if (!at) return { ok: false, detail: "Its health check isn't an address on that computer." };
-  const out = await sh(p.computerId, `${REPO_BIN} http ${at.port} ${b64(at.path)}`, 20);
+  const out = await sh(p.computerId, repoLine("http", at.port, b64(at.path)), 20);
   const code = Number(out.match(/^BOPS_REPO_HTTP=(\d+)/m)?.[1] ?? 0);
   const want = "expect" in h ? h.expect : undefined;
   const ok = want ? code === want : code > 0 && code < 500;
@@ -538,9 +557,10 @@ async function execute(runId: string, p: RepoPlan) {
   const step = (state: RepoRun["state"], words: string) => patchRun(runId, { state, step: words });
   try {
     step("preparing", "Getting the computer ready");
+    await ending.get(`${p.computerId}:${p.repoId}`);
     await ensureScript(p.computerId);
-    await sh(p.computerId, `${REPO_BIN} prepare ${p.repoId} ${p.user} ${p.ports.join(",") || "-"}`, 120);
-    await sh(p.computerId, `${REPO_BIN} reset ${p.repoId} ${p.user}`, 60);
+    await sh(p.computerId, repoLine("prepare", p.repoId, p.user, p.ports.join(",") || "-"), 120);
+    await sh(p.computerId, repoLine("reset", p.repoId, p.user), 60);
     step("fetching", `Fetching ${p.repo} at ${p.commit.slice(0, 12)}`);
     if (p.private) {
       const bytes = await privateTarball({ repo: p.repo, private: true, tokenName: recipeById(p.repoId)?.needs_token, wsId: workspaceOf(bot(p.botId)) }, p.commit);
@@ -558,6 +578,7 @@ async function execute(runId: string, p: RepoPlan) {
     patchRun(runId, { installed: true });
     if (!p.run.length) {
       patchRun(runId, { state: "done", step: "Installed. It has nothing to run." });
+      await endOnComputer(p.computerId, p.repoId);
       return report(runId, p);
     }
     if (p.background) {
@@ -568,13 +589,13 @@ async function execute(runId: string, p: RepoPlan) {
       }
       step("starting", `Starting: ${p.run.at(-1)}`);
       const env = Object.entries(p.env).map(([k, v]) => `${k}=${v}`).join("\n");
-      await sh(p.computerId, `${REPO_BIN} begin ${p.repoId} ${p.user} run ${repoTiming.serverSecs} ${env ? b64(env) : "-"} ${b64(p.run.at(-1)!)}`);
+      await sh(p.computerId, repoLine("begin", p.repoId, p.user, "run", repoTiming.serverSecs, env ? b64(env) : "-", b64(p.run.at(-1)!)));
       const until = Date.now() + repoTiming.healthMs;
       let last = { ok: false, detail: "no health check" };
       for (;;) {
         await repoDeps.sleep(repoTiming.pollMs);
         if (runOf(runId)?.state === "stopped") return;
-        const polled = await sh(p.computerId, `${REPO_BIN} poll ${p.repoId} run`);
+        const polled = await sh(p.computerId, repoLine("poll", p.repoId, "run"));
         const code = polled.match(/^BOPS_REPO_POLL=exit=(\d+)/m)?.[1];
         if (code !== undefined) throw stepFailed(`It stopped by itself; running ${p.run.at(-1)}`, { code: Number(code), tail: tailOf(polled) });
         patchRun(runId, { tail: tailOf(polled) });
@@ -605,13 +626,14 @@ async function execute(runId: string, p: RepoPlan) {
       patchRun(runId, { health: { ok: r.code === p.health.expect_exit, at: Date.now(), detail: `${p.health.cmd} exited ${r.code}` } });
     }
     patchRun(runId, { state: "done", step: "Ran and finished" });
+    await endOnComputer(p.computerId, p.repoId);
     return report(runId, p);
   } catch (e) {
     if (runOf(runId)?.state === "stopped") return;
     const err = e as Error & { tail?: string };
     patchRun(runId, { state: "failed", error: err instanceof RepoError ? err.message : `Something went wrong: ${redact(err.message)}`, ...(err.tail ? { tail: err.tail } : {}) });
     // Whatever it started is ended (a server whose health check never passed among them).
-    await sh(p.computerId, `${REPO_BIN} stop ${p.repoId} ${p.user}`, 30).catch(() => "");
+    await sh(p.computerId, repoLine("stop", p.repoId, p.user), 30).catch(() => "");
     report(runId, p);
   } finally {
     goingHere.delete(runId);
@@ -679,14 +701,27 @@ export async function stopRepo(botId: string, repoId: string): Promise<string> {
   patchRun(r.id, { state: "stopped", step: "Stopped" });
   const user = repoUser(repoId, hash);
   await ensureScript(r.computerId);
-  await sh(r.computerId, `${REPO_BIN} stop ${repoId} ${user}`, 30);
+  await sh(r.computerId, repoLine("stop", repoId, user), 30);
   return "Stopped.";
+}
+
+/**
+ * A run over, on its computer: every process of its user ended, and whatever it scheduled (cron, at,
+ * user timers, lingering) cleared. Best effort: the run's own state is already said.
+ */
+async function endOnComputer(computerId: string, repoId: string): Promise<void> {
+  try {
+    await ensureScript(computerId);
+    await sh(computerId, repoLine("stop", repoId, repoUser(repoId, hash)), 30);
+  } catch {
+    // The computer away or refusing: the next prepare clears it all again.
+  }
 }
 
 /** A running server's state, asked of its computer: one whose processes are all gone is marked failed. */
 async function refresh(r: RepoRun) {
   if (r.state !== "running") return;
-  const out = await sh(r.computerId, `${REPO_BIN} status ${r.repoId} ${repoUser(r.repoId, hash)}`, 30).catch(() => null);
+  const out = await sh(r.computerId, repoLine("status", r.repoId, repoUser(r.repoId, hash)), 30).catch(() => null);
   if (out === null) return;
   const procs = Number(out.match(/^BOPS_REPO_STATUS procs=(\d+)/m)?.[1] ?? 0);
   if (!procs) patchRun(r.id, { state: "failed", error: "It stopped by itself.", tail: tailOf(out) });

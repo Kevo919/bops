@@ -442,6 +442,12 @@ const LISTENERS = [
   'LISTEN 0 511 127.0.0.1:4173 0.0.0.0:* users:(("dev",pid=4,fd=3)) uid:0 ino:4',
 ];
 
+await check("a bops-repo line for root's shell takes only plain values: x\";cmd;\" and the like are refused before anything is sent", () => {
+  assert.equal(R.repoLine("begin", "rea", "repo-rea", "run", 60, "-", b64("npm start")), `/usr/local/bin/bops-repo begin rea repo-rea run 60 - ${b64("npm start")}`);
+  for (const bad of ['x";cmd;"', "a b", "$(id)", "`id`", "a;b", "a|b", "a\nb", "", "-x", "a'b"])
+    assert.throws(() => R.repoLine("stop", bad, "repo-rea"), /wasn't plain/, JSON.stringify(bad));
+});
+
 await check("the repo firewall is default-deny: the plan's declared ports and DNS alone get through, and nothing is decided by what happens to be listening", () => {
   const script = repoScript();
   const a = runFirewall(script, LISTENERS, "4173,3000");
