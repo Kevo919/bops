@@ -263,7 +263,12 @@ assert.equal(chat.agentsForTurn({}), true);
 ok("owner only: no window token, a phone, another host or a shared workspace gets 403 and no names; bots only on the owner's own turns");
 
 /* 5. Check */
-const check = async (name) => (await call(asOwner({ action: "check", id: by(name).id }))).json.result;
+const check = async (name) => {
+  const x = (await call(asOwner({ action: "check", id: by(name).id }))).json;
+  // The list that comes back carries the same answer (the page shows it from there).
+  assert.deepEqual(x.agents.find((a) => a.name === name).check, x.result);
+  return x.result;
+};
 let c = await check("Hermes on server");
 assert.equal(c.ok, true, c.words);
 assert.match(c.words, /It works\. Hermes answered as hermes server A/);

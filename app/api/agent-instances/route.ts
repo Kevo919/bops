@@ -26,7 +26,11 @@ export async function POST(request: Request) {
     if (body.action === "add") addAgent(body);
     else if (body.action === "edit") editAgent(body.id, body);
     else if (body.action === "remove") removeAgent(body.id);
-    else if (body.action === "check") return Response.json({ agents: listAgents(), result: await checkAgent(body.id) }, { headers });
+    else if (body.action === "check") {
+      // The Check first, then the list (which carries its answer).
+      const result = await checkAgent(body.id);
+      return Response.json({ agents: listAgents(), result }, { headers });
+    }
     else return Response.json({ error: "Add an agent, or choose one to change." }, { status: 400, headers });
   } catch (e) {
     // Only this screen's own words: never a key, nor a file system error that could name a path.
