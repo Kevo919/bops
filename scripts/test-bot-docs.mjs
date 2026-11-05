@@ -190,6 +190,30 @@ await check("the prompt blocks: SOUL.md in place of How I work when written, MEM
   for (const t of [withSoul, spoken, mem]) noDashes(t.replace(/"""[\s\S]*"""/, ""), "a prompt block");
 });
 
+await check("a prompt carries at most MAX_MEMORY_PROMPT_CHARS of a MEMORY.md, and outside turns and made-app answers carry none", async () => {
+  const { MAX_MEMORY_PROMPT_CHARS, MAX_BOT_DOC_CHARS } = await import(at("lib/types.ts"));
+  // The file keeps up to MAX_BOT_DOC_CHARS (20k); the prompt block quotes at most MAX_MEMORY_PROMPT_CHARS (12k) of it.
+  assert.ok(MAX_MEMORY_PROMPT_CHARS < MAX_BOT_DOC_CHARS, "the prompt cap is below the file cap");
+  const big = Docs.memoryDocBlock("Alex", { memoryDoc: "x".repeat(MAX_BOT_DOC_CHARS) });
+  const quoted = big.match(/"""\n([\s\S]*)\n"""/)?.[1] ?? "";
+  assert.equal(quoted.length, MAX_MEMORY_PROMPT_CHARS, "exactly the prompt cap is quoted");
+  // The owner's own turn carries the doc; doc: false (someone from outside, a made-app answering) carries none.
+  S.update((s) => {
+    s.bots.find((b) => b.id === "boppy").memoryDoc = "- Alex lives in Austin.";
+  });
+  const ownerTurn = await turn("Hi Boppy.");
+  assert.ok(ownerTurn.now.includes("Your MEMORY.md"), "the owner's own turn sees the bot's MEMORY.md");
+  const withDoc = await Memory.memoryBlock(Memory.scopeOf("boppy"), "anything");
+  const withoutDoc = await Memory.memoryBlock(Memory.scopeOf("boppy"), "anything", 2500, { doc: false });
+  assert.ok(withDoc.includes("Your MEMORY.md"), "memoryBlock with the doc");
+  assert.ok(!withoutDoc.includes("Your MEMORY.md") && !withoutDoc.includes("Austin"), "doc: false keeps MEMORY.md out entirely");
+  assert.ok(!withoutDoc.includes('"""'), "not even an empty quote block");
+  // Back as it was: later checks read the bot with no MEMORY.md of its own.
+  S.update((s) => {
+    s.bots.find((b) => b.id === "boppy").memoryDoc = undefined;
+  });
+});
+
 /* ---------------- The route ---------------- */
 
 await check("only the owner's Bops window reads or writes them", async () => {
@@ -324,7 +348,14 @@ await check("a computer's write of Bot.soul or Bot.memoryDoc is refused by Bops 
   assert.ok(!text.includes("Dry wit.") && !text.includes("Oat milk") && !text.includes("Otto's soul"), "a member reads neither");
 });
 
-rmSync(scratch, { recursive: true, force: true });
+// Cleanup only: on Windows a just-closed scratch dir can still be held (an AV scan) and rm gets EPERM
+// (the task-15 note); retry, and if it still won't go, leave it for %TEMP% rather than mask the results.
+try {
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 3, retryDelay: 250 });
+} catch (e) {
+  if (e?.code !== "EPERM") throw e;
+  console.error(`cleanup: scratch left at ${scratch} (EPERM)`);
+}
 if (failures) {
   console.error(`${failures} failed, ${passed} passed`);
   process.exit(1);

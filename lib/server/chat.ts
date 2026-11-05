@@ -1114,7 +1114,9 @@ export async function answerForApp(botId: string, app: { title: string; chatId: 
     appsNote(b, "chat"),
     `Now you're answering "${app.title}", an app you made for ${owner} that runs in Bops, not ${owner} in a chat. Find out what it asks with your tools and answer only that, ${json ? "as JSON only: no Markdown, no words around it" : "in plain text, briefly"}. Here you only read: you can't send, create or change anything, so if the question asks for that, say ${owner} can ask you in the chat.`,
     ...nowLines(b),
-    await memoryBlock(scopeOf(botId), question, 1500),
+    // No MEMORY.md here (doc: false): an app's answers can reach further than the owner's own chats, so
+    // what the owner keeps in the bot's memory stays out of them; what Honcho learned still helps.
+    await memoryBlock(scopeOf(botId), question, 1500, { doc: false }),
   ]
     .filter(Boolean)
     .join("\n");
@@ -2603,7 +2605,11 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       // What's known about the user (Honcho), for what they just said (or what the routine is about).
       // Searched only when knowing the user helps with it (Jev); small talk and plain commands skip it.
       // Not on a member's turn: what's known about the owner is the owner's own (NOT_FROM_MEMBER has no recall either).
-      member ? "" : await memoryBlock(scopeOf(botId), about, 2500, { search: await needsMemory(about) }),
+      // Someone from outside Bops still gets what's known, but never the bot's MEMORY.md (doc: false): the
+      // owner's long-lived facts are for the owner's own chats, not for a turn a stranger started.
+      member
+        ? ""
+        : await memoryBlock(scopeOf(botId), about, 2500, { search: await needsMemory(about), doc: !opts.outside }),
     ].filter(Boolean);
     // Going on from a pause for the user's OK: the same turn, on the response it paused in, with what it had then.
     const resumed = opts.resume?.resume?.engine === "chat" ? opts.resume.resume : undefined;

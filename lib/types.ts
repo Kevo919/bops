@@ -228,6 +228,9 @@ export type LineVoice = { for: CallVoice; id: string; name: string; exact?: true
 export const MAX_PERSONA_CHARS = 1500;
 /** How long a bot's SOUL.md or MEMORY.md may be (Bot.soul, Bot.memoryDoc), in characters. */
 export const MAX_BOT_DOC_CHARS = 20_000;
+/** How much of its MEMORY.md a prompt carries (lib/bot-docs.ts memoryDocBlock): the file keeps up to
+ *  MAX_BOT_DOC_CHARS, but a turn never carries more than this. */
+export const MAX_MEMORY_PROMPT_CHARS = 12_000;
 
 /** A workspace: one team with its own main bot, bots, chats and work. The user switches between them. */
 export type Workspace = {
