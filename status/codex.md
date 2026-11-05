@@ -17,3 +17,5 @@ Remaining external prerequisites include Actions re-enable,Gmail/Zapier auth,And
 ## Estimates and logs
 Conditional active-team estimates80%=6-12h,85%=10-18h,90%=16-30h,95%=2-3workingdays;100%dependency-bound. Plan tests/0435-codex-target100-plan. These are not deadlines or verified scores.
 Lead rebuilds/score;zai #38/#39/server checks;Codex LivePC/executor. No heavy job remains owned; no restart/deploy by parent. User testfiles retained in Downloads.
+
+2026-11-05T04:43Z update: Ideas lifecycle LIVE PASS (0442). PR59 merged1ccce9d aftertests/independentreview, not deployed. PR57/58 securityreviews FAIL (comments and boardmessages); awaitingzai fixes, no blindmerge. DraftPR60 Windowsharness improves125/9 to128/6; remainingSSH/Bash platform failures unresolved, notmerged. Noheavylockowned. Billing inspection stillblocked bybrowserinvalidtabpolicy; userrequestedcontinueindependentwork. Next: re-review57/58 fixes; coordinate genuineWindowsSSHport; remainingLivePCtests. Evidence tests/0443-codex-hosted-apps-windows.
