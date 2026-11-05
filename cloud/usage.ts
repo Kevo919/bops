@@ -85,8 +85,8 @@ export async function recordUsage(userId: string, kind: string, units: number, d
 /**
  * Use that can be seen more than once (an agent turn's tokens come in its event and again when it's
  * looked up; a call's seconds grow while it runs): one row per `ref`, keeping the largest count (and
- * the detail that came with it). The row is priced again each time, and only what it costs beyond
- * what was paid for it already is taken.
+ * the detail that came with it). What it grew by is paid: the new count less the old one, both at
+ * today's prices (a price change between sightings, or a retry of the same use, charges nothing).
  */
 export async function recordUsageFor(userId: string, kind: string, ref: string, units: number, detail: Record<string, unknown> = {}): Promise<void> {
   let paid = 0;
@@ -112,8 +112,10 @@ export async function recordUsageFor(userId: string, kind: string, ref: string, 
       // A smaller count is an older sighting: the larger one's detail stands.
       const keep = units >= was ? { units, detail: { ...detail, ref } } : { units: was, detail: { ...(seen?.detail ?? {}), ref } };
       const before = seen ? Number(seen.cost_micros) : 0;
-      const cost = Math.max(costOf(kind, keep.units, keep.detail), before);
-      paid = cost - before;
+      // Only what it grew by is paid, at today's prices: what was seen before is priced again the same
+      // way, so a price change between two sightings (or a retry of the same use) never charges anything.
+      paid = seen ? Math.max(0, costOf(kind, keep.units, keep.detail) - costOf(kind, was, { ...(seen.detail ?? {}), ref })) : costOf(kind, keep.units, keep.detail);
+      const cost = before + paid;
       if (seen)
         await c.query("UPDATE bops.cloud_usage SET units = $2, detail = $3::jsonb, cost_micros = $4 WHERE id = $1", [seen.id, keep.units, JSON.stringify(keep.detail), cost]);
       else

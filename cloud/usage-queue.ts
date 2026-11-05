@@ -5,6 +5,7 @@ import {
   readdir,
   readFile,
   rename,
+  stat,
   unlink,
 } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
@@ -141,15 +142,46 @@ function nap(ms: number) {
  */
 const spoolLine = (u: QueuedUse) => `\n${JSON.stringify(u)}\n`;
 
-/** Append one use to the spool: one write of its whole line, then fsync, so once this returns it's on disk. */
+/** Tests put awaits in an append (between its open and its write), to interleave a replay there. */
+export const spoolHooks = { afterOpen: async (): Promise<void> => {} };
+
+/**
+ * This process's spool work in turn: an append (open, write, fsync) never runs while a replay of this
+ * process claims (renames) and reads a file, or deletes one. Another process can still claim the spool
+ * under an append: appendUse sees that and appends again.
+ */
+let spoolTurn: Promise<unknown> = Promise.resolve();
+function inSpoolTurn<T>(work: () => Promise<T>): Promise<T> {
+  const run = spoolTurn.then(work, work);
+  spoolTurn = run.catch(() => {});
+  return run;
+}
+
+/**
+ * Append one use to the spool: one write of its whole line, then fsync, so once this returns it's on
+ * disk. If the file it wrote to was renamed meanwhile (another process's replay claimed it, maybe
+ * having read it before this line was in), it's appended again to the spool as it is now: written
+ * twice is harmless (one row per ref), and a line that landed in a file already read is not lost.
+ */
 async function appendUse(path: string, u: QueuedUse) {
-  const f = await open(path, "a", 0o600);
-  try {
-    await f.write(spoolLine(u));
-    await f.sync();
-  } finally {
-    await f.close();
+  for (let i = 0; i < 5; i++) {
+    const f = await open(path, "a", 0o600);
+    let stayed = false;
+    try {
+      await spoolHooks.afterOpen();
+      await f.write(spoolLine(u));
+      await f.sync();
+      const [wrote, now] = await Promise.all([
+        f.stat(),
+        stat(path).catch(() => null),
+      ]);
+      stayed = !!now && now.ino === wrote.ino && now.dev === wrote.dev;
+    } finally {
+      await f.close();
+    }
+    if (stayed) return;
   }
+  throw new Error("the spool was claimed under every try");
 }
 
 /**
@@ -166,7 +198,7 @@ async function spool(uses: QueuedUse[]): Promise<boolean> {
       continue;
     }
     try {
-      await appendUse(path, u);
+      await inSpoolTurn(() => appendUse(path, u));
       parked.delete(u.ref);
     } catch (e) {
       console.error(
@@ -194,11 +226,16 @@ const isUse = (x: unknown): x is QueuedUse => {
 const LINE_START = '{"ref":';
 
 /**
- * The uses in a spool's text, and what couldn't be read. Line by line, so a bad one costs only itself;
- * and in a line that doesn't read (a torn line of an older spool, with the next one joined on), the
- * last use that starts in it is tried on its own.
+ * The uses in a spool's text, what couldn't be read, and a last line not ended by its newline (`torn`):
+ * maybe an append still under way in another process, so it's not counted as bad. Line by line, so a
+ * bad one costs only itself; and in a line that doesn't read (a torn line of an older spool, with the
+ * next one joined on), the last use that starts in it is tried on its own.
  */
-export function readSpool(text: string): { uses: QueuedUse[]; bad: string[] } {
+export function readSpool(text: string): {
+  uses: QueuedUse[];
+  bad: string[];
+  torn: string;
+} {
   const uses: QueuedUse[] = [];
   const bad: string[] = [];
   const parse = (t: string): QueuedUse | null => {
@@ -209,7 +246,16 @@ export function readSpool(text: string): { uses: QueuedUse[]; bad: string[] } {
       return null;
     }
   };
-  for (const line of text.split("\n")) {
+  const lines = text.split("\n");
+  // After the last newline: "" when the text ends with one.
+  const last = lines.pop() ?? "";
+  let torn = "";
+  if (last.trim()) {
+    const whole = parse(last);
+    if (whole) uses.push(whole);
+    else torn = last;
+  }
+  for (const line of lines) {
     if (!line.trim()) continue;
     const whole = parse(line);
     if (whole) {
@@ -221,24 +267,61 @@ export function readSpool(text: string): { uses: QueuedUse[]; bad: string[] } {
     if (tail) uses.push(tail);
     bad.push(tail ? line.slice(0, at) : line);
   }
-  return { uses, bad };
+  return { uses, bad, torn };
 }
+
+/** A .bad file past this is moved to .bad.1 (the one before goes): two at most. */
+const BAD_MAX_BYTES = 1_000_000;
+
+/**
+ * Keep what couldn't be read, for a look by hand: not the fragment (it may hold a user's details),
+ * only when, its size, and the ref and kind if they can be made out (a ref names one use's row).
+ */
+async function keepBad(path: string, from: string, fragments: string[]) {
+  const bad = `${path}.bad`;
+  const lines = fragments.map((f) =>
+    JSON.stringify({
+      seenAt: new Date().toISOString(),
+      file: basename(from),
+      bytes: f.length,
+      ref: /"ref":"(use_[A-Za-z0-9_-]+)"/.exec(f)?.[1] ?? null,
+      kind: /"kind":"([a-z._]+)"/.exec(f)?.[1] ?? null,
+    }),
+  );
+  try {
+    if (((await stat(bad).catch(() => null))?.size ?? 0) > BAD_MAX_BYTES)
+      await rename(bad, `${bad}.1`);
+    await appendFile(bad, lines.map((l) => l + "\n").join(""), { mode: 0o600 });
+  } catch (e) {
+    console.error(
+      `[usage] ${bad} couldn't be written: ${(e as Error).message}`,
+    );
+  }
+}
+
+/** A claimed file whose last line is torn is left for the next pass until it's this old (an append may be under way). */
+export const spoolTiming = { tornGraceMs: 60_000 };
 
 let replaying: Promise<number> | null = null;
 
 /**
  * Write what's on the spool (and parked in memory). Each spool file is claimed first by renaming it to
- * a name only this process uses (`<spool>.replaying.<pid>.<random>`): a use spooled meanwhile goes on
- * a new spool, a file a replay of a process that stopped left behind is claimed and read here, and no
- * process ever deletes a file it didn't claim. What fails again goes back on the spool, and a claimed
- * file is deleted only once all of it is written or back on the spool. A parked use stays parked until
- * it's written or spooled, so a stop meanwhile still logs it. How many uses were written.
+ * a name of this process's (`<spool>.replaying.<pid>.<random>`), so a use spooled meanwhile goes on a
+ * new spool. Every `.replaying.*` file is claimed too, a live process's included (its replay may still
+ * be going): that's safe. Each use is written at most once (one row per ref, under its own lock in
+ * usage.ts recordUsageFor), so two replays writing the same use pay it once; the other process's
+ * delete of the name it had finds nothing (it never deletes a file under another name); and what it
+ * puts back on the spool goes on the spool itself. What fails again goes back on the spool, and a
+ * claimed file is deleted only once all of it is written or back on the spool, and its last line isn't
+ * torn (a torn last line may be an append under way: left for the next pass until it's tornGraceMs
+ * old, then kept as bad). A parked use stays parked until it's written or spooled, so a stop meanwhile
+ * still logs it. How many uses were written.
  */
 export function replayUsage(): Promise<number> {
   return (replaying ??= replayOnce().finally(() => (replaying = null)));
 }
 
-/** Claim the spool and any replay files left behind: each renamed to this process's own name. The names claimed. */
+/** Claim the spool and every replay file: each renamed to a name of this process's. The names claimed. */
 async function claimSpools(path: string): Promise<string[]> {
   const dir = dirname(path);
   const base = basename(path);
@@ -260,7 +343,7 @@ async function claimSpools(path: string): Promise<string[]> {
       await rename(join(dir, name), mine);
       claimed.push(mine);
     } catch {
-      // Gone meanwhile, or claimed by another process: theirs.
+      // Gone meanwhile (another replay claimed it first).
     }
   }
   return claimed;
@@ -269,30 +352,41 @@ async function claimSpools(path: string): Promise<string[]> {
 async function replayOnce(): Promise<number> {
   const uses = new Map<string, QueuedUse>(parked);
   const path = config.usageSpool();
-  const claimed = path ? await claimSpools(path) : [];
-  const unread: string[] = [];
-  for (const file of claimed) {
-    let text = "";
-    try {
-      text = await readFile(file, "utf8");
-    } catch (e) {
-      console.error(
-        `[usage] ${file} couldn't be read, kept: ${(e as Error).message}`,
-      );
-      unread.push(file);
-      continue;
-    }
-    const { uses: found, bad } = readSpool(text);
-    for (const u of found) if (!uses.has(u.ref)) uses.set(u.ref, u);
-    if (bad.length) {
-      console.error(
-        `[usage] ${bad.length} spool fragment(s) in ${file} couldn't be read, kept in ${path}.bad`,
-      );
-      await appendFile(`${path}.bad`, bad.map((b) => b + "\n").join(""), {
-        mode: 0o600,
-      }).catch(() => {});
-    }
-  }
+  /** Claimed files not to delete: unread, or with a last line that may still be being written. */
+  const keep = new Set<string>();
+  const claimed = !path
+    ? []
+    : await inSpoolTurn(async () => {
+        const files = await claimSpools(path);
+        for (const file of files) {
+          let text = "";
+          let mtime = 0;
+          try {
+            [text, mtime] = await Promise.all([
+              readFile(file, "utf8"),
+              stat(file).then((s) => s.mtimeMs),
+            ]);
+          } catch (e) {
+            console.error(
+              `[usage] ${file} couldn't be read, kept: ${(e as Error).message}`,
+            );
+            keep.add(file);
+            continue;
+          }
+          const { uses: found, bad, torn } = readSpool(text);
+          for (const u of found) if (!uses.has(u.ref)) uses.set(u.ref, u);
+          if (torn && Date.now() - mtime < spoolTiming.tornGraceMs)
+            keep.add(file);
+          else if (torn) bad.push(torn);
+          if (bad.length) {
+            console.error(
+              `[usage] ${bad.length} spool fragment(s) in ${file} couldn't be read: noted in ${path}.bad`,
+            );
+            await keepBad(path, file, bad);
+          }
+        }
+        return files;
+      });
   let wrote = 0;
   const again: QueuedUse[] = [];
   for (const u of uses.values()) {
@@ -309,9 +403,11 @@ async function replayOnce(): Promise<number> {
   }
   const respooled = await spool(again);
   // Every use in them is written or back on the spool (if not, they're replayed again from here).
-  if (respooled)
-    for (const file of claimed)
-      if (!unread.includes(file)) await unlink(file).catch(() => {});
+  if (respooled && path)
+    await inSpoolTurn(async () => {
+      for (const file of claimed)
+        if (!keep.has(file)) await unlink(file).catch(() => {});
+    });
   if (wrote) console.log(`[usage] ${wrote} use(s) from the spool written`);
   return wrote;
 }

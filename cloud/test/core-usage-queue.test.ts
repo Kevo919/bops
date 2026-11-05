@@ -4,8 +4,11 @@ import {
   mkdtemp,
   readdir,
   readFile,
+  rename,
   rm,
   truncate,
+  unlink,
+  utimes,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -24,6 +27,8 @@ import {
   drainUsage,
   keepUsage,
   readSpool,
+  spoolHooks,
+  spoolTiming,
   replayUsage,
   usageQueueState,
   usageQueueTiming,
@@ -267,7 +272,7 @@ test("a spool line a crash cut short costs only itself: the line after it is rep
   await rm(`${spoolPath()}.bad`);
 });
 
-test("a replay claims what another process's replay left behind under its own name, and deletes only that", async () => {
+test("a replay claims every replay file (another process's too) under a name of its own, and deletes only what it claimed", async () => {
   process.env.BOPS_USAGE_SPOOL = spoolPath();
   const left = `use_left_${Date.now()}`;
   const theirs = `${spoolPath()}.replaying.4242.deadbeef`;
@@ -347,6 +352,136 @@ test("an object a delete deletes at its provider waits out a delete holding the 
     await blocker.end();
     await query("DELETE FROM bops.deleted_users WHERE user_id = $1", [bob]);
   }
+});
+
+// Another process's replay, between an append's open and its write: it claims (renames) the spool and
+// reads it before the line is in, and deletes it after. The append sees the file it wrote to moved, and
+// appends again to the spool as it is now.
+test("an append that lands in a spool another process claimed and read meanwhile is appended again, not lost", async () => {
+  process.env.BOPS_USAGE_SPOOL = spoolPath();
+  Object.assign(usageQueueTiming, { tries: 1 });
+  const other = `${spoolPath()}.replaying.9999.0ther0ne`;
+  let readThere = "";
+  let opens = 0;
+  spoolHooks.afterOpen = async () => {
+    if (++opens > 1) return;
+    await rename(spoolPath(), other); // their claim
+    readThere = await readFile(other, "utf8"); // their read: the line isn't in yet
+  };
+  try {
+    await failWrites(true);
+    const ref = keepUsage(alice, "agentphone.sms", 1, { direction: "out" });
+    await until(
+      () => usageQueueState().pending === 0 && opens >= 2,
+      "it to be spooled",
+    );
+    // The write + fsync went to their file, after their read: then they delete it.
+    assert.ok(!readThere.includes(ref), "their read was before the line");
+    assert.ok(
+      (await readFile(other, "utf8")).includes(ref),
+      "the first write landed in their file",
+    );
+    await unlink(other); // their delete
+    assert.ok(
+      (await spooled()).some((u) => u.ref === ref),
+      "appended again to the spool",
+    );
+    await failWrites(false);
+    assert.equal(await replayUsage(), 1);
+    assert.equal((await rowsOf(ref)).length, 1);
+  } finally {
+    spoolHooks.afterOpen = async () => {};
+    await failWrites(false);
+  }
+});
+
+test("in this process, a replay waits for an append under way: it never claims the spool between its open and its write", async () => {
+  process.env.BOPS_USAGE_SPOOL = spoolPath();
+  Object.assign(usageQueueTiming, { tries: 1 });
+  let opens = 0;
+  let replayed: Promise<number> | undefined;
+  spoolHooks.afterOpen = async () => {
+    if (++opens > 1) return;
+    await failWrites(false);
+    replayed = replayUsage(); // a replay starting mid-append
+    await new Promise((r) => setTimeout(r, 200));
+    assert.ok(
+      !(await spoolFiles()).some((n) => n.includes(".replaying.")),
+      "nothing claimed mid-append",
+    );
+  };
+  try {
+    await failWrites(true);
+    const ref = keepUsage(alice, "agentphone.sms", 1, { direction: "out" });
+    await until(
+      () => replayed !== undefined && usageQueueState().pending === 0,
+      "it to be spooled",
+    );
+    // The replay ran once the append was done, and found the line.
+    assert.equal(await replayed, 1);
+    assert.equal(opens, 1, "one open: the file was never moved under it");
+    assert.equal((await rowsOf(ref)).length, 1);
+    assert.deepEqual(await spoolFiles(), []);
+  } finally {
+    spoolHooks.afterOpen = async () => {};
+    await failWrites(false);
+  }
+});
+
+test("a torn last line is left for the next pass while it may be an append under way, then noted as bad without its details", async () => {
+  process.env.BOPS_USAGE_SPOOL = spoolPath();
+  const good = `use_tail_ok_${Date.now()}`;
+  const whole = JSON.stringify(use(`use_tail_half_${Date.now()}`));
+  // Cut after its kind: a fragment with a user's id in it.
+  const half = whole.slice(0, whole.indexOf('"units"'));
+  await writeFile(spoolPath(), `\n${JSON.stringify(use(good))}\n\n${half}`);
+  assert.equal(await replayUsage(), 1);
+  assert.equal((await rowsOf(good)).length, 1);
+  const kept = (await spoolFiles()).filter((n) => n.includes(".replaying."));
+  assert.equal(kept.length, 1, "kept for the next pass, not deleted");
+  assert.ok(
+    !(await spoolFiles()).includes("usage-spool.jsonl.bad"),
+    "not bad yet",
+  );
+  // Still torn a while on: bad (only when, size, ref and kind), and the file goes.
+  const old = new Date(Date.now() - spoolTiming.tornGraceMs - 1_000);
+  await utimes(join(dir, kept[0]), old, old);
+  assert.equal(await replayUsage(), 1, "the good line again, paid once");
+  assert.equal((await rowsOf(good)).length, 1);
+  assert.deepEqual(await spoolFiles(), ["usage-spool.jsonl.bad"]);
+  const noted = (await readFile(`${spoolPath()}.bad`, "utf8"))
+    .trim()
+    .split("\n")
+    .map((l) => JSON.parse(l) as Record<string, unknown>);
+  assert.equal(noted.length, 1);
+  assert.equal(noted[0].kind, "honcho.calls");
+  assert.ok(String(noted[0].ref).startsWith("use_tail_half_"));
+  assert.ok(!JSON.stringify(noted).includes(alice), "no user id, no details");
+  await rm(`${spoolPath()}.bad`);
+});
+
+test("a use seen again after its price changed pays nothing more; one that grew pays only its growth", async () => {
+  const { recordUsageFor } = await import("../usage.ts");
+  const ref = `use_price_${Date.now()}`;
+  await recordUsageFor(alice, "agentphone.sms", ref, 2, { direction: "out" });
+  const [{ cost }] = await rowsOf(ref);
+  assert.ok(cost > 0, "texts cost something");
+  // As if it was paid when texts cost less: seen again, the same count, at today's higher price.
+  await query(
+    "UPDATE bops.cloud_usage SET cost_micros = cost_micros / 2 WHERE user_id = $1 AND detail->>'ref' = $2",
+    [alice, ref],
+  );
+  await recordUsageFor(alice, "agentphone.sms", ref, 2, { direction: "out" });
+  assert.deepEqual(
+    await rowsOf(ref),
+    [{ units: 2, cost: Math.floor(cost / 2) }],
+    "nothing more charged for the price change",
+  );
+  // Grown by one segment: that segment is paid, at today's price.
+  await recordUsageFor(alice, "agentphone.sms", ref, 3, { direction: "out" });
+  assert.deepEqual(await rowsOf(ref), [
+    { units: 3, cost: Math.floor(cost / 2) + cost / 2 },
+  ]);
 });
 
 // Last: a stop is for good (no use is retried after it).

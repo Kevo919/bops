@@ -17,8 +17,8 @@ export const config = {
   databaseUrl: () => env("BOPS_DATABASE_URL"),
   /** The longest any one database statement may run (ms) before Postgres cancels it (db.ts). */
   dbStatementTimeoutMs: () => Number(env("BOPS_DB_STATEMENT_TIMEOUT_MS")) || 30_000,
-  /** The longest a write exempt from the statement timeout waits on a lock (ms; db.ts ownObject). */
-  dbLockWaitMs: () => Number(env("BOPS_DB_LOCK_WAIT_MS")) || 300_000,
+  /** The longest a write exempt from the statement timeout waits on a lock (ms; db.ts ownObject): it holds one of the pool's 10 connections meanwhile. */
+  dbLockWaitMs: () => Number(env("BOPS_DB_LOCK_WAIT_MS")) || 60_000,
   /**
    * The file billable use goes on when it can't be written to the database (usage-queue.ts), replayed
    * at the start: BOPS_USAGE_SPOOL, else usage-spool.jsonl in systemd's StateDirectory (bops-cloud.service).
