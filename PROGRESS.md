@@ -66,7 +66,7 @@ The overnight ETAs for 80% slipped because the PC was locked, so Codex couldn't 
 - Settings needs a real "Your phone" item; the pairing card is buried in This PC, and the phone app needs a Scan button (#77, in progress)
 - Phone pairing with no friction: one screen with QR codes (get the app, Tailscale, pair) and a Scan button in the phone app (building now)
 - PC bot tasks on your Claude Code Max plan, plus a Settings box for an OpenAI key for anyone who prefers it (#80, in security review)
-- Composio: use the accounts you already connected in Composio (waiting on which Composio project they're in)
+- Composio: your Gmail and Drive are in Composio's "For You" area, which Bops' Platform key can't see. Adding a "Composio (your account)" option in Logins so bots can use them (building now). Quick path today: Settings → Logins → Gmail → Connect
 - Codex: every feature tested in the real Bops window on your PC (started now the PC is unlocked)
 - GitHub's automatic checks: you turned them back on; confirmed on the next change
 

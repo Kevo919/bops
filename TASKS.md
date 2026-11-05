@@ -100,7 +100,7 @@ Shared rules for 35–38:
 | 47 | Widgets, tabs and pages added by asking Boppy in chat (widgets most important) | lead's builder | IN PROGRESS (phase 1) | | Kevin, Nov 5 |
 | 48 | Animations: a place in Settings → Look to change them (Off, Subtle, Normal, Lively, plus speed), also by chat | lead's builder | IN PROGRESS (with 47) | | Kevin, Nov 5 |
 | 49 | COMPETITORS.md: Bops vs Meta Muse, ChatGPT Dots, Grok Bot and other leaders, with the gaps to work on | lead (research) | IN PROGRESS | | Kevin, Nov 5 |
-| 50 | Composio: use the accounts already connected in Composio (choose which Composio user), once Kevin says which project they're in | lead | WAITING ON KEVIN | | Kevin, Nov 5 |
+| 50 | Composio: Kevin's apps are in Composio's "For You" area, which the Platform project key can't see. Build a "Composio (your account)" Logins option: paste the For You MCP address, bots use those apps with the usual asks. Quick path today: Settings → Logins → Gmail → Connect | lead's builder | IN PROGRESS (feature/composio-for-you) | | Kevin, Nov 5 |
 | 51 | GitHub checks green again (#79: cron picker test, .gitleaksignore conflict markers, secret scan details) | lead | IN REVIEW (#79) | | |
 | 52 | Gap (COMPETITORS.md #2): built-in Microsoft 365 access (Outlook, Teams, SharePoint, OneDrive) | unassigned | BACKLOG | | M |
 | 53 | Gap #3: edit existing Word/Excel/PowerPoint files in place (keep formulas, pivots, templates) | unassigned | BACKLOG | | M |
