@@ -56,7 +56,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), { status
 globalThis.fetch = async (input, init = {}) => {
   const path = typeof input === "string" ? input : input.url;
   const method = init.method ?? "GET";
-  if (path !== "/api/remote") return json({}, 404);
+  if (path.split("?")[0] !== "/api/remote") return json({}, 404);
   if (method === "GET") return json(remote);
   sent.push(method);
   if (method === "DELETE") {

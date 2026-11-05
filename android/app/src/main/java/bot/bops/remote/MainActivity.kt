@@ -23,6 +23,9 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
@@ -30,7 +33,7 @@ import kotlin.concurrent.thread
 /**
  * Bops on your phone: the Bops page from your own Bops (on your PC over Tailscale, or on a server), in
  * a WebView. The first time, it asks for the address and the pairing code the Bops app showed
- * (Settings, Your phone); the code goes to Bops as its bops_remote cookie on every request
+ * (Settings, then Your phone, then Pair a phone); the code goes to Bops as its bops_remote cookie on every request
  * (proxy.ts), and stays on this phone only (no backups, see the manifest).
  */
 class MainActivity : Activity() {
@@ -48,7 +51,9 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         if (pairFrom(intent)) return
         val server = servers.all().find { it.id == intent.getStringExtra("serverId") } ?: servers.active()
-        if (server?.code != null && safeAddress(server.address) == null) open(server) else showServers()
+        if (server?.code != null && safeAddress(server.address) == null) open(server)
+        // Nothing saved yet: straight to the screen with Scan QR code, not an empty list.
+        else if (servers.all().isEmpty()) showSetup(null) else showServers()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -120,6 +125,7 @@ class MainActivity : Activity() {
                 }
             })
         }
+        root.addView(Button(this).apply { text = "Scan QR code"; setOnClickListener { scan { problem -> showSetup(problem) } } })
         root.addView(Button(this).apply { text = "Add server"; setOnClickListener { showSetup(null) } })
         showContent(android.widget.ScrollView(this).apply { addView(root) })
         PingService.startIfWanted(this)
@@ -132,11 +138,35 @@ class MainActivity : Activity() {
      */
     private fun pairFrom(intent: Intent?): Boolean {
         val data = intent?.data ?: return false
-        if (data.scheme != "bops" || data.host != "pair") return false
-        val a = data.getQueryParameter("a")?.trim()?.trimEnd('/') ?: return false
-        val c = data.getQueryParameter("c")?.trim() ?: return false
-        showSetup(null, a, c)
+        if (!data.scheme.equals("bops", true) || !data.host.equals("pair", true)) return false
+        offer(data.toString())
         return true
+    }
+
+    /**
+     * A pairing link, from the camera app (pairFrom) or Scan QR code: the same check either way
+     * (PairLink.parse), then the confirm screen. Nothing connects until the person presses Connect.
+     */
+    private fun offer(raw: String?) {
+        when (val link = PairLink.parse(raw)) {
+            is PairLink.Ok -> showSetup(null, link.address, link.code)
+            is PairLink.Bad -> showSetup(link.why)
+        }
+    }
+
+    /**
+     * Google's code scanner (Play services): it shows its own camera screen, so this app asks for no
+     * camera permission and never sees the camera. Only the text of one QR code comes back.
+     */
+    private fun scan(problem: (String) -> Unit) {
+        val options = GmsBarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
+        try {
+            GmsBarcodeScanning.getClient(this, options).startScan()
+                .addOnSuccessListener { code -> if (!isDestroyed) offer(code.rawValue) }
+                .addOnFailureListener { if (!isDestroyed) problem("The scanner couldn't start. Google Play may still be getting it ready, so try again in a minute, or scan the QR code with your camera app.") }
+        } catch (_: Exception) {
+            problem("This phone can't run the scanner. Scan the QR code with your camera app, or type the address and code below.")
+        }
     }
 
     /** The address and pairing code, checked against the server before they're kept. */
@@ -150,8 +180,17 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.WHITE)
         }
         fun label(text: String, size: Float = 15f) = TextView(this).apply { this.text = text; textSize = size; setTextColor(Color.BLACK); setPadding(0, pad / 2, 0, pad / 4) }
+        val red = Color.rgb(176, 0, 32)
+        val confirming = offeredCode != null
         root.addView(label("Connect to your Bops", 24f))
-        root.addView(label(if (offeredCode != null) "Connect this phone to the Bops at the address below? Only do this if you just scanned the code from your own Bops." else if (offeredAddress != null) "Pair this saved server again using a new code from its Bops Settings. Confirm the server below before connecting." else "In the Bops app on your computer, open Settings, then Your phone, and press Pair a phone. Scan its QR code with your camera, or enter what it shows."))
+        root.addView(label(if (confirming) "Connect this phone to the Bops at the address below? Only do this if you just scanned the code from your own Bops." else if (offeredAddress != null) "Pair this saved server again using a new code from Bops on your computer: Settings, then Your phone, then Pair a phone. Confirm the server below before connecting." else "In Bops on your computer, go to Settings, then Your phone, then Pair a phone. Then scan the QR code it shows."))
+        // Scan QR code first and biggest; typing it in is the fallback, under it. Once a code was scanned
+        // the question is the server and Yes, connect, so scanning again is the smaller button.
+        val scanButton = Button(this).apply {
+            text = "Scan QR code"
+            if (!confirming) { textSize = 20f; minHeight = (72 * resources.displayMetrics.density).toInt() }
+        }
+        val scanStatus = label(problem ?: "").apply { setTextColor(red); visibility = if (problem == null) android.view.View.GONE else android.view.View.VISIBLE }
         val addr = EditText(this).apply {
             hint = "Address, like http://100.101.102.103:3210"
             inputType = InputType.TYPE_TEXT_VARIATION_URI
@@ -159,18 +198,19 @@ class MainActivity : Activity() {
         }
         val existing = servers.all().find { ServerSafety.normalizeAddress(it.address) == offeredAddress?.let { a -> ServerSafety.normalizeAddress(a) } }
         val name = EditText(this).apply { hint = "Name, like My PC"; setText(existing?.name ?: "") }
-        root.addView(label("Server name")); root.addView(name)
         val pass = EditText(this).apply {
             hint = "Pairing code"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             if (offeredCode != null) setText(offeredCode)
         }
-        val status = label(problem ?: "").apply { setTextColor(Color.rgb(176, 0, 32)) }
-        val go = Button(this).apply { text = "Connect" }
-        val target = label("", 24f)
+        val status = label("").apply { setTextColor(red) }
+        val go = Button(this).apply { text = if (confirming) "Yes, connect" else "Connect" }
+        // Which server the code would go to: only once there's a real address (never "Target server: :80").
+        val target = label("", 20f).apply { setTypeface(typeface, android.graphics.Typeface.BOLD) }
         fun updateTarget() {
-            val uri = Uri.parse(enteredAddress(addr.text.toString()))
-            target.text = "Target server: " + (uri.host?.let { host -> "$host:${if (uri.port != -1) uri.port else if (uri.scheme == "https") 443 else 80}" } ?: "Invalid address")
+            val t = PairLink.targetOf(enteredAddress(addr.text.toString()))
+            target.text = t?.let { "Target server: $it" } ?: ""
+            target.visibility = if (t == null) android.view.View.GONE else android.view.View.VISIBLE
         }
         addr.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -178,16 +218,32 @@ class MainActivity : Activity() {
             override fun afterTextChanged(s: android.text.Editable?) {}
         })
         updateTarget()
-        root.addView(target)
-        root.addView(label("Address")); root.addView(addr)
-        root.addView(label("Pairing code")); root.addView(pass)
-        root.addView(go); root.addView(status)
+        if (confirming) {
+            root.addView(target); root.addView(go); root.addView(status)
+            root.addView(scanButton); root.addView(scanStatus)
+            root.addView(label("Details", 13f).apply { setTextColor(Color.DKGRAY) })
+            root.addView(label("Server name")); root.addView(name)
+            root.addView(label("Address")); root.addView(addr)
+            root.addView(label("Pairing code")); root.addView(pass)
+        } else {
+            root.addView(scanButton); root.addView(scanStatus)
+            root.addView(label("Or type it in", 13f).apply { setTextColor(Color.DKGRAY); setPadding(0, pad, 0, 0) })
+            root.addView(label("Server name")); root.addView(name)
+            root.addView(label("Address")); root.addView(addr)
+            root.addView(target)
+            root.addView(label("Pairing code")); root.addView(pass)
+            root.addView(go); root.addView(status)
+        }
         root.addView(Button(this).apply { text = "Saved servers"; setOnClickListener { showServers() } })
         showContent(android.widget.ScrollView(this).apply { addView(root) })
+        scanButton.setOnClickListener {
+            scan { why -> if (generation == screen) { scanStatus.text = why; scanStatus.visibility = android.view.View.VISIBLE } }
+        }
 
         go.setOnClickListener {
             val a = enteredAddress(addr.text.toString())
             val c = pass.text.toString().trim()
+            status.setTextColor(red)
             safeAddress(a)?.let { status.text = it; return@setOnClickListener }
             if (c.length < 32) { status.text = "That pairing code is too short. Copy the whole code."; return@setOnClickListener }
             go.isEnabled = false
@@ -209,10 +265,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun enteredAddress(value: String): String {
-        val raw = value.trim()
-        return ServerSafety.normalizeAddress(if (raw.startsWith("http://", true) || raw.startsWith("https://", true)) raw else "http://$raw")
-    }
+    private fun enteredAddress(value: String) = PairLink.entered(value)
 
     private fun openExternal(uri: Uri) {
         try { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
@@ -242,7 +295,7 @@ class MainActivity : Activity() {
                 connectTimeout = 8000; readTimeout = 8000
                 setRequestProperty("Cookie", "bops_remote=$code")
             }
-            if (health.responseCode == 401 || health.responseCode == 403) return "Bops didn't take that pairing code. Pair again in the Bops app and use the new code."
+            if (health.responseCode == 401 || health.responseCode == 403) return WRONG_CODE
             if (health.responseCode != 200 || !health.inputStream.bufferedReader().use { it.readText() }.contains("\"bops\"")) return "That address answers, but it isn't Bops."
             state = (URL("$address/api/state").openConnection() as HttpURLConnection).apply {
                 instanceFollowRedirects = false
@@ -251,11 +304,11 @@ class MainActivity : Activity() {
             }
             return when (state.responseCode) {
                 in 200..299 -> null
-                401, 403 -> "Bops didn't take that pairing code. Pair again in the Bops app and use the new code."
+                401, 403 -> WRONG_CODE
                 else -> "Bops answered ${state.responseCode}. Try again in a moment."
             }
         } catch (e: Exception) {
-            return "Can't reach $address. Is Bops open on your computer, and is Tailscale on here and there?"
+            return "Can't reach $address. Is Tailscale on, on both? Turn it on on this phone and on your computer, and check that Bops is open there."
         } finally { health?.disconnect(); state?.disconnect() }
     }
 
@@ -455,5 +508,6 @@ class MainActivity : Activity() {
         private const val FILES = 1
         private const val MIC = 2
         private const val NOTIFY = 3
+        private const val WRONG_CODE = "Bops didn't take that pairing code. It may be old: press Pair again in Bops on your computer and scan the new code."
     }
 }
