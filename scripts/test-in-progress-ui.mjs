@@ -1,8 +1,9 @@
 // Features being built (lib/feature-status.ts), in the real built app: each placeholder shows where it will live,
 // grayed and out of reach, its red label and its percent, in light and in dark, at 1280 px and at a phone's 412 px:
 // - Settings' nav: Widgets, a compact row (a tap says what's left, nothing opens);
-// - Settings, Look: Animations; Logins: Composio (your account);
-// - being tested: Bot tasks on this PC (#80's real card) usable, not grayed, its red "Being tested" label and 85%;
+// - Settings, Look: Animations;
+// - being tested: Bot tasks on this PC (#80's real card) and Composio (your account) (#83's real row, This computer,
+//   Connections) usable, not grayed, the red "Being tested" label, 85%, and what's left under the label;
 // - the child under each is inert (a click lands on the placeholder, never on what's under it), aria-disabled, its
 //   red the light or the dark one as the look's theme says, and at 412 px the page never scrolls sideways.
 // The same harness as scripts/test-mobile-layout.mjs: the production build (`npx next build` first) with `next start`
@@ -282,7 +283,6 @@ try {
       });
       for (const [p, id, percent, name] of [
         ["look", "animations-setting", 10, "look"],
-        ["logins", "composio-for-you", 15, "logins"],
       ])
         await check(`${tag}: Settings, ${p}: the ${id} placeholder, grayed, red label, ${percent}%`, async () => {
           await openSettings(page);
@@ -296,41 +296,54 @@ try {
         });
       await check(`${tag}: nothing threw`, async () => assert.deepEqual(errors, []));
       await ctx.close();
-      // Being tested: #80's real Bot tasks card, usable (not grayed, not disabled), the red label, 85% and what's left.
+      // Being tested: #80's real Bot tasks card and #83's real Composio (your account) row, usable (not grayed, not
+      // disabled), the red label, 85% and what's left, which opens under the label and pushes what follows down.
       const app = await context(phone ? "phone" : "owner", true);
-      await check(`${tag}: Bot tasks on this PC is usable, marked Being tested, 85%, a tap on the label says what's left`, async () => {
-        const pg = app.page;
-        await openSettings(pg);
-        if (phone) await place(pg, phone, "profile");
-        const el = pg.locator('[data-in-progress="pc-tasks-claude-plan"]').filter({ visible: true }).first();
-        await el.waitFor({ state: "visible", timeout: 15000 });
-        await el.scrollIntoViewIfNeeded();
-        assert.equal(await el.getAttribute("data-in-progress-state"), "testing");
-        assert.equal(await el.getAttribute("aria-disabled"), null, "it's marked disabled");
-        assert.equal(await el.getAttribute("aria-label"), "Bot tasks on this PC: being tested, 85% built.");
-        assert.equal(await el.locator("[inert]").count(), 0, "something in it is inert");
-        const look_ = await el.locator('[role="group"][aria-label="Bot tasks on this PC"]').evaluate((n) => {
-          let o = 1;
-          for (let p = n; p; p = p.parentElement) o *= Number(getComputedStyle(p).opacity);
-          const r = n.getBoundingClientRect();
-          const at = document.elementFromPoint(r.left + r.width / 2, r.top + 12);
-          return { o, filter: getComputedStyle(n.parentElement).filter, reach: !!at && n.contains(at) };
+      for (const [p, id, name, left, real, file] of [
+        ["profile", "pc-tasks-claude-plan", "Bot tasks on this PC", "A real task on your PC.", '[role="group"][aria-label="Bot tasks on this PC"]', "being-tested-pc-tasks"],
+        ["mac", "composio-for-you", "Composio (your account)", "Paste your For You address and key, then a live check.", '[data-connection="COMPOSIO_MCP_URL"]', "being-tested-composio"],
+      ])
+        await check(`${tag}: ${name} is usable, marked Being tested, 85%, a tap on the label says what's left below it`, async () => {
+          const pg = app.page;
+          await openSettings(pg);
+          if (phone || p !== "profile") await place(pg, phone, p);
+          const el = pg.locator(`[data-in-progress="${id}"]`).filter({ visible: true }).first();
+          await el.waitFor({ state: "visible", timeout: 15000 });
+          await el.scrollIntoViewIfNeeded();
+          assert.equal(await el.getAttribute("data-in-progress-state"), "testing");
+          assert.equal(await el.getAttribute("aria-disabled"), null, "it's marked disabled");
+          assert.equal(await el.getAttribute("aria-label"), `${name}: being tested, 85% built.`);
+          assert.equal(await el.locator("[inert]").count(), 0, "something in it is inert");
+          const seen = await el.locator(real).first().evaluate((n) => {
+            let o = 1;
+            for (let q = n; q; q = q.parentElement) o *= Number(getComputedStyle(q).opacity);
+            const r = n.getBoundingClientRect();
+            const at = document.elementFromPoint(r.left + r.width / 2, r.top + 12);
+            return { o, filter: getComputedStyle(n.parentElement).filter, reach: !!at && n.contains(at) };
+          });
+          assert.equal(seen.o, 1, "it's grayed");
+          assert.equal(seen.filter, "none");
+          assert.ok(seen.reach, "a click doesn't reach it");
+          assert.equal((await el.locator("[data-in-progress-label]").innerText()).trim(), "Being tested");
+          assert.equal(await el.locator("[data-in-progress-label]").evaluate((n) => getComputedStyle(n).color), RED[theme]);
+          assert.equal((await el.locator("[data-in-progress-percent]").innerText()).trim(), "85%");
+          await noSideways(pg, `${tag} ${id}`);
+          await shot(pg, `${tag}-settings-${file}`);
+          const before = await el.boundingBox();
+          await el.locator("button:has([data-in-progress-label])").click();
+          const tip = el.locator('[role="tooltip"]');
+          await tip.waitFor({ state: "visible", timeout: 3000 });
+          assert.equal(await tip.innerText(), `85% built. What's left: ${left}`);
+          // Under the label, inside the wrapper (which grew), clear of the real card or row above it.
+          const t = await tip.boundingBox();
+          const card = await el.locator(real).first().boundingBox();
+          const label = await el.locator("[data-in-progress-label]").boundingBox();
+          assert.ok(t.y >= label.y + label.height - 0.5 && t.y >= card.y + card.height, "the tooltip overlaps the card");
+          assert.ok((await el.boundingBox()).height > before.height, "the tooltip didn't push what follows down");
+          await tip.scrollIntoViewIfNeeded();
+          await shot(pg, `${tag}-settings-${file}-tip`);
+          assert.deepEqual(app.errors, []);
         });
-        assert.equal(look_.o, 1, "it's grayed");
-        assert.equal(look_.filter, "none");
-        assert.ok(look_.reach, "a click doesn't reach the card");
-        assert.equal((await el.locator("[data-in-progress-label]").innerText()).trim(), "Being tested");
-        assert.equal(await el.locator("[data-in-progress-label]").evaluate((n) => getComputedStyle(n).color), RED[theme]);
-        assert.equal((await el.locator("[data-in-progress-percent]").innerText()).trim(), "85%");
-        await noSideways(pg, `${tag} being tested`);
-        await shot(pg, `${tag}-settings-being-tested`);
-        await el.locator("button:has([data-in-progress-label])").click();
-        const tip = el.locator('[role="tooltip"]');
-        await tip.waitFor({ state: "visible", timeout: 3000 });
-        assert.equal(await tip.innerText(), "85% built. What's left: A real task on your PC.");
-        await shot(pg, `${tag}-settings-being-tested-tip`);
-        assert.deepEqual(app.errors, []);
-      });
       await app.ctx.close();
     }
   }

@@ -39,7 +39,7 @@ export type FeatureInProgress = {
 const LIST: FeatureInProgress[] = [
   { id: "widgets-by-chat", name: "Widgets and pages by chat", percent: 10, left: "Ask a bot in the chat for a widget or a page, and it builds it here", where: "feature/widgets-by-chat" },
   { id: "animations-setting", name: "Animations", percent: 10, left: "Choose how much the window moves: full, calm or off" },
-  { id: "composio-for-you", name: "Composio (your account)", percent: 15, left: "Connect your own Composio account, so your bots use your apps through it", where: "feature/composio-for-you" },
+  { id: "composio-for-you", name: "Composio (your account)", percent: 85, left: "Paste your For You address and key, then a live check", state: "testing", where: "PR #83, merged; live check left" },
   { id: "pc-tasks-claude-plan", name: "Bot tasks on this PC", percent: 85, left: "A real task on your PC", state: "testing", where: "PR #80, merged; live test left" },
   { id: "phone-pairing", name: "Your phone pairing", percent: 75, left: "Finish the review, then pair your phone with a QR code on your PC", where: "feature/easy-phone-pairing (PR #77)" },
 ];

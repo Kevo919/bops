@@ -6,7 +6,8 @@
 // - at 100, or with no entry, the child renders exactly as it would alone;
 // - no dash in any text shown or read, and the red keeps 4.5:1 on its pill in light and in dark;
 // - being tested: the child usable as it is (not disabled, grayed or inert), a red "Being tested" label, the percent;
-// - the placeholders are where they go (Settings' nav, Look, Logins), and #80's real card is marked being tested.
+// - no raw hex color classes in what this adds;
+// - the placeholders are where they go (Settings' nav, Look), and #80's and #83's real rows are marked being tested.
 // Rendered to static markup with React's own server renderer; .tsx files transpile with the TypeScript in node_modules.
 // Usage: node scripts/test-in-progress.mjs
 import assert from "node:assert/strict";
@@ -58,10 +59,10 @@ const good = { id: "sample-feature", name: "A sample", percent: 25, left: "Wire 
 
 check("the list parses, with the features being built now and their percents", () => {
   const byId = Object.fromEntries(F.FEATURES_IN_PROGRESS.map((f) => [f.id, f.percent]));
-  assert.deepEqual(byId, { "widgets-by-chat": 10, "animations-setting": 10, "composio-for-you": 15, "pc-tasks-claude-plan": 85, "phone-pairing": 75 });
+  assert.deepEqual(byId, { "widgets-by-chat": 10, "animations-setting": 10, "composio-for-you": 85, "pc-tasks-claude-plan": 85, "phone-pairing": 75 });
   for (const f of F.FEATURES_IN_PROGRESS) assert.ok(f.name && f.left, f.id);
   assert.deepEqual(F.checkFeatures([good]), [{ ...good, state: "building" }]);
-  assert.equal(F.FEATURES_IN_PROGRESS.find((f) => f.id === "pc-tasks-claude-plan").state, "testing");
+  for (const id of ["pc-tasks-claude-plan", "composio-for-you"]) assert.equal(F.FEATURES_IN_PROGRESS.find((f) => f.id === id).state, "testing", id);
   assert.equal(F.checkFeatures([{ ...good, state: "testing" }])[0].state, "testing");
 });
 
@@ -123,15 +124,17 @@ check("<InProgress>: being tested, the child is usable as it is: not disabled, n
   const describedBy = html.match(/aria-describedby="([^"]+)"/)[1];
   assert.ok(html.includes(`id="${describedBy}" role="tooltip"`));
   assert.ok(html.includes("85% built. What&#x27;s left: A real task on your PC."));
-  // Its tooltip shows from the label only (above it), never over the whole card on hover.
-  assert.match(html, /bottom-\[calc\(100%\+4px\)\]/);
+  // Its tooltip shows from the label only, in the flow under it (pushing what follows down), never over the card.
+  const tipTag = html.match(/<span id="[^"]+" role="tooltip"[^>]*>/)[0];
+  assert.doesNotMatch(tipTag, /absolute|bottom-|top-/);
   assert.match(html, /group-hover\/wiptip:block group-focus-within\/wiptip:block/);
   assert.doesNotMatch(html, /tabindex/);
   const row = renderToStaticMarkup(h(W.InProgressRow, { id: "pc-tasks-claude-plan", name: "Bot tasks" }, child));
   assert.doesNotMatch(row, /aria-disabled|opacity-55/);
-  assert.match(row, /aria-label="Bot tasks on this PC: being tested, 85% built."/);
+  // No aria-label on a span without a role (screen readers skip it): the label and percent are read as shown.
+  assert.doesNotMatch(row, /aria-label|aria-hidden="true" class="flex shrink-0/);
   assert.ok(row.includes(renderToStaticMarkup(child)));
-  assert.match(row, />Being tested<\/span>/);
+  assert.match(row, />Being tested<\/span><\/span><span data-in-progress-percent[^>]*>85%<\/span>/);
 });
 
 check("<InProgress>: past half it reads In progress; a label asked for wins", () => {
@@ -192,15 +195,24 @@ check("the red keeps at least 4.5:1 on its pill, in light and in dark, and the t
   console.log(`     red on its pill ${out.light.toFixed(1)}:1 light, ${out.dark.toFixed(1)}:1 dark; tooltip ${out.tipLight.toFixed(1)}:1 and ${out.tipDark.toFixed(1)}:1`);
 });
 
+check("no raw hex color classes in what this adds (the dark palette check): light-dark() pairs only", () => {
+  const src = readFileSync(new URL("components/app/in-progress.tsx", rootUrl), "utf8");
+  assert.doesNotMatch(src, /(?:bg|text|border|shadow|ring|fill|stroke)-\[[^\]]*#[0-9A-Fa-f]{3,8}/);
+  const at = (file) => readFileSync(new URL(file, rootUrl), "utf8");
+  for (const [file, re] of [["components/app/bops-app.tsx", /<InProgressRow[^\n]*/], ["components/app/look-settings.tsx", /<InProgress id="animations-setting"[^\n]*/]])
+    assert.doesNotMatch(at(file).match(re)[0], /#[0-9A-Fa-f]{3,8}/, file);
+});
+
 check("the placeholders are wired where they go, each tiny and self-contained", () => {
   const at = (file) => readFileSync(new URL(file, rootUrl), "utf8");
   assert.match(at("components/app/bops-app.tsx"), /<InProgressRow id="widgets-by-chat" name="Widgets"/);
   assert.doesNotMatch(at("components/app/bops-app.tsx"), /WipCard|pc-tasks-claude-plan/, "the Bot tasks placeholder is still there");
   assert.match(at("components/app/setup.tsx"), /<InProgress id="pc-tasks-claude-plan">\s*<PcTaskRunnerCard \/>\s*<\/InProgress>/);
   assert.match(at("components/app/look-settings.tsx"), /<InProgress id="animations-setting"/);
-  assert.match(at("components/app/logins.tsx"), /<InProgress id="composio-for-you">/);
+  assert.doesNotMatch(at("components/app/logins.tsx"), /InProgress|composio-for-you/, "the Composio placeholder is still in Logins");
+  assert.match(at("components/app/connections-card.tsx"), /c\.key === "COMPOSIO_MCP_URL" \? \(\s*<InProgress key=\{c\.key\} id="composio-for-you">\s*\{row\}/);
   // Every id the window names is in the list (a typo would show the placeholder as finished).
-  for (const file of ["components/app/bops-app.tsx", "components/app/look-settings.tsx", "components/app/logins.tsx", "components/app/setup.tsx"])
+  for (const file of ["components/app/bops-app.tsx", "components/app/look-settings.tsx", "components/app/connections-card.tsx", "components/app/setup.tsx"])
     for (const [, id] of at(file).matchAll(/<(?:InProgress|InProgressRow|WipCard) id="([^"]+)"/g)) assert.ok(F.featureInProgress(id), `${file}: ${id} isn't in the list`);
 });
 

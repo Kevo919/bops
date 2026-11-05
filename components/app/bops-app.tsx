@@ -2473,7 +2473,7 @@ export function Settings({
         {group("Account", "Yours, in every workspace", account)}
         {group("Workspace", shared ? "Shared with you" : "Shared with its people", workspace, switcher)}
         {/* Being built (lib/feature-status.ts): a placeholder, grayed with its percent, until feature/widgets-by-chat lands. */}
-        {!shared && <InProgressRow id="widgets-by-chat" name="Widgets" icon={glyph(WIDGETS_GLYPH)} className="h-[30px] text-[13px] text-[#3A3A38] max-md:h-11 max-md:text-[15px]" />}
+        {!shared && <InProgressRow id="widgets-by-chat" name="Widgets" icon={glyph(WIDGETS_GLYPH)} className="h-[30px] text-[13px] text-ink max-md:h-11 max-md:text-[15px]" />}
         {team_.length > 0 && group("Orgo team only", null, team_)}
       </nav>
       <main data-settings-pane={pane} className={`${narrow && listing ? "hidden" : "flex"} min-h-0 min-w-0 flex-1 flex-col ${framed ? "" : "overflow-y-auto pb-8"}`}>

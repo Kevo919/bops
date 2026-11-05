@@ -78,7 +78,7 @@ export function LookSettings({ state }: { state: AppState }) {
           <Segmented<LookDensity> title="Spacing" hint="How much room the window's parts keep." value={look.density ?? "normal"} options={[["compact", "Compact"], ["normal", "Normal"], ["roomy", "Roomy"]]} onPick={(density) => send({ density })} />
         </div>
         {/* Being built (lib/feature-status.ts): a placeholder, grayed with its percent, until the setting lands. */}
-        <InProgress id="animations-setting" className="-mx-1.5 border-t border-[#ECECEA] px-1.5 pt-1">
+        <InProgress id="animations-setting" className="-mx-1.5 border-t border-rule px-1.5 pt-1">
           <div className="flex w-full items-center gap-3 py-2.5 pr-12">
             {line("Animations", "How much the window moves: full, calm or off.")}
           </div>

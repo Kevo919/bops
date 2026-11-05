@@ -67,7 +67,7 @@ function Tip({ id, text, open, inside = false, testing = false }: { id: string; 
       id={id}
       role="tooltip"
       style={COLORS}
-      className={`${open ? "block" : "hidden"} pointer-events-none absolute ${testing ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"} z-40 ${inside ? "inset-x-1" : "left-2 w-max max-w-[min(300px,calc(100vw-48px))]"} rounded-lg bg-[var(--wip-tip-bg)] px-2.5 py-1.5 text-left text-[12px] font-normal normal-case leading-4 tracking-normal text-[var(--wip-tip-fg)] shadow-[0_8px_24px_-10px_#00000066] ${testing ? "group-hover/wiptip:block group-focus-within/wiptip:block" : "group-hover/wip:block group-focus-visible/wip:block"}`}
+      className={`${open ? "block" : "hidden"} pointer-events-none ${testing ? "mx-1 mb-1 w-fit max-w-full" : `absolute top-[calc(100%+4px)] z-40 ${inside ? "inset-x-1" : "left-2 w-max max-w-[min(300px,calc(100vw-48px))]"}`} rounded-lg bg-[var(--wip-tip-bg)] px-2.5 py-1.5 text-left text-[12px] font-normal normal-case leading-4 tracking-normal text-[var(--wip-tip-fg)] shadow-[0_8px_24px_-10px_rgb(0_0_0/0.4)] ${testing ? "group-hover/wiptip:block group-focus-within/wiptip:block" : "group-hover/wip:block group-focus-visible/wip:block"}`}
     >
       {text}
     </span>
@@ -113,15 +113,18 @@ export function InProgress({ id, children, label, className = "" }: { id: string
   const w = inProgressWords(f, label);
   if (f.state === "testing")
     // Usable as it is: not grayed, not disabled. The label is a small button of its own, so a tap on it (never on
-    // the child) says what's left; hovering the feature or focusing into it shows it too.
+    // the child) says what's left; hovering or focusing the label shows it too.
     return (
       <div data-in-progress={f.id} data-in-progress-state="testing" role="group" aria-label={w.aria} aria-describedby={tipId} style={COLORS} className={`relative ${className}`}>
         {children}
-        <div className="group/wiptip relative flex items-center gap-1.5 px-1 pb-1 pt-1">
-          <button type="button" aria-describedby={tipId} aria-expanded={tip.open} {...tip.props} className="cursor-help rounded-full outline-none focus-visible:shadow-[0_0_0_2px_var(--wip-red)]">
-            <Label text={w.label} />
-          </button>
-          <Percent text={w.percent} />
+        {/* The tooltip sits in the flow under the label (it pushes what follows down), never over the card. */}
+        <div className="group/wiptip">
+          <div className="flex items-center gap-1.5 px-1 pb-1 pt-1">
+            <button type="button" aria-describedby={tipId} aria-expanded={tip.open} {...tip.props} className="cursor-help rounded-full outline-none focus-visible:shadow-[0_0_0_2px_var(--wip-red)]">
+              <Label text={w.label} />
+            </button>
+            <Percent text={w.percent} />
+          </div>
           <Tip id={tipId} text={w.tip} open={tip.open} testing />
         </div>
       </div>
@@ -178,9 +181,10 @@ export function InProgressRow({
   // Being tested: the real item, usable, with the red label and percent after it (what's left in its title).
   if (f.state === "testing")
     return (
-      <span data-in-progress={f.id} data-in-progress-state="testing" title={w.tip} aria-label={w.aria} className="flex items-center gap-1" style={COLORS}>
+      <span data-in-progress={f.id} data-in-progress-state="testing" title={w.tip} className="flex items-center gap-1" style={COLORS}>
         <span className="min-w-0 flex-1">{children ?? name ?? f.name}</span>
-        <span aria-hidden className="flex shrink-0 items-center gap-1 pr-2.5">
+        {/* Read as it's shown: "Being tested 85%". */}
+        <span className="flex shrink-0 items-center gap-1 pr-2.5">
           <Label text={w.label} compact />
           <Percent text={w.percent} compact />
         </span>
