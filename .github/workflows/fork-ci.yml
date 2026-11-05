@@ -38,6 +38,9 @@ jobs:
         run: npx tsc --noEmit -p .
       - name: Lint
         run: npm run lint
+      - name: Look palette (no light-only colors in the window's classes)
+        # A raw hex, bg-ink or text-white in components/app can't turn dark: scripts/look-codemod.mjs converts them.
+        run: node scripts/look-palette.mjs --check
       - name: Bot AI tests
         run: node scripts/test-bot-ai.mjs
       - name: Subscription UI tests

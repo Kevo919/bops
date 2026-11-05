@@ -22,7 +22,7 @@ export const HANDY_STEPS: { title: string; words: string }[] = [
 ];
 
 const pill = "shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 disabled:opacity-50";
-const dark = `${pill} bg-ink text-white`;
+const dark = `${pill} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]`;
 
 const ICON = (
   <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
@@ -33,19 +33,19 @@ const ICON = (
 
 export function HandyCard() {
   return (
-    <div data-handy-card className="flex flex-col rounded-[14px] bg-white p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+    <div data-handy-card className="flex flex-col rounded-[14px] bg-white p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
       <div className="flex items-center gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-[#F2F2F0] text-ink">{ICON}</span>
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-[color:var(--hb-f2f2f0)] text-ink">{ICON}</span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex items-center gap-1.5">
             <span className="text-[13.5px] font-semibold leading-[18px]">Voice typing</span>
-            <span className="rounded-full bg-[#F2F2F0] px-2 py-px text-[11px] font-medium leading-4 text-[#3A3A38]">Optional</span>
+            <span className="rounded-full bg-[color:var(--hb-f2f2f0)] px-2 py-px text-[11px] font-medium leading-4 text-[color:var(--ht-3a3a38)]">Optional</span>
           </span>
           <span className="text-[12px] leading-4 text-pencil">
             Talk instead of typing, in Bops and every other program, with Handy: a free, open source (MIT) dictation app that works offline. Hold a key, speak, let go.
           </span>
-          <span className="flex items-center gap-1.5 pt-0.5 text-[12px] leading-4 text-[#3A3A38]">
-            <span className="size-[7px] shrink-0 rounded-full bg-[#C9C9C6]" />
+          <span className="flex items-center gap-1.5 pt-0.5 text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">
+            <span className="size-[7px] shrink-0 rounded-full bg-[color:var(--hb-c9c9c6)]" />
             A separate app you install yourself. Bops downloads nothing.
           </span>
         </div>
@@ -56,7 +56,7 @@ export function HandyCard() {
         </div>
       </div>
       <div className="pl-12 pt-3">
-        <ol className="flex list-decimal flex-col gap-1.5 pl-4 text-[12px] leading-4 text-[#3A3A38]">
+        <ol className="flex list-decimal flex-col gap-1.5 pl-4 text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">
           {HANDY_STEPS.map((s) => (
             <li key={s.title}>
               <span className="font-medium">{s.title}.</span> {s.words}

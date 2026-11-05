@@ -42,9 +42,9 @@ import { post, useSelfHosted } from "./ui";
 
 const glassRow = "flex w-full items-center gap-3";
 const pill = "rounded-full px-2.5 py-1 text-[12px] leading-4";
-const btnDark = "rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white hover:bg-[#2A2A28] disabled:opacity-50";
-const btnLight = "rounded-full bg-[#F2F2F0] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-ink hover:bg-[#EAEAE7] disabled:opacity-50";
-const quiet = "text-[12px] leading-4 text-[#6B6B6B]";
+const btnDark = "rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)] hover:bg-[color:var(--hb-2a2a28)] disabled:opacity-50";
+const btnLight = "rounded-full bg-[color:var(--hb-f2f2f0)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-ink hover:bg-[color:var(--hb-eaeae7)] disabled:opacity-50";
+const quiet = "text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]";
 
 /** A change to the bot's AI (POST /api/bots/ai): why not, or the agent it added. */
 async function change(botId: string, body: Record<string, unknown>): Promise<{ error: string | null; added?: string }> {
@@ -124,17 +124,17 @@ export function AgentTile({ agent: x, bot: b, state, isDefault, on, keys, onClic
       aria-expanded={onClick ? !!on : undefined}
       aria-disabled={soon || undefined}
       title={soon ? `Soon: ${st.soon}` : `${agentLabel(x, at)} · ${paysLabel(x, state, workBot(b, state.bots).computerId)}`}
-      className={`flex min-w-[148px] max-w-full items-center gap-2.5 rounded-[14px] bg-white px-3 py-2 text-left ${on ? "shadow-[0_0_0_1.5px_#0A0A0A]" : "shadow-[0_0_0_1px_#E6E6E3] hover:shadow-[0_0_0_1px_#C9C9C6]"} ${soon ? "opacity-55" : ""}`}
+      className={`flex min-w-[148px] max-w-full items-center gap-2.5 rounded-[14px] bg-white px-3 py-2 text-left ${on ? "shadow-[0_0_0_1.5px_var(--h-0a0a0a)]" : "shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:shadow-[0_0_0_1px_var(--h-c9c9c6)]"} ${soon ? "opacity-55" : ""}`}
     >
       <AgentMark kind={x.kind} size={18} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex items-center gap-1.5 text-[13px] font-medium leading-4 text-ink">
           <span className="truncate">{agentName(x, at)}</span>
-          {soon && <span className="shrink-0 rounded-full bg-[#F2F2F0] px-1.5 text-[10.5px] font-normal leading-[14px] text-[#6B6B6B]">Soon</span>}
+          {soon && <span className="shrink-0 rounded-full bg-[color:var(--hb-f2f2f0)] px-1.5 text-[10.5px] font-normal leading-[14px] text-[color:var(--ht-6b6b6b)]">Soon</span>}
           {isDefault && <DefaultPill />}
         </span>
-        <span className={`truncate text-[11.5px] leading-[15px] ${!st.ready && !soon && st.button ? "text-[#B54708]" : "text-[#6B6B6B]"}`}>{st.line}</span>
-        {(x.pays === "plan" || x.model?.startsWith("zai-coding/")) && <span className="text-[11.5px] leading-[15px] text-[#6B6B6B]">· {paysLabel(x, state, workBot(b, state.bots).computerId)}</span>}
+        <span className={`truncate text-[11.5px] leading-[15px] ${!st.ready && !soon && st.button ? "text-[color:var(--ht-b54708)]" : "text-[color:var(--ht-6b6b6b)]"}`}>{st.line}</span>
+        {(x.pays === "plan" || x.model?.startsWith("zai-coding/")) && <span className="text-[11.5px] leading-[15px] text-[color:var(--ht-6b6b6b)]">· {paysLabel(x, state, workBot(b, state.bots).computerId)}</span>}
       </span>
     </button>
   );
@@ -149,7 +149,7 @@ function ModelRow({ agent: x, disabled, onPick }: { agent: BotAgent; disabled?: 
   const [otherOpen, setOtherOpen] = useState(other);
   return (
     <div className="flex flex-col gap-1.5">
-      <label className={`${glassRow} rounded-[12px] bg-white px-3 py-2 shadow-[0_0_0_1px_#E6E6E3]`}>
+      <label className={`${glassRow} rounded-[12px] bg-white px-3 py-2 shadow-[0_0_0_1px_var(--h-e6e6e3)]`}>
         <span className="flex-1 text-[13px] leading-4">Model</span>
         <select
           disabled={disabled}
@@ -169,7 +169,7 @@ function ModelRow({ agent: x, disabled, onPick }: { agent: BotAgent; disabled?: 
           ))}
           {anyModel(x.kind) && <option value="__other">Other model</option>}
         </select>
-        <span aria-hidden className="text-[10px] text-[#9A9A98]">
+        <span aria-hidden className="text-[10px] text-[color:var(--ht-9a9a98)]">
           ▾
         </span>
       </label>
@@ -186,7 +186,7 @@ function ModelRow({ agent: x, disabled, onPick }: { agent: BotAgent; disabled?: 
             onChange={(e) => setTyping(e.target.value)}
             aria-label="Other model"
             placeholder="provider/model, like deepinfra/qwen3 or zai-coding/glm-5.3"
-            className="min-w-0 flex-1 rounded-[10px] bg-white px-3 py-1.5 text-[12.5px] leading-4 shadow-[0_0_0_1px_#E6E6E3] outline-none"
+            className="min-w-0 flex-1 rounded-[10px] bg-white px-3 py-1.5 text-[12.5px] leading-4 shadow-[0_0_0_1px_var(--h-e6e6e3)] outline-none"
           />
           <button type="submit" disabled={!OPENCODE_OTHER.test(typing.trim())} className={btnLight}>
             Use it
@@ -220,7 +220,7 @@ function JobsRow({ agent: x, others, disabled, onPick }: { agent: BotAgent; othe
               disabled={disabled}
               title={`${JOB_HELP[j]}${elsewhere ? ". Another agent has it now: picking it moves it here." : ""}`}
               onClick={() => onPick(on ? [...mine].filter((k) => k !== j) : [...mine, j])}
-              className={`${pill} ${on ? "bg-ink text-white" : "bg-black/[0.05] text-[#6B6B6B] hover:text-ink"} ${elsewhere ? "opacity-60" : ""} disabled:opacity-50`}
+              className={`${pill} ${on ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "bg-[color:var(--bops-tint)]/[0.05] text-[color:var(--ht-6b6b6b)] hover:text-ink"} ${elsewhere ? "opacity-60" : ""} disabled:opacity-50`}
             >
               {JOB_NAMES[j]}
             </button>
@@ -276,14 +276,14 @@ function AgentEditor({
   const going = acct?.signingIn && !acct.signingIn.failed ? acct.signingIn : undefined;
   const soons = PAYS_SHOWN[x.kind].map((p) => PAYS_SOON[x.kind]?.[p]).filter(Boolean);
   return (
-    <div className="flex flex-col gap-2 rounded-[16px] bg-[#FAFAF9] p-3 shadow-[0_0_0_1px_#EFEFEC]">
+    <div className="flex flex-col gap-2 rounded-[16px] bg-[color:var(--hb-fafaf9)] p-3 shadow-[0_0_0_1px_var(--h-efefec)]">
       <ModelRow key={`${x.id}:${x.pays}`} agent={x} disabled={ro || busy} onPick={(model) => void go({ op: "update", agentId: x.id, model })} />
       {BRAINS_ON && aiOf(b, state).agents.length > 1 && (
         <JobsRow agent={x} others={aiOf(b, state).agents.filter((y) => y.id !== x.id)} disabled={ro || busy} onPick={(jobs) => void go({ op: "update", agentId: x.id, jobs })} />
       )}
       <div className={`${glassRow} flex-wrap gap-y-1.5`}>
         <span className="min-w-[72px] flex-1 text-[13px] leading-4">Pays with</span>
-        <div role="group" aria-label="Pays with" className="flex shrink-0 gap-0.5 rounded-full bg-black/[0.05] p-[3px]">
+        <div role="group" aria-label="Pays with" className="flex shrink-0 gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[3px]">
           {PAYS_SHOWN[x.kind].map((p: AgentPays) => {
             const soon = PAYS_SOON[x.kind]?.[p];
             const name = p === "plan" ? (x.kind === "codex" ? "ChatGPT plan" : x.pays === "plan" && acct?.signIns?.[0]?.account?.plan ? `${upper(acct.signIns[0].account.plan)} plan` : "Claude plan") : p === "key" ? "Your key" : PAYS_NAMES[p];
@@ -297,7 +297,7 @@ function AgentEditor({
                 aria-disabled={off || undefined}
                 title={ownerPlanOnly ? "ChatGPT plans are available only to the self-hosted owner." : soon ? `Soon: ${soon}` : undefined}
                 onClick={() => !off && p !== x.pays && guard({ op: "update", agentId: x.id, pays: p })}
-                className={`${pill} ${off ? "cursor-default" : ""} ${x.pays === p ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F]" : soon ? "text-[#B5B5B3]" : "text-[#6B6B6B] hover:text-ink"}`}
+                className={`${pill} ${off ? "cursor-default" : ""} ${x.pays === p ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : soon ? "text-[color:var(--ht-b5b5b3)]" : "text-[color:var(--ht-6b6b6b)] hover:text-ink"}`}
               >
                 {name}
               </button>
@@ -335,7 +335,7 @@ function AgentEditor({
               type="button"
               disabled={busy}
               onClick={() => setAsk({ body: { op: "update", agentId: x.id, newAccount: true }, words: `${stops}${agentName(x, at)} moves to a new account, which signs in on its own. For another account beside this one, use + Add. Go ahead?` })}
-              className="text-[12px] leading-4 text-[#6B6B6B] underline decoration-[#C9C9C6] underline-offset-2 hover:text-ink"
+              className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)] underline decoration-[color:var(--h-c9c9c6)] underline-offset-2 hover:text-ink"
             >
               Move to another account
             </button>
@@ -344,7 +344,7 @@ function AgentEditor({
       )}
       {anyModel(x.kind) && <span className={quiet}>{AGENTS[x.kind].name} picks how hard to think by itself.</span>}
       <div className="flex items-center gap-2">
-        <span className={`min-w-0 flex-1 text-[12px] leading-4 ${st.ready ? "text-[#3A3A38]" : "text-[#B54708]"}`}>{st.line}</span>
+        <span className={`min-w-0 flex-1 text-[12px] leading-4 ${st.ready ? "text-[color:var(--ht-3a3a38)]" : "text-[color:var(--ht-b54708)]"}`}>{st.line}</span>
         {!ro && st.button === "show" && going && onShowScreen && (
           <button type="button" onClick={() => onShowScreen(going.botId, going.display)} className={btnLight}>
             Show
@@ -371,8 +371,8 @@ function AgentEditor({
         )}
       </div>
       {ask && (
-        <div role="alertdialog" aria-label={ask.words} className="flex flex-col gap-2 rounded-[12px] bg-[#FFF8EB] px-3 py-2.5">
-          <span className="text-[12px] leading-4 text-[#7A4B00]">{ask.words}</span>
+        <div role="alertdialog" aria-label={ask.words} className="flex flex-col gap-2 rounded-[12px] bg-[color:var(--hb-fff8eb)] px-3 py-2.5">
+          <span className="text-[12px] leading-4 text-[color:var(--ht-7a4b00)]">{ask.words}</span>
           <div className="flex gap-2">
             <button type="button" disabled={busy} onClick={() => void go(ask.body)} className={btnDark}>
               Go ahead
@@ -392,14 +392,14 @@ function AgentEditor({
           )}
           <span className="flex-1" />
           {x.kind !== "bops" && (
-            <button type="button" disabled={busy} onClick={() => guard({ op: "remove", agentId: x.id })} className="rounded-full px-3 py-1.5 text-[12.5px] leading-4 text-[#B42318] hover:bg-[#FEF3F2] disabled:opacity-50">
+            <button type="button" disabled={busy} onClick={() => guard({ op: "remove", agentId: x.id })} className="rounded-full px-3 py-1.5 text-[12.5px] leading-4 text-[color:var(--ht-b42318)] hover:bg-[color:var(--hb-fef3f2)] disabled:opacity-50">
               Remove
             </button>
           )}
         </div>
       )}
       {error && (
-        <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}
@@ -434,12 +434,12 @@ function AddMenu({ bot: b, agents, onAdded }: { bot: Bot; agents: BotAgent[]; on
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_#E6E6E3] hover:shadow-[0_0_0_1px_#C9C9C6]"
+        className="rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:shadow-[0_0_0_1px_var(--h-c9c9c6)]"
       >
         + Add
       </button>
       {open && (
-        <div role="menu" aria-label="Add an agent" className="absolute left-0 top-[calc(100%+6px)] z-10 flex min-w-[220px] flex-col rounded-[14px] bg-white p-1 shadow-[0_0_0_1px_#0000000F,0_12px_32px_-12px_#00000040]">
+        <div role="menu" aria-label="Add an agent" className="absolute left-0 top-[calc(100%+6px)] z-10 flex min-w-[220px] flex-col rounded-[14px] bg-white p-1 shadow-[0_0_0_1px_var(--h-0000000f),0_12px_32px_-12px_var(--h-00000040)]">
           {items.map((it) => (
             <button
               key={it.label}
@@ -449,7 +449,7 @@ function AddMenu({ bot: b, agents, onAdded }: { bot: Bot; agents: BotAgent[]; on
                 setOpen(false);
                 onAdded(await change(b.id, { op: "add", ...it.body }));
               }}
-              className="flex items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[13px] leading-4 hover:bg-[#F6F6F4]"
+              className="flex items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[13px] leading-4 hover:bg-[color:var(--hb-f6f6f4)]"
             >
               <AgentMark kind={it.body.kind as AgentKind} size={14} />
               {it.label}
@@ -464,7 +464,7 @@ function AddMenu({ bot: b, agents, onAdded }: { bot: Bot; agents: BotAgent[]; on
 /** The bot's threads now, each a chip with its agent's mark and state; up to six, then how many more (its chat, where they all are). */
 export function ThreadsNow({ state, bot: b, onOpenThread, onMore }: { state: AppState; bot: Bot; onOpenThread?: (s: Session) => void; onMore?: () => void }) {
   const all = threadsNow(state, b);
-  if (!all.length) return <span className="text-[12.5px] leading-4 text-[#9A9A98]">Nothing going right now.</span>;
+  if (!all.length) return <span className="text-[12.5px] leading-4 text-[color:var(--ht-9a9a98)]">Nothing going right now.</span>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {all.slice(0, 6).map((s) => {
@@ -477,22 +477,22 @@ export function ThreadsNow({ state, bot: b, onOpenThread, onMore }: { state: App
             type="button"
             onClick={() => onOpenThread?.(s)}
             title={[who.label, who.pays].filter(Boolean).join(" · ")}
-            className="flex max-w-full items-center gap-2 rounded-full bg-white py-1.5 pl-2 pr-3 text-[12.5px] leading-4 shadow-[0_0_0_1px_#E6E6E3] hover:shadow-[0_0_0_1px_#C9C9C6]"
+            className="flex max-w-full items-center gap-2 rounded-full bg-white py-1.5 pl-2 pr-3 text-[12.5px] leading-4 shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:shadow-[0_0_0_1px_var(--h-c9c9c6)]"
           >
             <AgentMark kind={threadKind(s)} size={15} state={ms} />
             <span className="sr-only">{who.label}: </span>
             <span className="truncate">{s.title}</span>
-            {words && <span className="shrink-0 text-[#6B6B6B]">· {words}</span>}
+            {words && <span className="shrink-0 text-[color:var(--ht-6b6b6b)]">· {words}</span>}
           </button>
         );
       })}
       {all.length > 6 &&
         (onMore ? (
-          <button type="button" onClick={onMore} className="self-center px-1 text-[12.5px] leading-4 text-[#6B6B6B] underline decoration-[#C9C9C6] underline-offset-2 hover:text-ink">
+          <button type="button" onClick={onMore} className="self-center px-1 text-[12.5px] leading-4 text-[color:var(--ht-6b6b6b)] underline decoration-[color:var(--h-c9c9c6)] underline-offset-2 hover:text-ink">
             and {all.length - 6} more
           </button>
         ) : (
-          <span className="self-center px-1 text-[12.5px] leading-4 text-[#6B6B6B]">and {all.length - 6} more</span>
+          <span className="self-center px-1 text-[12.5px] leading-4 text-[color:var(--ht-6b6b6b)]">and {all.length - 6} more</span>
         ))}
     </div>
   );
@@ -525,8 +525,8 @@ function SharedWarning({ bot: b, words, ro }: { bot: Bot; words: string; ro: boo
   };
   const canMove = !ro && !b.isMain;
   return (
-    <div className="flex flex-col gap-2 rounded-[10px] bg-[#FFF8EB] px-3 py-2">
-      <span className="text-[12px] leading-4 text-[#7A4B00]">{words}</span>
+    <div className="flex flex-col gap-2 rounded-[10px] bg-[color:var(--hb-fff8eb)] px-3 py-2">
+      <span className="text-[12px] leading-4 text-[color:var(--ht-7a4b00)]">{words}</span>
       {canMove && !asking && (
         <button type="button" onClick={() => setAsking(true)} className={`${btnDark} self-start`}>
           Own computer
@@ -534,7 +534,7 @@ function SharedWarning({ bot: b, words, ro }: { bot: Bot; words: string; ro: boo
       )}
       {canMove && asking && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[12px] leading-4 text-[#7A4B00]">{b.name} gets a computer of its own, set up on its next task. Go ahead?</span>
+          <span className="text-[12px] leading-4 text-[color:var(--ht-7a4b00)]">{b.name} gets a computer of its own, set up on its next task. Go ahead?</span>
           <button type="button" disabled={busy} onClick={() => void own()} className={btnDark}>
             Go ahead
           </button>
@@ -544,7 +544,7 @@ function SharedWarning({ bot: b, words, ro }: { bot: Bot; words: string; ro: boo
         </div>
       )}
       {error && (
-        <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}
@@ -605,12 +605,12 @@ export function BotAiSection({
     <div className={`flex w-full flex-col ${bare ? "" : "rounded-2xl"} ${className}`} data-ai-section>
       {!bare && (
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex items-center gap-2.5 px-4 py-3 text-left">
-        <span aria-hidden className={`flex size-5 items-center justify-center rounded-full bg-white text-[9px] text-[#6B6B6B] shadow-[0_0_0_1px_#E6E6E3] transition-transform ${open ? "" : "-rotate-90"}`}>
+        <span aria-hidden className={`flex size-5 items-center justify-center rounded-full bg-white text-[9px] text-[color:var(--ht-6b6b6b)] shadow-[0_0_0_1px_var(--h-e6e6e3)] transition-transform ${open ? "" : "-rotate-90"}`}>
           ▾
         </span>
         <span className="text-[14px] font-semibold leading-5">AI</span>
         {/* The Default by its kind (its tile says which), then its threads worst first: on a narrow row the name gives way first. */}
-        <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5 text-[12px] leading-4 text-[#6B6B6B]">
+        <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
           <span className="shrink-0">Default</span>
           <AgentMark kind={def.kind} size={14} />
           <span className="min-w-0 shrink-[10] truncate">{AGENTS[def.kind].name}</span>
@@ -619,8 +619,8 @@ export function BotAiSection({
       </button>
       )}
       <Fold open={open}>
-        <div className={bare ? "flex flex-col gap-3" : "flex flex-col gap-3 border-t border-black/[0.05] px-4 pb-4 pt-3"}>
-          <span className="text-[11px] font-medium uppercase leading-4 tracking-[0.04em] text-[#8A8A88]">Agents it can run</span>
+        <div className={bare ? "flex flex-col gap-3" : "flex flex-col gap-3 border-t border-[color:var(--bops-tint)]/[0.05] px-4 pb-4 pt-3"}>
+          <span className="text-[11px] font-medium uppercase leading-4 tracking-[0.04em] text-[color:var(--ht-8a8a88)]">Agents it can run</span>
           <div className="flex flex-wrap gap-2">
             {ai.agents.map((x) => (
               <AgentTile key={x.id} agent={x} bot={b} state={state} keys={keys} isDefault={x.id === ai.default} on={x.id === editing} onClick={() => setEditing((e) => (e === x.id ? null : x.id))} />
@@ -646,7 +646,7 @@ export function BotAiSection({
               <span className="text-[13px] font-semibold leading-4">Thinking</span>
               <span className={quiet}>{THINKING[b.effort ?? "auto"]}</span>
             </div>
-            <div role="group" aria-label="Thinking" className="flex shrink-0 gap-0.5 rounded-full bg-black/[0.05] p-[3px]">
+            <div role="group" aria-label="Thinking" className="flex shrink-0 gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[3px]">
               {(["auto", "low", "medium", "high"] as const).map((e) => (
                 <button
                   key={e}
@@ -654,18 +654,18 @@ export function BotAiSection({
                   disabled={ro}
                   aria-pressed={(b.effort ?? "auto") === e}
                   onClick={() => void post("/api/bots", { botId: b.id, effort: e }, "PATCH")}
-                  className={`${pill} capitalize ${(b.effort ?? "auto") === e ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F]" : "text-[#6B6B6B] hover:text-ink"}`}
+                  className={`${pill} capitalize ${(b.effort ?? "auto") === e ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "text-[color:var(--ht-6b6b6b)] hover:text-ink"}`}
                 >
                   {e}
                 </button>
               ))}
             </div>
           </div>
-          <span className="text-[11px] font-medium uppercase leading-4 tracking-[0.04em] text-[#8A8A88]">Threads now</span>
+          <span className="text-[11px] font-medium uppercase leading-4 tracking-[0.04em] text-[color:var(--ht-8a8a88)]">Threads now</span>
           <ThreadsNow state={state} bot={b} onOpenThread={onOpenThread} onMore={onOpenChat} />
           <div className="flex items-center gap-2">
             {BRAINS_ON && !ro && (
-              <button type="button" onClick={() => setNewThread(true)} className="rounded-full border border-dashed border-[#C9C9C6] bg-white/70 px-3 py-1.5 text-[12.5px] font-medium leading-4 hover:border-[#9A9A98]">
+              <button type="button" onClick={() => setNewThread(true)} className="rounded-full border border-dashed border-[color:var(--h-c9c9c6)] bg-white/70 px-3 py-1.5 text-[12.5px] font-medium leading-4 hover:border-[color:var(--h-9a9a98)]">
                 + New thread
               </button>
             )}
@@ -686,13 +686,13 @@ export function BotAiSection({
                   }
                   setTermBusy(false);
                 }}
-                className="text-[12.5px] leading-4 text-[#3A3A38] underline decoration-[#C9C9C6] underline-offset-2 hover:text-ink disabled:opacity-50"
+                className="text-[12.5px] leading-4 text-[color:var(--ht-3a3a38)] underline decoration-[color:var(--h-c9c9c6)] underline-offset-2 hover:text-ink disabled:opacity-50"
               >
                 Open its terminal
               </button>
             )}
           </div>
-          <div className={`${glassRow} rounded-[12px] bg-white px-3 py-2 shadow-[0_0_0_1px_#E6E6E3]`} title="Calls and texts by voice use OpenAI live voice for now.">
+          <div className={`${glassRow} rounded-[12px] bg-white px-3 py-2 shadow-[0_0_0_1px_var(--h-e6e6e3)]`} title="Calls and texts by voice use OpenAI live voice for now.">
             <span className="flex-1 text-[13px] leading-4">Calls</span>
             {BRAINS_ON ? <OpenAiMark size={14} /> : null}
             <span className="text-[13px] font-medium leading-4">OpenAI live voice</span>
@@ -708,7 +708,7 @@ export function BotAiSection({
             </span>
           )}
           {error && (
-            <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
+            <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
               {error}
             </span>
           )}

@@ -251,7 +251,7 @@ export function BotBrowser({ bot, project = "", hidden = false, inset = false }:
     void openHere(link);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once each link, when the browser is ready for it
   }, [link, known, away, frame, linkWaits, asking]);
-  const button = "flex size-7 items-center justify-center rounded-lg text-[#3A3A38] hover:bg-[#F2F2F0] disabled:opacity-30 disabled:hover:bg-transparent";
+  const button = "flex size-7 items-center justify-center rounded-lg text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)] disabled:opacity-30 disabled:hover:bg-transparent";
   const tryAgain = () => {
     setCut(false);
     setRefused(null);
@@ -261,7 +261,7 @@ export function BotBrowser({ bot, project = "", hidden = false, inset = false }:
   if (refused && refused.code !== "unreachable")
     return (
       <div className={`min-h-0 flex-1 flex-col ${inset ? "" : "px-5 pt-4"} ${hidden ? "hidden" : "flex"}`}>
-        <p className="px-1 py-2 text-[14px] leading-5 text-[#6B6B6B]" data-browser-refused={refused.code ?? ""}>
+        <p className="px-1 py-2 text-[14px] leading-5 text-[color:var(--ht-6b6b6b)]" data-browser-refused={refused.code ?? ""}>
           {refused.why}
         </p>
       </div>
@@ -269,7 +269,7 @@ export function BotBrowser({ bot, project = "", hidden = false, inset = false }:
 
   return (
     <div className={`min-h-0 flex-1 flex-col ${inset ? "-mx-5 -mb-4 -mt-4" : ""} ${hidden ? "hidden" : "flex"}`} aria-label={`${bot.name}'s browser`} data-bot-browser={bot.id} data-browser-look={look}>
-      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-[#F0F0EE] px-2.5">
+      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-[color:var(--h-f0f0ee)] px-2.5">
         <button className={button} aria-label="Back" title={control.you ? "Back" : "Take over to go back"} disabled={!control.you || page?.back == null} onClick={() => page?.back != null && input("Page.navigateToHistoryEntry", { entryId: page.back })}>
           <svg width="12" height="12" viewBox="0 0 14 14" aria-hidden>
             <path d="M9 2.5L4.5 7 9 11.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -303,7 +303,7 @@ export function BotBrowser({ bot, project = "", hidden = false, inset = false }:
             spellCheck={false}
             aria-label="Address"
             title={control.you ? page?.title : `${page?.title ? `${page.title} · ` : ""}Take over to go somewhere else`}
-            className="min-w-0 flex-1 truncate rounded-full bg-[#F2F2F0] px-3 py-1 font-mono text-[11.5px] leading-4 text-[#6B6B6B] outline-none read-only:cursor-default focus:bg-white focus:text-ink focus:shadow-[0_0_0_1.5px_#0A0A0A] read-only:focus:bg-[#F2F2F0] read-only:focus:text-[#6B6B6B] read-only:focus:shadow-none"
+            className="min-w-0 flex-1 truncate rounded-full bg-[color:var(--hb-f2f2f0)] px-3 py-1 font-mono text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)] outline-none read-only:cursor-default focus:bg-white focus:text-ink focus:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] read-only:focus:bg-[color:var(--hb-f2f2f0)] read-only:focus:text-[color:var(--ht-6b6b6b)] read-only:focus:shadow-none"
           />
         </form>
       </div>
@@ -313,17 +313,17 @@ export function BotBrowser({ bot, project = "", hidden = false, inset = false }:
           <span
             role="status"
             data-browser-line
-            className={`shrink-0 font-medium text-ink ${look === "needs" ? "rounded-full bg-highlighter px-2.5 py-1 shadow-[0_0_0_1px_#0A0A0A]" : ""}`}
+            className={`shrink-0 font-medium text-ink ${look === "needs" ? "rounded-full bg-highlighter px-2.5 py-1 shadow-[0_0_0_1px_var(--h-0a0a0a)]" : ""}`}
           >
             {line}
           </span>
-          <span className="min-w-0 flex-1 truncate text-[#6B6B6B]">{look === "unreachable" ? "" : page?.title}</span>
+          <span className="min-w-0 flex-1 truncate text-[color:var(--ht-6b6b6b)]">{look === "unreachable" ? "" : page?.title}</span>
           {action && (
             <button
               onClick={() => (action.act === "take" ? void take() : handBack())}
               disabled={action.disabled || asking || (action.act === "take" && !frame)}
               title={action.title}
-              className="min-w-[92px] shrink-0 rounded-full bg-ink px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-white disabled:cursor-default disabled:bg-[#B0B0AD]"
+              className="min-w-[92px] shrink-0 rounded-full bg-[color:var(--hb-0a0a0a)] px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-[color:var(--bops-on-fill)] disabled:cursor-default disabled:bg-[color:var(--hb-b0b0ad)]"
             >
               {action.label}
             </button>
@@ -377,15 +377,15 @@ export function BotBrowser({ bot, project = "", hidden = false, inset = false }:
             e.preventDefault();
             input("Input.insertText", { text: text.slice(0, 10_000) });
           }}
-          className={`relative w-full overflow-hidden rounded-[14px] bg-[#F7F7F6] outline-none ${control.you ? "cursor-default shadow-[0_0_0_2px_#0A0A0A]" : look === "browsing" ? "shadow-[0_0_0_2px_rgb(10_10_10_/_0.16)]" : "shadow-[0_0_0_1px_#ECECEA]"}`}
+          className={`relative w-full overflow-hidden rounded-[14px] bg-[color:var(--hb-f7f7f6)] outline-none ${control.you ? "cursor-default shadow-[0_0_0_2px_var(--h-0a0a0a)]" : look === "browsing" ? "shadow-[0_0_0_2px_rgb(10_10_10_/_0.16)]" : "shadow-[0_0_0_1px_var(--h-ececea)]"}`}
           style={{ aspectRatio: frame ? `${frame.meta.deviceWidth} / ${frame.meta.deviceHeight}` : "16 / 10" }}
         >
           {away ? (
             // What happened, what's kept, and the one way back.
             <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 px-8 text-center" data-browser-away={away}>
               <p className="text-[14px] font-medium leading-5 text-ink">{away === "computer" ? `${bot.name}'s computer isn't connected right now.` : `Lost the connection to ${bot.name}'s browser.`}</p>
-              <p className="text-[13px] leading-5 text-[#6B6B6B]">Its work still shows in the chat.</p>
-              <button onClick={tryAgain} className="mt-2 rounded-full bg-ink px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-white">
+              <p className="text-[13px] leading-5 text-[color:var(--ht-6b6b6b)]">Its work still shows in the chat.</p>
+              <button onClick={tryAgain} className="mt-2 rounded-full bg-[color:var(--hb-0a0a0a)] px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-[color:var(--bops-on-fill)]">
                 Try again
               </button>
             </div>
@@ -393,7 +393,7 @@ export function BotBrowser({ bot, project = "", hidden = false, inset = false }:
             // eslint-disable-next-line @next/next/no-img-element -- a live frame (a data URL many times a second), not an asset to optimize
             <img ref={shot} src={frame.src} alt={page?.title ? `${bot.name}'s browser: ${page.title}` : `${bot.name}'s browser`} draggable={false} className="block h-full w-full select-none" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center px-8 text-center text-[13px] leading-5 text-[#6B6B6B]">{`Opening ${bot.name}'s browser…`}</div>
+            <div className="flex h-full w-full items-center justify-center px-8 text-center text-[13px] leading-5 text-[color:var(--ht-6b6b6b)]">{`Opening ${bot.name}'s browser…`}</div>
           )}
           {frame && !away && <BrowserCursors bot={bot} feed={feed} page={{ width: frame.meta.deviceWidth, height: frame.meta.deviceHeight }} driver={control.by} idle={look === "idle"} />}
           {look === "browsing" && <span aria-hidden className="browser-sweep" data-browser-sweep />}
@@ -404,28 +404,28 @@ export function BotBrowser({ bot, project = "", hidden = false, inset = false }:
               aria-label="Open the link?"
               data-browser-ask
               onMouseDown={(e) => e.stopPropagation()}
-              className="absolute inset-x-3 top-3 flex items-center gap-2 rounded-[12px] bg-white py-2 pl-3.5 pr-2 text-[13px] leading-5 text-ink shadow-[0_0_0_1px_#E2E2DF,0_10px_24px_-12px_rgb(10_10_10_/_0.35)] motion-safe:animate-[rise-in_240ms_cubic-bezier(0.2,0.8,0.2,1)]"
+              className="absolute inset-x-3 top-3 flex items-center gap-2 rounded-[12px] bg-white py-2 pl-3.5 pr-2 text-[13px] leading-5 text-ink shadow-[0_0_0_1px_var(--h-e2e2df),0_10px_24px_-12px_rgb(10_10_10_/_0.35)] motion-safe:animate-[rise-in_240ms_cubic-bezier(0.2,0.8,0.2,1)]"
             >
               <span className="min-w-0 flex-1">
                 {them ? `${them} has control. The link opens here once they hand back, or open it in a web tab.` : `${bot.name} is using its browser. Open the link now? ${bot.name} waits until you hand back.`}
               </span>
               {!them && (
-                <button onClick={() => void openHere(link)} className="shrink-0 rounded-full bg-ink px-3 py-1.5 text-[13px] font-semibold leading-4 text-white">
+                <button onClick={() => void openHere(link)} className="shrink-0 rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[13px] font-semibold leading-4 text-[color:var(--bops-on-fill)]">
                   Take over and open
                 </button>
               )}
-              <button onClick={() => setLink(null)} className="shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium leading-4 text-[#3A3A38] hover:bg-[#F2F2F0]">
+              <button onClick={() => setLink(null)} className="shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium leading-4 text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)]">
                 Not now
               </button>
             </div>
           )}
         </div>
         {note && (
-          <p role="status" className="text-[13px] leading-4 text-[#6B6B6B]">
+          <p role="status" className="text-[13px] leading-4 text-[color:var(--ht-6b6b6b)]">
             {note}
           </p>
         )}
-        {control.you && <p className="text-[13px] leading-4 text-[#6B6B6B]">{`What you type here stays in ${bot.name}'s browser and never goes to the chat.`}</p>}
+        {control.you && <p className="text-[13px] leading-4 text-[color:var(--ht-6b6b6b)]">{`What you type here stays in ${bot.name}'s browser and never goes to the chat.`}</p>}
       </div>
     </div>
   );
@@ -438,7 +438,7 @@ export function BotBrowser({ bot, project = "", hidden = false, inset = false }:
 function DriverFace({ look, bot, by, you }: { look: Look; bot: Bot; by: BrowserPerson | null; you: boolean }) {
   if (by && look !== "unreachable")
     return (
-      <span aria-hidden className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${you ? "bg-ink text-white" : "bg-[#EEEEEC] text-[#3A3A38]"}`} data-driver-face={you ? "you" : "person"}>
+      <span aria-hidden className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${you ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "bg-[color:var(--hb-eeeeec)] text-[color:var(--ht-3a3a38)]"}`} data-driver-face={you ? "you" : "person"}>
         {initialsFrom(by.name)}
       </span>
     );
@@ -490,11 +490,11 @@ export function WatchChip({ bot, project, onWatch }: { bot: Bot; project: string
     <button
       onClick={onWatch}
       data-watch-chip
-      className="mx-3 mb-2 flex items-center gap-2 self-start rounded-full bg-white py-1 pl-1.5 pr-3 text-[13px] leading-5 text-ink shadow-[0_0_0_1px_#E2E2DF,0_6px_16px_-10px_rgb(10_10_10_/_0.35)] hover:bg-[#F7F7F6] motion-safe:animate-[rise-in_240ms_cubic-bezier(0.2,0.8,0.2,1)]"
+      className="mx-3 mb-2 flex items-center gap-2 self-start rounded-full bg-white py-1 pl-1.5 pr-3 text-[13px] leading-5 text-ink shadow-[0_0_0_1px_var(--h-e2e2df),0_6px_16px_-10px_rgb(10_10_10_/_0.35)] hover:bg-[color:var(--hb-f7f7f6)] motion-safe:animate-[rise-in_240ms_cubic-bezier(0.2,0.8,0.2,1)]"
     >
       <Mascot botId={bot.id} color={bot.color} size={20} antenna={false} />
       <span>{`${bot.name} is browsing`}</span>
-      <span aria-hidden className="text-[#9A9A98]">·</span>
+      <span aria-hidden className="text-[color:var(--ht-9a9a98)]">·</span>
       <span className="font-semibold">Watch</span>
     </button>
   );

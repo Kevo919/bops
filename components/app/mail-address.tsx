@@ -170,21 +170,21 @@ export function AddressForm({
         aria-labelledby={titleId}
         data-mail-address={place}
         onKeyDown={onKey}
-        className={`flex flex-col bg-white ${card ? "mx-1 mt-3 gap-3 rounded-[14px] px-3.5 pb-3.5 pt-3 shadow-[0_0_0_1px_#E6E6E3,0_8px_20px_-14px_#00000040]" : "gap-4 rounded-[14px] px-4 pb-4 pt-3.5 shadow-[0_0_0_1px_#E6E6E3]"} ${eases ? "motion-rise-in" : ""}`}
+        className={`flex flex-col bg-white ${card ? "mx-1 mt-3 gap-3 rounded-[14px] px-3.5 pb-3.5 pt-3 shadow-[0_0_0_1px_var(--h-e6e6e3),0_8px_20px_-14px_var(--h-00000040)]" : "gap-4 rounded-[14px] px-4 pb-4 pt-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]"} ${eases ? "motion-rise-in" : ""}`}
       >
         <div className="flex flex-col gap-1">
           <span id={titleId} className={card ? "text-[14px] font-semibold leading-[18px]" : "text-[15px] font-semibold leading-5"}>
             {title}
           </span>
-          <span className={card ? "text-[12px] leading-4 text-[#6B6B6B]" : "text-[13px] leading-[18px] text-[#6B6B6B]"}>
+          <span className={card ? "text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]" : "text-[13px] leading-[18px] text-[color:var(--ht-6b6b6b)]"}>
             {intro}
-            {workspaceName && workspaceId !== MAIN_WORKSPACE ? <span className="text-[#9A9A98]"> For {workspaceName}.</span> : null}
+            {workspaceName && workspaceId !== MAIN_WORKSPACE ? <span className="text-[color:var(--ht-9a9a98)]"> For {workspaceName}.</span> : null}
           </span>
         </div>
 
         <div className="flex flex-col gap-2">
           {/* The handle, inline in its address: [ tiger ].bops.bot */}
-          <label className={`flex cursor-text items-center rounded-full bg-[#F7F7F6] font-mono shadow-[0_0_0_1px_#E6E6E3] focus-within:bg-white focus-within:shadow-[0_0_0_1.5px_#0A0A0A] ${card ? "h-9 px-3 text-[13px]" : "h-11 px-4 text-[14px]"}`}>
+          <label className={`flex cursor-text items-center rounded-full bg-[color:var(--hb-f7f7f6)] font-mono shadow-[0_0_0_1px_var(--h-e6e6e3)] focus-within:bg-white focus-within:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] ${card ? "h-9 px-3 text-[13px]" : "h-11 px-4 text-[14px]"}`}>
             <input
               ref={input}
               value={value}
@@ -197,11 +197,11 @@ export function AddressForm({
               style={{ width: `calc(${Math.max(value.length, 3)}ch + 2px)` }}
               className="min-w-0 bg-transparent font-medium text-ink outline-none"
             />
-            <span className="select-none text-[#9A9A98]">.bops.bot</span>
+            <span className="select-none text-[color:var(--ht-9a9a98)]">.bops.bot</span>
             <span className="ml-auto flex items-center pl-2">{value && !fresh && !error ? <Spinner size={12} color="#9A9A98" /> : null}</span>
           </label>
           <div className="flex min-h-[18px] flex-wrap items-center justify-between gap-x-3 gap-y-1 px-1 text-[12.5px] leading-[18px]">
-            <span className="min-w-0 truncate text-[#3A3A38]">
+            <span className="min-w-0 truncate text-[color:var(--ht-3a3a38)]">
               {usable ? (
                 <span className="select-all font-mono">{check.address}</span>
               ) : check && fresh && check.status !== "available" && check.suggestion && check.suggestion !== value ? (
@@ -214,32 +214,32 @@ export function AddressForm({
               ) : null}
             </span>
             {note && (
-              <span className={`flex shrink-0 items-center gap-1.5 ${note.tone === "bad" ? "text-[#B42318]" : note.tone === "good" ? "text-[#1F7A4D]" : "text-[#9A9A98]"}`}>
-                {note.tone === "good" && <span className="size-[7px] rounded-full bg-[#2BB673]" />}
+              <span className={`flex shrink-0 items-center gap-1.5 ${note.tone === "bad" ? "text-[color:var(--ht-b42318)]" : note.tone === "good" ? "text-[color:var(--ht-1f7a4d)]" : "text-[color:var(--ht-9a9a98)]"}`}>
+                {note.tone === "good" && <span className="size-[7px] rounded-full bg-[color:var(--hb-2bb673)]" />}
                 {note.text}
               </span>
             )}
           </div>
-          <span className="px-1 text-[12px] leading-4 text-[#9A9A98]">
+          <span className="px-1 text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">
             Letters, numbers and dashes, 3 to 30 characters.
             {mode !== "pick" && changesLeft !== undefined ? ` ${changesLeft === 0 ? "It can't be changed again." : `You can change it ${changesLeft} more time${changesLeft === 1 ? "" : "s"}.`}` : ""}
           </span>
         </div>
 
         {error && (
-          <span role="alert" className="text-[12.5px] leading-[18px] text-[#B42318]">
+          <span role="alert" className="text-[12.5px] leading-[18px] text-[color:var(--ht-b42318)]">
             {error}
           </span>
         )}
 
         <div className="flex items-center justify-between gap-3 pt-1">
-          <button onClick={() => void later()} disabled={!!busy} className="text-[12.5px] font-medium leading-4 text-[#6B6B6B] hover:text-ink disabled:opacity-50">
+          <button onClick={() => void later()} disabled={!!busy} className="text-[12.5px] font-medium leading-4 text-[color:var(--ht-6b6b6b)] hover:text-ink disabled:opacity-50">
             {mode === "pick" ? (busy === "later" ? "Saving" : "Choose later") : mode === "offer" ? `Keep ${current ?? "it"}` : "Cancel"}
           </button>
           <button
             onClick={() => void use()}
             disabled={!usable || !!busy || outOfChanges}
-            className={`rounded-full bg-ink font-medium leading-4 text-white disabled:opacity-40 ${card ? "px-3 py-1.5 text-[12.5px]" : "px-4 py-2 text-[13px]"}`}
+            className={`rounded-full bg-[color:var(--hb-0a0a0a)] font-medium leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-40 ${card ? "px-3 py-1.5 text-[12.5px]" : "px-4 py-2 text-[13px]"}`}
           >
             {busy === "use" ? "Saving" : "Use this address"}
           </button>
@@ -303,12 +303,12 @@ export function MailAddressRail({ state, onOpen }: { state: AppState; onOpen: ()
       aria-label={tip}
       data-tip={tip}
       data-mail-address="rail"
-      className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#FCFCFB] active:scale-[.96]"
+      className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-fcfcfb)] active:scale-[.96]"
     >
       <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden>
         <path d="M2 3.5h12v9H2zM2 4l6 4.5L14 4" fill="none" stroke="#0A0A0A" strokeWidth="1.4" strokeLinejoin="round" />
       </svg>
-      <span aria-hidden className="absolute -right-px -top-px size-2.5 rounded-full bg-[#2F7BFF] shadow-[0_0_0_2px_#F9F9F8]" />
+      <span aria-hidden className="absolute -right-px -top-px size-2.5 rounded-full bg-[color:var(--hb-2f7bff)] shadow-[0_0_0_2px_var(--h-f9f9f8)]" />
     </button>
   );
 }
@@ -322,22 +322,22 @@ export function EmailAddresses({ state, only }: { state: AppState; only?: string
     <div className="flex flex-col gap-2 px-[22px] pt-4">
       <div className="flex flex-col gap-0.5">
         <span className="text-[13px] font-semibold">Email</span>
-        <span className="text-[12px] leading-4 text-[#6B6B6B]">Your bots&apos; addresses. Each workspace has its own part, yours alone.</span>
+        <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">Your bots&apos; addresses. Each workspace has its own part, yours alone.</span>
       </div>
-      <div className="flex flex-col rounded-[14px] px-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="flex flex-col rounded-[14px] px-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         {rows.map((w) => {
           const main = state.bots.find((b) => b.isMain && workspaceOf(b) === w.id);
           const onHandle = main?.email?.endsWith(`@${w.mailSlug}.bops.bot`) ? main.email : null;
           return (
-            <div key={w.id} className="flex items-center gap-3 border-b border-[#F0F0EE] py-2.5 last:border-0">
+            <div key={w.id} className="flex items-center gap-3 border-b border-[color:var(--h-f0f0ee)] py-2.5 last:border-0">
               <span className="w-[120px] shrink-0 truncate text-[13px] font-medium">{w.name}</span>
-              <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-[#3A3A38]">
-                {w.mailClaimed && w.mailSlug ? (onHandle ?? `${w.mailSlug}.bops.bot`) : <span className="font-sans text-[#9A9A98]">No address yet</span>}
+              <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-[color:var(--ht-3a3a38)]">
+                {w.mailClaimed && w.mailSlug ? (onHandle ?? `${w.mailSlug}.bops.bot`) : <span className="font-sans text-[color:var(--ht-9a9a98)]">No address yet</span>}
               </span>
               {open?.id !== w.id && (
                 <button
                   onClick={() => setOpen({ id: w.id, name: w.name, mode: w.mailClaimed ? "change" : "pick" })}
-                  className="shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6]"
+                  className="shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f7f7f6)]"
                 >
                   {w.mailClaimed ? "Change" : "Pick your address"}
                 </button>

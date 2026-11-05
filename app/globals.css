@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* Every hard-coded color the window's classes use, as a variable the dark look turns over (scripts/look-palette.mjs). */
+@import "./look-palette.css";
 
 @custom-variant dark (&:is(.dark *));
 

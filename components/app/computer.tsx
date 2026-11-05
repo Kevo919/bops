@@ -475,15 +475,15 @@ export function ComputerView({
                   style={{ boxShadow: acting(d) ? `inset 0 0 0 3px ${botBezel(b)}` : undefined }}
                 />
                 <div className="pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-200 group-hover/tile:opacity-100" style={{ boxShadow: "inset 0 0 0 2px #0A0A0A" }} />
-                <span className="absolute bottom-1.5 left-1.5 z-20 flex max-w-[85%] items-center gap-1 rounded-full bg-white/95 py-[2px] pl-1 pr-2 text-[11px] leading-[14px] shadow-[0_0_0_1px_#0000000F]">
+                <span className="absolute bottom-1.5 left-1.5 z-20 flex max-w-[85%] items-center gap-1 rounded-full bg-white/95 py-[2px] pl-1 pr-2 text-[11px] leading-[14px] shadow-[0_0_0_1px_var(--h-0000000f)]">
                   {s ? (
                     <>
                       <Mascot botId={botOn(d).id} color={botOn(d).color} size={13} antenna={false} />
                       <span className="shrink-0 font-semibold">{whoOn(d)}</span>
-                      <span className="truncate text-[#3A3A38]">{doingOn(d)}</span>
+                      <span className="truncate text-[color:var(--ht-3a3a38)]">{doingOn(d)}</span>
                     </>
                   ) : (
-                    <span className="truncate pl-1 text-[#6B6B6B]">{pageOn(d)}</span>
+                    <span className="truncate pl-1 text-[color:var(--ht-6b6b6b)]">{pageOn(d)}</span>
                   )}
                 </span>
               </>
@@ -530,7 +530,7 @@ export function ComputerView({
     >
       {mode === "focus" ? (
         <div className="flex items-center gap-2.5">
-          <button onClick={onBack} className="flex items-center gap-1.5 rounded-full py-1.5 pl-2 pr-3 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6]">
+          <button onClick={onBack} className="flex items-center gap-1.5 rounded-full py-1.5 pl-2 pr-3 shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f7f7f6)]">
             <svg width="12" height="12" viewBox="0 0 14 14">
               <path d="M9 2.5L4.5 7 9 11.5" fill="none" stroke="#0A0A0A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -538,7 +538,7 @@ export function ComputerView({
             <span className="text-[13px] font-medium leading-4">Back to {b.name}</span>
           </button>
           <span className="text-[15px] font-semibold leading-5">
-            {c.name}&apos;s computer{sharers.length ? <span className="font-normal text-[#6B6B6B]"> · shared with {sharers.map((x) => x.name).join(", ")}</span> : null}
+            {c.name}&apos;s computer{sharers.length ? <span className="font-normal text-[color:var(--ht-6b6b6b)]"> · shared with {sharers.map((x) => x.name).join(", ")}</span> : null}
           </span>
           <span className="flex-1" />
           <div className="flex gap-1">
@@ -549,12 +549,12 @@ export function ComputerView({
                 <button
                   key={d}
                   onClick={() => onDisplay(d)}
-                  className={`flex items-center gap-1.5 rounded-[9px] py-[5px] ${busy ? "pl-1.5" : "pl-2.5"} pr-2.5 ${on ? "bg-ink" : busy ? "bg-[#F2F2F0]" : "shadow-[inset_0_0_0_1.2px_#D9D9D6]"}`}
+                  className={`flex items-center gap-1.5 rounded-[9px] py-[5px] ${busy ? "pl-1.5" : "pl-2.5"} pr-2.5 ${on ? "bg-[color:var(--hb-0a0a0a)]" : busy ? "bg-[color:var(--hb-f2f2f0)]" : "shadow-[inset_0_0_0_1.2px_var(--h-d9d9d6)]"}`}
                 >
-                  <span className={`text-[11px] font-semibold tabular-nums leading-4 ${on ? "text-white/60" : "text-[#9A9A98]"}`}>{screenNo(d)}</span>
+                  <span className={`text-[11px] font-semibold tabular-nums leading-4 ${on ? "text-[color:var(--bops-on-fill)]/60" : "text-[color:var(--ht-9a9a98)]"}`}>{screenNo(d)}</span>
                   {busy && <Mascot botId={botOn(d).id} color={botOn(d).color} size={14} antenna={false} />}
-                  {busy && <span className={`text-[12px] font-medium leading-4 ${on ? "text-white" : "text-ink"}`}>{whoOn(d)}</span>}
-                  <span className={`max-w-[120px] truncate text-[12px] leading-4 ${on ? "text-white/70" : "text-[#6B6B6B]"}`}>{busy ? doingOn(d) : pageOn(d)}</span>
+                  {busy && <span className={`text-[12px] font-medium leading-4 ${on ? "text-[color:var(--bops-on-fill)]" : "text-ink"}`}>{whoOn(d)}</span>}
+                  <span className={`max-w-[120px] truncate text-[12px] leading-4 ${on ? "text-[color:var(--bops-on-fill)]/70" : "text-[color:var(--ht-6b6b6b)]"}`}>{busy ? doingOn(d) : pageOn(d)}</span>
                 </button>
               );
             })}
@@ -562,7 +562,7 @@ export function ComputerView({
           {readable && (
             <button
               onClick={() => setReaderFor(readerFor === viewKey ? null : viewKey)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-[12px] font-medium leading-4 ${readerFor === viewKey ? "bg-ink text-white" : "bg-white text-ink shadow-[0_0_0_1px_#E2E2DF] hover:bg-[#F7F7F6]"}`}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-[12px] font-medium leading-4 ${readerFor === viewKey ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "bg-white text-ink shadow-[0_0_0_1px_var(--h-e2e2df)] hover:bg-[color:var(--hb-f7f7f6)]"}`}
               title={readerFor === viewKey ? "Back to the computer" : "What the bot is reading, as a clean page you can skim"}
             >
               <svg width="12" height="12" viewBox="0 0 16 16">
@@ -629,7 +629,7 @@ export function ComputerView({
             // Clicking in takes control right here (the "You have control" notch drops down); full screen is its own button.
             // Not while it's asleep: waking it costs Free's hours, so that's the Take control button's alone.
             onClick={() => !takeover && !grid && clickable && !asleep && takeControl()}
-            className={`group/screen relative flex min-h-0 flex-1 flex-col overflow-hidden ${desktop ? "" : "rounded-xl bg-white shadow-[0_18px_40px_-16px_#28320073,0_0_0_1px_#0000000F]"} ${clickable && !asleep ? "cursor-pointer" : ""}`}
+            className={`group/screen relative flex min-h-0 flex-1 flex-col overflow-hidden ${desktop ? "" : "rounded-xl bg-white shadow-[0_18px_40px_-16px_var(--h-28320073),0_0_0_1px_var(--h-0000000f)]"} ${clickable && !asleep ? "cursor-pointer" : ""}`}
           >
             {/* Hovering a computer you can click into: a soft ring in the bot's color and a small pill, instead of a zoom cursor. */}
             {clickable && !asleep && !grid && sheet !== display && (
@@ -641,7 +641,7 @@ export function ComputerView({
             {handoff && (
               <div
                 key={handoff.key}
-                className="pointer-events-none absolute left-1/2 top-3 z-40 flex -translate-x-1/2 animate-[handoff_1900ms_ease-in-out_both] items-center gap-2 rounded-full bg-white/95 py-1 pl-1 pr-3 shadow-[0_0_0_1px_#0000000F,0_10px_24px_-10px_#00000066] backdrop-blur"
+                className="pointer-events-none absolute left-1/2 top-3 z-40 flex -translate-x-1/2 animate-[handoff_1900ms_ease-in-out_both] items-center gap-2 rounded-full bg-white/95 py-1 pl-1 pr-3 shadow-[0_0_0_1px_var(--h-0000000f),0_10px_24px_-10px_var(--h-00000066)] backdrop-blur"
               >
                 {handoff.to === "you" ? (
                   <span className="flex size-6 items-center justify-center rounded-full" style={{ background: botBezel(b) }}>
@@ -655,7 +655,7 @@ export function ComputerView({
                 <span className="whitespace-nowrap text-[12.5px] font-medium leading-4 text-ink">
                   {handoff.to === "you" ? (
                     <>
-                      {b.name} paused <span className="font-normal text-[#6B6B6B]">· you&rsquo;re driving</span>
+                      {b.name} paused <span className="font-normal text-[color:var(--ht-6b6b6b)]">· you&rsquo;re driving</span>
                     </>
                   ) : (
                     <>Back to {b.name}</>
@@ -668,7 +668,7 @@ export function ComputerView({
             {!grid && !takeover && sheet !== display && !(card && view !== "reader") && !readOnly(state) && (
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="absolute bottom-3 left-1/2 z-40 flex -translate-x-1/2 translate-y-1 items-center gap-1 rounded-full bg-white/95 p-1 opacity-0 shadow-[0_0_0_1px_#0000000F,0_10px_24px_-10px_#00000066] backdrop-blur transition duration-200 group-hover/screen:translate-y-0 group-hover/screen:opacity-100 has-[[data-open=true]]:translate-y-0 has-[[data-open=true]]:opacity-100"
+                className="absolute bottom-3 left-1/2 z-40 flex -translate-x-1/2 translate-y-1 items-center gap-1 rounded-full bg-white/95 p-1 opacity-0 shadow-[0_0_0_1px_var(--h-0000000f),0_10px_24px_-10px_var(--h-00000066)] backdrop-blur transition duration-200 group-hover/screen:translate-y-0 group-hover/screen:opacity-100 has-[[data-open=true]]:translate-y-0 has-[[data-open=true]]:opacity-100"
               >
                 <button
                   onClick={() => (watchedHere || canWatchHere) && setSheet(display)}
@@ -684,7 +684,7 @@ export function ComputerView({
                             ? "You're driving this screen"
                             : "Open a site on this screen to watch it"
                   }
-                  className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium leading-4 text-ink hover:bg-[#F2F2F0] disabled:cursor-default disabled:text-[#B0B0AD] disabled:hover:bg-transparent"
+                  className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium leading-4 text-ink hover:bg-[color:var(--hb-f2f2f0)] disabled:cursor-default disabled:text-[color:var(--ht-b0b0ad)] disabled:hover:bg-transparent"
                 >
                   <EyeIcon />
                   {watchedHere ? "Edit" : "Watch"}
@@ -701,7 +701,7 @@ export function ComputerView({
                           ? "Wake the computer and drive this screen yourself"
                           : "Pause the bot here and drive the screen yourself"
                   }
-                  className="flex items-center gap-1.5 rounded-full bg-ink py-1.5 pl-2 pr-3.5 text-[13px] font-semibold leading-4 text-white disabled:cursor-default disabled:bg-[#B0B0AD]"
+                  className="flex items-center gap-1.5 rounded-full bg-[color:var(--hb-0a0a0a)] py-1.5 pl-2 pr-3.5 text-[13px] font-semibold leading-4 text-[color:var(--bops-on-fill)] disabled:cursor-default disabled:bg-[color:var(--hb-b0b0ad)]"
                 >
                   <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden>
                     <path d="M4 2.5l8.5 5-3.6.9-1.8 3.6z" fill="currentColor" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
@@ -709,7 +709,7 @@ export function ComputerView({
                   <span className="whitespace-nowrap">Take control</span>
                 </button>
                 {mode === "panel" && onFocus && (
-                  <button onClick={onFocus} title="Full screen" aria-label="Full screen" className="flex size-[30px] items-center justify-center rounded-full text-[#6B6B6B] hover:bg-[#F2F2F0] hover:text-ink">
+                  <button onClick={onFocus} title="Full screen" aria-label="Full screen" className="flex size-[30px] items-center justify-center rounded-full text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--hb-f2f2f0)] hover:text-ink">
                     <ExpandIcon />
                   </button>
                 )}
@@ -731,7 +731,7 @@ export function ComputerView({
                   setReaderFor(readerFor === viewKey ? null : viewKey);
                 }}
                 title={readerFor === viewKey ? "Back to the computer" : "What the bot is reading, as a clean page you can skim"}
-                className={`absolute right-3 top-3 z-40 flex items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-[12px] font-medium leading-4 shadow-[0_0_0_1px_#0000001A,0_6px_16px_-8px_#00000059] ${readerFor === viewKey ? "bg-ink text-white" : "bg-white/95 text-ink hover:bg-white"}`}
+                className={`absolute right-3 top-3 z-40 flex items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-[12px] font-medium leading-4 shadow-[0_0_0_1px_var(--h-0000001a),0_6px_16px_-8px_var(--h-00000059)] ${readerFor === viewKey ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "bg-white/95 text-ink hover:bg-white"}`}
               >
                 <svg width="12" height="12" viewBox="0 0 16 16">
                   <path d="M2 3.5h4.5A1.5 1.5 0 0 1 8 5v8a1.5 1.5 0 0 0-1.5-1.5H2zM14 3.5H9.5A1.5 1.5 0 0 0 8 5v8a1.5 1.5 0 0 1 1.5-1.5H14z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
@@ -748,7 +748,7 @@ export function ComputerView({
               {cutNote && !grid && (
                 <span
                   key={cut.at}
-                  className="pointer-events-none absolute left-1/2 top-3 z-20 max-w-[90%] -translate-x-1/2 animate-[cut-note_2600ms_ease-in-out_forwards] truncate rounded-full bg-ink/85 px-3 py-1 text-[12px] font-medium leading-4 text-white shadow-[0_6px_16px_-8px_#00000080] backdrop-blur"
+                  className="pointer-events-none absolute left-1/2 top-3 z-20 max-w-[90%] -translate-x-1/2 animate-[cut-note_2600ms_ease-in-out_forwards] truncate rounded-full bg-[color:var(--hb-0a0a0a)]/85 px-3 py-1 text-[12px] font-medium leading-4 text-[color:var(--bops-on-fill)] shadow-[0_6px_16px_-8px_var(--h-00000080)] backdrop-blur"
                 >
                   {cutNote}
                 </span>
@@ -775,7 +775,7 @@ export function ComputerView({
               })()}
             </div>
             {onScreen && !takeover && view !== "desktop" && (
-              <span className="absolute bottom-3 left-3 rounded-full bg-highlighter px-2 py-[3px] text-[11px] font-semibold leading-[14px] shadow-[0_0_0_1px_#0000001F]">
+              <span className="absolute bottom-3 left-3 rounded-full bg-highlighter px-2 py-[3px] text-[11px] font-semibold leading-[14px] shadow-[0_0_0_1px_var(--h-0000001f)]">
                 {whoOn(display)}
               </span>
             )}
@@ -785,7 +785,7 @@ export function ComputerView({
                   e.stopPropagation();
                   setPicked(showingReal ? "home" : "real");
                 }}
-                className="absolute right-3 top-3 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-medium text-[#3A3A38] shadow-[0_0_0_1px_#0000000F] hover:bg-white"
+                className="absolute right-3 top-3 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-medium text-[color:var(--ht-3a3a38)] shadow-[0_0_0_1px_var(--h-0000000f)] hover:bg-white"
               >
                 {showingReal ? "Home screen" : "Real screen"}
               </button>
@@ -805,25 +805,25 @@ export function ComputerView({
               style={{ background: botBezel(b) }}
             >
               <span className="relative flex size-2.5 shrink-0" aria-hidden>
-                <span className="absolute inset-0 animate-ping rounded-full bg-ink/30" />
-                <span className="relative size-2.5 rounded-full bg-ink" />
+                <span className="absolute inset-0 animate-ping rounded-full bg-[color:var(--hb-0a0a0a)]/30" />
+                <span className="relative size-2.5 rounded-full bg-[color:var(--hb-0a0a0a)]" />
               </span>
               <span className="whitespace-nowrap text-[15px] leading-5 text-ink">You&rsquo;re driving</span>
               {reachable && view !== "desktop" && <AddressBar botId={b.id} display={display} />}
               {mode === "panel" && onFocus && (
-                <button onClick={onFocus} title="Full screen" aria-label="Full screen" className="flex size-9 shrink-0 items-center justify-center rounded-full text-ink hover:bg-black/[0.08]">
+                <button onClick={onFocus} title="Full screen" aria-label="Full screen" className="flex size-9 shrink-0 items-center justify-center rounded-full text-ink hover:bg-[color:var(--bops-tint)]/[0.08]">
                   <ExpandIcon />
                 </button>
               )}
               <button
                 onClick={() => void post("/api/takeover", {}, "DELETE")}
                 title={takeover?.terminal ? "Closes the terminal" : `${(holding.get(display) ? botOn(display) : b).name} picks up from here (Esc)`}
-                className="flex shrink-0 items-center gap-2 rounded-full bg-ink py-1.5 pl-1.5 pr-4 text-[14px] font-semibold leading-[18px] transition-transform active:scale-[0.97]"
+                className="flex shrink-0 items-center gap-2 rounded-full bg-[color:var(--hb-0a0a0a)] py-1.5 pl-1.5 pr-4 text-[14px] font-semibold leading-[18px] transition-transform active:scale-[0.97]"
                 style={{ color: botOnInk(b) }}
               >
                 <Mascot botId={(holding.get(display) ? botOn(display) : b).id} color={(holding.get(display) ? botOn(display) : b).color} size={22} antenna={false} />
                 Hand back to {(holding.get(display) ? botOn(display) : b).name}
-                {!takeover?.terminal && <kbd className="rounded-[5px] bg-white/15 px-1.5 py-px font-sans text-[11px] font-medium leading-4 text-white/70">esc</kbd>}
+                {!takeover?.terminal && <kbd className="rounded-[5px] bg-white/15 px-1.5 py-px font-sans text-[11px] font-medium leading-4 text-[color:var(--bops-on-fill)]/70">esc</kbd>}
               </button>
             </div>
             </div>
@@ -832,7 +832,7 @@ export function ComputerView({
       </div>
 
       {mode === "panel" && (
-        <div className="-mb-1 flex min-w-0 items-center gap-2 text-[12px] leading-4 text-[#6B6B6B]">
+        <div className="-mb-1 flex min-w-0 items-center gap-2 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
           {/* Whose computer this is, and who else works on it: the screens below are all of theirs. */}
           <span className="min-w-0 truncate" title={sharers.length ? `${sharers.map((x) => x.name).join(", ")} work on ${c.name}'s computer too, so its screens are theirs as well` : undefined}>
             <span className="font-medium text-ink">{c.name}&apos;s computer</span>
@@ -848,7 +848,7 @@ export function ComputerView({
           ) : follow ? (
             <span className="flex shrink-0 items-center gap-1.5">
               Pinned to screen {screenNo(display)}
-              <button onClick={follow.resume} className="rounded-full bg-white px-2 py-[2px] font-medium text-ink shadow-[0_0_0_1px_#E2E2DF] hover:bg-[#F7F7F6]">
+              <button onClick={follow.resume} className="rounded-full bg-white px-2 py-[2px] font-medium text-ink shadow-[0_0_0_1px_var(--h-e2e2df)] hover:bg-[color:var(--hb-f7f7f6)]">
                 Follow
               </button>
             </span>
@@ -883,7 +883,7 @@ export function ComputerView({
                       ? { boxShadow: `0 0 0 2px ${botBezel(b)}, 0 0 14px -2px ${botBezel(b)}` }
                       : undefined
                 }
-                className={`group/thumb relative flex min-w-0 flex-1 basis-0 flex-col gap-1.5 rounded-xl p-1.5 text-left transition-shadow duration-300 ${inView ? "bg-white shadow-[0_0_0_2px_#0A0A0A]" : tasks.includes(d) || w ? "bg-[#F7F7F6]" : "shadow-[inset_0_0_0_1.5px_#E2E2DF]"}`}
+                className={`group/thumb relative flex min-w-0 flex-1 basis-0 flex-col gap-1.5 rounded-xl p-1.5 text-left transition-shadow duration-300 ${inView ? "bg-white shadow-[0_0_0_2px_var(--h-0a0a0a)]" : tasks.includes(d) || w ? "bg-[color:var(--hb-f7f7f6)]" : "shadow-[inset_0_0_0_1.5px_var(--h-e2e2df)]"}`}
               >
                 {(canWatch || w) && !readOnly(state) && (
                   <span
@@ -895,7 +895,7 @@ export function ComputerView({
                       setSheet(d);
                     }}
                     title={w ? `Change what ${w.site} is watched for` : `Keep this screen on ${pageOn(d)} and tell me when something needs me`}
-                    className="absolute left-2.5 top-2.5 z-10 flex items-center gap-1 rounded-full bg-white/95 py-[2px] pl-1.5 pr-2 text-[10.5px] font-medium leading-[14px] text-ink opacity-0 shadow-[0_0_0_1px_#0000001A,0_4px_10px_-4px_#00000040] transition-opacity group-hover/thumb:opacity-100"
+                    className="absolute left-2.5 top-2.5 z-10 flex items-center gap-1 rounded-full bg-white/95 py-[2px] pl-1.5 pr-2 text-[10.5px] font-medium leading-[14px] text-ink opacity-0 shadow-[0_0_0_1px_var(--h-0000001a),0_4px_10px_-4px_var(--h-00000040)] transition-opacity group-hover/thumb:opacity-100"
                   >
                     <EyeIcon />
                     {w ? "Edit" : "Watch"}
@@ -926,17 +926,17 @@ export function ComputerView({
                       <Mascot botId={b.id} color={b.color} size={18} />
                     </div>
                   )}
-                  {s && live(s) && <span className={`absolute right-1 top-1 size-[9px] rounded-full bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A] ${acting(d) ? "animate-pulse" : ""}`} />}
+                  {s && live(s) && <span className={`absolute right-1 top-1 size-[9px] rounded-full bg-highlighter shadow-[0_0_0_1.5px_var(--h-0a0a0a)] ${acting(d) ? "animate-pulse" : ""}`} />}
                 </div>
                 <div className="flex min-w-0 items-center gap-[5px] text-[11px] leading-[14px]">
                   {/* Its number, and its state at a glance: the same number the bots use. */}
-                  <span className="shrink-0 font-semibold tabular-nums text-[#9A9A98]">{screenNo(d)}</span>
+                  <span className="shrink-0 font-semibold tabular-nums text-[color:var(--ht-9a9a98)]">{screenNo(d)}</span>
                   <StatusDot kind={infoOn(d)?.kind ?? "free"} pulse={acting(d)} shared={!!state.shared} />
                   {tasks.includes(d) ? (
                     <>
                       <Mascot botId={yours(d) ? b.id : botOn(d).id} color={yours(d) ? b.color : botOn(d).color} size={14} antenna={false} />
                       <span className="shrink-0 font-semibold">{whoOn(d)}</span>
-                      <span className={`truncate ${inView ? "text-ink" : "text-[#6B6B6B]"}`}>{doingOn(d)}</span>
+                      <span className={`truncate ${inView ? "text-ink" : "text-[color:var(--ht-6b6b6b)]"}`}>{doingOn(d)}</span>
                     </>
                   ) : w ? (
                     <>
@@ -945,15 +945,15 @@ export function ComputerView({
                       {alert && <span className="truncate rounded-[4px] bg-highlighter px-1 text-ink">{w.alert!.text}</span>}
                     </>
                   ) : infoOn(d)?.kind === "held" ? (
-                    <span className="truncate text-[#6B6B6B]" title={state.shared ? `Kept for "${infoOn(d)!.title}" while it waits on the owner, so their answer picks it up here` : `Kept for "${infoOn(d)!.title}" while it waits on you, so your answer picks it up here`}>
+                    <span className="truncate text-[color:var(--ht-6b6b6b)]" title={state.shared ? `Kept for "${infoOn(d)!.title}" while it waits on the owner, so their answer picks it up here` : `Kept for "${infoOn(d)!.title}" while it waits on you, so your answer picks it up here`}>
                       <span className="font-semibold text-ink">{nameOf(infoOn(d)!.botId)}</span> · held for {infoOn(d)!.title}
                     </span>
                   ) : infoOn(d)?.left ? (
-                    <span className="truncate text-[#9A9A98]" title={`${nameOf(infoOn(d)!.left!.botId)} left "${infoOn(d)!.left!.title}" here ${ago(infoOn(d)!.left!.at)}`}>
+                    <span className="truncate text-[color:var(--ht-9a9a98)]" title={`${nameOf(infoOn(d)!.left!.botId)} left "${infoOn(d)!.left!.title}" here ${ago(infoOn(d)!.left!.at)}`}>
                       Left by {nameOf(infoOn(d)!.left!.botId)} · {infoOn(d)!.left!.title}
                     </span>
                   ) : (
-                    <span className="truncate pl-0.5 text-[#9A9A98]">{pageOn(d)}</span>
+                    <span className="truncate pl-0.5 text-[color:var(--ht-9a9a98)]">{pageOn(d)}</span>
                   )}
                 </div>
               </button>
@@ -967,18 +967,18 @@ export function ComputerView({
 
       {/* Under the screen, only when something's going on: a bot at work, something waiting on you, news. Its controls are on the screen. */}
       {!takeover && (grid || onScreen || read?.blocker || watchedHere?.alert || infoOn(display)?.kind === "held" || infoOn(display)?.left) && (
-        <div className={`flex max-w-full items-center gap-3 self-center rounded-full bg-white py-1.5 pl-3.5 ${watchedHere?.alert && !grid ? "pr-1.5" : "pr-3.5"} shadow-[0_0_0_1px_#ECECEA,0_6px_18px_-10px_#00000040]`}>
+        <div className={`flex max-w-full items-center gap-3 self-center rounded-full bg-white py-1.5 pl-3.5 ${watchedHere?.alert && !grid ? "pr-1.5" : "pr-3.5"} shadow-[0_0_0_1px_var(--h-ececea),0_6px_18px_-10px_var(--h-00000040)]`}>
           <span
             className={`size-2 shrink-0 rounded-full ${
               grid
-                ? "bg-[#2BB673]"
+                ? "bg-[color:var(--hb-2bb673)]"
                 : onScreen?.blocker || read?.blocker || watchedHere?.alert
-                  ? "bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A]"
+                  ? "bg-highlighter shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
                   : onScreen
-                    ? "bg-[#2BB673]"
+                    ? "bg-[color:var(--hb-2bb673)]"
                     : infoOn(display)?.kind === "held"
-                      ? "bg-[#FFF7B0] shadow-[inset_0_0_0_1.5px_#C9B800]"
-                      : "shadow-[inset_0_0_0_1.2px_#C9C9C6]"
+                      ? "bg-[color:var(--hb-fff7b0)] shadow-[inset_0_0_0_1.5px_var(--h-c9b800)]"
+                      : "shadow-[inset_0_0_0_1.2px_var(--h-c9c9c6)]"
             }`}
           />
           <span className="min-w-0 truncate text-[13px] leading-4">
@@ -1000,7 +1000,7 @@ export function ComputerView({
             <button
               onClick={() => void post("/api/watches", { id: watchedHere.id, action: "draft" }, "PATCH")}
               title={`${b.name} writes a reply on ${watchedHere.site} for you to read and send`}
-              className="shrink-0 rounded-full bg-highlighter px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_#0000001F]"
+              className="shrink-0 rounded-full bg-highlighter px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_var(--h-0000001f)]"
             >
               Draft a reply
             </button>
@@ -1059,10 +1059,10 @@ function ResetMenu({ state, bot: b, screen, busy }: { state: AppState; bot: Bot;
       key={key}
       disabled={disabled}
       onClick={() => void run(key, body)}
-      className={`flex flex-col items-start gap-0.5 rounded-[10px] px-3 py-2 text-left disabled:opacity-40 ${confirm === key ? "bg-[#FBEAEA]" : "hover:bg-[#F7F7F6]"}`}
+      className={`flex flex-col items-start gap-0.5 rounded-[10px] px-3 py-2 text-left disabled:opacity-40 ${confirm === key ? "bg-[color:var(--hb-fbeaea)]" : "hover:bg-[color:var(--hb-f7f7f6)]"}`}
     >
-      <span className={`text-[13.5px] font-medium leading-[18px] ${confirm === key ? "text-[#B42318]" : ""}`}>{confirm === key ? `${title}? Click again` : title}</span>
-      <span className="text-[12px] leading-4 text-[#9A9A98]">{detail}</span>
+      <span className={`text-[13.5px] font-medium leading-[18px] ${confirm === key ? "text-[color:var(--ht-b42318)]" : ""}`}>{confirm === key ? `${title}? Click again` : title}</span>
+      <span className="text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">{detail}</span>
     </button>
   );
   return (
@@ -1075,15 +1075,15 @@ function ResetMenu({ state, bot: b, screen, busy }: { state: AppState; bot: Bot;
         disabled={running}
         title="Reset screens"
         aria-label="Reset screens"
-        className={`flex size-[30px] items-center justify-center rounded-full text-[#6B6B6B] hover:bg-[#F2F2F0] hover:text-ink ${open ? "bg-[#F2F2F0] text-ink" : ""} ${running ? "animate-spin" : ""}`}
+        className={`flex size-[30px] items-center justify-center rounded-full text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--hb-f2f2f0)] hover:text-ink ${open ? "bg-[color:var(--hb-f2f2f0)] text-ink" : ""} ${running ? "animate-spin" : ""}`}
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <path d="M2.8 8a5.2 5.2 0 109.2-3.3M12.6 1.8v3.2H9.4" />
         </svg>
       </button>
       {open && (
-        <div className="absolute bottom-[calc(100%+10px)] right-0 z-40 flex w-[290px] flex-col rounded-[14px] bg-white p-1.5 shadow-[0_0_0_1px_#E6E6E3,0_12px_32px_rgba(0,0,0,0.14)]">
-          <div className="px-3 pb-1 pt-1.5 text-[12px] leading-4 text-[#9A9A98]">Back to the home screen, with nothing else open. Logins stay.</div>
+        <div className="absolute bottom-[calc(100%+10px)] right-0 z-40 flex w-[290px] flex-col rounded-[14px] bg-white p-1.5 shadow-[0_0_0_1px_var(--h-e6e6e3),0_12px_32px_rgba(0,0,0,0.14)]">
+          <div className="px-3 pb-1 pt-1.5 text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">Back to the home screen, with nothing else open. Logins stay.</div>
           {busy
             ? busy.task
               ? item("one", `Stop and reset screen ${screen}`, `${busy.why}; its task stops`, { screen, force: true })
@@ -1094,7 +1094,7 @@ function ResetMenu({ state, bot: b, screen, busy }: { state: AppState; bot: Bot;
         </div>
       )}
       {note && !open && (
-        <div className="absolute bottom-[calc(100%+10px)] right-0 z-40 w-max max-w-[340px] rounded-[12px] bg-ink px-3 py-2 text-[12.5px] leading-[17px] text-white shadow-[0_10px_24px_-10px_#00000080]">{note}</div>
+        <div className="absolute bottom-[calc(100%+10px)] right-0 z-40 w-max max-w-[340px] rounded-[12px] bg-[color:var(--hb-0a0a0a)] px-3 py-2 text-[12.5px] leading-[17px] text-[color:var(--bops-on-fill)] shadow-[0_10px_24px_-10px_var(--h-00000080)]">{note}</div>
       )}
     </div>
   );
@@ -1144,7 +1144,7 @@ function WindowBar({ bot: b, tabs, compact }: { bot: Bot; tabs: MirrorTab[]; com
   };
   const active = tabs.find((t) => t.active);
   return (
-    <div className="flex h-9 shrink-0 items-center gap-2 border-b border-[#EFEFED] bg-[#FAFAF9] px-3">
+    <div className="flex h-9 shrink-0 items-center gap-2 border-b border-[color:var(--h-efefed)] bg-[color:var(--hb-fafaf9)] px-3">
       <span className="flex shrink-0 gap-1.5">
         {[0, 1, 2].map((i) => (
           <span key={i} className="size-[9px] rounded-full" style={{ background: i === 0 ? b.color : "#E2E2DF" }} />
@@ -1155,14 +1155,14 @@ function WindowBar({ bot: b, tabs, compact }: { bot: Bot; tabs: MirrorTab[]; com
           <span
             key={t.id}
             title={t.url}
-            className={`flex min-w-0 max-w-[200px] items-center gap-1.5 rounded-lg px-2 py-[3px] text-[12px] leading-4 ${t.active ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F,0_2px_6px_-3px_#00000026]" : "text-[#9A9A98]"}`}
+            className={`flex min-w-0 max-w-[200px] items-center gap-1.5 rounded-lg px-2 py-[3px] text-[12px] leading-4 ${t.active ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f),0_2px_6px_-3px_var(--h-00000026)]" : "text-[color:var(--ht-9a9a98)]"}`}
           >
             {t.active && <Mascot botId={b.id} color={b.color} size={13} />}
             <span className="truncate">{t.title || host(t.url)}</span>
           </span>
         ))}
       </div>
-      {active && !compact && <span className="shrink-0 truncate font-mono text-[11px] text-[#9A9A98]">{host(active.url)}</span>}
+      {active && !compact && <span className="shrink-0 truncate font-mono text-[11px] text-[color:var(--ht-9a9a98)]">{host(active.url)}</span>}
     </div>
   );
 }
@@ -1183,10 +1183,10 @@ function AsleepScreen({ bot: b, host, waking, hoursOut }: { bot: Bot; /** The bo
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 px-6 text-center">
           <Mascot botId={b.id} color={b.color} size={40} />
-          <span className="rounded-full bg-white/85 px-3 py-1 text-[12.5px] font-medium leading-4 text-[#3A3A38] shadow-[0_0_0_1px_#0000000D,0_6px_16px_-8px_#00000033]">
+          <span className="rounded-full bg-white/85 px-3 py-1 text-[12.5px] font-medium leading-4 text-[color:var(--ht-3a3a38)] shadow-[0_0_0_1px_var(--h-0000000d),0_6px_16px_-8px_var(--h-00000033)]">
             {`${host.name}'s computer is asleep`}
           </span>
-          <span className="max-w-[300px] text-[12px] leading-4 text-[#6B6B6B]">{line}</span>
+          <span className="max-w-[300px] text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{line}</span>
         </div>
       )}
     </div>
@@ -1204,22 +1204,22 @@ function HomeScreen({ state, bot: b }: { state: AppState; bot: Bot }) {
   const time = now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\s?[AP]M/, "");
   const ampm = now.getHours() < 12 ? "AM" : "PM";
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-[#FDFFF6] px-6">
-      <div className="max-w-[210px] rounded-xl bg-white px-3 py-2 text-[11.5px] leading-[15px] text-[#3A3A38] shadow-[0_0_0_1px_#0000000F,0_6px_16px_-8px_#00000014]">
+    <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-[color:var(--hb-fdfff6)] px-6">
+      <div className="max-w-[210px] rounded-xl bg-white px-3 py-2 text-[11.5px] leading-[15px] text-[color:var(--ht-3a3a38)] shadow-[0_0_0_1px_var(--h-0000000f),0_6px_16px_-8px_var(--h-00000014)]">
         {readOnly(state) ? "This is my computer. Watch me work." : "This is my computer. Watch me work, or take over when you need to."}
       </div>
       <Mascot botId={b.id} color={b.color} size={52} />
       <div className="flex items-end gap-1">
-        <span className="text-[40px] font-medium leading-[42px] tracking-[-0.04em] text-[#2E3300]">{time}</span>
-        <span className="pb-1 text-[11px] text-[#6B6B6B]">{ampm}</span>
+        <span className="text-[40px] font-medium leading-[42px] tracking-[-0.04em] text-[color:var(--ht-2e3300)]">{time}</span>
+        <span className="pb-1 text-[11px] text-[color:var(--ht-6b6b6b)]">{ampm}</span>
       </div>
-      <span className="text-[14px] leading-5 text-[#3A3A38]">Welcome back, {b.name}</span>
+      <span className="text-[14px] leading-5 text-[color:var(--ht-3a3a38)]">Welcome back, {b.name}</span>
       {apps.length > 0 && (
         <div className="flex gap-3 pt-2.5">
           {apps.map((x) => (
             <div key={x.app} className="flex w-[52px] flex-col items-center gap-1">
               <AppLogo app={x.app} name={x.appName} size={34} />
-              <span className="w-full truncate text-center text-[10px] leading-[13px] text-[#3A3A38]">{x.appName.replace("Google ", "")}</span>
+              <span className="w-full truncate text-center text-[10px] leading-[13px] text-[color:var(--ht-3a3a38)]">{x.appName.replace("Google ", "")}</span>
             </div>
           ))}
         </div>
@@ -1251,7 +1251,7 @@ function NoComputer({ state, bot: b, host }: { state: AppState; bot: Bot; /** Th
     if (b.runsOn !== "mac" && state.shared.role === "admin" && state.shared.screens?.includes(b.id)) return <SharedScreen state={state} bot={b} />;
     const orgoUrl = b.runsOn !== "mac" && (state.shared.role === "admin" || state.shared.computer) ? state.shared.orgoUrl : undefined;
     return (
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 py-2 text-[14px] leading-5 text-[#6B6B6B]">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 py-2 text-[14px] leading-5 text-[color:var(--ht-6b6b6b)]">
         <span>{`${b.name} works on ${b.runsOn === "mac" ? yourMac(state) : "the owner's computer"}. Its work shows in the chat.`}</span>
         {browserLine(state, b) && <span data-browser-why>{browserLine(state, b)}</span>}
         {orgoUrl && <OrgoLink href={orgoUrl} label={state.shared.role === "admin" ? SHARED_SCREEN_WORDS.open : SHARED_SCREEN_WORDS.watch} />}
@@ -1286,7 +1286,7 @@ function NoComputer({ state, bot: b, host }: { state: AppState; bot: Bot; /** Th
           }
         />
       ) : (
-        <button onClick={() => void post("/api/computer", { botId: b.id })} className="rounded-full bg-ink px-4 py-2 text-[13px] font-semibold leading-4 text-white">
+        <button onClick={() => void post("/api/computer", { botId: b.id })} className="rounded-full bg-[color:var(--hb-0a0a0a)] px-4 py-2 text-[13px] font-semibold leading-4 text-[color:var(--bops-on-fill)]">
           {`Set up ${host.name}'s computer`}
         </button>
       )}
@@ -1297,7 +1297,7 @@ function NoComputer({ state, bot: b, host }: { state: AppState; bot: Bot; /** Th
 /** The workspace on orgo.ai, where its computers are too: opened in the browser. */
 function OrgoLink({ href, label }: { href: string; label: string }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="rounded-full px-2.5 py-1 text-[13px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E6E6E3] hover:bg-black/[0.04]">
+    <a href={href} target="_blank" rel="noreferrer" className="rounded-full px-2.5 py-1 text-[13px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--bops-tint)]/[0.04]">
       {label}
     </a>
   );
@@ -1332,10 +1332,10 @@ function WakeButton({ botId, onAwake }: { botId: string; onAwake?: () => void })
   };
   return (
     <>
-      <button type="button" disabled={busy} onClick={() => void wake()} className="rounded-full px-2.5 py-1 text-[13px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E6E6E3] hover:bg-black/[0.04] disabled:opacity-50">
+      <button type="button" disabled={busy} onClick={() => void wake()} className="rounded-full px-2.5 py-1 text-[13px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--bops-tint)]/[0.04] disabled:opacity-50">
         {SHARED_SCREEN_WORDS.wake}
       </button>
-      {said && <span role="status" className="basis-full text-[12.5px] leading-4 text-[#6B6B6B]">{said}</span>}
+      {said && <span role="status" className="basis-full text-[12.5px] leading-4 text-[color:var(--ht-6b6b6b)]">{said}</span>}
     </>
   );
 }
@@ -1346,9 +1346,9 @@ function SharedScreen({ state, bot: b }: { state: AppState; bot: Bot }) {
   const orgoUrl = state.shared?.orgoUrl;
   if (failed)
     return (
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 py-2 text-[14px] leading-5 text-[#6B6B6B]">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 py-2 text-[14px] leading-5 text-[color:var(--ht-6b6b6b)]">
         <span>{`${SHARED_SCREEN_WORDS.failed} ${SHARED_SCREEN_WORDS.asleep(b.name)}`}</span>
-        <button type="button" onClick={() => setFailed(false)} className="rounded-full px-2.5 py-1 text-[13px] font-medium leading-4 text-ink hover:bg-black/[0.04]">
+        <button type="button" onClick={() => setFailed(false)} className="rounded-full px-2.5 py-1 text-[13px] font-medium leading-4 text-ink hover:bg-[color:var(--bops-tint)]/[0.04]">
           Try again
         </button>
         {cloudWakes(state) && <WakeButton botId={b.id} onAwake={() => setFailed(false)} />}
@@ -1361,7 +1361,7 @@ function SharedScreen({ state, bot: b }: { state: AppState; bot: Bot }) {
         <LiveDesktop botId={b.id} display={99} interactive={control} planUrl={`/api/workspaces/shared/screen?bot=${encodeURIComponent(b.id)}`} bot={b} busy={control} onFail={() => setFailed(true)} className="h-full w-full" />
       </div>
       <div className="flex flex-wrap items-center gap-2 px-1">
-        <button type="button" onClick={() => setControl((x) => !x)} className={`rounded-full px-3 py-1 text-[13px] font-medium leading-4 ${control ? "bg-ink text-white" : "text-ink shadow-[0_0_0_1px_#E6E6E3] hover:bg-black/[0.04]"}`}>
+        <button type="button" onClick={() => setControl((x) => !x)} className={`rounded-full px-3 py-1 text-[13px] font-medium leading-4 ${control ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "text-ink shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--bops-tint)]/[0.04]"}`}>
           {control ? SHARED_SCREEN_WORDS.release : SHARED_SCREEN_WORDS.control}
         </button>
         {orgoUrl && <OrgoLink href={orgoUrl} label={SHARED_SCREEN_WORDS.open} />}
@@ -1388,7 +1388,7 @@ export function ComputerSummary({ state, bot: b, className = "", onOpen }: { sta
       <MonitorIcon size={16} color="#0A0A0A" />
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="text-[13px] font-semibold leading-4">Computer</span>
-        <span className="truncate text-[12px] leading-4 text-[#6B6B6B]">
+        <span className="truncate text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
           {mac
             ? computerWords("Browsers on this Mac")
             : state.shared && b.runsOn === "mac"
@@ -1402,9 +1402,9 @@ export function ComputerSummary({ state, bot: b, className = "", onOpen }: { sta
                     : "Its own, set up on its first task"}
         </span>
       </div>
-      {info?.computer && <span className="shrink-0 font-mono text-[12px] leading-4 text-[#6B6B6B]">{`${info.computer.status === "suspended" ? "asleep" : info.computer.status} · ${info.computer.cpu} CPU`}</span>}
+      {info?.computer && <span className="shrink-0 font-mono text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{`${info.computer.status === "suspended" ? "asleep" : info.computer.status} · ${info.computer.cpu} CPU`}</span>}
       {onOpen && (
-        <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden className="shrink-0 text-[#9A9A98] transition-transform group-hover/pc:translate-x-0.5 group-hover/pc:text-ink">
+        <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden className="shrink-0 text-[color:var(--ht-9a9a98)] transition-transform group-hover/pc:translate-x-0.5 group-hover/pc:text-ink">
           <path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )}
@@ -1424,12 +1424,12 @@ export function ComputerPeek({ state, bot: b, onOpen }: { state: AppState; bot: 
       onClick={onOpen}
       aria-label={label}
       title={label}
-      className="relative flex size-11 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_#E6E6E3,0_8px_20px_-10px_#00000040] hover:shadow-[0_0_0_1px_#C9C9C6,0_8px_20px_-10px_#00000040]"
+      className="relative flex size-11 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_var(--h-e6e6e3),0_8px_20px_-10px_var(--h-00000040)] hover:shadow-[0_0_0_1px_var(--h-c9c9c6),0_8px_20px_-10px_var(--h-00000040)]"
     >
       <MonitorIcon size={18} color="#0A0A0A" />
       {(needsYou || running.length > 0) && (
         <span
-          className={`absolute right-[7px] top-[7px] size-[9px] rounded-full shadow-[0_0_0_2px_#FFFFFF] ${needsYou ? "bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A]" : "animate-pulse bg-[#2BB673]"}`}
+          className={`absolute right-[7px] top-[7px] size-[9px] rounded-full shadow-[0_0_0_2px_var(--h-ffffff)] ${needsYou ? "bg-highlighter shadow-[0_0_0_1.5px_var(--h-0a0a0a)]" : "animate-pulse bg-[color:var(--hb-2bb673)]"}`}
         />
       )}
     </button>
@@ -1451,7 +1451,7 @@ function AddressBar({ botId, display }: { botId: string; display: number }) {
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         placeholder="Go to an address"
-        className="w-[220px] rounded-full bg-white/70 px-3.5 py-1.5 text-[13px] leading-[18px] text-ink outline-none placeholder:text-[#6B6B6B] focus:bg-white"
+        className="w-[220px] rounded-full bg-white/70 px-3.5 py-1.5 text-[13px] leading-[18px] text-ink outline-none placeholder:text-[color:var(--ht-6b6b6b)] focus:bg-white"
       />
     </form>
   );
@@ -1463,13 +1463,13 @@ function AddressBar({ botId, display }: { botId: string; display: number }) {
  */
 function StatusDot({ kind, pulse, shared }: { kind: ScreenKind; pulse?: boolean; shared?: boolean }) {
   const look: Record<ScreenKind, string> = {
-    needsYou: "bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A]",
-    working: "bg-[#2BB673]",
-    helper: "bg-[#2BB673]",
-    driving: "bg-ink",
-    held: "shadow-[inset_0_0_0_1.5px_#C9B800] bg-[#FFF7B0]",
-    watched: "bg-[#4C7BF3]",
-    free: "shadow-[inset_0_0_0_1.2px_#C9C9C6]",
+    needsYou: "bg-highlighter shadow-[0_0_0_1.5px_var(--h-0a0a0a)]",
+    working: "bg-[color:var(--hb-2bb673)]",
+    helper: "bg-[color:var(--hb-2bb673)]",
+    driving: "bg-[color:var(--hb-0a0a0a)]",
+    held: "shadow-[inset_0_0_0_1.5px_var(--h-c9b800)] bg-[color:var(--hb-fff7b0)]",
+    watched: "bg-[color:var(--hb-4c7bf3)]",
+    free: "shadow-[inset_0_0_0_1.2px_var(--h-c9c9c6)]",
   };
   const words: Record<ScreenKind, string> = shared
     ? { needsYou: "Needs the owner", working: "Working", helper: "A helper is working", driving: "The owner is driving", held: "Held while it waits on the owner", watched: "Watched", free: "Free" }
@@ -1497,11 +1497,11 @@ function TeamRow({ state, mainId, hidden, onShow }: { state: AppState; mainId: s
   const leftCount = team.filter((t) => t.kind === "free").length;
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2 text-[12px] leading-4 text-[#6B6B6B]">
+      <div className="flex items-center gap-2 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
         <span className="font-medium text-ink">Team</span>
         <span>{[liveCount && `${liveCount} working`, leftCount && `${leftCount} finished lately`].filter(Boolean).join(" · ") || "nothing live right now"}</span>
         <span className="flex-1" />
-        <button onClick={() => setGrid(!grid)} className="rounded-full bg-white px-2 py-[2px] font-medium text-ink shadow-[0_0_0_1px_#E2E2DF] hover:bg-[#F7F7F6]">
+        <button onClick={() => setGrid(!grid)} className="rounded-full bg-white px-2 py-[2px] font-medium text-ink shadow-[0_0_0_1px_var(--h-e2e2df)] hover:bg-[color:var(--hb-f7f7f6)]">
           {grid ? "Row" : "Grid"}
         </button>
       </div>
@@ -1519,7 +1519,7 @@ function TeamRow({ state, mainId, hidden, onShow }: { state: AppState; mainId: s
               onClick={() => onShow?.(t.computerBotId, t.display)}
               title={`${who?.name ?? "A bot"} · screen ${t.no} of ${host?.name ?? "its"}'s computer · ${words}${t.doing ? ` · now: ${t.doing}` : ""}`}
               style={t.kind === "needsYou" ? { boxShadow: "0 0 0 2px #0A0A0A, 0 0 0 4px #E8FF3A" } : undefined}
-              className={`group/team relative flex min-w-0 shrink-0 flex-col gap-1.5 rounded-xl bg-[#F7F7F6] p-1.5 text-left ${grid ? "" : "w-[170px]"}`}
+              className={`group/team relative flex min-w-0 shrink-0 flex-col gap-1.5 rounded-xl bg-[color:var(--hb-f7f7f6)] p-1.5 text-left ${grid ? "" : "w-[170px]"}`}
             >
               <div className={`relative shrink-0 overflow-hidden rounded-[7px] ${grid ? "h-[110px]" : "h-[52px]"}`} style={{ backgroundImage: host ? botWash(host) : undefined }}>
                 {snap ? (
@@ -1537,8 +1537,8 @@ function TeamRow({ state, mainId, hidden, onShow }: { state: AppState; mainId: s
                 <StatusDot kind={t.kind} pulse={t.kind === "needsYou"} shared={!!state.shared} />
                 {who && <Mascot botId={who.id} color={who.color} size={14} antenna={false} />}
                 <span className="shrink-0 font-semibold">{who?.name ?? "A bot"}</span>
-                <span className="shrink-0 tabular-nums text-[#9A9A98]">{t.no}</span>
-                <span className="truncate text-[#6B6B6B]">{words}</span>
+                <span className="shrink-0 tabular-nums text-[color:var(--ht-9a9a98)]">{t.no}</span>
+                <span className="truncate text-[color:var(--ht-6b6b6b)]">{words}</span>
               </div>
             </button>
           );

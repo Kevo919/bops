@@ -246,6 +246,13 @@ await check("the style paints what the look says, and nothing it doesn't", () =>
   assert.match(all, /zoom: 1.2/);
   assert.match(all, /\.x\{color:red\}$/);
   assert.match(Theme.lookCssText({ theme: "system" }), /@media \(prefers-color-scheme: dark\)/);
+  // Dark turns the whole window: the page behind the sidebar, and the window's hard-coded colors (look-palette).
+  assert.match(all, /--background: #17191c/);
+  assert.match(all, /--hb-f2f2f0: #[0-9a-f]{6};/);
+  assert.match(all, /--ht-6b6b6b: #[0-9a-f]{6};/);
+  const sys = Theme.lookCssText({ theme: "system" });
+  assert.ok(sys.indexOf("--hb-f2f2f0") > sys.indexOf("@media (prefers-color-scheme: dark)") && sys.trim().endsWith("}"), "System's palette only under the dark preference");
+  assert.ok(!Theme.lookCssText({ theme: "light", accent: "#1f6f43" }).includes("--hb-"), "light paints no palette over the light one");
   assert.equal(Theme.lookCssText({}), "");
   assert.equal(Theme.lookCssText({ fontScale: 1 }), "", "the usual size styles nothing");
 });

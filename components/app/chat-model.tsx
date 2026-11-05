@@ -41,7 +41,7 @@ export function ChatModelPick({ state, chat: c, onError }: { state: AppState; ch
           setSaving(false);
         }
       }}
-      className="h-[30px] max-w-[150px] shrink-0 cursor-pointer truncate rounded-full bg-transparent px-2 text-[12.5px] leading-4 text-[#3A3A38] outline-none hover:bg-[#F2F2F0]"
+      className="h-[30px] max-w-[150px] shrink-0 cursor-pointer truncate rounded-full bg-transparent px-2 text-[12.5px] leading-4 text-[color:var(--ht-3a3a38)] outline-none hover:bg-[color:var(--hb-f2f2f0)]"
     >
       <ChatModelOptions keys={keys} value={value} auto="Auto (OpenAI)" />
     </select>

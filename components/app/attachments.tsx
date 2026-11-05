@@ -106,18 +106,18 @@ export function AttachmentTray({ items, onRemove }: { items: Attachment[]; onRem
       {items.map((a) => (
         <div key={a.key} className="group/att relative size-[60px] shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element -- a local preview of a file being attached */}
-          <img src={a.preview} alt="" className={`size-full rounded-[12px] object-cover shadow-[0_0_0_1px_#0000001A] ${a.status === "failed" ? "opacity-40" : ""}`} />
+          <img src={a.preview} alt="" className={`size-full rounded-[12px] object-cover shadow-[0_0_0_1px_var(--h-0000001a)] ${a.status === "failed" ? "opacity-40" : ""}`} />
           {a.status === "uploading" && (
             <span className="absolute inset-0 flex items-center justify-center rounded-[12px] bg-white/50">
-              <span className="size-4 animate-spin rounded-full border-2 border-[#0A0A0A]/20 border-t-[#0A0A0A]" />
+              <span className="size-4 animate-spin rounded-full border-2 border-[color:var(--h-0a0a0a)]/20 border-t-[color:var(--h-0a0a0a)]" />
             </span>
           )}
-          {a.status === "failed" && <span data-tip={a.error ?? "Couldn't attach this"} className="absolute inset-0 flex items-center justify-center text-[11px] font-medium text-[#B42318]">Failed</span>}
+          {a.status === "failed" && <span data-tip={a.error ?? "Couldn't attach this"} className="absolute inset-0 flex items-center justify-center text-[11px] font-medium text-[color:var(--ht-b42318)]">Failed</span>}
           <button
             type="button"
             onClick={() => onRemove(a.key)}
             aria-label="Remove image"
-            className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-[#0A0A0A] text-white shadow-[0_0_0_2px_#FFFFFF]"
+            className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)] shadow-[0_0_0_2px_var(--h-ffffff)]"
           >
             <svg width="8" height="8" viewBox="0 0 12 12" aria-hidden>
               <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -137,7 +137,7 @@ export function MessageImages({ images, previews, align = "end" }: { images?: Pi
   // A workspace shared with the user: its images are the owner's, kept where they were sent from, not here.
   if (!previews && !readAllowed(srcs[0]))
     return (
-      <div className={`rounded-[14px] px-3 py-2 text-[12.5px] leading-4 text-[#6B6B6B] shadow-[0_0_0_1px_#E6E6E3] ${align === "end" ? "self-end" : "self-start"}`}>
+      <div className={`rounded-[14px] px-3 py-2 text-[12.5px] leading-4 text-[color:var(--ht-6b6b6b)] shadow-[0_0_0_1px_var(--h-e6e6e3)] ${align === "end" ? "self-end" : "self-start"}`}>
         {srcs.length === 1 ? "An image" : `${srcs.length} images`}. Images in a shared workspace aren&apos;t shown yet.
       </div>
     );
@@ -146,7 +146,7 @@ export function MessageImages({ images, previews, align = "end" }: { images?: Pi
   return (
     <div className={`flex flex-wrap gap-1.5 ${align === "end" ? "justify-end self-end" : "self-start"} ${one ? "max-w-[300px]" : "max-w-[320px]"}`}>
       {srcs.map((src, i) => (
-        <button key={src} type="button" onClick={() => setOpen(src)} aria-label="Open image" className="overflow-hidden rounded-[16px] shadow-[0_0_0_1px_#0000000F]">
+        <button key={src} type="button" onClick={() => setOpen(src)} aria-label="Open image" className="overflow-hidden rounded-[16px] shadow-[0_0_0_1px_var(--h-0000000f)]">
           {/* eslint-disable-next-line @next/next/no-img-element -- images the user attached, served by this app */}
           <img
             src={src}
@@ -182,7 +182,7 @@ function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
       className="fixed inset-0 z-[900] flex animate-[screen-in_150ms_ease-out] cursor-zoom-out items-center justify-center bg-black/70 p-10 backdrop-blur-sm"
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- full-size view of an attached image */}
-      <img src={src} alt="" className="max-h-full max-w-full rounded-[12px] shadow-[0_24px_60px_-20px_#000000]" />
+      <img src={src} alt="" className="max-h-full max-w-full rounded-[12px] shadow-[0_24px_60px_-20px_var(--h-000000)]" />
     </div>,
     document.body,
   );

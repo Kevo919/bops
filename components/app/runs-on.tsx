@@ -25,12 +25,12 @@ const CHOICES = [
  * it's back: never on the Mac meanwhile), being set up or stopped, or why it couldn't start.
  */
 export function runnerNow(x: RunnerState | undefined, asleep: boolean, down?: string): { text: string; dot: string } {
-  if (!x) return { text: "Not set up yet", dot: "bg-[#C9C9C6]" };
-  if (x.status === "running" && down) return { text: `Its computer ${down === "error" ? "is broken" : `is ${down}`}. Its routines wait until it's back.`, dot: "bg-[#E59A0B]" };
-  if (x.status === "running") return asleep ? { text: "Asleep", dot: "bg-[#C9C9C6]" } : { text: "Running", dot: "bg-[#2BB673]" };
-  if (x.status === "installing") return { text: "Setting up", dot: "bg-[#E59A0B]" };
-  if (x.status === "stopping") return { text: "Stopping", dot: "bg-[#C9C9C6]" };
-  return { text: x.error?.trim() ? `Couldn't start: ${undash(x.error.trim())}` : "Couldn't start", dot: "bg-[#D92D20]" };
+  if (!x) return { text: "Not set up yet", dot: "bg-[color:var(--hb-c9c9c6)]" };
+  if (x.status === "running" && down) return { text: `Its computer ${down === "error" ? "is broken" : `is ${down}`}. Its routines wait until it's back.`, dot: "bg-[color:var(--hb-e59a0b)]" };
+  if (x.status === "running") return asleep ? { text: "Asleep", dot: "bg-[color:var(--hb-c9c9c6)]" } : { text: "Running", dot: "bg-[color:var(--hb-2bb673)]" };
+  if (x.status === "installing") return { text: "Setting up", dot: "bg-[color:var(--hb-e59a0b)]" };
+  if (x.status === "stopping") return { text: "Stopping", dot: "bg-[color:var(--hb-c9c9c6)]" };
+  return { text: x.error?.trim() ? `Couldn't start: ${undash(x.error.trim())}` : "Couldn't start", dot: "bg-[color:var(--hb-d92d20)]" };
 }
 
 /** The computers this workspace's bots work on, each once, as the bot whose computer it is. */
@@ -71,24 +71,24 @@ export function RunsOnChoice({ state, info, busy, error, onPick }: { state: AppS
               <span className="text-[14px] font-semibold">{computerWords(c.name)}</span>
               {radio(on === c.id)}
             </span>
-            <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">{computerWords(c.line)}</span>
+            <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-6b6b6b)]">{computerWords(c.line)}</span>
           </button>
         ))}
       </div>
-      {info?.missing && <span className="text-[12px] leading-4 text-[#6B6B6B]">Cloud isn&apos;t available yet.</span>}
-      {unheard && !error && <span className="text-[12px] leading-4 text-[#B42318]">Couldn&apos;t reach Orgo. Try again.</span>}
-      {error && <span className="text-[12px] leading-4 text-[#B42318]">{error}</span>}
+      {info?.missing && <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">Cloud isn&apos;t available yet.</span>}
+      {unheard && !error && <span className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">Couldn&apos;t reach Orgo. Try again.</span>}
+      {error && <span className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">{error}</span>}
       {!!shown.length && (
         <div className="flex flex-col">
           {shown.map(({ id, host }) => {
             const now = runnerNow(state.runners?.[id], !!info?.asleep.includes(id), info?.down?.[id]);
             return (
-              <div key={id} className="flex items-center border-b border-[#F0F0EE] py-2.5 last:border-0">
+              <div key={id} className="flex items-center border-b border-[color:var(--h-f0f0ee)] py-2.5 last:border-0">
                 <span className="flex w-[200px] items-center gap-2">
                   <Mascot botId={host.id} color={host.color} size={20} />
                   <span className="text-[13.5px] font-medium">{host.name}&apos;s computer</span>
                 </span>
-                <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] text-[#3A3A38]">
+                <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] text-[color:var(--ht-3a3a38)]">
                   <span className={`size-[7px] shrink-0 rounded-full ${now.dot}`} />
                   <span className="min-w-0 truncate" data-tip={now.text.length > 60 ? now.text : undefined}>
                     {now.text}

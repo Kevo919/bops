@@ -61,7 +61,7 @@ export const CONNECTIONS: Row[] = [
 /** The row in Settings, Services where each one's key is pasted (services.tsx), so nobody edits .env.local by hand. */
 const SERVICE_ROW: Record<string, "apps" | "composio-account" | "zapier"> = { COMPOSIO_API_KEY: "apps", COMPOSIO_MCP_URL: "composio-account", ZAPIER_MCP_URL: "zapier" };
 
-const DOT: Record<string, string> = { ok: "bg-[#12B76A]", set: "bg-[#F5B83D]", error: "bg-[#D92D20]", off: "bg-[#C9C9C6]" };
+const DOT: Record<string, string> = { ok: "bg-[color:var(--hb-12b76a)]", set: "bg-[color:var(--hb-f5b83d)]", error: "bg-[color:var(--hb-d92d20)]", off: "bg-[color:var(--hb-c9c9c6)]" };
 
 /** A row's status, in plain words, and its dot. */
 export function statusOf(r: KeyCheckResult | undefined, checking: boolean): { tone: keyof typeof DOT; words: string } {
@@ -73,7 +73,7 @@ export function statusOf(r: KeyCheckResult | undefined, checking: boolean): { to
   return { tone: "error", words: why[r.status] ?? "Not working" };
 }
 
-const light = "rounded-full px-3 py-1 text-[12px] font-medium leading-4 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F2F2F0] disabled:opacity-40";
+const light = "rounded-full px-3 py-1 text-[12px] font-medium leading-4 shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f2f2f0)] disabled:opacity-40";
 
 /** Settings, Logins, where connected apps are added (bops-app.tsx's Settings nav). */
 const openLogins = () => document.querySelector<HTMLButtonElement>('[data-settings-nav="logins"]')?.click();
@@ -136,29 +136,29 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
     return s && s !== "not set";
   }).length;
   return (
-    <div data-connections className="flex flex-col rounded-[14px] bg-white p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+    <div data-connections className="flex flex-col rounded-[14px] bg-white p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
       <div className="flex items-center gap-3">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-[13.5px] font-semibold leading-[18px]">Connections</span>
           <span className="text-[12px] leading-4 text-pencil">Outside accounts your bots can use. Keys go in .env.local on the computer running Bops, like the ones on the Keys card; they are never shown here.</span>
-          <span className="pt-0.5 text-[12px] leading-4 text-[#3A3A38]">{busy === "refresh" ? "Reading…" : rows ? `${on} of ${CONNECTIONS.length} set up` : "Status unavailable"}</span>
+          <span className="pt-0.5 text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">{busy === "refresh" ? "Reading…" : rows ? `${on} of ${CONNECTIONS.length} set up` : "Status unavailable"}</span>
         </div>
         <button className={light} disabled={busy !== null} onClick={() => { setBusy("refresh"); setError(null); void load(); }}>Refresh</button>
       </div>
       <div className="flex flex-col gap-2 pt-3" aria-live="polite">
-        {error && <p role="alert" className="text-[12px] text-[#B00020]">{error}</p>}
+        {error && <p role="alert" className="text-[12px] text-[color:var(--ht-b00020)]">{error}</p>}
         {CONNECTIONS.map((c) => {
           const r = rows?.find((x) => x.key === c.key);
           const s = statusOf(r, busy === c.key);
           const checked = r && r.status !== "set" && r.status !== "not set";
           const row = (
-            <div key={c.key} data-connection={c.key} className="flex flex-col gap-1 rounded-md px-2.5 py-2 shadow-[0_0_0_1px_#E6E6E3]">
+            <div key={c.key} data-connection={c.key} className="flex flex-col gap-1 rounded-md px-2.5 py-2 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
               <div className="flex items-center gap-2">
                 <span data-dot={s.tone} className={`size-[8px] shrink-0 rounded-full ${DOT[s.tone]}`} />
                 <span className="min-w-0 flex-1 text-[12.5px] font-medium">{c.name}</span>
                 <button className={light} disabled={busy !== null || !r || r.status === "not set"} aria-label={`Check ${c.name}`} onClick={() => void check(c.key)}>Check</button>
               </div>
-              <div data-status className="text-[12px] text-[#3A3A38]">{s.words}</div>
+              <div data-status className="text-[12px] text-[color:var(--ht-3a3a38)]">{s.words}</div>
               {checked && r.message && <div data-message className="text-[12px] text-pencil">{r.message}</div>}
               {r?.shown && <div data-shown className="text-[12px] text-pencil">Saved: {r.shown}</div>}
               <p className="text-[12px] text-pencil">{c.what}</p>

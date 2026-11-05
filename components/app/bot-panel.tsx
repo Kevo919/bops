@@ -100,11 +100,11 @@ export function BotPanel({
           key={t}
           onClick={() => (t === "routines" ? openRoutines(null) : onTab(t))}
           className={`rounded-[10px] px-3 py-1.5 text-[14px] capitalize leading-[18px] ${
-            tab === t ? (t === "details" ? "bg-white/70 font-medium text-ink shadow-[0_0_0_1px_#0000000F]" : "bg-[#EEEEEC] font-medium text-ink") : "text-[#6B6B6B] hover:text-ink"
+            tab === t ? (t === "details" ? "bg-white/70 font-medium text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "bg-[color:var(--hb-eeeeec)] font-medium text-ink") : "text-[color:var(--ht-6b6b6b)] hover:text-ink"
           }`}
         >
           {t}
-          {t === "phone" && <span className="ml-1 align-[1px] text-[10px] font-semibold uppercase tracking-[0.04em] text-[#9A9A98]">soon</span>}
+          {t === "phone" && <span className="ml-1 align-[1px] text-[10px] font-semibold uppercase tracking-[0.04em] text-[color:var(--ht-9a9a98)]">soon</span>}
         </button>
       ))}
     </div>
@@ -140,7 +140,7 @@ export function BotPanel({
         <Mascot botId={b.id} color={b.color} size={52} />
         <div className="flex flex-col items-center gap-px">
           <div className="text-[20px] font-semibold leading-6 tracking-[-0.01em]">{b.name}</div>
-          <div className="flex items-center gap-1.5 text-[13px] leading-4 text-[#6B6B6B]">
+          <div className="flex items-center gap-1.5 text-[13px] leading-4 text-[color:var(--ht-6b6b6b)]">
             {b.isMain ? "Chief of Staff · runs the team" : `${b.role} · Bops team`}
             <BotBrainBadge state={state} bot={b} />
           </div>
@@ -169,7 +169,7 @@ function ExpandButton({ onClick }: { onClick: () => void }) {
       aria-label={SETTINGS_WORDS.openFull}
       data-tip={SETTINGS_WORDS.openFull}
       data-open-full
-      className="absolute left-4 top-4 flex size-8 shrink-0 items-center justify-center rounded-full bg-white/60 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6] max-md:size-10"
+      className="absolute left-4 top-4 flex size-8 shrink-0 items-center justify-center rounded-full bg-white/60 shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f7f7f6)] max-md:size-10"
     >
       <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden>
         <path d="M8.5 1.5h4v4M12.5 1.5L8 6M5.5 12.5h-4v-4M1.5 12.5L6 8" fill="none" stroke="#0A0A0A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -248,21 +248,21 @@ function Details({
   };
 
   return (
-    <section className="motion-fade-in relative flex min-h-0 min-w-0 flex-col items-center gap-3.5 overflow-y-auto px-6 pb-5 pt-6" style={{ backgroundImage: `linear-gradient(180deg, transparent 40%, #FFFFFF 100%), ${botWash(b)}`, backgroundSize: "100% 520px", backgroundRepeat: "no-repeat", backgroundColor: "#FFFFFF" }}>
+    <section className="motion-fade-in relative flex min-h-0 min-w-0 flex-col items-center gap-3.5 overflow-y-auto px-6 pb-5 pt-6" style={{ backgroundImage: `linear-gradient(180deg, transparent 40%, var(--color-white) 100%), ${botWash(b)}`, backgroundSize: "100% 520px", backgroundRepeat: "no-repeat", backgroundColor: "var(--color-white)" }}>
       {expand}
       {close}
-      <div className={`flex size-[104px] items-center justify-center rounded-full ${glass} shadow-[inset_0_0_0_2px_#FFFFFF,0_14px_30px_-12px_#2832002E,0_0_0_1px_#0000000F]`}>
+      <div className={`flex size-[104px] items-center justify-center rounded-full ${glass} shadow-[inset_0_0_0_2px_var(--h-ffffff),0_14px_30px_-12px_var(--h-2832002e),0_0_0_1px_var(--h-0000000f)]`}>
         <Mascot botId={b.id} color={b.color} size={70} />
       </div>
       <div className="flex flex-col items-center gap-0.5">
         <div className="text-[26px] font-bold leading-[30px] tracking-[-0.02em]">{b.name}</div>
-        <div className="flex items-center gap-1.5 text-[13px] font-medium leading-4 text-[#3A3A38]">
+        <div className="flex items-center gap-1.5 text-[13px] font-medium leading-4 text-[color:var(--ht-3a3a38)]">
           {b.isMain ? "Chief of Staff · runs the team" : `${b.role} · Bops team`}
-          <BotBrainBadge state={state} bot={b} className="bg-white/60 shadow-[0_0_0_1px_#0000000F]" />
+          <BotBrainBadge state={state} bot={b} className="bg-white/60 shadow-[0_0_0_1px_var(--h-0000000f)]" />
         </div>
         {/* Its place on the team chart: who it answers to and how many it may ask, opening the chart at its sheet. */}
         {onOpenChart && chartLine(state, b.id) && (
-          <button type="button" data-chart-line onClick={() => onOpenChart(b.id)} className="mt-1 flex items-center gap-1 text-[12.5px] leading-4 text-[#6B6B6B] hover:text-ink hover:underline">
+          <button type="button" data-chart-line onClick={() => onOpenChart(b.id)} className="mt-1 flex items-center gap-1 text-[12.5px] leading-4 text-[color:var(--ht-6b6b6b)] hover:text-ink hover:underline">
             <ChartIcon size={12} />
             {chartLine(state, b.id)}
           </button>
@@ -282,7 +282,7 @@ function Details({
         {!line && !b.phone && <GetNumber bot={b} plan={plan} room={numberRoom} onUpgrade={onUpgrade} />}
         {/* Whose phone the number is linked to: the first to call or text it, then calls and texts from it count as the user. */}
         {reach && <LineLink key={reach} phone={reach} className="px-4 pb-[11px]" />}
-        <div className="h-px bg-black/[0.05]" />
+        <div className="h-px bg-[color:var(--bops-tint)]/[0.05]" />
         <Field label={b.mail?.paused ? `email · paused until ${you(state)} upgrade${state.shared ? "s" : ""} again` : "email"} value={b.email} empty="No inbox yet." />
         {!b.email && emailRoom && <PlanRoom short={emailRoom} onUpgrade={onUpgrade} />}
         {!b.email && !emailRoom && !plan.room && plan.planNeeded && <PlanNeeded what="An email address" bot={b} onUpgrade={onUpgrade} />}
@@ -309,16 +309,16 @@ function Details({
       <div className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 ${glass}`}>
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="text-[13px] font-semibold leading-4">Works on</span>
-          <span className="text-[12px] leading-4 text-[#6B6B6B]">
+          <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
             {(b.runsOn ?? "auto") === "auto" ? `Its cloud computer, or ${yourMac(state)} when a task needs it` : b.runsOn === "mac" ? computerWords`${Your(state)} Mac, always` : "Its cloud computer, always"}
           </span>
         </div>
-        <div className="flex shrink-0 gap-0.5 rounded-full bg-black/[0.05] p-[3px]">
+        <div className="flex shrink-0 gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[3px]">
           {([["auto", "Auto"], ["cloud", "Cloud"], ["mac", computerWords`${Your(state)} Mac`]] as const).map(([v, label]) => (
             <button
               key={v}
               onClick={() => void post("/api/bots", { botId: b.id, runsOn: v }, "PATCH")}
-              className={`rounded-full px-2.5 py-1 text-[12px] leading-4 ${(b.runsOn ?? "auto") === v ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F]" : "text-[#6B6B6B] hover:text-ink"}`}
+              className={`rounded-full px-2.5 py-1 text-[12px] leading-4 ${(b.runsOn ?? "auto") === v ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "text-[color:var(--ht-6b6b6b)] hover:text-ink"}`}
             >
               {label}
             </button>
@@ -329,16 +329,16 @@ function Details({
       <div className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 ${glass}`}>
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="text-[13px] font-semibold leading-4">Approvals</span>
-          <span className="text-[12px] leading-4 text-[#6B6B6B]">
+          <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
             {b.autoApprove ? "Sends, posts and changes things without asking. Still asks before paying" : `Asks ${you(state)} before it sends, posts, deletes or pays`}
           </span>
         </div>
-        <div className="flex shrink-0 gap-0.5 rounded-full bg-black/[0.05] p-[3px]">
+        <div className="flex shrink-0 gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[3px]">
           {([[false, "Ask first"], [true, "Just do it"]] as const).map(([v, label]) => (
             <button
               key={label}
               onClick={() => void post("/api/bots", { botId: b.id, autoApprove: v }, "PATCH")}
-              className={`rounded-full px-2.5 py-1 text-[12px] leading-4 ${!!b.autoApprove === v ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F]" : "text-[#6B6B6B] hover:text-ink"}`}
+              className={`rounded-full px-2.5 py-1 text-[12px] leading-4 ${!!b.autoApprove === v ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "text-[color:var(--ht-6b6b6b)] hover:text-ink"}`}
             >
               {label}
             </button>
@@ -350,16 +350,16 @@ function Details({
         <div className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 ${glass}`}>
           <div className="flex min-w-0 flex-1 flex-col">
             <span className="text-[13px] font-semibold leading-4">Business data</span>
-            <span className="text-[12px] leading-4 text-[#6B6B6B]">
+            <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
               {b.dataOff ? "No lookups of companies, people or contacts" : "Looks up companies, people, work emails and company news. Cents a lookup, from your credit"}
             </span>
           </div>
-          <div className="flex shrink-0 gap-0.5 rounded-full bg-black/[0.05] p-[3px]">
+          <div className="flex shrink-0 gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[3px]">
             {([[false, "On"], [true, "Off"]] as const).map(([v, label]) => (
               <button
                 key={label}
                 onClick={() => void post("/api/bots", { botId: b.id, dataOff: v }, "PATCH")}
-                className={`rounded-full px-2.5 py-1 text-[12px] leading-4 ${!!b.dataOff === v ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F]" : "text-[#6B6B6B] hover:text-ink"}`}
+                className={`rounded-full px-2.5 py-1 text-[12px] leading-4 ${!!b.dataOff === v ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "text-[color:var(--ht-6b6b6b)] hover:text-ink"}`}
               >
                 {label}
               </button>
@@ -383,7 +383,7 @@ function Details({
         <button
           onClick={() => void post("/api/sessions", { botId: b.id }, "DELETE")}
           disabled={!running}
-          className={`flex-1 rounded-[14px] px-4 py-[11px] text-left text-[14px] leading-[18px] text-[#B42318] disabled:text-[#C9C9C6] ${glass}`}
+          className={`flex-1 rounded-[14px] px-4 py-[11px] text-left text-[14px] leading-[18px] text-[color:var(--ht-b42318)] disabled:text-[color:var(--ht-c9c9c6)] ${glass}`}
         >
           {running ? `Pause ${b.name} · ${running} running` : `${b.name} is idle`}
         </button>
@@ -395,7 +395,7 @@ function Details({
 }
 
 /** The panel's card look, which its full settings page uses too. */
-export const GLASS = "bg-white/60 shadow-[inset_0_0_0_1px_#FFFFFF,0_0_0_1px_#0000000F]";
+export const GLASS = "bg-white/60 shadow-[inset_0_0_0_1px_var(--h-ffffff),0_0_0_1px_var(--h-0000000f)]";
 
 /**
  * How a bot is reached, and what the plan says about a number or an email for it: the workspace's line (its main bot's
@@ -459,7 +459,7 @@ function PageRow({ title, line, icon, marks, onClick }: { title: string; line: s
       <span className="flex size-5 shrink-0 items-center justify-center text-ink">{icon}</span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-[13px] font-semibold leading-4">{title}</span>
-        <span className="text-[12px] leading-4 text-[#6B6B6B]">{line}</span>
+        <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{line}</span>
         {marks && marks.length > 1 && (
           <span className="mt-1 flex items-center gap-1.5" data-agent-marks>
             {marks.map((k) => (
@@ -468,7 +468,7 @@ function PageRow({ title, line, icon, marks, onClick }: { title: string; line: s
           </span>
         )}
       </span>
-      <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden className="shrink-0 text-[#9A9A98]">
+      <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden className="shrink-0 text-[color:var(--ht-9a9a98)]">
         <path d="M2 1.5L6.5 6 2 10.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </button>
@@ -531,7 +531,7 @@ export function ComputerChoice({ state, bot: b, className, onUpgrade }: { state:
       <div className="flex items-center gap-3">
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="text-[13px] font-semibold leading-4">Computer</span>
-          <span className="text-[12px] leading-4 text-[#6B6B6B]">
+          <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
             {b.isMain
               ? `Works on ${your(state)} free Bops computer, which ${main.name} has, with ${b.name}'s team`
               : shared
@@ -543,13 +543,13 @@ export function ComputerChoice({ state, bot: b, className, onUpgrade }: { state:
                   : "Its own cloud computer, a copy of the main bot's"}
           </span>
         </div>
-        <div className="flex shrink-0 gap-0.5 rounded-full bg-black/[0.05] p-[3px]">
+        <div className="flex shrink-0 gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[3px]">
           {([["shared", "Shared"], ["own", "Its own"]] as const).map(([v, label]) => (
             <button
               key={v}
               disabled={busy || (v === "own" && shared && !!noRoom)}
               onClick={() => void pick(v)}
-              className={`rounded-full px-2.5 py-1 text-[12px] leading-4 disabled:opacity-60 ${(v === "shared") === shared ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F]" : "text-[#6B6B6B] hover:text-ink"}`}
+              className={`rounded-full px-2.5 py-1 text-[12px] leading-4 disabled:opacity-60 ${(v === "shared") === shared ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "text-[color:var(--ht-6b6b6b)] hover:text-ink"}`}
             >
               {label}
             </button>
@@ -557,15 +557,15 @@ export function ComputerChoice({ state, bot: b, className, onUpgrade }: { state:
         </div>
       </div>
       {sure && (
-        <div className="motion-rise-in flex flex-col gap-2 rounded-xl bg-[#FEF3F2] px-3 py-2.5 shadow-[0_0_0_1px_#FECDCA]">
-          <span className="text-[12.5px] leading-[17px] text-[#3A3A38]">
+        <div className="motion-rise-in flex flex-col gap-2 rounded-xl bg-[color:var(--hb-fef3f2)] px-3 py-2.5 shadow-[0_0_0_1px_var(--h-fecdca)]">
+          <span className="text-[12.5px] leading-[17px] text-[color:var(--ht-3a3a38)]">
             {`Move ${b.name} to ${main.name}'s computer? Its own computer is deleted, with anything saved on it that ${main.name}'s doesn't have.`}
           </span>
           <div className="flex gap-2">
-            <button onClick={() => void pick("shared")} disabled={busy} className="rounded-full bg-[#B42318] px-3 py-1 text-[12.5px] font-semibold text-white disabled:opacity-60">
+            <button onClick={() => void pick("shared")} disabled={busy} className="rounded-full bg-[color:var(--hb-b42318)] px-3 py-1 text-[12.5px] font-semibold text-[color:var(--bops-on-fill)] disabled:opacity-60">
               {busy ? "Moving…" : "Move and delete"}
             </button>
-            <button onClick={() => setSure(false)} disabled={busy} className="rounded-full px-3 py-1 text-[12.5px] font-medium shadow-[0_0_0_1px_#E6E6E3]">
+            <button onClick={() => setSure(false)} disabled={busy} className="rounded-full px-3 py-1 text-[12.5px] font-medium shadow-[0_0_0_1px_var(--h-e6e6e3)]">
               Keep its own
             </button>
           </div>
@@ -579,7 +579,7 @@ export function ComputerChoice({ state, bot: b, className, onUpgrade }: { state:
           onUpgrade={"upgrade" in noRoom && noRoom.upgrade ? onUpgrade : undefined}
         />
       )}
-      {error && error !== noRoom?.text && <span className="text-[12px] leading-4 text-[#B42318]">{error}</span>}
+      {error && error !== noRoom?.text && <span className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">{error}</span>}
     </div>
   );
 }
@@ -599,23 +599,23 @@ export function DeleteBot({ bot: b, apps }: { bot: Bot; apps: string | null }) {
   };
   if (!sure)
     return (
-      <button onClick={() => setSure(true)} className="self-center py-1 text-[13px] text-[#9A9A98] hover:text-[#B42318]">
+      <button onClick={() => setSure(true)} className="self-center py-1 text-[13px] text-[color:var(--ht-9a9a98)] hover:text-[color:var(--ht-b42318)]">
         Delete {b.name}
       </button>
     );
   return (
-    <div className="motion-rise-in flex w-full flex-col gap-2.5 rounded-2xl bg-[#FEF3F2] px-4 py-3 shadow-[0_0_0_1px_#FECDCA]">
-      <span className="text-[13px] leading-[18px] text-[#3A3A38]">
+    <div className="motion-rise-in flex w-full flex-col gap-2.5 rounded-2xl bg-[color:var(--hb-fef3f2)] px-4 py-3 shadow-[0_0_0_1px_var(--h-fecdca)]">
+      <span className="text-[13px] leading-[18px] text-[color:var(--ht-3a3a38)]">
         {sharesComputer(b)
           ? `Delete ${b.name}? Its chat, threads and routines go with it; the computer it works on stays.${apps ? ` ${apps}` : ""} This can't be undone.`
           : `Delete ${b.name}? Its computer, chat, threads and routines go with it.${apps ? ` ${apps}` : ""} This can't be undone.`}
       </span>
-      {error && <span className="text-[12px] text-[#B42318]">{error}</span>}
+      {error && <span className="text-[12px] text-[color:var(--ht-b42318)]">{error}</span>}
       <div className="flex gap-2">
-        <button onClick={() => void remove()} disabled={busy} className="rounded-full bg-[#B42318] px-3.5 py-1.5 text-[13px] font-semibold text-white disabled:opacity-60">
+        <button onClick={() => void remove()} disabled={busy} className="rounded-full bg-[color:var(--hb-b42318)] px-3.5 py-1.5 text-[13px] font-semibold text-[color:var(--bops-on-fill)] disabled:opacity-60">
           {busy ? "Deleting…" : `Delete ${b.name}`}
         </button>
-        <button onClick={() => setSure(false)} disabled={busy} className="rounded-full px-3.5 py-1.5 text-[13px] font-medium shadow-[0_0_0_1px_#E6E6E3]">
+        <button onClick={() => setSure(false)} disabled={busy} className="rounded-full px-3.5 py-1.5 text-[13px] font-medium shadow-[0_0_0_1px_var(--h-e6e6e3)]">
           Keep
         </button>
       </div>
@@ -631,7 +631,7 @@ export function ActionButton({ label, onClick, disabled, children, size }: { lab
       onClick={onClick}
       disabled={disabled}
       style={size ? { width: size, height: size } : undefined}
-      className="flex size-[50px] items-center justify-center rounded-full bg-white/60 shadow-[inset_0_0_0_1px_#FFFFFF,0_0_0_1px_#0000000F] hover:bg-white/80 disabled:opacity-40"
+      className="flex size-[50px] items-center justify-center rounded-full bg-white/60 shadow-[inset_0_0_0_1px_var(--h-ffffff),0_0_0_1px_var(--h-0000000f)] hover:bg-white/80 disabled:opacity-40"
     >
       <svg width="20" height="20" viewBox="0 0 14 14">
         {children}
@@ -686,15 +686,15 @@ export function usePhonePlan(): PhonePlan {
 export function PlanNeeded({ what, bot: b, onUpgrade, onCancel }: { what: string; bot: Bot; onUpgrade: () => void; onCancel?: () => void }) {
   return (
     <div className="flex flex-col gap-2 px-4 pb-[11px] text-[12px] leading-4">
-      <span className="text-[#3A3A38]">
+      <span className="text-[color:var(--ht-3a3a38)]">
         {what} comes with a plan. Pro and Max include a phone number and an email for {b.name}.
       </span>
       <div className="flex items-center gap-3">
-        <button onClick={onUpgrade} className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white">
+        <button onClick={onUpgrade} className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)]">
           Purchase a plan
         </button>
         {onCancel && (
-          <button onClick={onCancel} className="text-[12px] font-medium text-[#6B6B6B] hover:text-ink">
+          <button onClick={onCancel} className="text-[12px] font-medium text-[color:var(--ht-6b6b6b)] hover:text-ink">
             Not now
           </button>
         )}
@@ -710,16 +710,16 @@ export function PlanNeeded({ what, bot: b, onUpgrade, onCancel }: { what: string
 export function PlanRoom({ short, onUpgrade, onCancel }: { short: PlanRoomShort; onUpgrade: () => void; onCancel?: () => void }) {
   return (
     <div className="flex flex-col gap-2 px-4 pb-[11px] text-[12px] leading-4">
-      <span className="text-[#3A3A38]">{short.text}</span>
+      <span className="text-[color:var(--ht-3a3a38)]">{short.text}</span>
       {(short.upgrade || onCancel) && (
         <div className="flex items-center gap-3">
           {short.upgrade && (
-            <button onClick={onUpgrade} className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white">
+            <button onClick={onUpgrade} className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)]">
               {upgradeLabel(short.upgrade)}
             </button>
           )}
           {onCancel && (
-            <button onClick={onCancel} className="text-[12px] font-medium text-[#6B6B6B] hover:text-ink">
+            <button onClick={onCancel} className="text-[12px] font-medium text-[color:var(--ht-6b6b6b)] hover:text-ink">
               Not now
             </button>
           )}
@@ -748,13 +748,13 @@ export function GetEmail({ bot: b }: { bot: Bot }) {
           onClick={() => void get()}
           disabled={busy}
           data-tip="An address anyone can email. Max includes up to 5."
-          className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white disabled:opacity-50"
+          className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-50"
         >
           {busy ? "Getting the email…" : `Get ${b.name} an email`}
         </button>
       </div>
       {said && (
-        <span role="alert" className="text-[#6B6B6B]">
+        <span role="alert" className="text-[color:var(--ht-6b6b6b)]">
           {said}
         </span>
       )}
@@ -841,7 +841,7 @@ export function GetNumber({ bot: b, plan, room, onUpgrade }: { bot: Bot; plan: P
         <button
           onClick={() => setPicking(true)}
           data-tip="A real number anyone can text or call."
-          className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white disabled:opacity-50"
+          className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-50"
         >
           {`Get ${b.name} a number`}
         </button>
@@ -856,7 +856,7 @@ export function GetNumber({ bot: b, plan, room, onUpgrade }: { bot: Bot; plan: P
   return (
     <div className="flex flex-col gap-2 px-4 pb-[11px] text-[12px] leading-4">
       <label className="flex items-center gap-2">
-        <span className="text-[#6B6B6B]">Area code</span>
+        <span className="text-[color:var(--ht-6b6b6b)]">Area code</span>
         <input
           value={code ?? ""}
           onChange={(e) => type(e.target.value)}
@@ -866,20 +866,20 @@ export function GetNumber({ bot: b, plan, room, onUpgrade }: { bot: Bot; plan: P
           aria-label="Area code"
           inputMode="numeric"
           maxLength={3}
-          className="h-7 w-[64px] rounded-full bg-[#F7F7F6] px-3 text-[13px] tabular-nums outline-none shadow-[0_0_0_1px_#E6E6E3] focus:shadow-[0_0_0_1.5px_#0A0A0A] disabled:opacity-50"
+          className="h-7 w-[64px] rounded-full bg-[color:var(--hb-f7f7f6)] px-3 text-[13px] tabular-nums outline-none shadow-[0_0_0_1px_var(--h-e6e6e3)] focus:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] disabled:opacity-50"
         />
-        {(searching || code === null) && <span className="text-[#9A9A98]">Looking for numbers…</span>}
+        {(searching || code === null) && <span className="text-[color:var(--ht-9a9a98)]">Looking for numbers…</span>}
       </label>
       {!searching && found && (
         <>
           {nearby && (
-            <span className="text-[#6B6B6B]">
+            <span className="text-[color:var(--ht-6b6b6b)]">
               No {asked} numbers left. Nearby: {nearby.areaCode} {nearby.city || placeOf(nearby)}
             </span>
           )}
-          {found.anywhere && found.options.length > 0 && <span className="text-[#6B6B6B]">No {asked} numbers left, or nearby. These are from elsewhere in the US.</span>}
+          {found.anywhere && found.options.length > 0 && <span className="text-[color:var(--ht-6b6b6b)]">No {asked} numbers left, or nearby. These are from elsewhere in the US.</span>}
           {found.options.length === 0 ? (
-            <span className="text-[#6B6B6B]">No numbers for sale right now. Try another area code.</span>
+            <span className="text-[color:var(--ht-6b6b6b)]">No numbers for sale right now. Try another area code.</span>
           ) : (
             <div role="radiogroup" aria-label="Where the number is from" className="flex flex-wrap gap-1.5">
               {found.options.map((o) => {
@@ -891,7 +891,7 @@ export function GetNumber({ bot: b, plan, room, onUpgrade }: { bot: Bot; plan: P
                     aria-checked={chosen}
                     disabled={busy}
                     onClick={() => setPicked(o)}
-                    className={`rounded-full px-2.5 py-1 text-[12.5px] font-medium leading-4 disabled:opacity-50 ${chosen ? "bg-ink text-white" : "text-[#3A3A38] shadow-[0_0_0_1px_#E6E6E3] hover:bg-black/[0.04]"}`}
+                    className={`rounded-full px-2.5 py-1 text-[12.5px] font-medium leading-4 disabled:opacity-50 ${chosen ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]" : "text-[color:var(--ht-3a3a38)] shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--bops-tint)]/[0.04]"}`}
                   >
                     {optionLabel(o)}
                   </button>
@@ -901,21 +901,21 @@ export function GetNumber({ bot: b, plan, room, onUpgrade }: { bot: Bot; plan: P
           )}
         </>
       )}
-      {code !== null && code.length > 0 && code.length < 3 && <span className="text-[#9A9A98]">An area code is 3 digits.</span>}
+      {code !== null && code.length > 0 && code.length < 3 && <span className="text-[color:var(--ht-9a9a98)]">An area code is 3 digits.</span>}
       <div className="flex items-center gap-3">
         <button
           onClick={() => void get()}
           disabled={busy || searching || !picked}
-          className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white disabled:opacity-40"
+          className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-40"
         >
           {busy ? "Getting the number…" : "Get this number"}
         </button>
-        <button disabled={busy} onClick={() => setPicking(false)} className="text-[12px] font-medium text-[#6B6B6B] hover:text-ink disabled:opacity-40">
+        <button disabled={busy} onClick={() => setPicking(false)} className="text-[12px] font-medium text-[color:var(--ht-6b6b6b)] hover:text-ink disabled:opacity-40">
           Cancel
         </button>
       </div>
       {error && (
-        <span role="alert" className="text-[#B42318]">
+        <span role="alert" className="text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}
@@ -934,14 +934,14 @@ export function Field({ label, value, empty }: { label: string; value?: string; 
   return (
     <div className="flex items-center gap-2 px-4 py-[11px]">
       <div className="flex min-w-0 flex-1 flex-col gap-px">
-        <span className="text-[12px] leading-[15px] text-[#6B6B6B]">{label}</span>
-        <span className={`select-text truncate text-[16px] leading-[21px] ${value ? "text-ink" : "text-[14px] text-[#9A9A98]"}`}>{value ?? empty}</span>
+        <span className="text-[12px] leading-[15px] text-[color:var(--ht-6b6b6b)]">{label}</span>
+        <span className={`select-text truncate text-[16px] leading-[21px] ${value ? "text-ink" : "text-[14px] text-[color:var(--ht-9a9a98)]"}`}>{value ?? empty}</span>
       </div>
       {value && (
         <button
           onClick={copy}
           aria-label={copied ? "Copied" : `Copy ${label.split(" ")[0]}`}
-          className={`flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[12px] font-medium leading-4 transition-colors ${copied ? "bg-[#2BB673]/15 text-[#1E8A55]" : "text-[#6B6B6B] hover:bg-black/[0.05] hover:text-ink"}`}
+          className={`flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[12px] font-medium leading-4 transition-colors ${copied ? "bg-[color:var(--hb-2bb673)]/15 text-[color:var(--ht-1e8a55)]" : "text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--bops-tint)]/[0.05] hover:text-ink"}`}
         >
           {copied ? (
             <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden>
@@ -995,7 +995,7 @@ export function HowIWork({ bot: b, className }: { bot: Bot; className: string })
     <div className={`flex w-full flex-col gap-2 rounded-2xl px-4 py-3 ${className}`}>
       <div className="flex flex-col">
         <span className="text-[13px] font-semibold leading-4">How I work</span>
-        <span className="text-[12px] leading-4 text-[#6B6B6B]">{b.name} keeps this in mind in chats, tasks and calls</span>
+        <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{b.name} keeps this in mind in chats, tasks and calls</span>
       </div>
       <textarea
         value={text}
@@ -1018,19 +1018,19 @@ export function HowIWork({ bot: b, className }: { bot: Bot; className: string })
         maxLength={MAX_PERSONA_CHARS}
         aria-label={`How ${b.name} works`}
         placeholder={`How should ${b.name} work? For example: keep replies short, check my calendar before suggesting times, never email clients before 9 AM.`}
-        className="w-full resize-none rounded-[12px] bg-white/70 px-3 py-2 text-[13px] leading-[18px] outline-none shadow-[0_0_0_1px_#E6E6E3] placeholder:text-[#9A9A98] focus:shadow-[0_0_0_1.5px_#0A0A0A]"
+        className="w-full resize-none rounded-[12px] bg-white/70 px-3 py-2 text-[13px] leading-[18px] outline-none shadow-[0_0_0_1px_var(--h-e6e6e3)] placeholder:text-[color:var(--ht-9a9a98)] focus:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
       />
       <div className="flex items-center gap-2">
-        <button disabled={!changed || busy} onClick={() => void save()} className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white disabled:opacity-40">
+        <button disabled={!changed || busy} onClick={() => void save()} className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-40">
           {busy ? "Saving…" : "Save"}
         </button>
-        {saved && <span className="motion-fade-in text-[12px] leading-4 text-[#6B6B6B]">Saved</span>}
+        {saved && <span className="motion-fade-in text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">Saved</span>}
         {error && (
-          <span role="alert" className="min-w-0 text-[12px] leading-4 text-[#B42318]">
+          <span role="alert" className="min-w-0 text-[12px] leading-4 text-[color:var(--ht-b42318)]">
             {error}
           </span>
         )}
-        {left <= MAX_PERSONA_CHARS / 10 && <span className="ml-auto shrink-0 text-[12px] tabular-nums leading-4 text-[#9A9A98]">{left === 1 ? "1 character left" : `${left} characters left`}</span>}
+        {left <= MAX_PERSONA_CHARS / 10 && <span className="ml-auto shrink-0 text-[12px] tabular-nums leading-4 text-[color:var(--ht-9a9a98)]">{left === 1 ? "1 character left" : `${left} characters left`}</span>}
       </div>
     </div>
   );
@@ -1080,7 +1080,7 @@ export function Uses({ state, bot: b, onOpenVault, onOpenRoutines, className }: 
                     <button
                       onClick={() => onOpenRoutines(x.app)}
                       aria-label={`${routineCount(n)} from ${x.appName}`}
-                      className="h-[22px] rounded-full bg-black/[0.05] px-2 text-[11.5px] tabular-nums leading-4 text-[#3A3A38] outline-none hover:bg-black/[0.08] focus-visible:shadow-[0_0_0_1.5px_#0A0A0A]"
+                      className="h-[22px] rounded-full bg-[color:var(--bops-tint)]/[0.05] px-2 text-[11.5px] tabular-nums leading-4 text-[color:var(--ht-3a3a38)] outline-none hover:bg-[color:var(--bops-tint)]/[0.08] focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
                     >
                       {routineCount(n)}
                     </button>
@@ -1089,14 +1089,14 @@ export function Uses({ state, bot: b, onOpenVault, onOpenRoutines, className }: 
               );
             })}
             {logins.map((l) => (
-              <span key={l.id} title={`${l.username} on ${l.site}`} className="flex h-[22px] items-center gap-1 rounded-full bg-black/[0.05] px-2 text-[11.5px] leading-4">
+              <span key={l.id} title={`${l.username} on ${l.site}`} className="flex h-[22px] items-center gap-1 rounded-full bg-[color:var(--bops-tint)]/[0.05] px-2 text-[11.5px] leading-4">
                 <KeyIcon />
                 {l.site}
               </span>
             ))}
           </span>
         ) : (
-          <span className="text-[12px] leading-4 text-[#6B6B6B]">No apps or logins yet</span>
+          <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">No apps or logins yet</span>
         )}
       </div>
       <button onClick={onOpenVault} className="shrink-0 text-[12px] font-medium leading-4 text-ink">
@@ -1130,13 +1130,13 @@ function Phone({ state, bot: b }: { state: AppState; bot: Bot }) {
   return (
     <div className="flex gap-4">
       <div className="flex w-[260px] shrink-0 items-center justify-center rounded-[20px] py-6" style={{ backgroundImage: botWash(b) }}>
-        <div className="flex h-[400px] w-[196px] rounded-[38px] bg-ink p-[7px] shadow-[0_22px_44px_-16px_#28320073]">
+        <div className="flex h-[400px] w-[196px] rounded-[38px] bg-[color:var(--hb-0a0a0a)] p-[7px] shadow-[0_22px_44px_-16px_var(--h-28320073)]">
           <div className="flex flex-1 flex-col items-center gap-3 rounded-[31px] bg-white px-4 pt-3">
-            <span className="h-[18px] w-[62px] rounded-full bg-ink" />
+            <span className="h-[18px] w-[62px] rounded-full bg-[color:var(--hb-0a0a0a)]" />
             <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
               <Mascot botId={b.id} color={b.color} size={48} />
               <span className="text-[13px] font-semibold">{b.name}&apos;s phone</span>
-              <span className="text-[11.5px] leading-4 text-[#6B6B6B]">Coming soon</span>
+              <span className="text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]">Coming soon</span>
             </div>
           </div>
         </div>
@@ -1146,17 +1146,17 @@ function Phone({ state, bot: b }: { state: AppState; bot: Bot }) {
           <span className="text-[14px] font-semibold leading-[18px]">A real phone, not a simulator</span>
           <ComingSoon />
         </span>
-        <span className="text-[13px] leading-5 text-[#3A3A38]">
+        <span className="text-[13px] leading-5 text-[color:var(--ht-3a3a38)]">
           Soon {b.name} will get its own physical phone in the cloud, with its own number for calls, texts, iMessage and two-factor codes. It will drive the phone the same way it drives its computer.
         </span>
         <div className="flex flex-wrap gap-1.5">
           {["Calls", "SMS", "iMessage", "2FA codes", "Apps"].map((x) => (
-            <span key={x} className="rounded-full bg-[#F2F2F0] px-2.5 py-1 text-[12px] leading-4">
+            <span key={x} className="rounded-full bg-[color:var(--hb-f2f2f0)] px-2.5 py-1 text-[12px] leading-4">
               {x}
             </span>
           ))}
         </div>
-        <span className="text-[12px] leading-[17px] text-[#9A9A98]">
+        <span className="text-[12px] leading-[17px] text-[color:var(--ht-9a9a98)]">
           {state.shared
             ? `Not available yet. Until then, the owner can text and call ${b.isMain ? b.name : "their main bot"} on its number.`
             : `Not available yet. Until then, you can text and call ${b.isMain ? b.name : "your main bot"} on its number (Settings, How your bots reach you).`}

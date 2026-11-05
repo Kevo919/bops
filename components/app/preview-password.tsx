@@ -168,7 +168,7 @@ function Value({ password, waiting }: { password: string | null; waiting: string
       <CopyLink url={password} label="Copy password" />
     </span>
   ) : (
-    <span data-tip={waiting ?? undefined} className="min-w-0 truncate text-[12px] leading-4 text-[#9A9A98]">
+    <span data-tip={waiting ?? undefined} className="min-w-0 truncate text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">
       {waiting}
     </span>
   );
@@ -193,7 +193,7 @@ export function PreviewLock({ pass, at }: { pass: ReturnType<typeof usePreviewTa
         data-tip={open ? undefined : "Asks for a password"}
         aria-expanded={!!open}
         onClick={() => pass.setPopover(open ? null : "lock")}
-        className="flex size-7 items-center justify-center rounded-lg text-[#3A3A38] hover:bg-[#F2F2F0] aria-expanded:bg-[#F2F2F0]"
+        className="flex size-7 items-center justify-center rounded-lg text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)] aria-expanded:bg-[color:var(--hb-f2f2f0)]"
       >
         <LockIcon />
       </button>
@@ -202,9 +202,9 @@ export function PreviewLock({ pass, at }: { pass: ReturnType<typeof usePreviewTa
           data-preview-pass-popover={open}
           role="dialog"
           aria-label="Its password"
-          className="absolute right-0 top-[calc(100%+6px)] z-30 flex w-[240px] flex-col gap-1.5 rounded-[12px] bg-white p-3 shadow-[0_0_0_1px_#0000000F,0_12px_32px_-12px_#00000040]"
+          className="absolute right-0 top-[calc(100%+6px)] z-30 flex w-[240px] flex-col gap-1.5 rounded-[12px] bg-white p-3 shadow-[0_0_0_1px_var(--h-0000000f),0_12px_32px_-12px_var(--h-00000040)]"
         >
-          <span className="text-[12px] leading-4 text-[#6B6B6B]">{open === "browser" ? "Your browser asks for this password." : "This preview asks for a password."}</span>
+          <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{open === "browser" ? "Your browser asks for this password." : "This preview asks for a password."}</span>
           <Value password={pass.password} waiting={pass.waiting} />
           {open === "browser" && (
             <button
@@ -213,7 +213,7 @@ export function PreviewLock({ pass, at }: { pass: ReturnType<typeof usePreviewTa
                 pass.setPopover(null);
                 window.open(at, "_blank");
               }}
-              className="self-start rounded-full bg-ink px-2.5 py-1 text-[12px] font-semibold leading-4 text-white"
+              className="self-start rounded-full bg-[color:var(--hb-0a0a0a)] px-2.5 py-1 text-[12px] font-semibold leading-4 text-[color:var(--bops-on-fill)]"
             >
               Open in browser
             </button>
@@ -238,14 +238,14 @@ export function PasswordBeside({ ws, name, site, preview }: { ws: string; name: 
 export function PasswordShown({ password, waiting = null }: { password: string | null; waiting?: string | null }) {
   return (
     <span data-password-beside className={`flex max-w-full items-center gap-1.5 ${password ? "shrink-0" : "min-w-0"}`} onClick={(e) => e.stopPropagation()}>
-      <span className="shrink-0 text-[12px] leading-4 text-[#6B6B6B]">Password</span>
+      <span className="shrink-0 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">Password</span>
       <Value password={password} waiting={waiting} />
     </span>
   );
 }
 
-const HEAD = "pb-1 text-[12px] font-semibold leading-4 text-[#6B6B6B]";
-const HINT = "text-[12px] leading-4 text-[#9A9A98]";
+const HEAD = "pb-1 text-[12px] font-semibold leading-4 text-[color:var(--ht-6b6b6b)]";
+const HINT = "text-[12px] leading-4 text-[color:var(--ht-9a9a98)]";
 
 /**
  * A site's tab, Preview picked: its password, with Copy; Ask for a password (on by default: off, the link is open to
@@ -263,7 +263,7 @@ export function PasswordSection({ ws, name, site, preview }: { ws: string; name:
         {pass.on ? <Value password={pass.password} waiting={pass.waiting} /> : <span className={`${HINT} min-w-0`}>Anyone with the link can open it.</span>}
         <span className="ml-auto flex shrink-0 items-center gap-2">
           {pass.on && !asking && (
-            <button data-password-new disabled={!!pass.busy} onClick={() => setAsking(true)} className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E2E2DF] hover:bg-[#F6F6F4] disabled:text-[#9A9A98]">
+            <button data-password-new disabled={!!pass.busy} onClick={() => setAsking(true)} className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e2e2df)] hover:bg-[color:var(--hb-f6f6f4)] disabled:text-[color:var(--ht-9a9a98)]">
               New password
             </button>
           )}
@@ -273,9 +273,9 @@ export function PasswordSection({ ws, name, site, preview }: { ws: string; name:
             data-password-switch
             disabled={!!pass.busy}
             onClick={() => void pass.act(pass.on ? "off" : "on")}
-            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[12px] leading-4 text-ink hover:bg-black/[0.04] disabled:opacity-50"
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[12px] leading-4 text-ink hover:bg-[color:var(--bops-tint)]/[0.04] disabled:opacity-50"
           >
-            <span className={`relative h-4 w-7 rounded-full transition-colors ${pass.on ? "bg-ink" : "bg-[#D9D9D6]"}`}>
+            <span className={`relative h-4 w-7 rounded-full transition-colors ${pass.on ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-d9d9d6)]"}`}>
               <span className={`absolute top-0.5 size-3 rounded-full bg-white transition-all ${pass.on ? "left-3.5" : "left-0.5"}`} />
             </span>
             Ask for a password
@@ -296,7 +296,7 @@ export function PasswordSection({ ws, name, site, preview }: { ws: string; name:
         </div>
       )}
       {pass.error && (
-        <span role="alert" className="text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {pass.error}
         </span>
       )}

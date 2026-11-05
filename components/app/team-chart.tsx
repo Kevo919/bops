@@ -585,12 +585,12 @@ export function TeamChart({
               <span id="chart-title" className="text-[22px] font-bold leading-7 tracking-[-0.02em]">
                 {CHART_WORDS.title}
               </span>
-              <span className="text-[13px] leading-[19px] text-[#6B6B6B]">{CHART_WORDS.subtitle(ws.name)}</span>
+              <span className="text-[13px] leading-[19px] text-[color:var(--ht-6b6b6b)]">{CHART_WORDS.subtitle(ws.name)}</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 px-[26px] pb-3">
-            <span className="text-[13px] font-medium leading-4 text-[#3A3A38]">{CHART_WORDS.switchLabel}</span>
-            <div role="radiogroup" aria-label={CHART_WORDS.switchLabel} data-sideways-switch className="flex gap-0.5 rounded-[10px] bg-[#F6F6F4] p-[2px] shadow-[inset_0_0_0_1px_#E8E8E5]">
+            <span className="text-[13px] font-medium leading-4 text-[color:var(--ht-3a3a38)]">{CHART_WORDS.switchLabel}</span>
+            <div role="radiogroup" aria-label={CHART_WORDS.switchLabel} data-sideways-switch className="flex gap-0.5 rounded-[10px] bg-[color:var(--hb-f6f6f4)] p-[2px] shadow-[inset_0_0_0_1px_var(--h-e8e8e5)]">
               {(["open", "closed"] as const).map((v) => {
                 const on = (chain.sideways ?? "open") === v;
                 return (
@@ -600,27 +600,27 @@ export function TeamChart({
                     role="radio"
                     aria-checked={on}
                     onClick={() => !on && void save({ ...chain, sideways: v === "open" ? undefined : "closed" })}
-                    className={`rounded-[8px] px-2.5 py-1 text-[12.5px] leading-4 ${on ? "bg-white font-semibold text-ink shadow-[0_1px_2px_#00000014]" : "text-[#3A3A38] hover:text-ink"}`}
+                    className={`rounded-[8px] px-2.5 py-1 text-[12.5px] leading-4 ${on ? "bg-white font-semibold text-ink shadow-[0_1px_2px_var(--h-00000014)]" : "text-[color:var(--ht-3a3a38)] hover:text-ink"}`}
                   >
                     {v === "open" ? CHART_WORDS.everyone : CHART_WORDS.upDown}
                   </button>
                 );
               })}
             </div>
-            {own > 0 && <span className="text-[12px] leading-4 text-[#8A8A88]">{CHART_WORDS.ownSetting(own)}</span>}
+            {own > 0 && <span className="text-[12px] leading-4 text-[color:var(--ht-8a8a88)]">{CHART_WORDS.ownSetting(own)}</span>}
           </div>
 
           {/* The chart and everything under it: the chart keeps at least 300px and scrolls in its frame; the rest
               (notes, People) scrolls under it when there's more than fits. */}
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" data-chart-scroll>
-            <div className="relative mx-[26px] flex min-h-[300px] flex-1 flex-col overflow-auto rounded-[18px] bg-[#F6F6F4] [background-image:radial-gradient(#DDDDD8_1px,transparent_1px)] [background-size:18px_18px]" onClick={() => setPopover(null)}>
+            <div className="relative mx-[26px] flex min-h-[300px] flex-1 flex-col overflow-auto rounded-[18px] bg-[color:var(--hb-f6f6f4)] [background-image:radial-gradient(var(--h-ddddd8)_1px,transparent_1px)] [background-size:18px_18px]" onClick={() => setPopover(null)}>
               <div className="relative mx-auto shrink-0" style={{ width, height }}>
                 <Wires t={t} boxes={boxes} rows={rows} picked={picked} many={many} ghost={others.length === 0} name={name} onLine={(a, b, x, y) => setPopover({ a, b, x, y })} />
                 {/* You, on top. */}
                 {chief && (
                   <div className="absolute flex -translate-x-1/2 flex-col items-center" style={{ left: width / 2, top: PAD - 6 }}>
-                    <div className="grid size-[46px] place-items-center rounded-full bg-ink text-[15px] font-semibold text-white shadow-[0_0_0_4px_#FFFFFF,0_4px_14px_#0000001F]">{initials(state)}</div>
-                    <div className="mt-2 rounded-full bg-white px-2.5 py-[3px] text-[12.5px] leading-4 text-[#3A3A38] shadow-[0_0_0_1px_#E8E8E5]">{CHART_WORDS.you}</div>
+                    <div className="grid size-[46px] place-items-center rounded-full bg-[color:var(--hb-0a0a0a)] text-[15px] font-semibold text-[color:var(--bops-on-fill)] shadow-[0_0_0_4px_var(--h-ffffff),0_4px_14px_var(--h-0000001f)]">{initials(state)}</div>
+                    <div className="mt-2 rounded-full bg-white px-2.5 py-[3px] text-[12.5px] leading-4 text-[color:var(--ht-3a3a38)] shadow-[0_0_0_1px_var(--h-e8e8e5)]">{CHART_WORDS.you}</div>
                   </div>
                 )}
                 {t.bots.map((tb) => {
@@ -658,7 +658,7 @@ export function TeamChart({
                 })}
                 {others.length === 0 && chief && <Ghost box={boxes.get(chief.id)!} onMakeBot={onMakeBot} />}
                 {many && !picked && (
-                  <div className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[11.5px] leading-4 text-[#6B6B6B] shadow-[0_0_0_1px_#E8E8E5]" data-ask-badge>
+                  <div className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)] shadow-[0_0_0_1px_var(--h-e8e8e5)]" data-ask-badge>
                     {askBadge(t, chain)}
                   </div>
                 )}
@@ -668,23 +668,23 @@ export function TeamChart({
               {others.length > 0 && <Legend memory={others.some((b) => entryOf(t, b.id).memory === "own")} />}
             </div>
 
-            <p className="px-[26px] pt-3 text-[12.5px] leading-[18px] text-[#6B6B6B]">
+            <p className="px-[26px] pt-3 text-[12.5px] leading-[18px] text-[color:var(--ht-6b6b6b)]">
               {chief && `${CHART_WORDS.chiefSees(chief.name)} `}
               {CHART_WORDS.upDownOpen}
             </p>
             {/* Bots that can't ask each other on one computer: what's there is shared all the same. */}
             {chief &&
               sharedPairs(t, state).map(([a, b]) => (
-                <div key={`${a}|${b}`} data-shares-note className="mx-[26px] mt-2 flex items-center justify-between gap-3 rounded-[12px] bg-[#FFF7E6] px-3 py-2 text-[12.5px] leading-[18px] text-[#8A5A00] shadow-[inset_0_0_0_1px_#F5D9A6]">
+                <div key={`${a}|${b}`} data-shares-note className="mx-[26px] mt-2 flex items-center justify-between gap-3 rounded-[12px] bg-[color:var(--hb-fff7e6)] px-3 py-2 text-[12.5px] leading-[18px] text-[color:var(--ht-8a5a00)] shadow-[inset_0_0_0_1px_var(--h-f5d9a6)]">
                   <span>{CHART_WORDS.sharesNote(name(a), name(b), chief.name)}</span>
-                  <button type="button" onClick={() => void giveComputer(a)} className="shrink-0 rounded-full bg-white px-3 py-1 text-[12px] font-medium text-ink shadow-[0_0_0_1px_#F5D9A6] hover:bg-[#FFFDF8]">
+                  <button type="button" onClick={() => void giveComputer(a)} className="shrink-0 rounded-full bg-white px-3 py-1 text-[12px] font-medium text-ink shadow-[0_0_0_1px_var(--h-f5d9a6)] hover:bg-[color:var(--hb-fffdf8)]">
                     {CHART_WORDS.giveOwnComputer(name(a))}
                   </button>
                 </div>
               ))}
             {/* A Mac or runner on the account on a Bops from before the chart: it runs turns by the old rules until it updates. */}
             {older && (
-              <p className="px-[26px] pt-2 text-[12px] leading-4 text-[#B54708]" data-older-bops>
+              <p className="px-[26px] pt-2 text-[12px] leading-4 text-[color:var(--ht-b54708)]" data-older-bops>
                 {CHART_WORDS.olderBops}
               </p>
             )}
@@ -710,7 +710,7 @@ export function TeamChart({
             <div className="h-4 shrink-0" />
           </div>
           {toast && (
-            <div role={toast.error ? "alert" : "status"} className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-full bg-ink px-4 py-2 text-[12.5px] leading-4 text-white shadow-[0_8px_24px_#00000033]">
+            <div role={toast.error ? "alert" : "status"} className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-full bg-[color:var(--hb-0a0a0a)] px-4 py-2 text-[12.5px] leading-4 text-[color:var(--bops-on-fill)] shadow-[0_8px_24px_var(--h-00000033)]">
               <span>{toast.text}</span>
               {toast.undo && (
                 <button
@@ -962,7 +962,7 @@ function Wires({
           <path d={`M${x1} ${y1} C${x1} ${dip}, ${x2} ${dip}, ${x2} ${y2}`} stroke="#2F6BFF" strokeWidth="2" strokeDasharray="2 6" strokeLinecap="round" fill="none" />
           <foreignObject x={(x1 + x2) / 2 - 110} y={dip - 30} width="220" height="26">
             <div className="flex justify-center">
-              <span className="rounded-full bg-white px-2.5 py-[3px] text-[11px] leading-4 text-[#2F6BFF] shadow-[0_0_0_1px_#CFE0FF]">{mayAskIn(t, b, a) ? CHART_WORDS.bothAsk(name(a), name(b)) : CHART_WORDS.mayAskLabel(name(a), name(b))}</span>
+              <span className="rounded-full bg-white px-2.5 py-[3px] text-[11px] leading-4 text-[color:var(--ht-2f6bff)] shadow-[0_0_0_1px_var(--h-cfe0ff)]">{mayAskIn(t, b, a) ? CHART_WORDS.bothAsk(name(a), name(b)) : CHART_WORDS.mayAskLabel(name(a), name(b))}</span>
             </div>
           </foreignObject>
         </>,
@@ -983,19 +983,19 @@ function LinePopover({ t, chain, a, b, x, y, name, onSave, onClose }: { t: Team;
       aria-label={CHART_WORDS.lineTitle(name(a), name(b))}
       data-line-popover
       onClick={(e) => e.stopPropagation()}
-      className="motion-menu-in absolute z-20 flex w-[270px] -translate-x-1/2 flex-col gap-2 rounded-[14px] bg-white p-3 shadow-[0_0_0_1px_#E6E6E3,0_12px_32px_#0000001F]"
+      className="motion-menu-in absolute z-20 flex w-[270px] -translate-x-1/2 flex-col gap-2 rounded-[14px] bg-white p-3 shadow-[0_0_0_1px_var(--h-e6e6e3),0_12px_32px_var(--h-0000001f)]"
       style={{ left: x, top: y + 14 }}
     >
       <div className="flex items-center justify-between">
         <span className="text-[13px] font-semibold leading-4">{CHART_WORDS.lineTitle(name(a), name(b))}</span>
-        <button type="button" aria-label="Close" onClick={onClose} className="text-[#9A9A98] hover:text-ink">
+        <button type="button" aria-label="Close" onClick={onClose} className="text-[color:var(--ht-9a9a98)] hover:text-ink">
           <svg width="10" height="10" viewBox="0 0 12 12">
             <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </button>
       </div>
       {fixed ? (
-        <span className="text-[12px] leading-4 text-[#6B6B6B]">
+        <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
           {CHART_WORDS.lineLeads(name(lead ?? (belowIn(t, a).includes(b) || a === t.chief?.id ? a : b)), name(lead === a || belowIn(t, a).includes(b) || a === t.chief?.id ? b : a))}
         </span>
       ) : (
@@ -1012,7 +1012,7 @@ function LinePopover({ t, chain, a, b, x, y, name, onSave, onClose }: { t: Team;
 
 function Legend({ memory }: { memory: boolean }) {
   return (
-    <div className="sticky left-0 mx-auto mb-3.5 mt-auto flex w-fit shrink-0 items-center gap-4 whitespace-nowrap rounded-[12px] bg-white/90 px-3 py-2 text-[11.5px] leading-4 text-[#3A3A38] shadow-[0_0_0_1px_#E8E8E5]">
+    <div className="sticky left-0 mx-auto mb-3.5 mt-auto flex w-fit shrink-0 items-center gap-4 whitespace-nowrap rounded-[12px] bg-white/90 px-3 py-2 text-[11.5px] leading-4 text-[color:var(--ht-3a3a38)] shadow-[0_0_0_1px_var(--h-e8e8e5)]">
       <span className="flex items-center gap-1.5">
         <svg width="26" height="8" aria-hidden>
           <path d="M0 4 H26" stroke="#0A0A0A" strokeWidth="2" />
@@ -1138,11 +1138,11 @@ function Card({
         onDrop();
       }}
       className={`absolute flex cursor-pointer select-none flex-col items-center rounded-[16px] bg-white px-3 pb-3 pt-3 transition-[opacity,box-shadow] duration-150 ${
-        picked ? "shadow-[0_0_0_2px_#0A0A0A,0_8px_26px_#0000001F]" : over ? "shadow-[0_0_0_2px_#2F6BFF,0_8px_26px_#2F6BFF33]" : glow ? "shadow-[0_0_0_1.5px_#9DB8FF,0_6px_18px_#0000000D]" : "shadow-[0_0_0_1px_#E8E8E5,0_1px_2px_#0000000A,0_6px_18px_#0000000D]"
+        picked ? "shadow-[0_0_0_2px_var(--h-0a0a0a),0_8px_26px_var(--h-0000001f)]" : over ? "shadow-[0_0_0_2px_var(--h-2f6bff),0_8px_26px_var(--h-2f6bff33)]" : glow ? "shadow-[0_0_0_1.5px_var(--h-9db8ff),0_6px_18px_var(--h-0000000d)]" : "shadow-[0_0_0_1px_var(--h-e8e8e5),0_1px_2px_var(--h-0000000a),0_6px_18px_var(--h-0000000d)]"
       } ${shaking ? "motion-shake" : ""}`}
       style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
     >
-      {chief && <span className="absolute left-[11px] top-[9px] text-[13px] text-[#E2B007]" aria-label="Chief of staff">★</span>}
+      {chief && <span className="absolute left-[11px] top-[9px] text-[13px] text-[color:var(--ht-e2b007)]" aria-label="Chief of staff">★</span>}
       {e.memory === "own" && (
         <span className="absolute right-[10px] top-[9px]" data-tip={CHART_WORDS.legendMemory}>
           <Lock />
@@ -1153,33 +1153,33 @@ function Card({
       </span>
       {/* Its name and role never give way to what's under them. */}
       <span className="mt-1.5 max-w-full shrink-0 truncate text-[14px] font-semibold leading-[18px]">{b.name}</span>
-      <span className="max-w-full shrink-0 truncate text-[11.5px] leading-4 text-[#8A8A88]">{chief ? CHART_WORDS.chiefRole : who ? CHART_WORDS.personsBot(who.name) : b.role}</span>
+      <span className="max-w-full shrink-0 truncate text-[11.5px] leading-4 text-[color:var(--ht-8a8a88)]">{chief ? CHART_WORDS.chiefRole : who ? CHART_WORDS.personsBot(who.name) : b.role}</span>
       {/* The bot's AI chip (dev/bot-ai): its provider and model go here, its row's height in AI_CHIP_H. Nothing for now. */}
       <CardAiChip bot={b} />
       {chief ? (
-        <span className="mt-2 rounded-full bg-[#F6F6F4] px-2.5 py-[3px] text-[11px] leading-4 text-[#3A3A38] shadow-[inset_0_0_0_1px_#E8E8E5]">{CHART_WORDS.seesAll}</span>
+        <span className="mt-2 rounded-full bg-[color:var(--hb-f6f6f4)] px-2.5 py-[3px] text-[11px] leading-4 text-[color:var(--ht-3a3a38)] shadow-[inset_0_0_0_1px_var(--h-e8e8e5)]">{CHART_WORDS.seesAll}</span>
       ) : (
         f.tags.length > 0 && (
           <div className="mt-2 flex max-w-full flex-wrap justify-center gap-1">
             {f.tags.map((x) => (
-              <span key={x} className="truncate rounded-full bg-[#F6F6F4] px-2 py-[2px] text-[10.5px] leading-[14px] text-[#3A3A38] shadow-[inset_0_0_0_1px_#E8E8E5]">
+              <span key={x} className="truncate rounded-full bg-[color:var(--hb-f6f6f4)] px-2 py-[2px] text-[10.5px] leading-[14px] text-[color:var(--ht-3a3a38)] shadow-[inset_0_0_0_1px_var(--h-e8e8e5)]">
                 {x}
               </span>
             ))}
           </div>
         )
       )}
-      {f.lost && <span className="mt-1 max-w-full shrink-0 truncate text-[10.5px] leading-[14px] text-[#B54708]">{f.lost}</span>}
+      {f.lost && <span className="mt-1 max-w-full shrink-0 truncate text-[10.5px] leading-[14px] text-[color:var(--ht-b54708)]">{f.lost}</span>}
       {f.chips.length > 0 && (
         <div className="mt-auto flex max-w-full flex-wrap justify-center gap-1 pt-1.5" data-people-chips>
           {f.chips.map(({ p, label }) => (
-            <span key={p.key} className="inline-flex max-w-full items-center gap-1 rounded-full bg-white px-1.5 py-[2px] text-[10.5px] leading-[14px] text-[#3A3A38] shadow-[0_0_0_1px_#E8E8E5]">
+            <span key={p.key} className="inline-flex max-w-full items-center gap-1 rounded-full bg-white px-1.5 py-[2px] text-[10.5px] leading-[14px] text-[color:var(--ht-3a3a38)] shadow-[0_0_0_1px_var(--h-e8e8e5)]">
               <span className="size-1.5 shrink-0 rounded-full" style={{ background: dotOf(people ?? [], p) }} />
               <span className="truncate">{label}</span>
             </span>
           ))}
           {f.more > 0 && (
-            <span className="rounded-full bg-[#F6F6F4] px-1.5 py-[2px] text-[10.5px] leading-[14px] text-[#3A3A38] shadow-[inset_0_0_0_1px_#E8E8E5]" data-more>
+            <span className="rounded-full bg-[color:var(--hb-f6f6f4)] px-1.5 py-[2px] text-[10.5px] leading-[14px] text-[color:var(--ht-3a3a38)] shadow-[inset_0_0_0_1px_var(--h-e8e8e5)]" data-more>
               {CHART_WORDS.more(f.more)}
             </span>
           )}
@@ -1238,15 +1238,15 @@ function sharedPairs(t: Team, state: AppState): [string, string][] {
 function Ghost({ box, onMakeBot }: { box: Box; onMakeBot?: () => void }) {
   return (
     <div className="absolute flex flex-col items-center gap-2" style={{ left: box.x + box.w / 2 - 120, top: box.y + box.h + V_GAP, width: 240 }} data-ghost>
-      <div className="flex w-full flex-col items-center gap-2 rounded-[16px] border-[1.5px] border-dashed border-[#C9C9C5] bg-white/60 px-4 py-5">
-        <span className="text-[13px] font-medium leading-4 text-[#3A3A38]">{CHART_WORDS.ghost}</span>
+      <div className="flex w-full flex-col items-center gap-2 rounded-[16px] border-[1.5px] border-dashed border-[color:var(--h-c9c9c5)] bg-white/60 px-4 py-5">
+        <span className="text-[13px] font-medium leading-4 text-[color:var(--ht-3a3a38)]">{CHART_WORDS.ghost}</span>
         {onMakeBot && (
-          <button type="button" onClick={onMakeBot} className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white hover:bg-[#262626]">
+          <button type="button" onClick={onMakeBot} className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)] hover:bg-[color:var(--hb-262626)]">
             {CHART_WORDS.makeBot}
           </button>
         )}
       </div>
-      <span className="text-center text-[12px] leading-4 text-[#8A8A88]">{CHART_WORDS.ghostNote}</span>
+      <span className="text-center text-[12px] leading-4 text-[color:var(--ht-8a8a88)]">{CHART_WORDS.ghostNote}</span>
     </div>
   );
 }
@@ -1263,11 +1263,11 @@ export function Switch({ label, on, onFlip, disabled, tip }: { label: string; on
       data-tip={tip}
       disabled={disabled}
       onClick={() => onFlip(!on)}
-      className="flex w-full items-center justify-between gap-3 text-left text-[13px] leading-[18px] text-[#3A3A38] disabled:opacity-50"
+      className="flex w-full items-center justify-between gap-3 text-left text-[13px] leading-[18px] text-[color:var(--ht-3a3a38)] disabled:opacity-50"
     >
       <span className="min-w-0 flex-1">{label}</span>
-      <span className={`relative h-5 w-[34px] shrink-0 rounded-full transition-colors ${on ? "bg-ink" : "bg-[#D9D9D5]"}`}>
-        <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow-[0_1px_2px_#00000033] transition-all ${on ? "left-[16px]" : "left-0.5"}`} />
+      <span className={`relative h-5 w-[34px] shrink-0 rounded-full transition-colors ${on ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-d9d9d5)]"}`}>
+        <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow-[0_1px_2px_var(--h-00000033)] transition-all ${on ? "left-[16px]" : "left-0.5"}`} />
       </span>
     </button>
   );
@@ -1276,9 +1276,9 @@ export function Switch({ label, on, onFlip, disabled, tip }: { label: string; on
 /* ---------------- A bot's sheet ---------------- */
 
 const SECTION = "flex flex-col gap-2 pt-4";
-const HEAD = "text-[12px] font-semibold uppercase tracking-[0.02em] text-[#8A8A88]";
-const NOTE = "text-[11.5px] leading-[16px] text-[#8A8A88]";
-const BOXED = "w-full rounded-[12px] py-2 pl-3 pr-8 shadow-[0_0_0_1px_#E8E8E5]";
+const HEAD = "text-[12px] font-semibold uppercase tracking-[0.02em] text-[color:var(--ht-8a8a88)]";
+const NOTE = "text-[11.5px] leading-[16px] text-[color:var(--ht-8a8a88)]";
+const BOXED = "w-full rounded-[12px] py-2 pl-3 pr-8 shadow-[0_0_0_1px_var(--h-e8e8e5)]";
 
 /** A select drawn as the sheet's boxed row, with its caret. */
 function Picker({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: React.ReactNode }) {
@@ -1287,7 +1287,7 @@ function Picker({ label, value, onChange, children }: { label: string; value: st
       <select aria-label={label} value={value} onChange={(ev) => onChange(ev.target.value)} className={`${BOXED} appearance-none bg-white text-[13px] leading-[18px] text-ink`}>
         {children}
       </select>
-      <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#8A8A88]">
+      <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--ht-8a8a88)]">
         <path d="M2.5 4l2.5 2.5L7.5 4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </div>
@@ -1454,7 +1454,7 @@ export function BotTeamFields({
                         setAskFor(null);
                         onGiveWriteFor(askingFor);
                       }}
-                      className="shrink-0 rounded-full bg-[#F2F2F0] px-2.5 py-1 text-[12px] font-medium text-ink hover:bg-[#EAEAE7]"
+                      className="shrink-0 rounded-full bg-[color:var(--hb-f2f2f0)] px-2.5 py-1 text-[12px] font-medium text-ink hover:bg-[color:var(--hb-eaeae7)]"
                     >
                       {CHART_WORDS.giveWrite}
                     </button>
@@ -1467,7 +1467,7 @@ export function BotTeamFields({
                     <span className={`${NOTE} flex items-center justify-between gap-2`} data-give-write>
                       <span>{who.since ? `${CHART_WORDS.cantUseNow(who.name, b.name)} ${CHART_WORDS.giveWriteAsk(who.name)}` : CHART_WORDS.cantUseYet(who.name, b.name)}</span>
                       {people.find((p) => p.key === who.key)?.id && (
-                        <button type="button" onClick={() => onLevel(people.find((p) => p.key === who.key)!, "write")} className="shrink-0 rounded-full bg-[#F2F2F0] px-2.5 py-1 text-[12px] font-medium text-ink hover:bg-[#EAEAE7]">
+                        <button type="button" onClick={() => onLevel(people.find((p) => p.key === who.key)!, "write")} className="shrink-0 rounded-full bg-[color:var(--hb-f2f2f0)] px-2.5 py-1 text-[12px] font-medium text-ink hover:bg-[color:var(--hb-eaeae7)]">
                           {CHART_WORDS.giveWrite}
                         </button>
                       )}
@@ -1494,7 +1494,7 @@ export function BotTeamFields({
                     data-tip={fixed ? (id === t.chief?.id ? CHART_WORDS.chiefTip(name(id)) : CHART_WORDS.canAskTip(name(below.includes(id) ? b.id : id), name(below.includes(id) ? id : b.id))) : undefined}
                     onClick={() => onSave(withPair(t, chain, b.id, id, !on))}
                     className={`inline-flex items-center gap-1.5 rounded-full py-[5px] pl-1.5 pr-2.5 text-[12.5px] leading-4 ${
-                      on ? "bg-[#EEF4FF] text-[#1D4ED8] shadow-[inset_0_0_0_1px_#CFE0FF]" : "bg-white text-[#8A8A88] line-through decoration-[#C9C9C5] shadow-[inset_0_0_0_1px_#E8E8E5]"
+                      on ? "bg-[color:var(--hb-eef4ff)] text-[color:var(--ht-1d4ed8)] shadow-[inset_0_0_0_1px_var(--h-cfe0ff)]" : "bg-white text-[color:var(--ht-8a8a88)] line-through decoration-[color:var(--h-c9c9c5)] shadow-[inset_0_0_0_1px_var(--h-e8e8e5)]"
                     } ${fixed ? "cursor-default" : "hover:brightness-[0.98]"}`}
                   >
                     {ob && <Mascot botId={ob.id} color={ob.color} size={18} />}
@@ -1533,7 +1533,7 @@ export function BotTeamFields({
               />
             </div>
             {asking ? (
-              <div className="flex flex-col gap-2 rounded-[12px] bg-[#F6F6F4] px-3 py-2.5" data-bring-ask>
+              <div className="flex flex-col gap-2 rounded-[12px] bg-[color:var(--hb-f6f6f4)] px-3 py-2.5" data-bring-ask>
                 <span className="text-[12.5px] leading-[18px] text-ink">{CHART_WORDS.bringAsk(b.name)}</span>
                 <span className="flex gap-2">
                   <button
@@ -1544,7 +1544,7 @@ export function BotTeamFields({
                       // The chart first (what it learns from now on goes to the team's), then what it learned before.
                       onBringIn();
                     }}
-                    className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white hover:bg-[#262626]"
+                    className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)] hover:bg-[color:var(--hb-262626)]"
                   >
                     {CHART_WORDS.bringIn}
                   </button>
@@ -1554,7 +1554,7 @@ export function BotTeamFields({
                       setAsking(false);
                       void set({ memory: undefined, readsTeam: undefined, kept: true });
                     }}
-                    className="rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E8E8E5] hover:bg-[#F7F7F6]"
+                    className="rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e8e8e5)] hover:bg-[color:var(--hb-f7f7f6)]"
                   >
                     {CHART_WORDS.keepApart}
                   </button>
@@ -1578,9 +1578,9 @@ export function BotTeamFields({
         <div className={SECTION} data-computer>
           <span className={HEAD}>{CHART_WORDS.computer}</span>
           {sharesComputer(b) ? (
-            <div className="flex flex-col gap-2 rounded-[12px] bg-[#F6F6F4] px-3 py-2.5">
-              <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">{CHART_WORDS.computerShared(b.name, chiefName)}</span>
-              <button type="button" onClick={onGiveComputer} className="self-start rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E8E8E5] hover:bg-[#F7F7F6]">
+            <div className="flex flex-col gap-2 rounded-[12px] bg-[color:var(--hb-f6f6f4)] px-3 py-2.5">
+              <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{CHART_WORDS.computerShared(b.name, chiefName)}</span>
+              <button type="button" onClick={onGiveComputer} className="self-start rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e8e8e5)] hover:bg-[color:var(--hb-f7f7f6)]">
                 {CHART_WORDS.giveComputer}
               </button>
             </div>
@@ -1598,13 +1598,13 @@ export function BotTeamFields({
           ) : (
             <div className="flex flex-col" data-sheet-people>
               {people.map((p) => (
-                <div key={p.key} className="flex items-center gap-2.5 border-b border-[#F0F0ED] py-2 last:border-0">
-                  <span className="grid size-[26px] shrink-0 place-items-center rounded-full text-[11px] font-semibold text-white" style={{ background: dotOf(people, p) }}>
+                <div key={p.key} className="flex items-center gap-2.5 border-b border-[color:var(--h-f0f0ed)] py-2 last:border-0">
+                  <span className="grid size-[26px] shrink-0 place-items-center rounded-full text-[11px] font-semibold text-[color:var(--bops-on-fill)]" style={{ background: dotOf(people, p) }}>
                     {p.name.charAt(0).toUpperCase()}
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-[13px] leading-4">{p.name}</span>
-                    {p.email && <span className="truncate text-[11px] leading-[14px] text-[#8A8A88]">{p.email}</span>}
+                    {p.email && <span className="truncate text-[11px] leading-[14px] text-[color:var(--ht-8a8a88)]">{p.email}</span>}
                   </span>
                   <LevelPicker label={`What ${p.name} can do with ${b.name}`} value={levelFor(p, b.id)} onChange={(level) => onLevel(p, level)} disabled={!p.id} />
                 </div>
@@ -1618,14 +1618,14 @@ export function BotTeamFields({
       )}
 
       {presetPerson && presetOpen && (
-        <div data-preset-confirm className="mt-5 flex flex-col gap-2.5 rounded-[14px] bg-[#F6F6F4] p-3.5 shadow-[inset_0_0_0_1px_#E8E8E5]">
+        <div data-preset-confirm className="mt-5 flex flex-col gap-2.5 rounded-[14px] bg-[color:var(--hb-f6f6f4)] p-3.5 shadow-[inset_0_0_0_1px_var(--h-e8e8e5)]">
           <span className="text-[13px] font-semibold leading-4">{CHART_WORDS.preset(presetPerson.name.split(" ")[0])}</span>
-          <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">{CHART_WORDS.presetConfirm(presetPerson.name.split(" ")[0], b.name)}</span>
+          <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{CHART_WORDS.presetConfirm(presetPerson.name.split(" ")[0], b.name)}</span>
           <span className="flex gap-2">
-            <button type="button" autoFocus onClick={() => (setPresetOpen(null), onPreset(presetPerson))} className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white hover:bg-[#262626]">
+            <button type="button" autoFocus onClick={() => (setPresetOpen(null), onPreset(presetPerson))} className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--bops-on-fill)] hover:bg-[color:var(--hb-262626)]">
               {CHART_WORDS.presetGo}
             </button>
-            <button type="button" onClick={() => setPresetOpen(null)} className="rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E8E8E5] hover:bg-[#F7F7F6]">
+            <button type="button" onClick={() => setPresetOpen(null)} className="rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e8e8e5)] hover:bg-[color:var(--hb-f7f7f6)]">
               {CHART_WORDS.cancel}
             </button>
           </span>
@@ -1633,7 +1633,7 @@ export function BotTeamFields({
       )}
 
       {inline && presetPerson && !presetOpen && !isTheirs && (
-        <button type="button" onClick={() => setPresetOpen(presetPerson.key)} className="mt-4 self-start rounded-full bg-white px-4 py-2 text-[13px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E8E8E5] hover:bg-[#F7F7F6]">
+        <button type="button" onClick={() => setPresetOpen(presetPerson.key)} className="mt-4 self-start rounded-full bg-white px-4 py-2 text-[13px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e8e8e5)] hover:bg-[color:var(--hb-f7f7f6)]">
           {CHART_WORDS.preset(presetPerson.name.split(" ")[0])}
         </button>
       )}
@@ -1700,13 +1700,13 @@ function BotSheet({
         ev.stopPropagation();
         setPresetOpen(null);
       }}
-      className="motion-fade-in flex w-[400px] shrink-0 flex-col overflow-y-auto border-l border-[#E8E8E5] bg-white px-[22px] pb-6 pt-[22px] outline-none"
+      className="motion-fade-in flex w-[400px] shrink-0 flex-col overflow-y-auto border-l border-[color:var(--h-e8e8e5)] bg-white px-[22px] pb-6 pt-[22px] outline-none"
     >
       <div className="flex items-center gap-3">
         <Mascot botId={b.id} color={b.color} size={48} />
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[17px] font-semibold leading-[22px]">{b.name}</span>
-          <span className="truncate text-[12.5px] leading-4 text-[#8A8A88]">
+          <span className="truncate text-[12.5px] leading-4 text-[color:var(--ht-8a8a88)]">
             {chief ? CHART_WORDS.chiefSub : CHART_WORDS.sheetSub(who ? CHART_WORDS.personsBot(who.name) : b.role, lead ? name(lead) : chiefName)}
           </span>
         </div>
@@ -1719,14 +1719,14 @@ function BotSheet({
       <BotTeamFields {...props} bot={b} preset={[presetOpen, setPresetOpen]} />
 
       {/* Done, and the preset, always in reach: kept at the bottom while the sheet scrolls. */}
-      <div className="sticky -bottom-6 -mx-[22px] mt-auto flex items-center justify-end gap-2 bg-white px-[22px] pb-6 pt-3 shadow-[0_-1px_0_#F0F0ED]">
+      <div className="sticky -bottom-6 -mx-[22px] mt-auto flex items-center justify-end gap-2 bg-white px-[22px] pb-6 pt-3 shadow-[0_-1px_0_var(--h-f0f0ed)]">
         {/* Make it the person it works for's own, when it isn't yet. */}
         {presetPerson && !presetOpen && !isTheirs && (
-          <button type="button" onClick={() => setPresetOpen(presetPerson.key)} className="rounded-full bg-white px-4 py-2 text-[13px] font-medium leading-4 text-ink shadow-[0_0_0_1px_#E8E8E5] hover:bg-[#F7F7F6]">
+          <button type="button" onClick={() => setPresetOpen(presetPerson.key)} className="rounded-full bg-white px-4 py-2 text-[13px] font-medium leading-4 text-ink shadow-[0_0_0_1px_var(--h-e8e8e5)] hover:bg-[color:var(--hb-f7f7f6)]">
             {CHART_WORDS.preset(presetPerson.name.split(" ")[0])}
           </button>
         )}
-        <button type="button" onClick={onClose} className="rounded-full bg-ink px-4 py-2 text-[13px] font-medium leading-4 text-white hover:bg-[#262626]">
+        <button type="button" onClick={onClose} className="rounded-full bg-[color:var(--hb-0a0a0a)] px-4 py-2 text-[13px] font-medium leading-4 text-[color:var(--bops-on-fill)] hover:bg-[color:var(--hb-262626)]">
           {CHART_WORDS.done}
         </button>
       </div>
@@ -1787,12 +1787,12 @@ function PeoplePart({
       </button>
       {open && (
         <div className="flex flex-col gap-3 pt-2">
-          <span className="text-[12px] leading-4 text-[#6B6B6B]">{CHART_WORDS.peopleIntro}</span>
+          <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{CHART_WORDS.peopleIntro}</span>
           {people.length === 0 ? (
-            <div className="flex items-center justify-between gap-3 text-[12.5px] leading-[18px] text-[#6B6B6B]">
+            <div className="flex items-center justify-between gap-3 text-[12.5px] leading-[18px] text-[color:var(--ht-6b6b6b)]">
               <span>{planNote ?? CHART_WORDS.nobodyYet}</span>
               {onOpenPeople && (
-                <button type="button" onClick={onOpenPeople} className="shrink-0 rounded-full bg-[#F2F2F0] px-3 py-1.5 text-[12.5px] font-medium text-ink hover:bg-[#EAEAE7]">
+                <button type="button" onClick={onOpenPeople} className="shrink-0 rounded-full bg-[color:var(--hb-f2f2f0)] px-3 py-1.5 text-[12.5px] font-medium text-ink hover:bg-[color:var(--hb-eaeae7)]">
                   {CHART_WORDS.openPeople}
                 </button>
               )}
@@ -1802,26 +1802,26 @@ function PeoplePart({
               const theirs = bots.filter((b) => levelFor(p, b.id) !== "none");
               const ownBot = bots.find((b) => entryOf(t, b.id).for === p.key);
               return (
-                <div key={p.key} className="flex flex-col gap-1.5 border-b border-[#F0F0ED] pb-3 last:border-0">
+                <div key={p.key} className="flex flex-col gap-1.5 border-b border-[color:var(--h-f0f0ed)] pb-3 last:border-0">
                   <div className="flex items-center justify-between gap-2 text-[13px] leading-4">
                     <span className="font-medium">
                       {p.name}
                       {p.invited ? ` · ${CHART_WORDS.invited}` : ""}
                     </span>
-                    {p.email && <span className="text-[12px] text-[#8A8A88]">{p.email}</span>}
+                    {p.email && <span className="text-[12px] text-[color:var(--ht-8a8a88)]">{p.email}</span>}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {theirs.length ? (
                       theirs.map((b) => (
-                        <button key={b.id} type="button" onClick={() => onPickBot(b.id)} className="rounded-full bg-[#F6F6F4] px-2.5 py-1 text-[12px] leading-4 text-[#3A3A38] shadow-[inset_0_0_0_1px_#E8E8E5] hover:bg-[#EFEFEC]">
+                        <button key={b.id} type="button" onClick={() => onPickBot(b.id)} className="rounded-full bg-[color:var(--hb-f6f6f4)] px-2.5 py-1 text-[12px] leading-4 text-[color:var(--ht-3a3a38)] shadow-[inset_0_0_0_1px_var(--h-e8e8e5)] hover:bg-[color:var(--hb-efefec)]">
                           {b.name} · {levelFor(p, b.id) === "write" ? "Write" : "Read"}
                         </button>
                       ))
                     ) : (
-                      <span className="flex items-center gap-2 text-[12px] text-[#8A8A88]">
+                      <span className="flex items-center gap-2 text-[12px] text-[color:var(--ht-8a8a88)]">
                         {CHART_WORDS.noBots}
                         {p.id && (
-                          <button type="button" onClick={() => setGiving(giving === p.key ? null : p.key)} className="rounded-full bg-[#F2F2F0] px-2.5 py-1 font-medium text-ink hover:bg-[#EAEAE7]">
+                          <button type="button" onClick={() => setGiving(giving === p.key ? null : p.key)} className="rounded-full bg-[color:var(--hb-f2f2f0)] px-2.5 py-1 font-medium text-ink hover:bg-[color:var(--hb-eaeae7)]">
                             {CHART_WORDS.giveBot(p.name.split(" ")[0])}
                           </button>
                         )}
@@ -1831,23 +1831,23 @@ function PeoplePart({
                   {giving === p.key && (
                     <div className="flex flex-wrap gap-1.5" data-give-bot>
                       {free.map((b) => (
-                        <button key={b.id} type="button" onClick={() => (setGiving(null), onGiveBot(p, b.id))} className="inline-flex items-center gap-1.5 rounded-full bg-white py-1 pl-1.5 pr-2.5 text-[12px] leading-4 text-ink shadow-[inset_0_0_0_1px_#E8E8E5] hover:bg-[#F7F7F6]">
+                        <button key={b.id} type="button" onClick={() => (setGiving(null), onGiveBot(p, b.id))} className="inline-flex items-center gap-1.5 rounded-full bg-white py-1 pl-1.5 pr-2.5 text-[12px] leading-4 text-ink shadow-[inset_0_0_0_1px_var(--h-e8e8e5)] hover:bg-[color:var(--hb-f7f7f6)]">
                           <Mascot botId={b.id} color={b.color} size={16} />
                           {b.name}
                         </button>
                       ))}
                       {onMakeBot && (
-                        <button type="button" onClick={onMakeBot} className="rounded-full bg-white px-2.5 py-1 text-[12px] leading-4 text-ink shadow-[inset_0_0_0_1px_#E8E8E5] hover:bg-[#F7F7F6]">
+                        <button type="button" onClick={onMakeBot} className="rounded-full bg-white px-2.5 py-1 text-[12px] leading-4 text-ink shadow-[inset_0_0_0_1px_var(--h-e8e8e5)] hover:bg-[color:var(--hb-f7f7f6)]">
                           {CHART_WORDS.newBotFor(p.name.split(" ")[0])}
                         </button>
                       )}
                     </div>
                   )}
-                  {ownBot && <span className="text-[12px] leading-4 text-[#6B6B6B]">{CHART_WORDS.ownBot(ownBot.name)}</span>}
+                  {ownBot && <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{CHART_WORDS.ownBot(ownBot.name)}</span>}
                   {theirs
                     .filter((b) => entryOf(t, b.id).for && entryOf(t, b.id).for !== p.key)
                     .map((b) => (
-                      <span key={b.id} className="text-[12px] leading-4 text-[#B54708]">
+                      <span key={b.id} className="text-[12px] leading-4 text-[color:var(--ht-b54708)]">
                         {CHART_WORDS.seesChats(p.name, b.name)}
                       </span>
                     ))}
@@ -1855,7 +1855,7 @@ function PeoplePart({
               );
             })
           )}
-          <div className="flex flex-col gap-0.5 text-[12px] leading-4 text-[#8A8A88]">
+          <div className="flex flex-col gap-0.5 text-[12px] leading-4 text-[color:var(--ht-8a8a88)]">
             <span>{CHART_WORDS.readNote}</span>
             <span>{CHART_WORDS.writeNote}</span>
             <span>{CHART_WORDS.orgoNote}</span>

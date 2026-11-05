@@ -17,7 +17,7 @@ import { changeWorkspaceDns, DnsZone, DOMAIN_STATES, PULSE, QUIET } from "./host
  */
 
 /** Get a domain, as Settings' other header buttons are (This Mac's Allow all): light, never the black one. */
-const LIGHT = "shrink-0 rounded-full bg-[#F2F2F0] px-3 py-1.5 text-[12.5px] font-medium leading-4 hover:bg-[#EAEAE7] disabled:opacity-50 disabled:hover:bg-[#F2F2F0]";
+const LIGHT = "shrink-0 rounded-full bg-[color:var(--hb-f2f2f0)] px-3 py-1.5 text-[12.5px] font-medium leading-4 hover:bg-[color:var(--hb-eaeae7)] disabled:opacity-50 disabled:hover:bg-[color:var(--hb-f2f2f0)]";
 
 /** How often, and how many times, the list is read again while a domain is still being registered. */
 const PENDING_MS = 15_000;
@@ -50,7 +50,7 @@ export function domainLine(d: WorkspaceDomain, late = false): { text: string; am
 
 /** A domain's dot: green once it's the workspace's, pulsing while it's registered, amber while a renewal needs looking at, grey once it's expired. */
 const dotOf = (d: WorkspaceDomain) =>
-  d.status === "pending" ? PULSE : d.renewal?.state === "retrying" ? "bg-[#F79009]" : d.renewal?.state === "expired" ? "bg-[#9A9A98]" : "bg-[#2BB673]";
+  d.status === "pending" ? PULSE : d.renewal?.state === "retrying" ? "bg-[color:var(--hb-f79009)]" : d.renewal?.state === "expired" ? "bg-[color:var(--hb-9a9a98)]" : "bg-[color:var(--hb-2bb673)]";
 
 /**
  * The workspace's domains, in Settings. `onOpenApp`: an app named under Where it points, opened in its tab
@@ -169,7 +169,7 @@ export function WorkspaceDomains({
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-[13px] font-semibold">Domains</span>
-          <span className="text-[12px] leading-4 text-[#6B6B6B]">Domains {named} owns, paid for with Orgo credits.</span>
+          <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">Domains {named} owns, paid for with Orgo credits.</span>
         </div>
         {aside}
       </div>
@@ -182,8 +182,8 @@ export function WorkspaceDomains({
       {shopping && answer?.open && (
         <div data-domain-shop onKeyDown={(e) => escCloses(buying, closeShop)(e)} className={BOX}>
           <div className="flex items-center gap-2">
-            <span className="flex-1 text-[12px] font-semibold leading-4 text-[#6B6B6B]">Get a domain</span>
-            <button aria-label="Close" disabled={buying} onClick={closeShop} className="flex size-6 shrink-0 items-center justify-center rounded-md text-[#6B6B6B] hover:bg-black/[0.05] hover:text-ink disabled:opacity-50">
+            <span className="flex-1 text-[12px] font-semibold leading-4 text-[color:var(--ht-6b6b6b)]">Get a domain</span>
+            <button aria-label="Close" disabled={buying} onClick={closeShop} className="flex size-6 shrink-0 items-center justify-center rounded-md text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--bops-tint)]/[0.05] hover:text-ink disabled:opacity-50">
               <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
                 <path d="M2 2l6 6M8 2L2 8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
               </svg>
@@ -204,7 +204,7 @@ export function WorkspaceDomains({
         </div>
       )}
       {/* One card, a divided row a domain, as Settings' other sections have them. */}
-      <div data-domains-card className="flex flex-col rounded-[14px] px-3.5 shadow-[0_0_0_1px_#E6E6E3]">
+      <div data-domains-card className="flex flex-col rounded-[14px] px-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         {!answer ? (
           failed ? (
             <div data-domains-failed className="flex min-h-10 flex-wrap items-center gap-x-2 py-2.5">
@@ -225,7 +225,7 @@ export function WorkspaceDomains({
           say("This workspace has no domains yet.", { "data-no-domains": true })
         ) : (
           answer.domains.map((d) => (
-            <div key={d.id} className="flex flex-col border-b border-[#F0F0EE] last:border-0">
+            <div key={d.id} className="flex flex-col border-b border-[color:var(--h-f0f0ee)] last:border-0">
               <DomainRow d={d} late={stillLate} open={open === d.id} onClick={() => setOpen((o) => (o === d.id ? null : d.id))} />
               {open === d.id && d.status === "active" && (
                 <DomainDetail ws={ws} d={d} note={note?.id === d.id ? note.text : null} onRenewal={onRenewal} onOpenApp={(name) => onOpenApp(ws, name)} />
@@ -262,11 +262,11 @@ function DomainRow({ d, late, open, onClick }: { d: WorkspaceDomain; late: boole
       <span title={d.domain} className="min-w-0 max-w-[45%] shrink-0 truncate font-mono text-[13px] leading-4 text-ink">
         {d.domain}
       </span>
-      <span data-domain-line className={`min-w-0 flex-1 truncate text-[12.5px] leading-4 ${line.amber ? "text-[#B54708]" : "text-[#6B6B6B]"}`}>
+      <span data-domain-line className={`min-w-0 flex-1 truncate text-[12.5px] leading-4 ${line.amber ? "text-[color:var(--ht-b54708)]" : "text-[color:var(--ht-6b6b6b)]"}`}>
         {line.text}
       </span>
       {opens && (
-        <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden className={`shrink-0 text-[#9A9A98] transition-transform ${open ? "rotate-90" : ""}`}>
+        <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden className={`shrink-0 text-[color:var(--ht-9a9a98)] transition-transform ${open ? "rotate-90" : ""}`}>
           <path d="M2.5 1l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )}
@@ -278,7 +278,7 @@ function DomainRow({ d, late, open, onClick }: { d: WorkspaceDomain; late: boole
 function UseLine({ u, onOpenApp }: { u: DomainUse; onOpenApp: (name: string) => void }) {
   const s = DOMAIN_STATES[u.status] ?? DOMAIN_STATES.pending;
   return (
-    <div data-use={u.name} className="flex min-h-7 min-w-0 items-center gap-2 text-[12px] leading-4 text-[#3A3A38]">
+    <div data-use={u.name} className="flex min-h-7 min-w-0 items-center gap-2 text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">
       <span className={`size-1.5 shrink-0 rounded-full ${s.dot}`} />
       <span className="min-w-0 truncate">
         <span className="font-mono text-ink">{u.name}</span> is on{" "}
@@ -323,7 +323,7 @@ function DomainDetail({ ws, d, note, onRenewal, onOpenApp }: { ws: string; d: Wo
   return (
     <div data-domain-detail={d.domain} className="flex flex-col gap-2 pb-3.5">
       {note && (
-        <span role="status" className="text-[12px] leading-4 text-[#1E7A4C]">
+        <span role="status" className="text-[12px] leading-4 text-[color:var(--ht-1e7a4c)]">
           {note}
         </span>
       )}

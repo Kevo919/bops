@@ -93,7 +93,7 @@ export function useMembersCount(state: AppState) {
 export function TeamCount({ count }: { count: number | null }) {
   if (!count) return null;
   return (
-    <span data-team-count className="pointer-events-none absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EEEEEC] px-1 text-[11px] font-semibold leading-none tabular-nums text-[#3A3A38] shadow-[0_0_0_2px_#F9F9F8]">
+    <span data-team-count className="pointer-events-none absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[color:var(--hb-eeeeec)] px-1 text-[11px] font-semibold leading-none tabular-nums text-[color:var(--ht-3a3a38)] shadow-[0_0_0_2px_var(--h-f9f9f8)]">
       {count}
     </span>
   );
@@ -124,7 +124,7 @@ const errorOf = (r: Answer, fallback: string) =>
   r.status === 0 ? WORDS.appUnreachable : typeof r.json.error === "string" && r.json.code !== "UNREACHABLE" && r.json.code !== "ORGO_ERROR" ? r.json.error : fallback;
 
 const pill = "rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4";
-const quiet = `${pill} shrink-0 bg-[#F2F2F0] hover:bg-[#EAEAE7]`;
+const quiet = `${pill} shrink-0 bg-[color:var(--hb-f2f2f0)] hover:bg-[color:var(--hb-eaeae7)]`;
 
 /**
  * Team: Settings' section of who sees which bots (bops-app.tsx Settings), a part of the page like its others. It
@@ -221,7 +221,7 @@ export function Members({
             <span id="members-title" className="text-[22px] font-bold leading-7 tracking-[-0.02em]">
               Team
             </span>
-            <span className="text-[13px] leading-[19px] text-[#6B6B6B]">{state.shared ? "Who sees which of the owner's bots, and their computers." : "Who sees which of your bots, and their computers."}</span>
+            <span className="text-[13px] leading-[19px] text-[color:var(--ht-6b6b6b)]">{state.shared ? "Who sees which of the owner's bots, and their computers." : "Who sees which of your bots, and their computers."}</span>
             {/* Who answers to whom, and who may ask whom: the team chart (your own workspace only). */}
             {onTeamChart && !state.shared && (
               <button type="button" data-chart-link onClick={onTeamChart} className="mt-1 flex items-center gap-1.5 self-start text-[12.5px] font-medium leading-4 text-ink hover:underline">
@@ -288,13 +288,13 @@ export function Members({
         )}
 
         {read?.state === "ready" && read.shared ? (
-          <div className="px-[22px] pb-5 pt-5 text-[12px] leading-4 text-[#9A9A98]">
+          <div className="px-[22px] pb-5 pt-5 text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">
             <a href={read.orgoUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-ink">
               Open on orgo.ai
             </a>
           </div>
         ) : read?.state === "ready" ? (
-          <div className="px-[22px] pb-5 pt-5 text-[12px] leading-4 text-[#9A9A98]">
+          <div className="px-[22px] pb-5 pt-5 text-[12px] leading-4 text-[color:var(--ht-9a9a98)]">
             People you add sign in with the email you invite. In Bops they see everything of the bots you pick, your chats with them too. On orgo.ai they see every bot&apos;s
             computer, like an open inbox, and can ask Orgo&apos;s agent to work on it. {read.keysOnComputers ? "Never your saved logins." : "Never your saved logins or keys."}{" "}
             <a href={read.orgoUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-ink">
@@ -438,7 +438,7 @@ export function BotAccess({ bots, value, onChange, disabled, invite }: { bots: B
   const pickLevel = (botId: string | null, level: AccessLevel) => onChange(fitComputer(withLevel(value, botId, level), ids));
   return (
     <div data-bot-access className="flex flex-col gap-2">
-      <div className="flex max-h-[250px] flex-col overflow-y-auto rounded-[12px] px-2.5 shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="flex max-h-[250px] flex-col overflow-y-auto rounded-[12px] px-2.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         <AccessRow
           icon={<EveryBot />}
           name="Every bot, new ones too"
@@ -462,7 +462,7 @@ export function BotAccess({ bots, value, onChange, disabled, invite }: { bots: B
       </div>
       {/* Your Apps: a scope of its own, behind the list's hairline (lib/member-access.ts MemberAccess.apps), only with a bot (workspaces.ts showsAny). */}
       {scope.shown && (
-        <div data-apps-access className="flex flex-col rounded-[12px] px-2.5 shadow-[0_0_0_1px_#E6E6E3]">
+        <div data-apps-access className="flex flex-col rounded-[12px] px-2.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
           <AccessRow
             icon={<AppsIcon size={16} />}
             name={APPS_WORDS.row}
@@ -474,28 +474,28 @@ export function BotAccess({ bots, value, onChange, disabled, invite }: { bots: B
         </div>
       )}
       {scope.shown && (!hasBot || !CLOUD_SHARES_APPS || !scope.roles) && (
-        <span data-apps-note className="px-1 text-[12px] leading-4 text-[#6B6B6B]">
+        <span data-apps-note className="px-1 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
           {!hasBot ? APPS_WORDS.needsBot : APPS_WORDS.notYet}
         </span>
       )}
       {/* Use its computer: a scope of its own, as Your Apps is (lib/member-access.ts MemberAccess.computer), only with Write on a bot, never on an invite. */}
-      <div data-computer-access className="flex flex-col rounded-[12px] px-2.5 shadow-[0_0_0_1px_#E6E6E3]">
+      <div data-computer-access className="flex flex-col rounded-[12px] px-2.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         {/* On without Write (a bot deleted under them, or orgo-web's list says so): shown as on, and it can only be turned off. */}
         <ComputerRow on={computerOn} onChange={(on) => onChange(withComputer(value, on))} disabled={disabled || invite} onLocked={!writes} />
       </div>
-      <span data-computer-note className="px-1 text-[12px] leading-4 text-[#6B6B6B]">
+      <span data-computer-note className="px-1 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
         {invite ? COMPUTER_WORDS.afterJoin : writes ? COMPUTER_WORDS.legend : computerOn ? COMPUTER_WORDS.onWithoutWrite : COMPUTER_WORDS.needsWrite}
       </span>
-      <ul data-access-levels className="flex flex-col gap-0.5 px-1 text-[12px] leading-4 text-[#6B6B6B]">
+      <ul data-access-levels className="flex flex-col gap-0.5 px-1 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
         {ACCESS_LEVELS.map((level) => (
           <li key={level}>
-            <span className="font-medium text-[#3A3A38]">{ACCESS_LABELS[level]}:</span> {ACCESS_TIPS[level].charAt(0).toLowerCase() + ACCESS_TIPS[level].slice(1)}
+            <span className="font-medium text-[color:var(--ht-3a3a38)]">{ACCESS_LABELS[level]}:</span> {ACCESS_TIPS[level].charAt(0).toLowerCase() + ACCESS_TIPS[level].slice(1)}
           </li>
         ))}
         {scope.shown && <li data-apps-legend>{APPS_WORDS.legend}</li>}
       </ul>
       {scope.shown && scope.older && (
-        <span data-apps-older className="px-1 text-[12px] leading-4 text-[#6B6B6B]">
+        <span data-apps-older className="px-1 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
           {APPS_WORDS.older}
         </span>
       )}
@@ -510,7 +510,7 @@ function ComputerRow({ on, onChange, disabled, onLocked }: { on: boolean; onChan
     <div className="flex h-[30px] shrink-0 items-center gap-2">
       <ComputerMark />
       <span className="min-w-0 flex-1 truncate text-[12.5px] leading-4 text-ink">{COMPUTER_WORDS.row}</span>
-      <div role="radiogroup" aria-label={COMPUTER_WORDS.row} className={`flex shrink-0 gap-0.5 rounded-full bg-black/[0.05] p-[2px] ${dim ? "opacity-50" : ""}`}>
+      <div role="radiogroup" aria-label={COMPUTER_WORDS.row} className={`flex shrink-0 gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[2px] ${dim ? "opacity-50" : ""}`}>
         {[false, true].map((value) => (
           <button
             key={String(value)}
@@ -520,7 +520,7 @@ function ComputerRow({ on, onChange, disabled, onLocked }: { on: boolean; onChan
             disabled={disabled || (value && onLocked && !on)}
             data-tip={value ? COMPUTER_WORDS.onTip : COMPUTER_WORDS.offTip}
             onClick={() => on !== value && onChange(value)}
-            className={`rounded-full px-2 py-0.5 text-[11.5px] leading-4 ${on === value ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F]" : "text-[#6B6B6B] hover:text-ink"}`}
+            className={`rounded-full px-2 py-0.5 text-[11.5px] leading-4 ${on === value ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "text-[color:var(--ht-6b6b6b)] hover:text-ink"}`}
           >
             {value ? COMPUTER_WORDS.on : COMPUTER_WORDS.off}
           </button>
@@ -566,7 +566,7 @@ function AccessRow({
 }) {
   const tipId = useId();
   return (
-    <div className="flex h-[30px] shrink-0 items-center gap-2 border-b border-[#F0F0EE] last:border-0">
+    <div className="flex h-[30px] shrink-0 items-center gap-2 border-b border-[color:var(--h-f0f0ee)] last:border-0">
       {icon}
       <span data-tip={tip} className="min-w-0 flex-1 truncate text-[12.5px] leading-4 text-ink">
         {name}
@@ -604,7 +604,7 @@ export function LevelPicker({
   tips?: Record<AccessLevel, string>;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} aria-describedby={describedBy} className={`flex shrink-0 gap-0.5 rounded-full bg-black/[0.05] p-[2px] ${disabled ? "opacity-50" : ""}`}>
+    <div role="radiogroup" aria-label={label} aria-describedby={describedBy} className={`flex shrink-0 gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[2px] ${disabled ? "opacity-50" : ""}`}>
       {ACCESS_LEVELS.map((level) => {
         const on = value === level;
         return (
@@ -616,7 +616,7 @@ export function LevelPicker({
             disabled={disabled}
             data-tip={tips[level]}
             onClick={() => (!on || loose) && onChange(level)}
-            className={`rounded-full px-2 py-0.5 text-[11.5px] leading-4 ${on && !loose ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F]" : on ? "bg-white/60 text-[#3A3A38] hover:text-ink" : "text-[#6B6B6B] hover:text-ink"}`}
+            className={`rounded-full px-2 py-0.5 text-[11.5px] leading-4 ${on && !loose ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : on ? "bg-white/60 text-[color:var(--ht-3a3a38)] hover:text-ink" : "text-[color:var(--ht-6b6b6b)] hover:text-ink"}`}
           >
             {ACCESS_LABELS[level]}
           </button>
@@ -638,7 +638,7 @@ function EveryBot() {
 /** "Choose bots" or "Bots": opens the picker under it, and closes it. */
 function BotsToggle({ open, label, onClick }: { open: boolean; label: string; onClick: () => void }) {
   return (
-    <button type="button" aria-expanded={open} onClick={onClick} className="flex shrink-0 items-center gap-0.5 rounded-full text-[12px] font-medium leading-4 text-[#3A3A38] hover:text-ink">
+    <button type="button" aria-expanded={open} onClick={onClick} className="flex shrink-0 items-center gap-0.5 rounded-full text-[12px] font-medium leading-4 text-[color:var(--ht-3a3a38)] hover:text-ink">
       {label}
       <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className={`transition-transform ${open ? "rotate-180" : ""}`}>
         <path d="M2.5 4l2.5 2.5L7.5 4" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
@@ -697,7 +697,7 @@ function AddSomeone({ info, state, bots, act, onRetry, onUpgrade }: { info: Read
   // Over the limit (a plan changed after they joined), the block says how many: "4 of 2" would only puzzle.
   const aside = s.limit !== null && s.used > s.limit ? null : peopleAside(s);
   const counter = aside && (
-    <span data-tip="People with access, and invites still waiting" className="text-[12px] tabular-nums text-[#9A9A98]">
+    <span data-tip="People with access, and invites still waiting" className="text-[12px] tabular-nums text-[color:var(--ht-9a9a98)]">
       {aside}
     </span>
   );
@@ -724,14 +724,14 @@ function AddSomeone({ info, state, bots, act, onRetry, onUpgrade }: { info: Read
       <Notice
         action={
           upgrade && (
-            <button onClick={onUpgrade} className={`${pill} shrink-0 bg-ink text-white`}>
+            <button onClick={onUpgrade} className={`${pill} shrink-0 bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)]`}>
               {upgradeLabel(upgrade)}
             </button>
           )
         }
       >
         {short?.text ?? WORDS.upgradeRequired}
-        {short?.note && <span className="block text-[#6B6B6B]">{short.note}</span>}
+        {short?.note && <span className="block text-[color:var(--ht-6b6b6b)]">{short.note}</span>}
         {s.plan === "free_bops" && <OrgoPlanLine state={state} />}
       </Notice>
       {line}
@@ -743,7 +743,7 @@ function AddSomeone({ info, state, bots, act, onRetry, onUpgrade }: { info: Read
 function OrgoPlanLine({ state }: { state: AppState }) {
   const tier = usePlan(state)?.plan?.tier;
   if (!tier || tier.toLowerCase() === "free") return null;
-  return <span className="block text-[#6B6B6B]">Your Orgo plan covers your other Orgo workspaces, not your bots&apos; computers.</span>;
+  return <span className="block text-[color:var(--ht-6b6b6b)]">Your Orgo plan covers your other Orgo workspaces, not your bots&apos; computers.</span>;
 }
 
 /** What the last invite did (muted, or red for a problem), with the invite's link when the email didn't go out. */
@@ -752,7 +752,7 @@ type Said = { tone: "muted" | "bad"; text: string; link?: string; brief?: true }
 /** The line under the form, or under the plan's block once the invite took the last seat. */
 function SaidLine({ said }: { said: Said }) {
   return (
-    <span role={said.tone === "bad" ? "alert" : "status"} className={`flex flex-wrap items-center gap-x-2 text-[12px] leading-4 ${said.tone === "bad" ? "text-[#B42318]" : "text-[#6B6B6B]"}`}>
+    <span role={said.tone === "bad" ? "alert" : "status"} className={`flex flex-wrap items-center gap-x-2 text-[12px] leading-4 ${said.tone === "bad" ? "text-[color:var(--ht-b42318)]" : "text-[color:var(--ht-6b6b6b)]"}`}>
       {said.text}
       {said.link && <CopyLink link={said.link} />}
     </span>
@@ -850,15 +850,15 @@ function InviteForm({
           placeholder="name@example.com"
           aria-label="Their email"
           autoComplete="off"
-          className="h-10 min-w-0 flex-1 rounded-full bg-white px-4 text-[14px] shadow-[0_0_0_1px_#E6E6E3] outline-none placeholder:text-[#9A9A98] focus:shadow-[0_0_0_1.5px_#0A0A0A]"
+          className="h-10 min-w-0 flex-1 rounded-full bg-white px-4 text-[14px] shadow-[0_0_0_1px_var(--h-e6e6e3)] outline-none placeholder:text-[color:var(--ht-9a9a98)] focus:shadow-[0_0_0_1.5px_var(--h-0a0a0a)]"
         />
         <AccessPicker value={role} onChange={setRole} disabled={busy} />
-        <button type="submit" disabled={!email.trim() || busy} className="h-10 shrink-0 rounded-full bg-ink px-4 text-[13px] font-medium text-white disabled:opacity-50">
+        <button type="submit" disabled={!email.trim() || busy} className="h-10 shrink-0 rounded-full bg-[color:var(--hb-0a0a0a)] px-4 text-[13px] font-medium text-[color:var(--bops-on-fill)] disabled:opacity-50">
           {busy ? "Sending…" : sent ? "Sent" : again ? "Resend invite" : "Send invite"}
         </button>
       </div>
       {picking && (
-        <span className="flex min-w-0 items-center gap-2 pt-0.5 text-[12.5px] leading-[18px] text-[#6B6B6B]">
+        <span className="flex min-w-0 items-center gap-2 pt-0.5 text-[12.5px] leading-[18px] text-[color:var(--ht-6b6b6b)]">
           <span data-access-summary className="truncate">
             {summary(access, ids)}
           </span>
@@ -878,12 +878,12 @@ const useRoleLines = () => (useContext(SheetScope) ? ROLE_LINES_SHARED : ROLE_LI
 function RoleLine({ role }: { role: MemberRole }) {
   const lines = useRoleLines();
   return role === "admin" ? (
-    <span className="flex items-start gap-1.5 pt-0.5 text-[12.5px] leading-[18px] text-[#3A3A38]">
+    <span className="flex items-start gap-1.5 pt-0.5 text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">
       <NeedsYouDot className="mt-px" />
       {lines.admin}
     </span>
   ) : (
-    <span className="pt-0.5 text-[12.5px] leading-[18px] text-[#6B6B6B]">{lines.viewer}</span>
+    <span className="pt-0.5 text-[12.5px] leading-[18px] text-[color:var(--ht-6b6b6b)]">{lines.viewer}</span>
   );
 }
 
@@ -893,8 +893,8 @@ function AccessPicker({ value, onChange, disabled }: { value: MemberRole; onChan
   const lines = useRoleLines();
   return (
     <div className="flex shrink-0 items-center gap-1.5">
-      <span className="text-[12px] text-[#9A9A98]">Role</span>
-      <div role="radiogroup" aria-label="Their role" className={`flex shrink-0 gap-0.5 rounded-full bg-black/[0.05] p-[3px] ${disabled ? "opacity-50" : ""}`}>
+      <span className="text-[12px] text-[color:var(--ht-9a9a98)]">Role</span>
+      <div role="radiogroup" aria-label="Their role" className={`flex shrink-0 gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[3px] ${disabled ? "opacity-50" : ""}`}>
         {(["viewer", "admin"] as const).map((r) => {
           const on = value === r;
           // Not offered yet: Bops Cloud would give an Admin no bots (someone an Admin already can still be made a Member).
@@ -908,7 +908,7 @@ function AccessPicker({ value, onChange, disabled }: { value: MemberRole; onChan
               disabled={disabled || held}
               data-tip={held ? WORDS.fullAccessNotYet : r === "admin" ? lines.admin : lines.viewer}
               onClick={() => !on && onChange(r)}
-              className={`rounded-full px-2.5 py-1 text-[12px] leading-4 ${on ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F]" : held ? "text-[#B5B5B3]" : "text-[#6B6B6B] hover:text-ink"}`}
+              className={`rounded-full px-2.5 py-1 text-[12px] leading-4 ${on ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : held ? "text-[color:var(--ht-b5b5b3)]" : "text-[color:var(--ht-6b6b6b)] hover:text-ink"}`}
             >
               {ROLE_NAMES[r]}
             </button>
@@ -924,13 +924,13 @@ function AccessPicker({ value, onChange, disabled }: { value: MemberRole; onChan
 /** A person's initials on a circle: the user's in ink and highlighter, as on Account. */
 function Face({ label, you }: { label: string; you?: boolean }) {
   return (
-    <span className={`flex size-9 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold ${you ? "bg-ink text-highlighter" : "bg-[#EEEEEC] text-[#6B6B6B]"}`}>
+    <span className={`flex size-9 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold ${you ? "bg-[color:var(--hb-0a0a0a)] text-highlighter" : "bg-[color:var(--hb-eeeeec)] text-[color:var(--ht-6b6b6b)]"}`}>
       {initialsFrom(label)}
     </span>
   );
 }
 
-const row = "group flex flex-col border-b border-[#F0F0EE] px-3.5 py-3 last:border-0";
+const row = "group flex flex-col border-b border-[color:var(--h-f0f0ee)] px-3.5 py-3 last:border-0";
 const rowAction = "rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100";
 
 /**
@@ -940,7 +940,7 @@ const rowAction = "rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 op
 function SubLine({ who, children }: { who?: string | null; children?: React.ReactNode }) {
   if (!who && !children) return null;
   return (
-    <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] leading-4 text-[#6B6B6B]">
+    <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
       {/* Who first: their access line beside it gives way before it does. */}
       {who && <span className={`truncate ${children ? "max-w-[55%] shrink-0" : ""}`}>{who}</span>}
       {who && children && <span aria-hidden>·</span>}
@@ -956,7 +956,7 @@ function WhoHasAccess({ info, bots, act }: { info: Ready; bots: Bot[] | null; ac
   const shared = !!info.shared;
   return (
     <Section title="Who has access">
-      <div className="flex flex-col rounded-[14px] shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="flex flex-col rounded-[14px] shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         <div className={row}>
           <div className="flex items-center gap-3">
             <Face label={you.name} you={!shared} />
@@ -968,15 +968,15 @@ function WhoHasAccess({ info, bots, act }: { info: Ready; bots: Bot[] | null; ac
               <SubLine who={you.email && you.email !== you.name ? you.email : null}>
                 <span className="shrink-0">Every bot</span>
               </SubLine>
-              {shared && <span data-owner-line className="text-[12px] leading-4 text-[#6B6B6B]">{ADMIN_SHEET_WORDS.owner}</span>}
+              {shared && <span data-owner-line className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{ADMIN_SHEET_WORDS.owner}</span>}
             </div>
-            <span className="shrink-0 text-[12.5px] text-[#9A9A98]">Owner</span>
+            <span className="shrink-0 text-[12.5px] text-[color:var(--ht-9a9a98)]">Owner</span>
           </div>
         </div>
         {info.people.map((p) => (
           <PersonRow key={p.id} person={p} bots={bots} act={act} />
         ))}
-        {!info.people.length && <div className="px-3.5 py-3 text-[12.5px] leading-4 text-[#9A9A98]">Just you so far.</div>}
+        {!info.people.length && <div className="px-3.5 py-3 text-[12.5px] leading-4 text-[color:var(--ht-9a9a98)]">Just you so far.</div>}
       </div>
     </Section>
   );
@@ -1095,10 +1095,10 @@ function PersonRow({ person: p, bots, act }: { person: Person; bots: Bot[] | nul
           </SubLine>
         </div>
         {/* Their own row on an Admin's sheet: Leave only (shared-people.ts refuses a change to their own role). */}
-        {locked || me ? <span className="shrink-0 text-[12.5px] text-[#9A9A98]">{ROLE_NAMES[p.role]}</span> : <AccessPicker value={p.role} disabled={busy} onChange={(role) => (role === "admin" ? setAsking("full") : void change(role))} />}
+        {locked || me ? <span className="shrink-0 text-[12.5px] text-[color:var(--ht-9a9a98)]">{ROLE_NAMES[p.role]}</span> : <AccessPicker value={p.role} disabled={busy} onChange={(role) => (role === "admin" ? setAsking("full") : void change(role))} />}
         {/* Asked in place: while it asks, its question under the row stands for it. */}
         {asking !== "remove" && (!locked || me) && (
-          <button onClick={() => setAsking("remove")} className={`${rowAction} shrink-0 text-[#B42318] hover:bg-[#FEF3F2]`}>
+          <button onClick={() => setAsking("remove")} className={`${rowAction} shrink-0 text-[color:var(--ht-b42318)] hover:bg-[color:var(--hb-fef3f2)]`}>
             {me ? "Leave" : "Remove"}
           </button>
         )}
@@ -1109,12 +1109,12 @@ function PersonRow({ person: p, bots, act }: { person: Person; bots: Bot[] | nul
         </div>
       )}
       {error && (
-        <span role="alert" className="pl-12 pt-1.5 text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="pl-12 pt-1.5 text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}
       {copied && p.role === "viewer" && (
-        <span role="status" className="pl-12 pt-1.5 text-[12px] leading-4 text-[#6B6B6B]">
+        <span role="status" className="pl-12 pt-1.5 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
           {`${sheet ? ADMIN_WORDS.toMemberTipShared : ADMIN_WORDS.toMemberTip} ${WORDS.copiedPassword}`}
         </span>
       )}
@@ -1169,13 +1169,13 @@ function Invited({ info, bots, act }: { info: Ready; bots: Bot[] | null; act: Ac
       title="Invited"
       aside={
         (free || over) && (
-          <span data-tip={tip} className="text-[12px] text-[#9A9A98]">
+          <span data-tip={tip} className="text-[12px] text-[color:var(--ht-9a9a98)]">
             Can&apos;t be accepted right now
           </span>
         )
       }
     >
-      <div className="flex flex-col rounded-[14px] shadow-[0_0_0_1px_#E6E6E3]">
+      <div className="flex flex-col rounded-[14px] shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         {info.invites.map((i) => (
           <InviteRow key={i.email} invite={i} bots={bots} canSend={!!s} act={act} />
         ))}
@@ -1246,12 +1246,12 @@ function InviteRow({ invite: i, bots, canSend, act }: { invite: Invite; bots: Bo
   return (
     <div className={row}>
       <div className="flex items-center gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F7F7F6] text-[13px] font-semibold uppercase text-[#9A9A98] shadow-[inset_0_0_0_1px_#E6E6E3]">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--hb-f7f7f6)] text-[13px] font-semibold uppercase text-[color:var(--ht-9a9a98)] shadow-[inset_0_0_0_1px_var(--h-e6e6e3)]">
           {i.email[0]}
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-[14px] font-medium leading-[18px]">{i.email}</span>
-          <span data-access-summary className="truncate text-[12.5px] leading-4 text-[#6B6B6B]">
+          <span data-access-summary className="truncate text-[12.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
             {role === "admin" ? ADMIN_WORDS.row : bots && summary(i.access, bots.map((b) => b.id))}
             {i.expiresAt !== null && `${role === "admin" || bots ? " · " : ""}${i.expired ? "expired" : "expires"} ${day(i.expiresAt)}`}
           </span>
@@ -1259,10 +1259,10 @@ function InviteRow({ invite: i, bots, canSend, act }: { invite: Invite; bots: Bo
         {!sure && <AccessPicker value={role} disabled={!!busy} onChange={(next) => void changeRole(next)} />}
         {sure ? (
           <span className="motion-rise-in flex shrink-0 items-center gap-1">
-            <button disabled={!!busy} onClick={() => void cancel()} className="rounded-full bg-[#B42318] px-2.5 py-1 text-[12px] font-semibold leading-4 text-white disabled:opacity-50">
+            <button disabled={!!busy} onClick={() => void cancel()} className="rounded-full bg-[color:var(--hb-b42318)] px-2.5 py-1 text-[12px] font-semibold leading-4 text-[color:var(--bops-on-fill)] disabled:opacity-50">
               {busy === "cancel" ? "Cancelling…" : "Cancel invite"}
             </button>
-            <button disabled={!!busy} onClick={() => setSure(false)} className="rounded-full px-2 py-1 text-[12px] leading-4 text-[#6B6B6B]">
+            <button disabled={!!busy} onClick={() => setSure(false)} className="rounded-full px-2 py-1 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
               Keep
             </button>
           </span>
@@ -1273,20 +1273,20 @@ function InviteRow({ invite: i, bots, canSend, act }: { invite: Invite; bots: Bo
                 disabled={!!busy || resting}
                 data-tip={resting ? "Sent. You can send it again in a minute." : "Sends a new email. The old link stops working."}
                 onClick={() => void resend()}
-                className="rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-[#3A3A38] hover:bg-[#F2F2F0] disabled:opacity-50"
+                className="rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)] disabled:opacity-50"
               >
                 {busy === "resend" ? "Sending…" : sent ? "Sent" : i.expired ? "Send again" : "Resend"}
               </button>
             )}
             {i.link && <CopyLink link={i.link} tip={`Works only for someone signed in to Orgo as ${i.email}`} />}
-            <button disabled={!!busy} onClick={() => setSure(true)} className="rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-[#B42318] hover:bg-[#FEF3F2]">
+            <button disabled={!!busy} onClick={() => setSure(true)} className="rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-[color:var(--ht-b42318)] hover:bg-[color:var(--hb-fef3f2)]">
               Cancel
             </button>
           </span>
         )}
       </div>
       {error && (
-        <span role="alert" className="pl-12 pt-1.5 text-[12px] leading-4 text-[#B42318]">
+        <span role="alert" className="pl-12 pt-1.5 text-[12px] leading-4 text-[color:var(--ht-b42318)]">
           {error}
         </span>
       )}
@@ -1307,7 +1307,7 @@ function CopyLink({ link, tip }: { link: string; tip?: string }) {
       type="button"
       data-tip={copied ? undefined : tip}
       onClick={() => void navigator.clipboard?.writeText(link).then(() => setCopied(true))}
-      className="rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-[#3A3A38] hover:bg-[#F2F2F0]"
+      className="rounded-full px-2.5 py-1 text-[12px] font-medium leading-4 text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)]"
     >
       {copied ? "Copied" : "Copy link"}
     </button>
