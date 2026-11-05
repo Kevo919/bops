@@ -28,3 +28,5 @@ Hourly automation bops-hourly-build-check remains active. Current interactive se
 
 Hourly checkpoint 2026-11-05T14:31:24.2060697Z: board0c159af, source61d91fc includes wordingPR81, but live health remains1dDITvEsqsc1hnKKxI4wj. PR80 head588d2a7 unchanged; review fixes pending. No repeated live test against unchanged build; no heavy resources, merge or restart. Next: deployed Memory/runner/wording visual acceptance and reviewed installer. Own hourly lock released on exit.
 
+
+2026-11-05T15:34Z: Read offline plan; exact live acceptance runbook tests/live-scripts/pc-acceptance.md prepared. PR80 original4findings statically closed; Windows cancellation runtime remains unverified and task60 residual retained. Health unchanged; awaiting batched deployment. No heavy resources held. Hourly lock owned/released.
