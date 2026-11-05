@@ -176,6 +176,8 @@ R.repoTiming.pollMs = 0;
 /** A computer: what bops-repo answers, by line. `fail` makes one command fail as bops-repo would. */
 const computers = { "comp-1": [], "comp-2": [] };
 let fail = null;
+let stopLeaves = false; // stop answers procs-left (a process that wouldn't end)
+let stopDuringPoll = null; // a Stop landing while the fetch step's exit=0 poll is out
 // (Made up at run time, so no token-shaped string sits in this file.)
 const fakeToken = `ghp_${"abcdefghijklmnopqrstuvwxyz0123456789ABCD"}`;
 let pollTail = `Vite ready on http://localhost:4173\nleaked ${fakeToken}`;
@@ -184,6 +186,12 @@ R.repoDeps.bash = async (computerId, command) => {
   const line = command.split("\n").find((l) => l.includes("bops-repo")) ?? command;
   const verb = command.startsWith("# bops-repo install") ? "install" : line.match(/bops-repo (\w+)/)?.[1];
   if (fail && fail.verb === verb) return { output: `BOPS_REPO_FAIL=${fail.code}\nBOPS_REPO_WHY=${b64(fail.why)}\n`, exit_code: 1 };
+  if (stopLeaves && verb === "stop") return { output: `BOPS_REPO_FAIL=procs-left\nBOPS_REPO_WHY=${b64("2 of its processes wouldn't end.")}\n`, exit_code: 1 };
+  if (stopDuringPoll && verb === "poll" && / fetch$/.test(line)) {
+    const go = stopDuringPoll;
+    stopDuringPoll = null;
+    void go();
+  }
   const out = {
     install: "BOPS_REPO_TOOL=ok",
     prepare: "BOPS_REPO_READY=1",
@@ -441,6 +449,66 @@ const LISTENERS = [
   'LISTEN 0 511 0.0.0.0:53 0.0.0.0:* users:(("dns",pid=3,fd=3)) uid:0 ino:3',
   'LISTEN 0 511 127.0.0.1:4173 0.0.0.0:* users:(("dev",pid=4,fd=3)) uid:0 ino:4',
 ];
+
+await check("a run whose processes Bops couldn't all end isn't called done: it says so (and so does Stop)", async () => {
+  reset();
+  stopLeaves = true;
+  try {
+    const ask = await R.repoTool(MAIN, "run_repo", { repo_id: "rea", url: null, action: "run" }, owner).then(() => null, (e) => e);
+    await R.repoTool(MAIN, "run_repo", { repo_id: "rea", url: null, action: "run" }, { ...owner, approved: true, askedPlan: ask.ask.repoPlan });
+    await settle();
+    const r = lastRun(MAIN, "rea");
+    assert.equal(r.state, "failed", "not done");
+    assert.match(r.error, /It finished, but Bops couldn't stop everything the repo started on the computer: 2 of its processes wouldn't end/);
+    // A failed run's stop that leaves something says so too.
+    reset();
+    fail = { verb: "reset", code: "reset", why: "no" };
+    const ask2 = await R.repoTool(MAIN, "run_repo", { repo_id: "rea", url: null, action: "run" }, owner).then(() => null, (e) => e);
+    await R.repoTool(MAIN, "run_repo", { repo_id: "rea", url: null, action: "run" }, { ...owner, approved: true, askedPlan: (ask2 ?? ask).ask.repoPlan });
+    await settle();
+    assert.match(lastRun(MAIN, "rea").error, /And Bops couldn't stop everything/);
+    fail = null;
+    // Stop itself: the run says it, and the caller hears it.
+    reset();
+    stopLeaves = false;
+    const ask3 = await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, owner).then(() => null, (e) => e);
+    if (ask3) await R.repoTool(MAIN, "run_repo", { repo_id: "gods-eye-view", url: null, action: "run" }, { ...owner, approved: true, askedPlan: ask3.ask.repoPlan });
+    await settle();
+    assert.equal(lastRun(MAIN, "gods-eye-view").state, "running");
+    stopLeaves = true;
+    const err = await R.stopRepo(MAIN, "gods-eye-view").then(() => null, (e) => e);
+    assert.match(err?.message ?? "", /couldn't stop everything/);
+    const g = lastRun(MAIN, "gods-eye-view");
+    assert.equal(g.state, "stopped");
+    assert.match(g.error, /couldn't stop everything/);
+  } finally {
+    stopLeaves = false;
+    fail = null;
+  }
+});
+
+await check("a Stop that lands while a step's last poll is out: nothing after it starts, and the run stays stopped", async () => {
+  reset();
+  computers["comp-1"].length = 0;
+  const ask = await R.repoTool(MAIN, "run_repo", { repo_id: "rea", url: null, action: "run" }, owner).then(() => null, (e) => e);
+  stopDuringPoll = () => R.stopRepo(MAIN, "rea");
+  await R.repoTool(MAIN, "run_repo", { repo_id: "rea", url: null, action: "run" }, { ...owner, approved: true, askedPlan: ask.ask.repoPlan });
+  await settle();
+  assert.equal(stopDuringPoll, null, "the stop landed during the fetch poll");
+  const r = lastRun(MAIN, "rea");
+  assert.equal(r.state, "stopped", r.error);
+  const cmds = computers["comp-1"];
+  const at = cmds.findIndex((c) => / poll rea fetch$/.test(c));
+  assert.ok(at >= 0);
+  assert.ok(!cmds.slice(at + 1).some((c) => / begin /.test(c)), "no step began after the stop");
+  assert.ok(cmds.slice(at + 1).some((c) => / stop rea repo-rea$/.test(c)), "and its user was stopped");
+});
+
+await check("a bops-repo line for root's shell takes only plain values: x\";cmd;\" and the like are refused before anything is sent", () => {
+  assert.equal(R.repoLine("begin", "rea", "repo-rea", "run", 60, "-", b64("npm start")), `/usr/local/bin/bops-repo begin rea repo-rea run 60 - ${b64("npm start")}`);
+  for (const bad of ['x";cmd;"', "a b", "$(id)", "`id`", "a;b", "a|b", "a\nb", "", "-x", "a'b"])
+    assert.throws(() => R.repoLine("stop", bad, "repo-rea"), /wasn't plain/, JSON.stringify(bad));
+});
 
 await check("the repo firewall is default-deny: the plan's declared ports and DNS alone get through, and nothing is decided by what happens to be listening", () => {
   const script = repoScript();
