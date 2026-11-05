@@ -218,12 +218,17 @@ const as = (userId: string, method: string, path: string, json?: unknown, header
 /* ---------------- AgentPhone ---------------- */
 
 test("AgentPhone: every call acts in the user's own sub-account, whatever the Mac sends", async () => {
+  const texts = async () => (await query("SELECT count(*)::int AS n FROM bops.cloud_usage WHERE user_id = $1 AND kind = 'agentphone.sms'", [alice])).rows[0].n;
+  const textsBefore = await texts();
   const r = await as(alice, "POST", "/proxy/agentphone/v1/messages", { agent_id: agent, to_number: "+14155550000", body: "hi" }, { "x-sub-account-id": sub(bob) });
   assert.equal(r.status, 200, r.text);
   const sent = agentphone.got.at(-1)!;
   assert.equal(sent.headers["x-sub-account-id"], sub(alice));
   assert.equal(sent.headers.authorization, "Bearer ap-test-key");
   assert.deepEqual(sent.json, { agent_id: agent, to_number: "+14155550000", body: "hi" });
+  // The text is counted after the answer (proxy.ts counted: never waited for). Wait for it here, so it
+  // can't land in a later test that counts Alice's usage rows.
+  await until(async () => (await texts()) > textsBefore, "the text to be counted");
 });
 
 test("AgentPhone: naming a sub-account in the query or the body is refused", async () => {
