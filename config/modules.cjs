@@ -111,6 +111,16 @@ const MODULES = [
     ],
   },
   {
+    id: "voice-local",
+    name: "Voice (local)",
+    help: "The chat's mic runs through your own speech service instead of OpenAI: nothing leaves this machine and no OpenAI key is needed. Any service that speaks OpenAI's /v1/audio/transcriptions works — Speaches (which also speaks /v1/audio/speech, recipe in the Repos section), whisper.cpp's server, faster-whisper-server. While your service is down, OpenAI is the fallback (never without a key). Spoken replies on calls stay with AgentPhone's voice agent: it speaks, Bops only writes the words.",
+    keys: [],
+    settings: [
+      { key: "baseURL", env: "VOICE_LOCAL_BASE_URL", label: "Service address", help: "Your Whisper service's OpenAI-style address, for example http://127.0.0.1:8080/v1.", type: "text" },
+      { key: "model", env: "VOICE_LOCAL_STT_MODEL", label: "Model name the service expects", type: "text", placeholder: "whisper-1" },
+    ],
+  },
+  {
     id: "remote",
     name: "Your phone and the internet",
     help: "Reaching this Bops from the Bops Android app, or from the internet.",
