@@ -123,6 +123,7 @@ Shared rules for 35–38:
 | 64 | PC bot task: the bot's Chrome didn't start on port 9304 (found live by codex). Add plain diagnostics, fix the proven causes, retry on a busy port or stale lock | lead's builder | APPROVED (#92), merging after #87 | | [CLOUD] fix; [PC] codex retest |
 | 65 | Tests already failing on windows-port that CI doesn't run or that fail locally: test-runner-mode (1), test-hosted-apps (1), test-chat-edge (won't load under react-server), test-chat-compact-ui, test-logins-ui, test-settings-page-ui, test-windows-fuses (Node 22 only), test-shared (won't load). Fix each, or mark it Node-24 only, and add the green ones to fork CI | unassigned | TODO | | [CLOUD] M. Found by builders, Nov 5 |
 | 66 | #93 follow-ups: count only this turn's own sends (not other bots' in the same moment); an app read action (mark read) or an MCP reply must not back "sent"; a failure-only note must not become "Done."; the prompt line saying every task runs on the PC | unassigned | TODO | | [CLOUD] S |
+| 67 | Flaky cloud test: "AgentPhone: numbers for sale can be searched…" (cloud/test core) fails about 1 in 3 runs on the same commit (#77, #87). Find the race and fix it; never loosen the assertion without saying why | unassigned | TODO | | [CLOUD] S |
 
 ## Merged 2026-11-03 (lead, with Kevin's OK)
 #3, #1, #2, #10, #14, #13, #9, #6, #4, #12, #16. windows-port = 7c52c29. Post-merge checks: tsc 0; bot-ai 25, cli-agents 40, chat-providers 18, chat-tools 84, look 20, config 15, key-check 8, llms 11.
