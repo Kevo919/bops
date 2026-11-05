@@ -805,12 +805,17 @@ function FullAccessCard({ items }: { items: Items }) {
   );
 }
 
+type Tailscale = { installed: boolean; connected: boolean; needsLogin: boolean; backend?: string };
+
 type Remote = {
   paired: boolean;
   created: number | null;
   code?: string;
   qr?: string | null;
   addresses: { tailnet: string[]; home: string[]; public: string | null };
+  // What this computer's Tailscale is doing (lib/server/remote.ts tailscaleState), so step 2 can say
+  // "installed but signed out" instead of "install it" - the exact confusion the 22:29 report hit.
+  tailscale?: Tailscale;
   // QR codes of APP_URL and TAILSCALE_ANDROID_URL, made by the server (app/api/remote/route.ts).
   help?: { app: string; tailscale: string };
 };
@@ -914,6 +919,24 @@ export function PhoneCard() {
           <span data-tailscale="ready">
             Ready. This computer&apos;s Tailscale address is <code className="select-all font-mono">{r.addresses.tailnet[0]}</code>. Turn on Tailscale on your phone too, signed in to the same account.
           </span>
+        ) : r.tailscale?.installed && r.tailscale.needsLogin ? (
+          <div data-tailscale="signed-out" className="flex flex-col gap-1.5">
+            <span>
+              Tailscale is installed on this computer but not signed in. Open Tailscale (its icon in the system tray, near the clock), press{" "}
+              <b>Sign in</b>, and sign in with the same account as your phone. Then press Check again below.
+            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              {r.help?.tailscale && <Qr svg={r.help.tailscale} px={176} label="Tailscale on Google Play" />}
+              <a href={TAILSCALE_ANDROID_URL} target="_blank" rel="noreferrer" className={link}>
+                {TAILSCALE_ANDROID_URL}
+              </a>
+            </div>
+            <div>
+              <button onClick={load} className={light}>
+                Check again
+              </button>
+            </div>
+          </div>
         ) : (
           <div data-tailscale="missing" className="flex flex-col gap-1.5">
             <span>
@@ -959,7 +982,12 @@ export function PhoneCard() {
             <span className="text-pencil">This code is shown only now. Anyone with it can use your bots, so keep it to yourself.</span>
           </div>
         ) : !where ? (
-          <span data-no-address>Finish step 2 first. Then press {r.paired ? "Pair again" : "Pair a phone"}, and a QR code shows here for the Bops app to scan.</span>
+          <span data-no-address>
+            No QR yet: {r.tailscale?.installed && r.tailscale.needsLogin
+              ? "Tailscale on this computer is not signed in (step 2). Sign in there, press Check again, then press Pair."
+              : "step 2 isn't finished yet; this computer has no address your phone can reach."}{" "}
+            Then press {r.paired ? "Pair again" : "Pair a phone"}, and a QR code shows here for the Bops app to scan.
+          </span>
         ) : r.paired ? (
           <span>Your phone is paired. To use a different phone, press Pair again.</span>
         ) : (

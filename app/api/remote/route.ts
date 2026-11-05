@@ -1,7 +1,7 @@
 import QRCode from "qrcode";
 import { APP_URL, TAILSCALE_ANDROID_URL } from "@/lib/remote-links";
 import { fromThisMac } from "@/lib/server/owner-email";
-import { addresses, pair, pairing, unpair } from "@/lib/server/remote";
+import { addresses, pair, pairing, tailscaleState, unpair } from "@/lib/server/remote";
 import { fromBopsWindow } from "@/lib/server/ui-token";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   if (!allowed(request)) return no();
   const p = pairing();
   const help = new URL(request.url).searchParams.get("help") === "1";
-  return Response.json({ paired: !!p, created: p?.created ?? null, addresses: addresses(), ...(help ? { help: await helpQrs() } : {}) });
+  return Response.json({ paired: !!p, created: p?.created ?? null, addresses: addresses(), tailscale: tailscaleState(), ...(help ? { help: await helpQrs() } : {}) });
 }
 
 /**
