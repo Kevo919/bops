@@ -2952,9 +2952,10 @@ export function ToPicker({ state, onOpenChat, onCancel }: { state: AppState; onO
 }
 
 function Kbd({ n }: { n: number }) {
+  const computerWords = useComputerWords();
   return (
     <span className="flex gap-[3px]">
-      <span className="rounded-[5px] bg-white px-1.5 py-0.5 text-[11px] leading-[14px] text-[#6B6B6B] shadow-[0_0_0_1px_#E2E2DF]">⌘</span>
+      <span className="rounded-[5px] bg-white px-1.5 py-0.5 text-[11px] leading-[14px] text-[#6B6B6B] shadow-[0_0_0_1px_#E2E2DF]">{computerWords("⌘")}</span>
       <span className="rounded-[5px] bg-white px-1.5 py-0.5 font-mono text-[11px] leading-[14px] text-[#6B6B6B] shadow-[0_0_0_1px_#E2E2DF]">{n}</span>
     </span>
   );
