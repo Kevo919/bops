@@ -59,11 +59,13 @@ The overnight ETAs for 80% slipped because the PC was locked, so Codex couldn't 
 - Repos section (#38), Connections (#40), OpenRouter presets, custom models, Auto Router and a model per routine (#44), several accounts per provider (#45), editable bot files (#39), your own tool servers per bot (#32), Word/PowerPoint/Excel from chat (#41), Goals and ideas (#51), custom schedules (#52)
 
 ## Next
+- Widgets, tabs and pages you can add by asking Boppy, plus an Animations setting in Look (building now)
+- COMPETITORS.md: what Bops has vs Meta Muse, ChatGPT Dots, Grok Bot and others, and the gaps (researching now)
 - No blank screens: an automatic check that opens every page like your PC and fails on blank pages, error text or dead buttons, with a screenshot each; then fixes ("How bots reach you" first) (building now)
 - Dark mode that turns the whole app dark, every screen (Kevin found the sidebar and Settings list stay light) (building now)
 - Settings needs a real "Your phone" item; the pairing card is buried in This PC, and the phone app needs a Scan button (#77, in progress)
 - Phone pairing with no friction: one screen with QR codes (get the app, Tailscale, pair) and a Scan button in the phone app (building now)
-- PC bot tasks on your Claude Code Max plan, plus a Settings box for an OpenAI key for anyone who prefers it (building now)
+- PC bot tasks on your Claude Code Max plan, plus a Settings box for an OpenAI key for anyone who prefers it (#80, in security review)
 - Composio: use the accounts you already connected in Composio (waiting on which Composio project they're in)
 - Codex: every feature tested in the real Bops window on your PC (started now the PC is unlocked)
 - GitHub's automatic checks: you turned them back on; confirmed on the next change

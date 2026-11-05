@@ -93,6 +93,15 @@ Shared rules for 35–38:
 | 40 | Use what's already on Kevin's VPS (found 2026-11-03): Paperclip (port 32768), Hermes Agent (32769), OpenClaw (56580), Ollama (32770), LiteLLM (4000, internal), n8n (127.0.0.1:5678 behind Traefik). Repos-section entries that point at the running service ("on your server") instead of reinstalling, reached over Tailscale. And: Ollama via LiteLLM as an OpenAI-compatible chat provider in config/llms.yaml (free local models) | lead | TODO | | Lead does this with the VPS install. Nothing on the VPS may be stopped or changed |
 | 41 | "Voice typing (optional)" card in Settings: explains Handy (github.com/cjpais/Handy, free, open-source, offline dictation for any app, MIT; verify the license and the Windows installer link from its Releases page). Short plain steps: download, install, pick a shortcut key, allow the mic. A "Get Handy" button opens the Releases page in the browser. Bops installs nothing itself | lead | IN PROGRESS | | S. Settings card only (components/app/setup.tsx or the Settings pane). Verify the links load |
 | 42 | Desktop + Start Menu shortcuts: the installer (#15) makes them; the lead made a temporary desktop shortcut to dist-desktop\win-unpacked\Bops.exe on 2026-11-03. The installer must replace it, not leave a second one (check for an existing Desktop\Bops.lnk pointing at win-unpacked) | codex | TODO | | Part of #15 |
+| 43 | Easy phone pairing: a "Your phone" item in Settings with QR codes (get the app, Tailscale, pair); a Scan QR code button in the phone app; no confusing ":80" line | lead's builder | IN REVIEW (#77) | | Kevin, Nov 5 |
+| 44 | PC bot tasks on Kevin's Claude Code Max plan, plus a Settings box for an OpenAI key | lead's builder | IN REVIEW (#80, security review running) | | Kevin, Nov 5 |
+| 45 | Dark mode that turns the whole app dark, every screen, with an automatic dark check | lead's builder | IN PROGRESS | | Kevin, Nov 5 |
+| 46 | No blank screens: an automatic check of every page set up like Kevin's PC, then fixes ("How bots reach you" first) | lead's builder | IN PROGRESS | | Kevin, Nov 5 |
+| 47 | Widgets, tabs and pages added by asking Boppy in chat (widgets most important) | lead's builder | IN PROGRESS (phase 1) | | Kevin, Nov 5 |
+| 48 | Animations: a place in Settings → Look to change them (Off, Subtle, Normal, Lively, plus speed), also by chat | lead's builder | IN PROGRESS (with 47) | | Kevin, Nov 5 |
+| 49 | COMPETITORS.md: Bops vs Meta Muse, ChatGPT Dots, Grok Bot and other leaders, with the gaps to work on | lead (research) | IN PROGRESS | | Kevin, Nov 5 |
+| 50 | Composio: use the accounts already connected in Composio (choose which Composio user), once Kevin says which project they're in | lead | WAITING ON KEVIN | | Kevin, Nov 5 |
+| 51 | GitHub checks green again (#79: cron picker test, .gitleaksignore conflict markers, secret scan details) | lead | IN REVIEW (#79) | | |
 
 ## Merged 2026-11-03 (lead, with Kevin's OK)
 #3, #1, #2, #10, #14, #13, #9, #6, #4, #12, #16. windows-port = 7c52c29. Post-merge checks: tsc 0; bot-ai 25, cli-agents 40, chat-providers 18, chat-tools 84, look 20, config 15, key-check 8, llms 11.
