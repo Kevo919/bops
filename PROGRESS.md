@@ -61,6 +61,7 @@ The overnight ETAs for 80% slipped because the PC was locked, so Codex couldn't 
 - Repos section (#38), Connections (#40), OpenRouter presets, custom models, Auto Router and a model per routine (#44), several accounts per provider (#45), editable bot files (#39), your own tool servers per bot (#32), Word/PowerPoint/Excel from chat (#41), Goals and ideas (#51), custom schedules (#52)
 
 ## Next
+- Several DeepSeek Harness and Hermes Agent instances you can link and hand tasks to (researching and building now)
 - Unfinished features visible but grayed out, with red "not set up yet" text and a percent complete, so you can see what's coming (building now)
 - Widgets, tabs and pages you can add by asking Boppy, plus an Animations setting in Look (building now)
 - [COMPETITORS.md](COMPETITORS.md): what Bops has vs Meta Muse, ChatGPT Dots, Grok Bot and others, and the 12 gaps (done; gaps added to TASKS 52 to 57)

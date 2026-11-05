@@ -119,6 +119,7 @@ Shared rules for 35–38:
 | 60 | #80 follow-ups: Windows Job Object so nothing Claude Code started is left running; Glob/Grep check the pattern too; exact CLI version check | unassigned | TODO | | [CLOUD] build; [PC] live |
 | 61 | Chat says a bot task started when no task session was created (found live by codex): never claim a start without a session id; show the real error | codex diagnosing, then builder | DOING | | [PC] diagnose; [CLOUD] fix. HIGH |
 | 62 | Copy: "Works on" says "Your Mac" on Windows; stale "Claude local subscription not enabled" text in Profile | unassigned | TODO | | [CLOUD] S |
+| 63 | Several instances of DeepSeek Harness and Hermes Agent: an "Agents you run" list (add, check, remove each; own home, address and key), and bots can hand a task to a named instance with the usual asks | lead's builder | DOING (feature/agent-instances) | | [CLOUD] research + build; [PC] live with Kevin's dsh app and the server's Hermes. Kevin, Nov 5 |
 
 ## Merged 2026-11-03 (lead, with Kevin's OK)
 #3, #1, #2, #10, #14, #13, #9, #6, #4, #12, #16. windows-port = 7c52c29. Post-merge checks: tsc 0; bot-ai 25, cli-agents 40, chat-providers 18, chat-tools 84, look 20, config 15, key-check 8, llms 11.
