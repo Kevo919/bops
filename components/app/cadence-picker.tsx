@@ -390,7 +390,10 @@ export function CadencePicker({
     ? base
     : [{ label: describeSchedule(asLike(tidy(first)), tz), schedule: first }, ...base];
   const picked = chips.find((p) => sameCadence(p.schedule, value));
-  const [custom, setCustom] = useState(() => !base.some((p) => sameCadence(p.schedule, value)));
+  // A routine whose when isn't one of the suggestions still has its own chip (in chips): that's picked,
+  // not Custom — opening Change used to open on Custom with the own chip unpicked, and clicking Custom
+  // then closed the editor instead of opening the fields (crawl L4).
+  const [custom, setCustom] = useState(() => !chips.some((p) => sameCadence(p.schedule, value)));
 
   const now = nowMs();
   const tidied = tidy(value);
