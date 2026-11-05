@@ -134,16 +134,18 @@ await check("a local refusal with a key falls back to OpenAI; without a key it s
 });
 
 await check("an unreachable or silent service is one error, not a crash", async () => {
+  // The error shapes are localTranscribe's own; with a key set, transcribe() falls back to OpenAI
+  // instead of surfacing them (by design), so these are asked of the local layer directly.
   localAnswer = () => new Response(JSON.stringify({ weird: true }), { headers: { "content-type": "application/json" } });
-  await assert.rejects(() => transcribe(audio(), chatId), /sent no text back/);
+  await assert.rejects(() => V.localTranscribe(audio()), /sent no text back/);
   process.env.VOICE_LOCAL_BASE_URL = "http://127.0.0.1:9";
-  await assert.rejects(() => transcribe(audio(), chatId), /isn't reachable/);
+  await assert.rejects(() => V.localTranscribe(audio()), /isn't reachable/);
   process.env.VOICE_LOCAL_BASE_URL = "http://127.0.0.1:8900/v1";
 });
 
 await check("config/modules.cjs carries the voice-local module with its env-backed settings", async () => {
-  const require = createRequire(rootUrl.href);
-  const { MODULES } = require("../config/modules.cjs");
+  const require = createRequire(new URL("package.json", rootUrl).href);
+  const { MODULES } = require("./config/modules.cjs");
   const m = MODULES.find((x) => x.id === "voice-local");
   assert.ok(m, "the module exists");
   assert.equal(m.name, "Voice (local)");
