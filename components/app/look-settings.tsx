@@ -16,6 +16,8 @@ export function LookSettings({ state }: { state: AppState }) {
   const look = normalizeLook(state.look?.current);
   const canUndo = (state.look?.history?.length ?? 0) > 0;
   const [error, setError] = useState("");
+  // Reset goes back to Bops' own look at once (crawl L7): the first press asks, the second does it.
+  const [confirmReset, setConfirmReset] = useState(false);
   const send = (change: Record<string, unknown>) => {
     setError("");
     void post("/api/look", { action: "set", look: change }).then(async (res) => {
@@ -108,11 +110,14 @@ export function LookSettings({ state }: { state: AppState }) {
         <button
           onClick={() => {
             setError("");
+            if (!confirmReset) return setConfirmReset(true);
+            setConfirmReset(false);
             void post("/api/look", { action: "reset" });
           }}
-          className="rounded-full px-3 py-1 text-[12px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_#D9D9D6] hover:bg-black/[0.04]"
+          onBlur={() => setConfirmReset(false)}
+          className={`rounded-full px-3 py-1 text-[12px] font-semibold leading-4 shadow-[0_0_0_1px_#D9D9D6] ${confirmReset ? "bg-[#B42318] text-white" : "text-ink hover:bg-black/[0.04]"}`}
         >
-          Reset
+          {confirmReset ? "Reset for sure?" : "Reset"}
         </button>
       </div>
     </div>

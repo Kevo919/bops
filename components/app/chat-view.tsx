@@ -2261,7 +2261,11 @@ function SystemNote({ text }: { text: string }) {
 function LookNote({ m, readOnly = false, className = "" }: { m: Message; readOnly?: boolean; className?: string }) {
   const look = m.look!;
   const [busy, setBusy] = useState(false);
+  // Reset is a click away from Undo (crawl L7): it asks once first, and clicking away cancels.
+  const [confirmReset, setConfirmReset] = useState(false);
   const act = (action: "undo" | "reset") => {
+    if (action === "reset" && !confirmReset) return setConfirmReset(true);
+    setConfirmReset(false);
     setBusy(true);
     void post("/api/look", { action, messageId: m.id }).finally(() => setBusy(false));
   };
@@ -2285,8 +2289,13 @@ function LookNote({ m, readOnly = false, className = "" }: { m: Message; readOnl
             <button disabled={busy} onClick={() => act("undo")} className={button}>
               Undo
             </button>
-            <button disabled={busy} onClick={() => act("reset")} className={button}>
-              Reset
+            <button
+              disabled={busy}
+              onClick={() => act("reset")}
+              onBlur={() => setConfirmReset(false)}
+              className={`${button} ${confirmReset ? "bg-[#B42318] text-white" : ""}`}
+            >
+              {confirmReset ? "For sure?" : "Reset"}
             </button>
           </div>
         )}
