@@ -744,10 +744,12 @@ type Remote = { paired: boolean; created: number | null; code?: string; qr?: str
  * Tailscale (or the home wifi, or a public address). The code is shown once, right after pairing; pairing
  * again makes a new one and the phone paired before stops working, and so does Unpair.
  */
-function PhoneCard() {
+export function PhoneCard() {
   const [r, setR] = useState<Remote | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [qr, setQr] = useState<string | null>(null);
+  // Unpair and Pair again lock out the phone paired now at once: each is asked in place first.
+  const [asking, setAsking] = useState<"unpair" | "again" | null>(null);
   const load = useCallback(() => void fetch("/api/remote").then((x) => (x.ok ? x.json() : null)).then(setR).catch(() => {}), []);
   useEffect(load, [load]);
   if (!r) return null;
@@ -802,16 +804,30 @@ function PhoneCard() {
         ) : undefined
       }
     >
-      <div className="flex gap-1.5">
-        <button onClick={() => void pairNow()} className={r.paired ? light : dark}>
-          {r.paired ? "Pair again" : "Pair a phone"}
-        </button>
-        {r.paired && (
-          <button onClick={() => void unpairNow()} className={light}>
-            Unpair
+      {asking && r.paired ? (
+        <div role="alertdialog" aria-label={asking === "unpair" ? "Unpair your phone" : "Pair a new phone"} className="flex flex-col gap-1.5 text-[12.5px] leading-5">
+          <span>{asking === "unpair" ? "Unpair? Your phone stops reaching Bops at once." : "Pair again? The phone paired now stops working at once, until you enter the new code on it."}</span>
+          <div className="flex gap-1.5">
+            <button onClick={() => (setAsking(null), void (asking === "unpair" ? unpairNow() : pairNow()))} className={dark}>
+              {asking === "unpair" ? "Unpair" : "Pair again"}
+            </button>
+            <button onClick={() => setAsking(null)} className={light}>
+              Keep
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-1.5">
+          <button onClick={() => (r.paired ? setAsking("again") : void pairNow())} className={r.paired ? light : dark}>
+            {r.paired ? "Pair again" : "Pair a phone"}
           </button>
-        )}
-      </div>
+          {r.paired && (
+            <button onClick={() => setAsking("unpair")} className={light}>
+              Unpair
+            </button>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
