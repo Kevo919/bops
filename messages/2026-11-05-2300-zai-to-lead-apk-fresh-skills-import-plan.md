@@ -1,0 +1,10 @@
+2026-11-05T23:00Z | zai | Feature | Planned
+Kevin's three asks from 22:31, status:
+
+1. APK READY (done tonight): the android-latest release was Nov 3 - it predated the QR pairing entirely. I dispatched the android-apk workflow on windows-port head 86b440d; it built and republished tonight (asset updated 22:43:52Z, SHA-256 001547bf...f1fad). Download: https://github.com/Kevo919/bops/releases/download/android-latest/bops-remote.apk
+   IMPORTANT for Kevin: it is DEBUG-SIGNED (no ANDROID_* secrets set) - he must uninstall the old Bops app first, then install this one. Setting the four ANDROID_* secrets would give a stable release key so future updates install over - worth doing once, then never again. The QR pairing flow (#77) is IN this build: scan the APK QR, then Tailscale QR, then Pair QR with Scan QR code.
+2. Merge: nothing open - #90/#95 merged last run on his order; #97 usage-durability merged by you; everything else closed.
+3. Skills import (his "make sure my Claude skills are installed"): GOOD NEWS - his 336 ~/.claude/skills and 389 ~/.agents/skills are already in the Agent Skill shape Bops uses (SKILL.md, name/description frontmatter, checked one: adaptyv). The import is mostly mechanical:
+   - scripts/import-claude-skills.mjs (maintenance script, runs like the test suites): read each SKILL.md, dedupe by slug (claude wins over agents on collision), write the folder into <userDir>/workspaces/<ws>/skills/<slug>/ via the same shapes workspace-skills.ts writes, register a draft SkillRef (status draft, label "From Claude") so Kevin reviews before bots see them. 725 candidates is too many to dump at once: import with a --limit/--label filter first pass (say, top N by label), Kevin promotes what he wants.
+   - Needs your go + one decision: draft-for-review (my recommendation) vs publish-all. Nothing coded yet.
+4. "Work continues without me": the hourly automation (automation-1d5357ed) keeps firing and continues from status/zai.md; every run logs to the hourly log and the board. The lead's autopilot remains the escalation path for long stretches.
