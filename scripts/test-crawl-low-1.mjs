@@ -1,6 +1,6 @@
 // Crawl LOW batch part 1 (L2, L3): a paired phone's Logins refusal says the desktop app instead of a
 // "Try again" that can never pass; and a half-typed cron expression can't be saved - Save is disabled in
-// the routine editors (autopilot.tsx) and the pick-to-save row (routines.tsx) skips it until it's good,
+// the routine editors (autopilot.tsx) and the pick-to-save popup (routines.tsx) holds Set up until it's good,
 // so the server's 400 ("99" isn't a minute) can't be reached from the UI.
 // Usage: node scripts/test-crawl-low-1.mjs
 import assert from "node:assert/strict";
@@ -30,13 +30,19 @@ check("L3: both routine editors gate Save (and submit, and Ctrl/Cmd-Enter) on a 
   assert.match(s, /changed && !busy && !cronBad\) \{/, "Ctrl/Cmd-Enter waits too");
   assert.equal((s.match(/cronError\(when\.schedule\.expr\)/g) ?? []).length, 2, "each editor computes its own cronBad");
   const r = read("components/app/routines.tsx");
-  assert.match(r, /kind === "cron" && cronError\(s\.expr\)\) return;/, "pick-to-save skips a bad cron instead of sending it");
+  // The cron box is controlled by this row's value: dropping a half-typed one would snap the box back,
+  // so a cron couldn't be typed a character at a time. Every keystroke goes up; Set up waits instead.
+  assert.doesNotMatch(r, /cronError\(s\.expr\)\) return;/, "the offer row never drops a keystroke");
+  assert.match(r, /const cronBad = picked\.some\(/, "Set up checks every picked one's cron");
+  assert.match(r, /disabled=\{busy \|\| !picked\.length \|\| cronBad\}/, "Set up is disabled on a bad cron");
+  assert.match(r, /!picked\.length \|\| cronBad\) return;/, "and setUp refuses it too");
 });
 
 check("L2: a paired phone's Logins refusal names the desktop app, not Try again", () => {
   const s = read("components/app/logins.tsx");
   assert.match(s, /res\.status === 403\) setError\("Open the Bops desktop app to do this/, "the 403 branch");
-  assert.match(s, /a paired phone can/, "says why retrying can't help");
+  assert.match(s, /A paired phone can/, "says why retrying can't help");
+  assert.doesNotMatch(s, /this - a paired/, "no dash in what's shown");
 });
 
 if (failures) {
