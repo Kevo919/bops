@@ -213,7 +213,9 @@ ${DARK_PALETTE}`;
  * The dark look: the palette, and the highlighter's ink. What's marked in the highlighter (a yellow button, a badge)
  * inherits its words' color from around it, which the dark look turns light; on the highlighter they stay dark, or
  * light on an accent dark enough to need it (black or white, whichever reads on the accent's lightness). And the
- * hint in an empty box is the faint ink, whatever share of the ink it was in light: still 4.5:1 on any field.
+ * hint in an empty box is the faint ink, whatever share of the ink it was in light: still 4.5:1 on any field. The
+ * loading Boppy and its notes (mascot.tsx, drawn in the ink's #0A0A0A) are the raised grey of a dark fill, not black
+ * on the dark paper.
  */
 const DARK_CSS = `:root {
 ${DARK_VARS}
@@ -224,6 +226,9 @@ ${DARK_VARS}
 input::placeholder,
 textarea::placeholder {
   color: #a7a7a5;
+}
+.boppy-loading-scene [fill="#0A0A0A"] {
+  fill: var(--hb-0a0a0a);
 }`;
 
 /**

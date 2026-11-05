@@ -16,25 +16,30 @@
 //   - words: inks become light inks, the order kept and the faintest still readable at WCAG AA on the papers, and
 //     strong colors are lifted to read on a dark page.
 // Black at a low alpha (a hairline) becomes white at that alpha; deeper black shadows stay black, a little stronger.
-// A class with a hex the palette doesn't have yet is a variable with no value, so run this after adding one:
+// New classes go through scripts/look-codemod.mjs first; a variable the palette doesn't have yet has no value, so run
+// this after adding one:
 //   node scripts/look-palette.mjs           (writes both files)
-//   node scripts/look-palette.mjs --check   (fails if either is out of date, or a class still has a raw hex)
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+//   node scripts/look-palette.mjs --check   (fails if either is out of date, or scripts/look-codemod.mjs would still
+//                                            change a class: a raw hex, bg-ink, text-white, a faint black tint)
+import { readFileSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { convert, filesUnder } from "./look-codemod.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const dir = join(root, "components", "app");
-const files = readdirSync(dir).filter((f) => /\.tsx?$/.test(f));
+const files = filesUnder([join(root, "components", "app")]);
 const used = { h: new Set(), ht: new Set(), hb: new Set() };
+// What the codemod (scripts/look-codemod.mjs) would still change: a raw hex in a class, bg-ink, text-white, a faint black tint.
 const raw = [];
-const RAW = /(^|[\s"'`:!{(])((?:bg|text|border(?:-[trblxyse])?|ring|ring-offset|shadow|inset-shadow|outline|divide|decoration|accent|caret|fill|stroke|from|via|to)-)\[([^\]\s"'`]*#[0-9a-fA-F]{3,8}[^\]\s"'`]*)\]/g;
 for (const f of files) {
-  const src = readFileSync(join(dir, f), "utf8");
+  const src = readFileSync(f, "utf8");
   for (const m of src.matchAll(/--(h|ht|hb)-([0-9a-f]{6}(?:[0-9a-f]{2})?)\b/g)) used[m[1]].add(m[2]);
-  for (const m of src.matchAll(RAW)) raw.push(`${f}: ${m[2]}[${m[3]}]`);
-  // An arbitrary property (`[background-image:radial-gradient(#DDDDD8_1px,...)]`) with a raw hex in it, too.
-  for (const m of src.matchAll(/(?:^|[\s"'`:!{(])\[[a-z-]+:[^\]\s"'`]*#[0-9a-fA-F]{3,8}[^\]\s"'`]*\]/g)) raw.push(`${f}: ${m[0].trim()}`);
+  const out = convert(src);
+  if (out !== src) {
+    const was = src.split("\n");
+    const now = out.split("\n");
+    was.forEach((line, i) => line !== now[i] && raw.push(`${relative(root, f)}:${i + 1}: ${line.trim().slice(0, 140)}`));
+  }
 }
 
 // ---- color math (sRGB <-> OKLab) ----------------------------------------------------------------------------------
@@ -68,6 +73,8 @@ const PAPER = (([L, a, b]) => [L, Math.hypot(a, b), Math.atan2(b, a)])(toLab(par
 
 /** The dark look's color for a line or a shadow (and, through it, the base rules the others build on). */
 function lineOf(hex) {
+  // Pure black is only ever a shadow here (lines are the ink, #0A0A0A): it stays black, never a white glow.
+  if (hex === "000000") return "#000000";
   const alpha = hex.length === 8 ? hex.slice(6) : "";
   const [L, a, b] = toLab(parse(hex));
   const C = Math.hypot(a, b);
@@ -157,7 +164,7 @@ if (process.argv.includes("--check")) {
   if (readFileSync(tsPath, "utf8") !== ts) stale.push("lib/look-palette.ts");
   if (stale.length || raw.length) {
     if (stale.length) console.error(`Out of date: ${stale.join(", ")}. Run node scripts/look-palette.mjs`);
-    if (raw.length) console.error(`A class with a raw hex color (write it as bg-[color:var(--h-<hex>)] and run the script):\n  ${raw.slice(0, 20).join("\n  ")}`);
+    if (raw.length) console.error(`${raw.length} line(s) with a light-only color class (a raw hex, bg-ink, text-white or a faint black tint), which the dark look can't turn over. Run node scripts/look-codemod.mjs, then node scripts/look-palette.mjs:\n  ${raw.slice(0, 20).join("\n  ")}`);
     process.exit(1);
   }
   console.log(`look palette up to date: ${count} colors`);

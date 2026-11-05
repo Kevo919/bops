@@ -611,7 +611,7 @@ export function WeekLetters({ days, routineId, color }: { days: DayPlan[]; routi
       {days.map((x) => (
         <span
           key={x.key}
-          style={on(x) ? { background: color ?? "#0A0A0A", color: textOn(color ?? "#0A0A0A") } : undefined}
+          style={on(x) ? { background: color ?? "var(--hb-0a0a0a)", color: color ? textOn(color) : "var(--bops-on-fill)" } : undefined}
           className={`flex size-[14px] items-center justify-center rounded-full text-[8.5px] font-semibold leading-none ${on(x) ? "" : "bg-[color:var(--hb-f2f2f0)] text-[color:var(--ht-b0b0ad)]"} ${x.today ? "shadow-[0_0_0_1px_var(--h-0a0a0a)]" : ""}`}
         >
           {DOW[x.dow][0]}

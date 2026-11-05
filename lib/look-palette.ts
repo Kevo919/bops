@@ -2,7 +2,7 @@
 /** The dark look's value for each hard-coded color of the window (app/look-palette.css has the light ones). */
 export const DARK_PALETTE = `  --bops-tint: #fff;
   --bops-on-fill: #f5f5f3;
-  --h-000000: #ffffff;
+  --h-000000: #000000;
   --h-00000008: #ffffff08;
   --h-0000000a: #ffffff0a;
   --h-0000000d: #ffffff0d;
