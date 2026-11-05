@@ -24,6 +24,9 @@ import { addMessage, bot, getState, id, ownerName, session, update } from "./sto
  *   the Linux user, every command, the ports): from the desktop window's Run, or the approval card a bot's run_repo
  *   opens (permission.ts: never a member, never Always allow, never the bot's own "Just do it" rules). The same plan
  *   runs again without asking; any change to it asks again.
+ * - A private repo's contents are the owner's too: open_repo reads one (its README and top files) only on the owner's
+ *   own turn; on a member's, a routine's run, a call or a computer's turn it is refused before anything of the repo
+ *   is read. A public repo anyone may open.
  * - On the computer it runs as its own unprivileged user, sandboxed by vm/bin/bops-repo (no keys in its env, its
  *   own folder and a temp HOME, ulimits and time limits, the bots' folders, X displays, Docker and other services'
  *   ports out of reach, checked by a probe as that user before anything of the repo runs: it fails closed).
@@ -729,11 +732,13 @@ export function reposLine(botId: string): string {
   return `Repos (list_repos, open_repo, run_repo, repo_status): ${all.length} ready-to-run GitHub repos are listed. ${said.length ? `On your computer: ${said.join("; ")}.` : "None is installed on your computer yet."}`;
 }
 
-/** A repo opened: what it is, its link, its README and top files (from GitHub, untrusted), and its status for the bot. */
-export async function openRepo(botId: string, t: RepoTarget): Promise<string> {
+/** A repo opened: what it is, its link, its README and top files (from GitHub, untrusted), and its status for the bot. A private repo's contents are the owner's: only their own turn opens one (`ownerTurn`). */
+export async function openRepo(botId: string, t: RepoTarget, ownerTurn = true): Promise<string> {
   const basis = basisOf(t);
   const b = bot(botId);
   const src = await sourceOf(basis, workspaceOf(b));
+  // Refused before anything of the repo is read: no commit, no README, no files, no broker call.
+  if (src.private && !ownerTurn) throw new RepoError(`${src.repo} is private, and only ${ownerName()} can open one, on their own turn. Ask them, or say they can open it from the Repos section in Settings.`, 403);
   const commit = await headCommit(src);
   const [readme, top] = await Promise.all([ghReadme(src, commit).catch(() => null), ghTop(src, commit).catch(() => [])]);
   const r = basis.recipe;
@@ -839,7 +844,7 @@ export async function repoTool(botId: string, name: string, a: Record<string, un
     }
     if (name === "repo_status") return await statusText(botId, target.repoId);
     if (!target.repoId && !target.url) return "Say which repo: a repo_id from list_repos, or a GitHub url.";
-    if (name === "open_repo") return await openRepo(botId, target);
+    if (name === "open_repo") return await openRepo(botId, target, place.owner);
     if (name !== "run_repo") return `Unknown tool ${name}.`;
     if (!place.owner) return `Only ${owner} can run repos, on their own turn. Say ${owner} can run it from the Repos section in Settings, or ask you themselves.`;
     if (a.action === "stop") return await stopRepo(botId, target.repoId ?? basisOf(target).id);

@@ -48,7 +48,8 @@ To look at it, open a browser on that computer's screen (the Computer panel) and
 Every bot has four tools, in its chat and in its tasks:
 
 - `list_repos`: the list, with each repo's status on its computer;
-- `open_repo`: what a repo is, its link, its commands, its README and files, and its status;
+- `open_repo`: what a repo is, its link, its commands, its README and files, and its status. A private repo's contents
+  are yours: only on your own messages and tasks can a bot open one (a public repo anyone may open);
 - `run_repo`: run (or stop) a repo on its computer. Only on your own messages and tasks, never a stranger's, a member's
   or a routine's. The first run asks you with an approval card showing the same plan; only you can answer it, from
   the Bops window (Always allow counts as once, and the bot's own "Just do it" setting doesn't skip it);
