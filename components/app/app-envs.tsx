@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { allLocals, localWords, type AppDeploy, type AppEnv, type HostedApp, type HostedAppsAnswer, type HostedSite, type LocalAnswer, type LocalSite, type PreviewSite, type SiteDomain } from "@/lib/hosted-apps";
 import { readSettings, Variables } from "./app-settings";
+import { useComputerWords } from "./computer-words";
 import { act, deploying, isSending, OpenHostedApp, PROBLEM, PULSE, short, UrlLink, useSending } from "./hosted-apps";
 import { useDismiss } from "./new-thread";
 import { OpenPreview } from "./panel-tabs";
@@ -203,6 +204,7 @@ export function AppEnvs({
   const open = useContext(OpenHostedApp);
   const openPreview = useContext(OpenPreview);
   const openBot = useContext(OpenBotComputer);
+  const computerWords = useComputerWords();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [said, setSaid] = useState<string | null>(null);
@@ -271,7 +273,7 @@ export function AppEnvs({
     const r = await openPreview(ws, app.name, site, bot);
     setBusy(null);
     if (r.error) setError(undash(r.error));
-    else if (r.screen) setSaid(undash(r.said ?? "This Mac can't reach its computer, so it opens on its screen."));
+    else if (r.screen) setSaid(undash(r.said ?? computerWords("This Mac can't reach its computer, so it opens on its screen.")));
   };
   /** Roll back: Prod's newest deploy that can be put back, asked once more first. */
   const rollbackAsk = async () => {
@@ -524,6 +526,7 @@ export function LocalSection({ ws, app, site, local, onLocal }: { ws: string; ap
   const x = local?.sites[own];
   const openPreview = useContext(OpenPreview);
   const openBot = useContext(OpenBotComputer);
+  const computerWords = useComputerWords();
   const [typed, setTyped] = useState<string | null>(null);
   const [port, setPort] = useState<string | null>(null);
   const [busy, setBusy] = useState<"start" | "open" | null>(null);
@@ -561,7 +564,7 @@ export function LocalSection({ ws, app, site, local, onLocal }: { ws: string; ap
       const r = await openPreview(ws, app.name, site);
       setBusy(null);
       if (r.error) setError({ words: undash(r.error) });
-      else if (r.screen) setSaid(undash(r.said ?? "This Mac can't reach its computer, so it opens on its screen."));
+      else if (r.screen) setSaid(undash(r.said ?? computerWords("This Mac can't reach its computer, so it opens on its screen.")));
       return;
     }
     const r = await localAct(ws, app.name, { action: "open", ...(site ? { site } : {}) });

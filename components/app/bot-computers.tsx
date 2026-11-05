@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { runnerNeedsKey, workBot, type AppState, type Bot, type ComputerOrgoKey, type RunnerState } from "@/lib/types";
 import { Your, yourMac } from "@/lib/shared";
+import { useComputerWords } from "./computer-words";
 import { Mascot } from "./mascot";
 import { since } from "./side-group";
 import { teamOf } from "./ui";
@@ -17,9 +18,9 @@ export type ComputerKeys = { keys: Record<string, ComputerOrgoKey | null>; manag
 const onThisMac = (state: AppState) => !state.shared && state.host === "mac";
 
 /** A bot's computer, in plain words. A bot that shares says whose computer it works on. */
-const computerNow = (state: AppState, b: Bot) => {
+const computerNow = (state: AppState, b: Bot, words: (text: string) => string) => {
   const c = workBot(b, state.bots);
-  if (onThisMac(state)) return "Uses this Mac";
+  if (onThisMac(state)) return words("Uses this Mac");
   // A shared workspace's bot set to its owner's Mac works there, as its Details say (computer.tsx ComputerSummary).
   if (state.shared && b.runsOn === "mac") return `Works on ${yourMac(state)}`;
   if (c.id !== b.id) return `Works on ${c.name}'s computer`;
@@ -53,6 +54,7 @@ export const IDENTITY_LINE = "Orgo identity (this computer only)";
  * tests.
  */
 export function BotComputersList({ state, keys, padded }: { state: AppState; keys: ComputerKeys | null; padded: boolean }) {
+  const computerWords = useComputerWords();
   return (
     <div className={`flex flex-col px-[22px] pt-4 ${padded ? "pb-5" : ""}`}>
       <span className="pb-1 text-[13px] font-semibold">{`${Your(state)} bots' computers`}</span>
@@ -72,7 +74,7 @@ export function BotComputersList({ state, keys, padded }: { state: AppState; key
                 <span
                   className={`size-[7px] rounded-full ${onThisMac(state) || workBot(b, state.bots).computerStatus === "ready" ? "bg-[color:var(--hb-2bb673)]" : workBot(b, state.bots).computerStatus === "cloning" ? "bg-[color:var(--hb-e59a0b)]" : "bg-[color:var(--hb-c9c9c6)]"}`}
                 />
-                {computerNow(state, b)}
+                {computerNow(state, b, computerWords)}
               </span>
               {identity && <span className="min-w-0 truncate pl-[13px] text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{IDENTITY_LINE}</span>}
               {line && (

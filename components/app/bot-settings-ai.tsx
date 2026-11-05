@@ -3,6 +3,7 @@
 import { botChatId, type AppState, type Bot, type Session } from "@/lib/types";
 import { Your, yourMac } from "@/lib/shared";
 import { BotAiSection } from "./bot-ai";
+import { useComputerWords } from "./computer-words";
 import { Segmented } from "./segmented";
 import { useBotSave } from "./sequences";
 
@@ -28,6 +29,9 @@ export function AiSlot({
 }) {
   const { busy, error, send } = useBotSave(b.id);
   const runsOn = b.runsOn ?? "auto";
+  // Fixed words only: this computer's own name on Windows ("your PC"). A shared workspace's is the owner's, whose computer this one can't name.
+  const computerWords = useComputerWords();
+  const words = (text: string) => (state.shared ? text : computerWords(text));
   return (
     <div className="flex flex-col gap-3" data-ai-slot>
       <BotAiSection
@@ -41,12 +45,12 @@ export function AiSlot({
       />
       <Segmented
         title="Works on"
-        hint={runsOn === "auto" ? `Its cloud computer, or ${yourMac(state)} when a task needs it` : runsOn === "mac" ? `${Your(state)} Mac, always` : "Its cloud computer, always"}
+        hint={runsOn === "auto" ? `Its cloud computer, or ${words(yourMac(state))} when a task needs it` : runsOn === "mac" ? words(`${Your(state)} Mac, always`) : "Its cloud computer, always"}
         value={runsOn}
         options={[
           ["auto", "Auto"],
           ["cloud", "Cloud"],
-          ["mac", `${Your(state)} Mac`],
+          ["mac", words(`${Your(state)} Mac`)],
         ]}
         disabled={busy || !!state.shared}
         onPick={(v) => void send({ runsOn: v })}
