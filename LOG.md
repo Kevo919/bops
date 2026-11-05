@@ -172,3 +172,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 19:40 lead: #90 independent review = REQUEST CHANGES (D3 incomplete). Notes in messages/2026-11-05-1945. #85 dark mode pushed fab9002, update-branch + merge-when-green running.
 - 19:45 lead: merged #85 dark mode at 55db629 (all checks green; builder's dark 61/0, light 58/0 screenshot runs). #86 builder resumed for codemod + registry swap.
 - 19:58 lead: PC rebuilt+restarted at 55db629 (build osd4t7mlrAnn76r154pAC, health OK; Kevin told first). Server updated to 55db629, active; server-tests3 rerunning. Codex queue: messages/2026-11-05-2000.
+- 20:02 lead: server-tests3 at 55db629: memory-reachable 4/4, openai-key-wording 2/2, crawl-low-1 2/2. Noted the llms.yaml 'require is not defined' warning as task 71. #86 rebased by builder (6f014c4), lead looked at the dark Home and Look/Animations screenshots (good); update-branch + merge-when-green running.
