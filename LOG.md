@@ -6,6 +6,11 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 1:25 PM (Chicago)
+- **Merged #93 (no false "task started") and #94 (Repos can't schedule themselves or keep running after Stop; two security reviews).**
+- **PC rebuilt at c1570a4 and restarted** (Kevin told first). Codex is live-testing: a real PC task, false claims, Services, Agents you run.
+- **Next:** dark mode (#85), then widgets (#86), then one more PC update.
+
 ### Nov 5, 1:35 PM (Chicago)
 - **Merged #92: the bot's Chrome on this PC.**
   - If it can't start, the task now says why in plain words.
