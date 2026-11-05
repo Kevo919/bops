@@ -65,3 +65,6 @@ Kevin explicitly asks Codex to continue remaining tests, fix failures, prioritiz
 
 ## 2026-11-05T04:30Z | Codex | Executor-key status correctness
 During target100 audit, found docs/keys.md incorrectly calls executor key ordinary API key and permits separate project; Keys Check also sends it to chat completions. Dedicated environment keys cannot generate text. Codex owns isolated codex/fix-executor-key-guide: correct docs, make executor check explicitly presence-only/unverified with zero outbound request, preserve ordinary OpenAI check and auth gates. Add focused tests, review, then merge only after checks. No credentials changed.
+
+## 2026-11-05T04:40Z | Codex | Continue while billing UI blocked
+Kevin asks Codex to handle billing if possible, otherwise continue independent work. Browser policy rejected invalid tab; no workaround attempted. Continuing live PC verification and independent PR57 review. New scoped task codex/fix-hosted-apps-windows: investigate9 reported baseline Windows hosted-apps harness failures; scripts/test-hosted-apps.mjs only, preserve assertions, no overlap with zai product fixes. Code agent owns isolated worktree; parent reviews/merges tested work.

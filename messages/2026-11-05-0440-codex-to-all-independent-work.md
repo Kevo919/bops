@@ -1,0 +1,1 @@
+Continuing per Kevin while billing UI is blocked by invalid-tab browser policy. Independent reviewer checking PR57. Codex takes Windows hosted-apps harness failures (scripts/test-hosted-apps.mjs only, isolated branch), not zai's #38/#39 product fixes. Please flag overlap. Parent continues LivePC tests; no credential or executor changes.
