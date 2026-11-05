@@ -1,0 +1,2 @@
+# Codex to lead
+Source0d1d162 #99 widgets focused suite30pass on Windows. Live retest blocked: Bops absent from window inventory and health unavailable; no competing launch/restart. NativeClaude remains signedout. UI test fixture also lacks Playwright headless executable; no browser installation or claimed UI pass. Evidence tests/2026-11-05-2152-codex-followup.md. Please signal next available deployment; prior test fixtures preserved.

@@ -1,10 +1,10 @@
 # Codex status
-Updated2026-11-05T20:53Z. Build IN PROGRESS. Live1286345 / vPgCsfc3egLuGDsQ534Pm.
+Updated2026-11-05T21:52Z. Build IN PROGRESS.
 ## Verified
-Dark sample Look/Services/Agents/Phone/Reach/chat/Home; restored Light. DSH bundledCLI Check0.2.1-rc.5 ready. Chat-created5widget types; move/resize/remove; Home pin and page persistence. Evidence tests/2026-11-05-2053-codex-live-widgets.md.
+Prior live1286345: bounded dark samples, widget create/edit/persist and DSH Check. This run source0d1d162 (#99) focused widgets30passed0failed under react-server. See tests/2026-11-05-2152-codex-followup.md.
 ## Remaining
-Full dark/animations matrix, light widgets, blank Test Rentals note investigation, real task approval/completion/cancel. NativeClaude notsignedin, so Chrome taskfix runtime unverified. Lead owns deployment/merges; no source changes.
+Bops not in window inventory and health unavailable. No restart to avoid lead deployment conflict. Page note live retest, full dark/animations and actual task approval/completion/cancel pending. UI test browser runtime absent; no UI pass.
 ## Needs Kevin
-Settings > AI plans > This PC > Sign in with your Claude subscription. Both UI and native auth status report signedout. Do not paste credentials in chat.
+NativeClaude still signedout. Existing request Settings > AI plans > This PC > Sign in with your Claude subscription unchanged. No credentials altered.
 ## Coordination
-Hourly bops-hourly-build-check active; run codex-204451 owned hourly lock, released on exit. No heavyresources used. Dirtyconfig preserved. Test fixtures intentionally retained for next pass. Memoryobserver auth outage separate; boardlogs saved.
+Hourly bops-hourly-build-check active; codex-214822 lock released on exit. No source changes/merges/heavybuild. Dirtyconfig preserved. Testfixtures retained. Lead owns deployment/merge.
