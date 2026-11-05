@@ -1,5 +1,6 @@
 import "server-only";
 import net from "node:net";
+import type { Duplex } from "node:stream";
 
 /*
  * An app's Local seen from the owner's Mac (Your Apps, Open preview): its dev server runs on its bot's
@@ -25,7 +26,8 @@ const HEAD_MS = 5000;
  * tailnet: an SSH tunnel's (computer-ssh.ts), each connection one through it. It's the forward's once given to
  * openForward, and closes with it.
  */
-export type Carrier = { via: "ssh"; connect: () => net.Socket; close: () => void };
+export type CarrierStream = Duplex & { setTimeout(ms: number, callback?: () => void): unknown };
+export type Carrier = { via: "ssh"; connect: () => CarrierStream; close: () => void };
 
 type Forward = {
   key: string;
@@ -46,7 +48,7 @@ const forwards = (g.bopsPreviewForwards ??= new Map<number, Forward>());
 export class ForwardError extends Error {
   code: "MAC_PORT_BUSY";
   constructor(port: number) {
-    super(`Port ${port} on this Mac is in use, so it opens on its screen.`);
+    super(`Port ${port} on this computer is in use, so it opens on its screen.`);
     this.code = "MAC_PORT_BUSY";
   }
 }
@@ -95,6 +97,9 @@ function take(f: Forward, sock: net.Socket) {
     if (!host || !ok.has(host)) return reply(sock, "403 Forbidden", `Open it at localhost:${f.macPort}.`);
     const up = f.carrier ? f.carrier.connect() : net.connect({ host: f.host, port: f.port });
     let open = false;
+    let responded = false;
+    let failed = false;
+    up.once("data", () => { responded = true; });
     up.setTimeout(10_000, () => {
       if (!open) up.destroy(new Error("timeout"));
     });
@@ -107,11 +112,12 @@ function take(f: Forward, sock: net.Socket) {
       sock.resume();
     });
     up.on("error", () => {
-      if (!open) reply(sock, "502 Bad Gateway", `Bops can't reach ${f.app} on its computer right now.`);
+      failed = true;
+      if (!responded) reply(sock, "502 Bad Gateway", `Bops can't reach ${f.app} on its computer right now.`);
       else sock.destroy();
     });
     sock.once("close", () => up.destroy());
-    up.once("close", () => sock.destroy());
+    up.once("close", () => { if (!failed) sock.destroy(); });
   };
   sock.on("data", onData);
 }

@@ -59,7 +59,7 @@
 // only, an @orgo.ai account only, and nothing asked of Orgo on a bot's computer.
 // Usage: node --conditions=react-server scripts/test-hosted-apps.mjs
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawnSync, spawn, execFile } from "node:child_process";
 import { constants, createHash, generateKeyPairSync, privateDecrypt, randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
@@ -80,9 +80,22 @@ process.env.BOPS_ORGO_ORIGIN = ORGO;
 const INGOT = "http://ingot.test";
 process.env.BOPS_INGOT_URL = `${INGOT}/`;
 // (As a path, not a URL's: a folder with a space in its name would be %20, then %2520 once made a URL again.)
+const windows = process.platform === "win32";
 const root = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
 // A file URL for import specifiers, from this OS-path root.
 const fileUrl = (p) => pathToFileURL(join(root, p)).href;
+const shellPath = (p) => {
+  if (!windows) return p;
+  const r = spawnSync("wsl.exe", ["--exec", "wslpath", "-u", p], { encoding: "utf8" });
+  assert.equal(r.status, 0, "Windows shell fixture requires existing WSL with wslpath");
+  return r.stdout.trim();
+};
+const privateAcl = (path) => {
+  const script = "$ErrorActionPreference='Stop';$sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User;$a=[System.IO.File]::GetAccessControl($env:BOPS_TEST_ACL);if(!$a.AreAccessRulesProtected){throw 'inherited ACL'};foreach($r in $a.Access){if($r.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]) -ne $sid){throw 'other identity'}}";
+  const r = spawnSync(join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script,"utf16le").toString("base64")], { env:{...process.env,BOPS_TEST_ACL:path}, encoding:"utf8" });
+  assert.equal(r.status, 0, "private file has a protected current-SID-only ACL");
+};
+const assertPrivate = (path) => windows ? privateAcl(path) : assert.equal(statSync(path).mode & 0o777, 0o600);
 const scratch = mkdtempSync(join(tmpdir(), "bops-test-hosted-apps-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
@@ -125,6 +138,7 @@ writeFileSync(
   join(bin, "ssh.mjs"),
   `import { appendFileSync, existsSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import net from "node:net";
+import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 const here = dirname(process.argv[1]);
 const a = process.argv.slice(2);
@@ -138,9 +152,20 @@ if (ctl.down) fail("ssh: connect to host " + host + " port " + port + ": Connect
 const known = (opt("UserKnownHostsFile") ?? "").replace(/^"|"$/g, "");
 if (!existsSync(known) || !readFileSync(known, "utf8").split("\\n").includes("[" + host + "]:" + port + " " + ctl.hostKey)) fail("Host key verification failed.");
 const key = a[a.indexOf("-i") + 1];
-if ((statSync(key).mode & 0o077) !== 0) fail("Permissions for '" + key + "' are too open.");
+if (process.platform !== "win32" && (statSync(key).mode & 0o077) !== 0) fail("Permissions for '" + key + "' are too open.");
 const body = readFileSync(key + ".pub", "utf8").split(" ")[1];
 if (!readFileSync(ctl.authorized, "utf8").split("\\n").some((l) => l.split(" ").includes(body))) fail("root@" + host + ": Permission denied (publickey).");
+if (process.platform === "win32") {
+  const ps = "$a=[System.IO.File]::GetAccessControl($env:BOPS_TEST_ACL);$sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User;if(!$a.AreAccessRulesProtected){exit 1};foreach($r in $a.Access){if($r.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]) -ne $sid){exit 1}}";
+  try { execFileSync(join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), ["-NoProfile", "-EncodedCommand", Buffer.from(ps,"utf16le").toString("base64")], { env:{...process.env,BOPS_TEST_ACL:key}, stdio:"pipe" }); } catch { fail("private ACL refused"); }
+}
+if (a.includes("-W")) {
+  const remote = a[a.indexOf("-W") + 1].split(":").at(-1);
+  const up = net.connect({host:"127.0.0.1", port:ctl.ports?.[remote] ?? 9});
+  process.stdin.pipe(up); up.pipe(process.stdout);
+  up.on("error", () => fail("forward refused"));
+  up.on("end", () => process.exit(0));
+} else {
 const [sock, , remote] = a[a.indexOf("-L") + 1].split(":");
 const server = net.createServer((c) => {
   const up = net.connect({ host: "127.0.0.1", port: ctl.ports?.[remote] ?? 9 });
@@ -153,6 +178,7 @@ server.listen(sock);
 const end = () => (server.close(), existsSync(sock) && unlinkSync(sock), process.exit(0));
 process.on("SIGTERM", end);
 process.on("SIGINT", end);
+}
 `,
 );
 for (const name of ["ssh", "ssh-keygen"]) writeFileSync(join(bin, name), `#!/bin/sh\nexec "${process.execPath}" "${join(bin, `${name}.mjs`)}" "$@"\n`, { mode: 0o755 });
@@ -167,13 +193,44 @@ const logLines = (name) => {
     return [];
   }
 };
+// A live request rather than a completed response: Windows owns an SSH child per connection.
+const heldClients = new Set();
+async function holdSshPage(port) {
+  const { default: net } = await import("node:net");
+  const before = logLines("ssh.log").length;
+  const client = net.connect({host:"127.0.0.1",port});
+  heldClients.add(client);
+  client.once("close", () => heldClients.delete(client));
+  client.on("error", () => {});
+  await new Promise(r => client.once("connect", r));
+  client.write(`GET /hold HTTP/1.1\r\nHost: localhost:${port}\r\n\r\n`);
+  await until(() => logLines("ssh.log").length > before);
+  return { client, entry:logLines("ssh.log").at(-1) };
+}
 let BINARY = randomBytes(400 * 1024);
 writeFileSync(join(vendor, "ingot-linux-amd64"), BINARY);
 
 // Modules that start processes when loaded do nothing; sessions.ts records the tasks started instead of running them.
+const ownedSshChildren = new Set();
+process.once("exit", () => {
+  for (const client of heldClients) client.destroy();
+  for (const child of ownedSshChildren) if(child.exitCode === null && child.signalCode === null) child.kill();
+});
+globalThis.__hostedChild = {
+  spawn: (file, args, options) => {
+    const child = spawn(process.execPath, [file + ".mjs", ...args], options);
+    ownedSshChildren.add(child);
+    child.once("exit", () => ownedSshChildren.delete(child));
+    return child;
+  },
+  execFile: (file, args, options, callback) => file === process.env.BOPS_SSH_KEYGEN_BIN
+    ? execFile(process.execPath, [file + ".mjs", ...args], options, callback)
+    : execFile(file, args, options, callback),
+};
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
+    if (windows && specifier === "node:child_process" && context.parentURL?.endsWith("/computer-ssh.ts")) return {url:"test:hosted-child",shortCircuit:true};
     if (specifier.startsWith("@/")) specifier = fileUrl(specifier.slice(2));
     try {
       return next(specifier, context);
@@ -187,6 +244,7 @@ registerHooks({
     }
   },
   load(url, context, next) {
+    if(url === "test:hosted-child") return {format:"module",shortCircuit:true,source:"export const spawn=(...a)=>globalThis.__hostedChild.spawn(...a);export const execFile=(...a)=>globalThis.__hostedChild.execFile(...a);"};
     const name = url.match(/\/lib\/server\/([a-z-]+)\.ts$/)?.[1];
     if (!name || !STAND_INS.has(name)) return next(url, context);
     const names = [...readFileSync(new URL(url), "utf8").matchAll(/^export (?:async )?(?:function\*? |const |let |class )([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]);
@@ -491,9 +549,10 @@ function bash(id, command) {
   const c = fleet.get(id);
   // Bops' SSH key put on the computer and its host key read: in a real shell, on the computer's files in a folder of its own.
   if (c && command.startsWith("# bops-ssh key\n")) {
-    const home = sshFiles(c);
+    const home = shellPath(sshFiles(c));
     c.sshKeyRuns = (c.sshKeyRuns ?? 0) + 1;
-    const r = spawnSync("bash", ["-c", command.replaceAll("/root/.ssh", `${home}/root/.ssh`).replaceAll("/etc/ssh", `${home}/etc/ssh`)], { encoding: "utf8" });
+    const moved = command.replaceAll("/root/.ssh", `${home}/root/.ssh`).replaceAll("/etc/ssh", `${home}/etc/ssh`);
+    const r = windows ? spawnSync("wsl.exe", ["--exec", "bash", "-s"], {input:moved,encoding:"utf8"}) : spawnSync("bash", ["-c", moved], { encoding: "utf8" });
     return { output: r.stdout + r.stderr, exit_code: r.status };
   }
   const local = c && localFake(c, command);
@@ -1538,7 +1597,7 @@ await check("No vendored binary for the computer: a clear error, nothing put the
   const c = central.calls.length;
   await assert.rejects(I.ensureIngotCli("c_arm", WS), (e) => {
     assert.ok(e instanceof I.IngotError);
-    assert.match(hear(e.message), /^This Bops has no Ingot for the computer to run \(.*vendor-ingot\/ingot-linux-arm64 is missing\), so its apps can't be set up there\.$/);
+    assert.match(hear(e.message), /^This Bops has no Ingot for the computer to run \(.*vendor-ingot[\\/]ingot-linux-arm64 is missing\), so its apps can't be set up there\.$/);
     return true;
   });
   assert.deepEqual(kinds("c_arm", n), ["probe"]);
@@ -2243,7 +2302,7 @@ await check("Asked of a task already on the app (foldInto hands that one back): 
   assert.equal(sessionOf("ses_plain").app, undefined);
   H.askDeploy("ses_notes", RECIPE);
   assert.equal(sessionOf("ses_notes").app.deployAfter, undefined);
-  const src = readFileSync(`${root}/lib/server/sessions.ts`, "utf8");
+  const src = readFileSync(`${root}/lib/server/sessions.ts`, "utf8").replace(/\r\n/g, "\n");
   const twin = src.slice(src.indexOf("const twin = opts.fresh"), src.indexOf("let to = await chooseWhere"));
   assert.match(twin, /foldInto\(twin, s\.goal, where, opts\);\n.*\n\s*if \(s\.app\?\.deployAfter\) askDeploy\(twin\.id, s\.app\);/);
 });
@@ -2400,7 +2459,7 @@ await check("Nothing for a task with no deploy ask, one that moved on to another
 });
 
 await check("sessions.ts: a run that ended done asks after its result is posted, one that failed after its failure is (never one the user stopped), and so does a task whose computer couldn't be set up", async () => {
-  const src = readFileSync(`${root}/lib/server/sessions.ts`, "utf8");
+  const src = readFileSync(`${root}/lib/server/sessions.ts`, "utf8").replace(/\r\n/g, "\n");
   const runAt = src.indexOf("async function run(sessionId");
   const doneAt = src.indexOf('patchSession(sessionId, { status: "done"', runAt);
   const hook = src.indexOf("void deployAfterTask(sessionId)", doneAt);
@@ -5659,7 +5718,7 @@ await check("Preview on this Mac without the tailnet goes through its computer's
   const authorized = join(sshFiles(boppy), "root/.ssh/authorized_keys");
   rmSync(authorized, { force: true });
   // Its dev server: one on this Mac, standing in for that port of its computer.
-  const dev = http.createServer((req, res) => res.end(`field notes, asked for ${req.headers.host}`));
+  const dev = http.createServer((req, res) => { if(req.url !== "/hold") res.end(`field notes, asked for ${req.headers.host}`); });
   await new Promise((r) => dev.listen(0, "127.0.0.1", r));
   const port = await free();
   sshSays({ hostKey: boppy.hostKey, authorized, ports: { [port]: dev.address().port } });
@@ -5667,13 +5726,13 @@ await check("Preview on this Mac without the tailnet goes through its computer's
   const key = `${WS}/field-notes/field-notes`;
   let n = web.calls.length;
   const r = await localAsk({ action: "preview" });
-  assert.deepEqual([r.status, r.body.preview], [200, `http://localhost:${port}/`]);
+  assert.deepEqual([r.status, r.body.preview], [200, `http://localhost:${port}/`], JSON.stringify(r.body));
   // Its key: made once (the preview Orgo turned down before made it), 0600, never sent anywhere.
   const made = logLines("keygen.log");
   assert.equal(made.length, 1, "made once, then the same");
   const keyFile = made[0][made[0].indexOf("-f") + 1];
   assert.deepEqual(made[0], ["-q", "-t", "ed25519", "-N", "", "-C", "bops", "-f", keyFile]);
-  assert.equal(statSync(keyFile).mode & 0o777, 0o600, "its private key is the user's alone");
+  assertPrivate(keyFile);
   const pub = readFileSync(`${keyFile}.pub`, "utf8").split(" ").slice(0, 2).join(" ");
   const secret = readFileSync(keyFile, "utf8");
   assert.ok(![...web.calls.map((c) => JSON.stringify(c.body ?? null)), ...ran.map((x) => x.command)].some((x) => x.includes("PRIVATE KEY") || x.includes(secret.split("\n")[1])), "never sent");
@@ -5683,30 +5742,30 @@ await check("Preview on this Mac without the tailnet goes through its computer's
   assert.equal(readFileSync(authorized, "utf8"), `${pub} bops\n`, "on its computer once (Orgo wrote it, and Bops found it there)");
   const known = join(dirname(keyFile), "known_hosts");
   assert.equal(readFileSync(known, "utf8"), `[${SSH_HOST}]:40022 ${boppy.hostKey}\n`, "its host key pinned for its address");
-  assert.equal(statSync(known).mode & 0o777, 0o600);
+  assertPrivate(known);
+  // Windows starts SSH only when the validated request arrives.
+  if (windows) assert.equal(await pageAt(port), `200 field notes, asked for localhost:${port}`);
   // ssh: this argv and nothing else.
   const one = logLines("ssh.log").at(-1);
-  const sock = one.argv[one.argv.indexOf("-L") + 1].split(":")[0];
-  assert.match(sock, /\/bops-ssh-[A-Za-z0-9]+\/\d+\.sock$/);
-  assert.ok(sock.length < 104, "a socket's path fits");
+  const sock = windows ? null : one.argv[one.argv.indexOf("-L") + 1].split(":")[0];
+  if (!windows) assert.match(sock, /\/bops-ssh-[A-Za-z0-9]+\/\d+\.sock$/);
+  if (!windows) assert.ok(sock.length < 104, "a socket's path fits");
   assert.deepEqual(one.argv, [
-    "-F", "/dev/null",
+    "-F", windows ? "NUL" : "/dev/null",
     "-i", keyFile,
     "-o", "IdentitiesOnly=yes",
     "-o", "IdentityAgent=none",
     "-o", "BatchMode=yes",
     "-o", "StrictHostKeyChecking=yes",
     "-o", `UserKnownHostsFile="${known}"`,
-    "-o", "GlobalKnownHostsFile=/dev/null",
+    "-o", `GlobalKnownHostsFile=${windows ? "NUL" : "/dev/null"}`,
     "-o", "HostKeyAlgorithms=ssh-ed25519",
     "-o", "UpdateHostKeys=no",
     "-o", "ExitOnForwardFailure=yes",
     "-o", "ServerAliveInterval=15",
     "-o", "ServerAliveCountMax=3",
     "-o", "ConnectTimeout=10",
-    "-o", "StreamLocalBindUnlink=yes",
-    "-N",
-    "-L", `${sock}:127.0.0.1:${port}`,
+    ...(windows ? ["-W", `127.0.0.1:${port}`] : ["-o", "StreamLocalBindUnlink=yes", "-N", "-L", `${sock}:127.0.0.1:${port}`]),
     "-p", "40022",
     "-l", "root",
     "--", SSH_HOST,
@@ -5747,7 +5806,8 @@ await check("Preview on this Mac without the tailnet goes through its computer's
 
   // The tailnet first, when it's up: an SSH forward open moves to it, its ssh stopped.
   assert.equal((await localAsk({ action: "preview" })).status, 200);
-  const before = logLines("ssh.log").at(-1).pid;
+  const held = windows ? await holdSshPage(port) : undefined;
+  const before = held?.entry.pid ?? logLines("ssh.log").at(-1).pid;
   S.update((st) => (st.bots.find((b) => b.id === "boppy").tailnet = { ip: "100.64.0.9", name: "bops-boppy" }));
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => (new URL(new Request(input, init).url).host === "100.64.0.9:9299" ? json({ Browser: "Chrome" }) : realFetch(input, init));
@@ -5795,7 +5855,7 @@ await check("A preview through SSH follows its Local to a new port (a tunnel to 
   boppy.locals?.clear();
   boppy.ssh = undefined;
   const authorized = join(sshFiles(boppy), "root/.ssh/authorized_keys");
-  const dev = http.createServer((req, res) => res.end("field notes"));
+  const dev = http.createServer((req, res) => { if(req.url !== "/hold") res.end("field notes"); });
   await new Promise((r) => dev.listen(0, "127.0.0.1", r));
   const [port, moved] = [await free(), await free()];
   sshSays({ hostKey: boppy.hostKey, authorized, ports: { [port]: dev.address().port, [moved]: dev.address().port } });
@@ -5803,24 +5863,28 @@ await check("A preview through SSH follows its Local to a new port (a tunnel to 
   try {
     await localAsk({ action: "start", port });
     assert.equal((await localAsk({ action: "preview" })).status, 200);
-    const first = logLines("ssh.log").at(-1);
+    const firstHeld = windows ? await holdSshPage(port) : undefined;
+    const first = firstHeld?.entry ?? logLines("ssh.log").at(-1);
     // Its Local started again on another port: a tunnel to that one, on that port here too; the old one stopped.
     await localAsk({ action: "start", port: moved });
     await until(() => P.forwardOf(key)?.port === moved, 8000);
     assert.deepEqual(P.forwardOf(key), { macPort: moved, host: SSH_HOST, port: moved, via: "ssh" });
     assert.equal(P.forwardOn(port), undefined, "the old one closed");
-    const second = logLines("ssh.log").at(-1);
-    assert.equal(second.argv[second.argv.indexOf("-L") + 1].split(":").slice(1).join(":"), `127.0.0.1:${moved}`);
+    const secondHeld = windows ? await holdSshPage(moved) : undefined;
+    const second = secondHeld?.entry ?? logLines("ssh.log").at(-1);
+    assert.equal(windows ? second.argv[second.argv.indexOf("-W") + 1] : second.argv[second.argv.indexOf("-L") + 1].split(":").slice(1).join(":"), `127.0.0.1:${moved}`);
     await until(() => !alive(first.pid));
     assert.equal(await pageAt(moved), "200 field notes");
     // ssh drops (the computer restarted, the network went): back by itself, the key looked at again first.
     const runs = boppy.sshKeyRuns;
     process.kill(second.pid, "SIGKILL");
-    await until(() => logLines("ssh.log").at(-1).pid !== second.pid, 8000);
-    assert.equal(await pageAt(moved), "200 field notes", "a page waits for it");
-    assert.ok(boppy.sshKeyRuns > runs, "its key put back first, should a start have taken it");
+    if (!windows) await until(() => logLines("ssh.log").at(-1).pid !== second.pid, 8000);
+    assert.equal(await pageAt(moved), "200 field notes", "a new request reconnects");
+    if (windows) assert.equal(boppy.sshKeyRuns, runs, "Windows pins remain fixed until preview reopened");
+    else assert.ok(boppy.sshKeyRuns > runs, "its key put back first, should a start have taken it");
     // Stop: closed, ssh stopped.
-    const third = logLines("ssh.log").at(-1);
+    const thirdHeld = windows ? await holdSshPage(moved) : undefined;
+    const third = thirdHeld?.entry ?? logLines("ssh.log").at(-1);
     await localAsk({ action: "stop" });
     assert.equal(P.forwardOf(key), undefined);
     await until(() => !alive(third.pid));
@@ -5833,7 +5897,13 @@ await check("A preview through SSH follows its Local to a new port (a tunnel to 
     boppy.ssh = undefined;
     sshSays({ down: true });
     const down = await localAsk({ action: "preview" });
-    assert.deepEqual([down.status, down.body.fallback, down.body.error], [409, "screen", "Its computer's SSH didn't answer, so it opens on its screen."]);
+    if (windows) {
+      assert.equal(down.status, 200, "Windows creates the preview before SSH authentication");
+      assert.match(await pageAt(port), /^502 Bops can.t reach/);
+      const failedPid = logLines("ssh.log").at(-1).pid;
+      await until(() => !alive(failedPid));
+      await localAsk({action:"unpreview"});
+    } else assert.deepEqual([down.status, down.body.fallback, down.body.error], [409, "screen", "Its computer's SSH didn't answer, so it opens on its screen."]);
     assert.equal(P.forwardOf(key), undefined);
     assert.equal(await new Promise((done) => net.connect({ host: "127.0.0.1", port }).once("connect", () => done("open")).once("error", () => done("free"))), "free");
     sshSays({ hostKey: boppy.hostKey, authorized, ports: { [port]: dev.address().port } });
@@ -5841,7 +5911,7 @@ await check("A preview through SSH follows its Local to a new port (a tunnel to 
     await new Promise((r) => taken.once("listening", r));
     const n = web.calls.length;
     const busy = await localAsk({ action: "preview" });
-    assert.deepEqual([busy.status, busy.body.fallback, busy.body.error], [409, "screen", `Port ${port} on this Mac is in use, so it opens on its screen.`]);
+    assert.deepEqual([busy.status, busy.body.fallback, busy.body.error], [409, "screen", `Port ${port} on this computer is in use, so it opens on its screen.`]);
     assert.deepEqual(callsSince(n, "GET", /\/ssh$/), [], "Orgo not asked");
     taken.close();
   } finally {
@@ -5853,7 +5923,7 @@ await check("A preview through SSH follows its Local to a new port (a tunnel to 
 await check("Removing an app forgets its Locals on its computer (bops-local forget: each one stopped, its files gone, so its port is free for the next app), closes its previews on this Mac (their ssh too), and removes its working folder there only with its repo, and only its own workspace's; never wakes a computer asleep for it", async () => {
   const P = await import(fileUrl("lib/server/local-preview.ts"));
   const http = await import("node:http");
-  const dev = http.createServer((req, res) => res.end("field notes"));
+  const dev = http.createServer((req, res) => { if(req.url !== "/hold") res.end("field notes"); });
   await new Promise((r) => dev.listen(0, "127.0.0.1", r));
   const authorized = join(sshFiles(boppy), "root/.ssh/authorized_keys");
   const del = (body) => ask(AppRoute, "DELETE", "/api/hosted-apps/field-notes", NOTES, { ws: WS, ...body });
@@ -5867,7 +5937,8 @@ await check("Removing an app forgets its Locals on its computer (bops-local forg
     boppy.locals.set("other-app--other-app", { port: 3002, dev: 3002, cmd: "npm run dev", since: 1, stopped: false, env: new Map() });
     sshSays({ hostKey: boppy.hostKey, authorized, ports: { 3000: dev.address().port } });
     assert.equal((await localAsk({ action: "preview" })).status, 200);
-    const tunnel = logLines("ssh.log").at(-1);
+    const removalHeld = windows ? await holdSshPage(3000) : undefined;
+    const tunnel = removalHeld?.entry ?? logLines("ssh.log").at(-1);
     const r = await del({});
     assert.deepEqual([r.status, r.body], [200, { removed: "field-notes", repo: false }]);
     assert.deepEqual(boppy.forgets.at(-1), { name: "field-notes", folder: false });
@@ -5994,16 +6065,48 @@ await check("All of it only for an @orgo.ai account: anyone else gets 404s from 
 });
 
 await check("The commands work in a real shell (their paths moved into a scratch folder, ingot stubbed, openssl as it is): root's config, the central server alone; the token sealed here to a key made there and opened there straight into the workspace's token file, each 0600 in folders of root's alone, the key gone after; setup-git run as root; the probe's sha256 of each is the one kept; a bot's name with a quote in it arrives whole as git's user.name; the folder is cloned as <project>/<name>, pulled when it holds that repo, moved aside first when it isn't one (or the old local Ingot's), and left as it is when it holds another workspace's", async () => {
-  const sh = join(scratch, "sh");
+  // Windows mode bits are emulated on NTFS. Run this permission fixture on WSL's Linux filesystem.
+  const fs = await import("node:fs");
+  const { posix } = await import("node:path");
+  const windows = process.platform === "win32";
+  const quote = (value) => "'" + value.replaceAll("'", "'\"'\"'") + "'";
+  const shell = (input) => spawnSync(windows ? "wsl.exe" : "bash", windows ? ["--exec", "bash", "-s"] : ["-s"], { input, encoding: "utf8" });
+  const created = windows ? shell("mktemp -d /tmp/bops-hosted-permissions-XXXXXXXX\n") : null;
+  if (created) assert.equal(created.status, 0, "WSL must provide a real Linux permission fixture");
+  const sh = windows ? created.stdout.trim() : posix.join(scratch, "sh");
+  if (windows) assert.match(sh, /^\/tmp\/bops-hosted-permissions-[A-Za-z0-9]+$/);
+  const mapped = windows ? shell(`wslpath -w ${quote(sh)}\n`) : null;
+  if (mapped) assert.equal(mapped.status, 0, "the WSL fixture must be accessible to Node");
+  const nativeRoot = windows ? mapped.stdout.trim() : sh;
+  if (windows) assert.ok(nativeRoot.startsWith("\\\\") && nativeRoot.endsWith(sh.replaceAll("/", "\\")), "cleanup is confined to the generated WSL scratch folder");
+  const join = posix.join;
+  const native = (path) => {
+    assert.ok(path === sh || path.startsWith(sh + "/"), "fixture filesystem operations stay inside its scratch root");
+    return nativeRoot + path.slice(sh.length).replaceAll("/", windows ? "\\" : "/");
+  };
+  const mkdirSync = (path, options) => fs.mkdirSync(native(path), options);
+  const writeFileSync = (path, data, options) => fs.writeFileSync(native(path), data, options);
+  const readFileSync = (path, options) => fs.readFileSync(native(path), options);
+  const readdirSync = (path) => fs.readdirSync(native(path));
+  const rmSync = (path, options) => fs.rmSync(native(path), options);
+  const statSync = (path) => {
+    const stat = fs.statSync(native(path));
+    if (!windows) return stat;
+    const mode = shell(`stat -c %a -- ${quote(path)}\n`);
+    assert.equal(mode.status, 0, "read actual Linux permissions");
+    return { mode: parseInt(mode.stdout.trim(), 8), isFile: () => stat.isFile() };
+  };
+  try {
   for (const d of ["root", "apps", "bin"]) mkdirSync(join(sh, d), { recursive: true });
   const log = join(sh, "log");
   // Its clone writes the state as Ingot does (internal/workdir state.go: indented, a field a line).
   const stateOf = (ws, name) => `{\n  "repo": "${name}",\n  "workspace": "${ws}",\n  "base": "",\n  "files": {},\n  "written_at": 1\n}\n`;
   writeFileSync(join(sh, "bin", "ingot"), `#!/bin/sh\necho "ingot $* HOME=$HOME" >> "${log}"\nif [ "$1" = clone ]; then mkdir -p "$3/.ingot" && printf '{\\n  "repo": "%s",\\n  "workspace": "%s",\\n  "base": ""\\n}\\n' "\${2#*/}" "\${2%%/*}" > "$3/.ingot/state.json"; fi\nexit 0\n`, { mode: 0o755 });
   const moved = (cmd) => cmd.replaceAll("~root", join(sh, "root")).replaceAll("/workspace/apps", join(sh, "apps")).replaceAll("/opt/bops/bin/ingot", join(sh, "bin", "ingot"));
-  const run = (cmd) => spawnSync("bash", ["-c", moved(cmd)], { encoding: "utf8", env: { ...process.env, PATH: `${join(sh, "bin")}:${process.env.PATH}` } });
+  const run = (cmd) => shell(`export PATH=${quote(join(sh, "bin"))}:$PATH\n${moved(cmd)}`);
+  assert.equal(shell(`chmod 755 ${quote(join(sh, "bin", "ingot"))}\n`).status, 0);
   const lines = () => readFileSync(log, "utf8").trim().split("\n");
-  assert.equal(spawnSync("openssl", ["version"]).status, 0, "openssl on this Mac, as on a computer");
+  assert.equal(shell("openssl version\n").status, 0, "openssl in the shell, as on a computer");
   // Sol's computer runs the token's commands for real (its binary goes to the fake as before).
   S.update((s) => s.bots.push({ id: "sol", name: "Sol", role: "Ops", color: "#999999", isMain: false, computerStatus: "ready", computerId: "c_shell" }));
   computer("c_shell", { shell: (cmd) => (({ stdout, stderr, status }) => ({ output: `${stdout}${stderr}`, exit_code: status ?? 1 }))(run(cmd)) });
@@ -6074,6 +6177,9 @@ await check("The commands work in a real shell (their paths moved into a scratch
   const clone = `ingot clone ${PROJECT}/pink ${pink} ${home}`;
   assert.deepEqual(lines().slice(1), [clone, `ingot pull ${home}`, `ingot pull ${home}`, clone, clone]);
   noTokenSent();
+  } finally {
+    if (windows) fs.rmSync(nativeRoot, { recursive: true, force: true });
+  }
 });
 
 await check("Every script sent to a computer passes bash -n, and each is one argument Linux takes (128 KiB at most), the binary's pieces too", async () => {
