@@ -6,6 +6,13 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 11:10 AM (Chicago)
+- **Merged #84: your "in progress" rule is now in the app.**
+  - Unfinished features show grayed out, with red "Not set up yet" text and a percent.
+  - Built ones still being tried on your PC show "Being tested" with a percent, and stay usable. That covers PC tasks on your Claude plan and Composio (your account), both at 85%.
+- **Next:** dark mode (#85) rebases on this, then widgets (#86) and Settings → Services (#87).
+- **New:** task 63, several DeepSeek Harness and Hermes Agent instances (research and build started).
+
 ### Nov 5, 10:45 AM (Chicago)
 - **The PC is back online.** Bops was rebuilt with everything merged today and restarted: the Memory message, GitHub checks green, no blank screens, PC tasks on your Claude plan, phone pairing, and Composio (your account) (#83, merged).
 - **The new phone app is published** with the Scan QR code button. It was sent to Kevin in chat.
