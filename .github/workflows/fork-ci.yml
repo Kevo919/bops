@@ -50,6 +50,8 @@ jobs:
         run: node --conditions=react-server scripts/test-local-codex-chat.mjs
       - name: Desktop and phone proxy boundary tests
         run: node --conditions=react-server scripts/test-proxy.mjs
+      - name: Documents a bot makes (docx/pptx/xlsx) tests
+        run: node --conditions=react-server scripts/test-docs.mjs
       - name: Brain accounts and sign-in tests
         run: node scripts/test-brains.mjs
       - name: CLI agent tests

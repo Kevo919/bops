@@ -64,6 +64,10 @@ assert.ok(passes(call("HEAD", "/api/health", { origin: null })));
 assert.ok(passes(call("GET", "/api/health", { origin: null })));
 assert.ok(passes(call("GET", "/api/pages/p_123", { origin: null })));
 assert.equal(call("POST", "/api/pages/p_123").status, 403, "but nothing else on them");
+// A document a bot made (docs.ts): its download link is clicked as a navigation, which the shell's
+// download handler or a new tab makes without the window's cookie - so like pages and files, an open read.
+assert.ok(passes(call("GET", "/api/docs/docs_0123456789abcdef", { origin: null })), "a doc download reaches the route, which 404s unknown ids");
+assert.equal(call("POST", "/api/docs/docs_0123456789abcdef").status, 403, "but only reads on them");
 // An app a bot made: its page (code only) is an open read; what it keeps, its code and its bridge are the window's.
 assert.ok(passes(call("GET", "/api/made-apps/app_123/view?v=2", { origin: null })));
 for (const [method, path] of [["POST", "/api/made-apps/app_123/bridge"], ["GET", "/api/made-apps/app_123"], ["POST", "/api/made-apps/app_123"], ["GET", "/api/made-apps/app_123/view/x"]])
