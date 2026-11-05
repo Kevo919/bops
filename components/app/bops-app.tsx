@@ -59,7 +59,7 @@ import { OPEN_MAC_KEY } from "./mac-pip";
 import { MacComputer } from "./mac-computer";
 import { RestartButton, RestartIcon, useCanRestart } from "./restart";
 import { RunsOnSettings } from "./runs-on";
-import { chatInWorkspace, currentWorkspace, option, post, radio, SideToggleIcon, teamOf, useAppState, useSelfHosted } from "./ui";
+import { chatInWorkspace, currentWorkspace, option, post, radio, SideToggleIcon, teamOf, useAppState, useSelfHosted, useStateRefused } from "./ui";
 import { viewOnly } from "./view-only";
 import { readOnlyLine, seesBrowser } from "@/lib/shared";
 import { duePings } from "@/lib/pings";
@@ -2355,10 +2355,20 @@ export function Settings({
 function FirstLoad() {
   const [slow, setSlow] = useState(false);
   const canRestart = useCanRestart();
+  // Turned away (a phone whose pairing is gone): say so and how to get back in, not "Loading" forever.
+  const refusedWhy = useStateRefused();
   useEffect(() => {
     const t = setTimeout(() => setSlow(true), 20_000);
     return () => clearTimeout(t);
   }, []);
+  if (refusedWhy)
+    return (
+      <BoppyLoading label="Bops can't let this device in.">
+        <span role="alert" data-refused className="max-w-[320px] text-center">
+          {refusedWhy} On a phone: pair it again in the Bops app on your computer (Settings, then Your phone).
+        </span>
+      </BoppyLoading>
+    );
   return (
     <BoppyLoading label="Loading Bops…">
       {slow && (
