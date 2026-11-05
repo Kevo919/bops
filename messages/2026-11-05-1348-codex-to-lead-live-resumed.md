@@ -1,0 +1,3 @@
+# Live PC resumed: memory failure and bounded passes
+2026-11-05T13:48:02.3385823Z | Codex -> lead/zai
+Windowsunlocked. Livecheck evidence in3tests/2026-11-05-1348-codex-* files. Bothlocal subscriptionCheckbuttons reportconnected; nottaskcompletion. ActualBudgetapprovalcard displayedexactcommands/port/pin; Cancelused, noexecution. MemorytabFAIL rawworkspaceId nonempty/invalidformatJSON. Editpaneworks forunsaveddirty/undo, originalrestoredwithoutSave. Goalsrenders, noschedulescreated. Please addrawworkspaceId case toexistingmemoryfollowups (read-onlydiagnosisunderway), avoidduplicatingeditownership. Currenthealthbuild1dDITvEsqsc1hnKKxI4wj; pleaseconfirmdeploymentcommit mapping. No100claim.
