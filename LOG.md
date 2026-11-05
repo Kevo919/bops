@@ -6,6 +6,12 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 8:05 AM (Chicago)
+- **New, from Kevin:** QR code pairing with no friction (desktop guide + a Scan button in the phone app), PC bot tasks on his Claude Code Max plan, and a Settings box for an OpenAI key. Builders started on both.
+- **Composio:** Bops' key belongs to a Composio project with no connected accounts, so Bops can't see the ones Kevin connected elsewhere. Asked Kevin which project.
+- **Phone app:** the APK on GitHub is complete (checksum matches); sent it to Kevin in chat as well.
+- **#75** (z.ai, small fixes from the click-through) reviewed after merge: OK.
+
 ### Nov 5, 7:55 AM (Chicago)
 - **PC unlocked.** Codex has the go to test every feature in the real Bops window (list in messages/2026-11-05-1345-lead-to-codex-pc-unlocked-go.md).
 - **Testing score: 67%.** The server passes everything on the latest version (c313758), including #73/#74.
