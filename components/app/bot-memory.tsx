@@ -9,7 +9,7 @@ import { ago, memberAnswers, post, quietNothing, StatusIcon } from "./ui";
 import { you } from "@/lib/shared";
 
 type Fact = { id: string; text: string; private: boolean; at?: number; source?: string };
-type Data = { workspace: string; ws: string; own?: boolean; card: Fact[]; facts: Fact[]; error?: string };
+type Data = { workspace: string; ws: string; own?: boolean; card: Fact[]; facts: Fact[]; error?: string; unreachable?: boolean };
 /** The bot whose own memory the tab shows (it keeps its memory to itself: lib/chain.ts), so a change goes to its own bank. */
 const OwnMemoryOf = createContext<string | undefined>(undefined);
 /** Each bot's Memory tab as last loaded, so opening it again is instant (then it refreshes). */
@@ -184,6 +184,8 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
         </div>
       ) : !data ? (
         <Quiet>Loading…</Quiet>
+      ) : data.unreachable ? (
+        <Quiet>Can&rsquo;t reach the memory service right now. It&rsquo;s set up, but it didn&rsquo;t answer &mdash; try again in a moment.</Quiet>
       ) : data.error ? (
         <Quiet>{data.error}</Quiet>
       ) : (

@@ -1,4 +1,4 @@
-import { askMemory, askWorkspace, copyMemory, deleteGroup, fixFact, forgetFact, memoryFor, memoryInfo, pinFact, previewCopy, reviewMemory, scopeOf, settleFlag, shareMemory, undoMemory } from "@/lib/server/memory";
+import { askMemory, askWorkspace, copyMemory, deleteGroup, fixFact, forgetFact, memoryFor, memoryInfo, memoryOn, pinFact, previewCopy, reviewMemory, scopeOf, settleFlag, shareMemory, undoMemory } from "@/lib/server/memory";
 import { bringInOwnBank, dropOwnBank } from "@/lib/server/memory-deletes";
 import { getState } from "@/lib/server/store";
 import { ownMemory } from "@/lib/chain";
@@ -15,6 +15,9 @@ export async function GET(request: Request) {
     if (botId) return Response.json(await memoryFor(botId, { q: u.get("q") ?? undefined, mine: u.get("mine") === "1" }));
     return Response.json(await memoryInfo(u.get("ws") ?? currentWorkspaceId()));
   } catch (e) {
+    // Memory is on but its service wouldn't answer: a different thing from off, and the sheet must say so
+    // ("can't reach") instead of falling back to "isn't on" (the error's JSON has no `on` field).
+    if (memoryOn()) return Response.json({ unreachable: true, error: (e as Error).message }, { status: 503 });
     return Response.json({ error: (e as Error).message }, { status: 500 });
   }
 }
