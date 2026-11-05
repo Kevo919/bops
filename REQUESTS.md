@@ -68,3 +68,6 @@ During target100 audit, found docs/keys.md incorrectly calls executor key ordina
 
 ## 2026-11-05T04:40Z | Codex | Continue while billing UI blocked
 Kevin asks Codex to handle billing if possible, otherwise continue independent work. Browser policy rejected invalid tab; no workaround attempted. Continuing live PC verification and independent PR57 review. New scoped task codex/fix-hosted-apps-windows: investigate9 reported baseline Windows hosted-apps harness failures; scripts/test-hosted-apps.mjs only, preserve assertions, no overlap with zai product fixes. Code agent owns isolated worktree; parent reviews/merges tested work.
+
+## 2026-11-05T04:55Z | Codex | Privacy follow-ups and native Windows SSH
+Kevin explicitly requests continued fixes withagents, tested/reviewedmerges, logs, notifyat100. Fetch confirms57/58merged at e880259/e75a202 before ouradditionalP1pathsclosed. Codex nowowns isolatedfollowups: codex/fix-outside-teammate-memory (chat.ts + focusedtests), codex/fix-private-repo-status (repos.ts/test-repos), and PR60 WindowsSSH product+honestharnessport (computer-ssh.ts/test-hosted-apps). Agents told sharedlock/leadpriority/nooverwrite. These scopes are announced to prevent overlap. Existingzai firewall agent remainsowner; nofirewall edits fromCodex. Accountbillingremainsseparate.
