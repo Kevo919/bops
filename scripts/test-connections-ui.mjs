@@ -51,11 +51,13 @@ const rows = [
   { key: "OPENROUTER_API_KEY", label: "OpenRouter", status: "set" },
   { key: "COMPOSIO_API_KEY", label: "Composio (connected apps)", status: "set" },
   { key: "ZAPIER_MCP_URL", label: "Zapier", status: "not set" },
+  { key: "COMPOSIO_MCP_URL", label: "Composio (your account)", status: "set", shown: "connect.composio.dev/mcp, key ck_•••••••• saved" },
 ];
 const sent = [];
 const answers = {
   OPENROUTER_API_KEY: { key: "OPENROUTER_API_KEY", label: "OpenRouter", status: "works", message: "The authenticated check succeeded." },
   COMPOSIO_API_KEY: { key: "COMPOSIO_API_KEY", label: "Composio (connected apps)", status: "invalid", message: "The provider rejected this key's authentication." },
+  COMPOSIO_MCP_URL: { key: "COMPOSIO_MCP_URL", label: "Composio (your account)", status: "works", message: "Composio answered with 2 tools: apps: Gmail, Google Drive.", shown: "connect.composio.dev/mcp, key ck_•••••••• saved" },
 };
 const json = (j, status = 200) => ({ ok: status < 400, status, json: async () => j });
 globalThis.fetch = async (url, opts = {}) => {
@@ -103,20 +105,20 @@ await act(async () => {
 for (let i = 0; i < 20 && /Reading…/.test(box.textContent); i++) await act(async () => settle());
 
 try {
-  await test("three rows in plain words: Composio, Zapier, OpenRouter, each with where to get a key and what to paste where", async () => {
+  await test("four rows in plain words: Composio, Composio (your account), Zapier, OpenRouter, each with where to get a key and what to paste where", async () => {
     const text = box.textContent;
     assert.match(text, /Connections/);
-    assert.deepEqual([...box.querySelectorAll("[data-connection]")].map((r) => r.getAttribute("data-connection")), ["COMPOSIO_API_KEY", "ZAPIER_MCP_URL", "OPENROUTER_API_KEY"]);
-    assert.match(text, /2 of 3 set up/);
+    assert.deepEqual([...box.querySelectorAll("[data-connection]")].map((r) => r.getAttribute("data-connection")), ["COMPOSIO_API_KEY", "COMPOSIO_MCP_URL", "ZAPIER_MCP_URL", "OPENROUTER_API_KEY"]);
+    assert.match(text, /3 of 4 set up/);
     const links = Object.fromEntries(CONNECTIONS.map((c) => [c.key, [...row(c.key).querySelectorAll("a")].map((a) => a.getAttribute("href"))]));
-    assert.deepEqual(links, { COMPOSIO_API_KEY: ["https://composio.dev"], ZAPIER_MCP_URL: ["https://mcp.zapier.com"], OPENROUTER_API_KEY: ["https://openrouter.ai/keys"] });
-    for (const [key, words] of [["COMPOSIO_API_KEY", "COMPOSIO_API_KEY=your_key"], ["ZAPIER_MCP_URL", "ZAPIER_MCP_URL=that_url"], ["OPENROUTER_API_KEY", "OPENROUTER_API_KEY=your_key"]]) {
+    assert.deepEqual(links, { COMPOSIO_API_KEY: ["https://composio.dev"], COMPOSIO_MCP_URL: ["https://composio.dev"], ZAPIER_MCP_URL: ["https://mcp.zapier.com"], OPENROUTER_API_KEY: ["https://openrouter.ai/keys"] });
+    for (const [key, words] of [["COMPOSIO_API_KEY", "COMPOSIO_API_KEY=your_key"], ["ZAPIER_MCP_URL", "ZAPIER_MCP_URL=that_url"], ["OPENROUTER_API_KEY", "OPENROUTER_API_KEY=your_key"], ["COMPOSIO_MCP_URL", "COMPOSIO_MCP_URL= followed by the address"]]) {
       assert.ok(row(key).textContent.includes(words), `${key}: what to paste`);
       assert.ok(row(key).textContent.includes(".env.local"), `${key}: where`);
     }
     assert.match(row("ZAPIER_MCP_URL").textContent, /not for team members, Telegram, Discord/);
     assert.match(row("OPENROUTER_API_KEY").textContent, /:free/);
-    assert.ok(!box.querySelector("[data-connection=OPENAI_API_KEY]"), "only these three");
+    assert.ok(!box.querySelector("[data-connection=OPENAI_API_KEY]"), "only these four");
     assert.ok(box.querySelector("a[href$='docs/connections.md']"));
     assert.ok(!/—|–/.test(text), "no dashes");
   });
@@ -138,6 +140,20 @@ try {
     assert.equal(row("COMPOSIO_API_KEY").querySelector("[data-dot]").getAttribute("data-dot"), "error");
     assert.match(row("COMPOSIO_API_KEY").querySelector("[data-status]").textContent, /Not working: the key or address was turned down/);
     assert.match(row("COMPOSIO_API_KEY").querySelector("[data-message]").textContent, /rejected this key/);
+  });
+
+  await test("Composio (your account): plain steps, shown only masked, and Check lists what it found", async () => {
+    const r = row("COMPOSIO_MCP_URL");
+    assert.match(r.textContent, /In Composio, open For You, then Connect my agent, copy the address, paste it here/);
+    assert.match(r.textContent, /COMPOSIO_MCP_KEY= followed by the key/);
+    assert.match(r.textContent, /sends, changes, deletes or pays asks you first/);
+    assert.match(r.textContent, /not for team members, Telegram, Discord/);
+    assert.equal(r.querySelector("[data-shown]").textContent, "Saved: connect.composio.dev/mcp, key ck_•••••••• saved");
+    assert.ok(!/—|–| - /.test(r.textContent), "no dashes");
+    await click(checkButton("COMPOSIO_MCP_URL"));
+    assert.equal(sent.at(-1), "COMPOSIO_MCP_URL");
+    assert.equal(r.querySelector("[data-dot]").getAttribute("data-dot"), "ok");
+    assert.match(r.querySelector("[data-message]").textContent, /Gmail, Google Drive/);
   });
 
   await test("Connected apps: how many there are, and a click opens Logins", async () => {

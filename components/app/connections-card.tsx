@@ -6,7 +6,8 @@ import type { KeyCheckResult } from "@/lib/server/key-check";
 
 /*
  * Settings → This Mac → Connections: the outside accounts Bops can use, one row each, in plain words. Composio (your
- * connected apps: Gmail, Slack, Notion, Google Sheets…), Zapier (the actions on your Zapier MCP server) and
+ * connected apps: Gmail, Slack, Notion, Google Sheets…), Composio (your account: the apps connected in Composio's
+ * For You, over its MCP address; shown only masked), Zapier (the actions on your Zapier MCP server) and
  * OpenRouter (hundreds of AI models, some free). Each row says whether its key is set, and after Check whether it
  * works; where to get the key, and what to paste where. Keys are added by hand in .env.local, as on the Keys card:
  * nothing here reads, shows or saves one. The status comes from /api/key-check (the same as Keys): only whether a
@@ -29,6 +30,14 @@ export const CONNECTIONS: Row[] = [
     what: "Lets your bots use Gmail, Slack, Notion, Google Sheets and about 1,000 more apps. You sign in to each app on its own page; Composio keeps the login, Bops never sees your password.",
     getKey: { label: "Get a key at composio.dev", href: "https://composio.dev" },
     paste: "Sign in at composio.dev, open Settings, Project Settings, and copy the project key under API Keys (it starts with ak_). Put it in .env.local as COMPOSIO_API_KEY=your_key, then restart Bops.",
+  },
+  {
+    key: "COMPOSIO_MCP_URL",
+    name: "Composio (your account)",
+    what: "Lets your bots use the apps you already connected yourself in Composio's For You area (like Gmail and Google Drive), in your own chats in Bops. Reading runs right away; anything that sends, changes, deletes or pays asks you first.",
+    getKey: { label: "Open Composio", href: "https://composio.dev" },
+    paste: "In Composio, open For You, then Connect my agent, copy the address, paste it here: in .env.local, add a line COMPOSIO_MCP_URL= followed by the address. If that page shows a key too (it starts with ck_), add a line COMPOSIO_MCP_KEY= followed by the key. Then restart Bops and press Check.",
+    more: "Only in your own chats in the Bops app: not for team members, Telegram, Discord, Slack, texts, emails, routines, or the bots' cloud computers.",
   },
   {
     key: "ZAPIER_MCP_URL",
@@ -145,6 +154,7 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
               </div>
               <div data-status className="text-[12px] text-[#3A3A38]">{s.words}</div>
               {checked && r.message && <div data-message className="text-[12px] text-pencil">{r.message}</div>}
+              {r?.shown && <div data-shown className="text-[12px] text-pencil">Saved: {r.shown}</div>}
               <p className="text-[12px] text-pencil">{c.what}</p>
               <p className="text-[12px] text-pencil">{c.paste}</p>
               {c.more && <p className="text-[12px] text-pencil">{c.more}</p>}
