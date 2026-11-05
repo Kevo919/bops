@@ -5,7 +5,8 @@
 //   with aria-disabled, a label a screen reader reads and the tooltip tied to it; <InProgressRow> the same, compact;
 // - at 100, or with no entry, the child renders exactly as it would alone;
 // - no dash in any text shown or read, and the red keeps 4.5:1 on its pill in light and in dark;
-// - the placeholders are where they go (Settings' nav, Look, Logins, This PC).
+// - being tested: the child usable as it is (not disabled, grayed or inert), a red "Being tested" label, the percent;
+// - the placeholders are where they go (Settings' nav, Look, Logins), and #80's real card is marked being tested.
 // Rendered to static markup with React's own server renderer; .tsx files transpile with the TypeScript in node_modules.
 // Usage: node scripts/test-in-progress.mjs
 import assert from "node:assert/strict";
@@ -57,9 +58,11 @@ const good = { id: "sample-feature", name: "A sample", percent: 25, left: "Wire 
 
 check("the list parses, with the features being built now and their percents", () => {
   const byId = Object.fromEntries(F.FEATURES_IN_PROGRESS.map((f) => [f.id, f.percent]));
-  assert.deepEqual(byId, { "widgets-by-chat": 10, "animations-setting": 10, "composio-for-you": 15, "pc-tasks-claude-plan": 60, "phone-pairing": 75 });
+  assert.deepEqual(byId, { "widgets-by-chat": 10, "animations-setting": 10, "composio-for-you": 15, "pc-tasks-claude-plan": 85, "phone-pairing": 75 });
   for (const f of F.FEATURES_IN_PROGRESS) assert.ok(f.name && f.left, f.id);
-  assert.deepEqual(F.checkFeatures([good]), [good]);
+  assert.deepEqual(F.checkFeatures([good]), [{ ...good, state: "building" }]);
+  assert.equal(F.FEATURES_IN_PROGRESS.find((f) => f.id === "pc-tasks-claude-plan").state, "testing");
+  assert.equal(F.checkFeatures([{ ...good, state: "testing" }])[0].state, "testing");
 });
 
 check("bad entries are refused, each with its reason", () => {
@@ -79,6 +82,7 @@ check("bad entries are refused, each with its reason", () => {
     [{ ...good, id: "Bad Id" }, /its id must be/],
     [{ ...good, id: undefined }, /its id must be/],
     [null, /isn't an entry/],
+    [{ ...good, state: "done" }, /state must be "building" or "testing"/],
   ];
   for (const [entry, why] of bad) assert.throws(() => F.checkFeatures([entry]), (e) => e instanceof F.FeatureStatusError && why.test(e.message), JSON.stringify(entry));
   assert.throws(() => F.checkFeatures([good, good]), /there twice/);
@@ -108,8 +112,32 @@ check("<InProgress>: its child grayed and inert, the red label, the percent badg
   assert.match(html, /tabindex="0"/);
 });
 
+check("<InProgress>: being tested, the child is usable as it is: not disabled, not grayed, not inert", () => {
+  const html = renderToStaticMarkup(h(W.InProgress, { id: "pc-tasks-claude-plan" }, child));
+  assert.match(html, /data-in-progress="pc-tasks-claude-plan" data-in-progress-state="testing" role="group"/);
+  assert.doesNotMatch(html, /aria-disabled/);
+  assert.doesNotMatch(html, /inert|opacity-50|grayscale|pointer-events-none select-none/);
+  assert.ok(html.includes(renderToStaticMarkup(child)), "the child isn't there as it is");
+  assert.match(html, /aria-label="Bot tasks on this PC: being tested, 85% built."/);
+  assert.match(html, /<button type="button" aria-describedby="[^"]+" aria-expanded="false"[^>]*><span data-in-progress-label[^>]*>.*Being tested<\/span><\/span><\/button><span data-in-progress-percent[^>]*>85%<\/span>/);
+  const describedBy = html.match(/aria-describedby="([^"]+)"/)[1];
+  assert.ok(html.includes(`id="${describedBy}" role="tooltip"`));
+  assert.ok(html.includes("85% built. What&#x27;s left: A real task on your PC."));
+  // Its tooltip shows from the label only (above it), never over the whole card on hover.
+  assert.match(html, /bottom-\[calc\(100%\+4px\)\]/);
+  assert.match(html, /group-hover\/wiptip:block group-focus-within\/wiptip:block/);
+  assert.doesNotMatch(html, /tabindex/);
+  const row = renderToStaticMarkup(h(W.InProgressRow, { id: "pc-tasks-claude-plan", name: "Bot tasks" }, child));
+  assert.doesNotMatch(row, /aria-disabled|opacity-55/);
+  assert.match(row, /aria-label="Bot tasks on this PC: being tested, 85% built."/);
+  assert.ok(row.includes(renderToStaticMarkup(child)));
+  assert.match(row, />Being tested<\/span>/);
+});
+
 check("<InProgress>: past half it reads In progress; a label asked for wins", () => {
-  assert.match(renderToStaticMarkup(h(W.InProgress, { id: "pc-tasks-claude-plan" }, child)), />In progress<\/span>[\s\S]*>60%</);
+  const half = F.FEATURES_IN_PROGRESS.find((f) => f.id === "phone-pairing");
+  assert.match(renderToStaticMarkup(h(W.InProgress, { id: "phone-pairing" }, child)), />In progress<\/span>[\s\S]*>75%</);
+  assert.equal(half.state, "building");
   assert.match(renderToStaticMarkup(h(W.InProgress, { id: "widgets-by-chat", label: "In progress" }, child)), />In progress</);
 });
 
@@ -167,11 +195,12 @@ check("the red keeps at least 4.5:1 on its pill, in light and in dark, and the t
 check("the placeholders are wired where they go, each tiny and self-contained", () => {
   const at = (file) => readFileSync(new URL(file, rootUrl), "utf8");
   assert.match(at("components/app/bops-app.tsx"), /<InProgressRow id="widgets-by-chat" name="Widgets"/);
-  assert.match(at("components/app/bops-app.tsx"), /<WipCard id="pc-tasks-claude-plan" title=\{computerWords\("Bot tasks on this Mac"\)\}/);
+  assert.doesNotMatch(at("components/app/bops-app.tsx"), /WipCard|pc-tasks-claude-plan/, "the Bot tasks placeholder is still there");
+  assert.match(at("components/app/setup.tsx"), /<InProgress id="pc-tasks-claude-plan">\s*<PcTaskRunnerCard \/>\s*<\/InProgress>/);
   assert.match(at("components/app/look-settings.tsx"), /<InProgress id="animations-setting"/);
   assert.match(at("components/app/logins.tsx"), /<InProgress id="composio-for-you">/);
   // Every id the window names is in the list (a typo would show the placeholder as finished).
-  for (const file of ["components/app/bops-app.tsx", "components/app/look-settings.tsx", "components/app/logins.tsx"])
+  for (const file of ["components/app/bops-app.tsx", "components/app/look-settings.tsx", "components/app/logins.tsx", "components/app/setup.tsx"])
     for (const [, id] of at(file).matchAll(/<(?:InProgress|InProgressRow|WipCard) id="([^"]+)"/g)) assert.ok(F.featureInProgress(id), `${file}: ${id} isn't in the list`);
 });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useComputerWords } from "./computer-words";
+import { InProgress } from "./in-progress";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BRAINS_ON, signInOn, workBot, workspaceOf, type AppState, type Bot, type BotAi } from "@/lib/types";
@@ -60,7 +61,10 @@ export function AiSubscriptionsCard({ state, onShowScreen, onOpenVault }: { stat
       {localSelected ? <>
         <p className="text-[12px] leading-5 text-[#6B6B6B]">Sign in through the official CLI in your normal browser. Its login stays on this PC across restarts. No bot computer or AI profile is needed to connect. Once Claude is signed in here, bot tasks on this PC can run on your Claude plan: choose that below.</p>
         <LocalSubscriptions />
-        <PcTaskRunnerCard />
+        {/* Being tested (lib/feature-status.ts): usable, marked with its percent until its live test passes. */}
+        <InProgress id="pc-tasks-claude-plan">
+          <PcTaskRunnerCard />
+        </InProgress>
         <div className="rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]"><h3 className="font-semibold">z.ai GLM Coding Plan</h3><p className="my-2">Connect with a key from your Coding Plan account in Keys. This is not a browser sign-in; a saved Z.ai key alone does not verify a subscription.</p><button type="button" onClick={onOpenVault} className={light}>Manage Coding Plan key</button></div>
       </> : <>
         <p className="text-[12px] leading-5 text-[#6B6B6B]">Cloud subscriptions power tasks on the selected bot&apos;s computer. Sign-in opens on that computer&apos;s screen. This does not connect the subscription on your PC.</p>

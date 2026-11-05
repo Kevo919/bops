@@ -55,7 +55,7 @@ import { PickComputer, useSizePick } from "./computer-size";
 import { AiSubscriptionsCard, ThisMacSettings } from "./setup";
 import { TooltipLayer } from "./tooltip";
 import { LoginsPage } from "./logins";
-import { InProgress, InProgressRow } from "./in-progress";
+import { InProgressRow } from "./in-progress";
 import { MacPreviews } from "./mac-tab";
 import { OPEN_MAC_KEY } from "./mac-pip";
 import { MacComputer } from "./mac-computer";
@@ -2018,18 +2018,6 @@ const GLYPHS: Record<SettingsPane, string> = {
 /** Widgets (being built: lib/feature-status.ts), for its placeholder in Settings' nav. */
 const WIDGETS_GLYPH = "M2.5 2.5h5v5h-5zM9.5 2.5h4v3h-4zM9.5 7.5h4v6h-4zM2.5 9.5h5v4h-5z";
 
-/** A placeholder for a feature being built (components/app/in-progress.tsx): its row, grayed, with its percent. */
-function WipCard({ id, title, hint }: { id: string; title: string; hint: string }) {
-  return (
-    <InProgress id={id} className="mx-[22px] mt-4">
-      <div className="rounded-[14px] bg-white px-3.5 py-3 shadow-[0_0_0_1px_#E6E6E3]">
-        <div className="pr-12 text-[13px] font-semibold leading-4">{title}</div>
-        <div className="text-[12px] leading-4 text-[#6B6B6B]">{hint}</div>
-      </div>
-    </InProgress>
-  );
-}
-
 /** A pane's title and what it's for, above what it holds. */
 function PaneHead({ title, sub }: { title: string; sub?: string }) {
   return (
@@ -2395,8 +2383,6 @@ export function Settings({
       <>
         <PaneHead title={computerWords("This Mac")} sub="Permissions here, where your bots work, and their computers." />
         <ThisMacSettings state={state} />
-        {/* Being built (lib/feature-status.ts, PR #80): a placeholder until its own row lands. */}
-        <WipCard id="pc-tasks-claude-plan" title={computerWords("Bot tasks on this Mac")} hint="Your bots run tasks right on this computer, on your Claude plan." />
         <WhereBotsWork state={state} />
         {/* Bots in browsers on this Mac have no computer to run routines on; a self-hosted Bops has no Bops Cloud for a runner to share the state through. */}
         {!selfHosted && state.host !== "mac" && <RunsOnSettings state={state} />}

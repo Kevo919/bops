@@ -6,7 +6,8 @@ import { featureInProgress, type FeatureInProgress } from "@/lib/feature-status"
 /**
  * A feature still being built (lib/feature-status.ts), shown where it will live but plainly unfinished: grayed out
  * and not clickable, a red "Not set up yet" or "In progress" label, its percent in the corner, and what's left on
- * hover, tap or focus. Once its entry reaches 100 or leaves the list, the child shows as it is, nothing around it.
+ * hover, tap or focus. A feature in its "testing" state (built and reviewed, not yet live tested) shows its child as
+ * it is, usable, with a small red "Being tested" label and its percent beside it. Once its entry reaches 100 or leaves the list, the child shows as it is, nothing around it.
  *
  *   <InProgress id="animations-setting"><Row … /></InProgress>     a widget, a card, a Settings row, a page
  *   <InProgressRow id="widgets-by-chat" name="Widgets" icon={…} />  a nav item or a tab, compact
@@ -29,11 +30,11 @@ const COLORS = {
   "--wip-tip-fg": "light-dark(#FFFFFF, #141414)",
 } as CSSProperties;
 
-export type InProgressLabel = "Not set up yet" | "In progress";
+export type InProgressLabel = "Not set up yet" | "In progress" | "Being tested";
 
 /** What's shown and read for a feature: its label, its percent, the hover line and what a screen reader says. */
 export function inProgressWords(f: FeatureInProgress, label?: InProgressLabel) {
-  const said = label ?? (f.percent < 50 ? "Not set up yet" : "In progress");
+  const said = f.state === "testing" ? "Being tested" : (label ?? (f.percent < 50 ? "Not set up yet" : "In progress"));
   return {
     label: said,
     percent: `${f.percent}%`,
@@ -60,13 +61,13 @@ function useTip() {
   };
 }
 
-function Tip({ id, text, open, inside = false }: { id: string; text: string; open: boolean; inside?: boolean }) {
+function Tip({ id, text, open, inside = false, testing = false }: { id: string; text: string; open: boolean; inside?: boolean; testing?: boolean }) {
   return (
     <span
       id={id}
       role="tooltip"
       style={COLORS}
-      className={`${open ? "block" : "hidden"} pointer-events-none absolute top-[calc(100%+4px)] z-40 ${inside ? "inset-x-1" : "left-2 w-max max-w-[min(300px,calc(100vw-48px))]"} rounded-lg bg-[var(--wip-tip-bg)] px-2.5 py-1.5 text-left text-[12px] font-normal normal-case leading-4 tracking-normal text-[var(--wip-tip-fg)] shadow-[0_8px_24px_-10px_#00000066] group-hover/wip:block group-focus-visible/wip:block`}
+      className={`${open ? "block" : "hidden"} pointer-events-none absolute ${testing ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"} z-40 ${inside ? "inset-x-1" : "left-2 w-max max-w-[min(300px,calc(100vw-48px))]"} rounded-lg bg-[var(--wip-tip-bg)] px-2.5 py-1.5 text-left text-[12px] font-normal normal-case leading-4 tracking-normal text-[var(--wip-tip-fg)] shadow-[0_8px_24px_-10px_#00000066] ${testing ? "group-hover/wiptip:block group-focus-within/wiptip:block" : "group-hover/wip:block group-focus-visible/wip:block"}`}
     >
       {text}
     </span>
@@ -110,6 +111,21 @@ export function InProgress({ id, children, label, className = "" }: { id: string
   const tip = useTip();
   if (!f) return <>{children}</>;
   const w = inProgressWords(f, label);
+  if (f.state === "testing")
+    // Usable as it is: not grayed, not disabled. The label is a small button of its own, so a tap on it (never on
+    // the child) says what's left; hovering the feature or focusing into it shows it too.
+    return (
+      <div data-in-progress={f.id} data-in-progress-state="testing" role="group" aria-label={w.aria} aria-describedby={tipId} style={COLORS} className={`relative ${className}`}>
+        {children}
+        <div className="group/wiptip relative flex items-center gap-1.5 px-1 pb-1 pt-1">
+          <button type="button" aria-describedby={tipId} aria-expanded={tip.open} {...tip.props} className="cursor-help rounded-full outline-none focus-visible:shadow-[0_0_0_2px_var(--wip-red)]">
+            <Label text={w.label} />
+          </button>
+          <Percent text={w.percent} />
+          <Tip id={tipId} text={w.tip} open={tip.open} testing />
+        </div>
+      </div>
+    );
   return (
     <div
       data-in-progress={f.id}
@@ -159,6 +175,17 @@ export function InProgressRow({
   const tip = useTip();
   if (!f) return <>{children ?? null}</>;
   const w = inProgressWords(f, label ?? "In progress");
+  // Being tested: the real item, usable, with the red label and percent after it (what's left in its title).
+  if (f.state === "testing")
+    return (
+      <span data-in-progress={f.id} data-in-progress-state="testing" title={w.tip} aria-label={w.aria} className="flex items-center gap-1" style={COLORS}>
+        <span className="min-w-0 flex-1">{children ?? name ?? f.name}</span>
+        <span aria-hidden className="flex shrink-0 items-center gap-1 pr-2.5">
+          <Label text={w.label} compact />
+          <Percent text={w.percent} compact />
+        </span>
+      </span>
+    );
   return (
     <span className="group/wip relative block" style={COLORS}>
       <button
