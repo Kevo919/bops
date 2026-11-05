@@ -5,7 +5,7 @@ Every feature, how it was tested, when, by whom, and the result. **Kevin: read t
 Legend: ✅ passed · ⚠️ passed with a known limit · ❌ failed · ⏳ not yet tested this way.
 Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an independent agent read the code for bugs and security), **Live PC** (on Kevin's PC, real app), **Live server** (on the Hostinger server), **Live phone**, **Real account** (with Kevin's real provider account).
 
-**Tested: 66%** (101.5 of 153 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
+**Tested: 67%** (102.5 of 153 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
 
 **Visual features (Kevin, Nov 5):** a screen or visual change is only ✅ when (1) its tests pass, (2) a screenshot check passes (dark mode, no blank screens), (3) an independent review passes, and (4) it's tried in the real app on the PC.
 
@@ -49,7 +49,7 @@ Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an indepen
 | Which OpenAI key powers chat, said plainly (#72, from the crawl) | ✅ Nov 5 zai: openai-key-wording 2 | ✅ Nov 5 reviewer (one wording nit) | ⏳ | ✅ Nov 5 lead: openai-key-wording 2 on the server (b754835) | n/a | wording only; one key store is a later decision |
 | Bad cron can't be saved; phone Logins refusal says why (#73, #74, from the crawl) | ✅ Nov 5 zai + lead: crawl-low-1 2 | ✅ Nov 5 reviewer (#74; #73 typing bug found and fixed) | ⏳ | ✅ Nov 5 lead: crawl-low-1 2 on the server (c313758) | n/a |  |
 | Crawl LOW part 2: own schedule chip picked, skills 503, name limits, avatar label (#75) | ✅ Nov 5 zai + lead: crawl-low-2 4 | ✅ Nov 5 lead (post-merge; nit: the 503 is chosen by matching the error text) | ⏳ | ⏳ | n/a |  |
-| GitHub automatic checks (CI) | ❌ paused by GitHub since Nov 3 |  |  |  |  | Kevin to re-enable on the Actions page |
+| GitHub automatic checks (CI) | ✅ Nov 5: back on; #79 all green (web, check incl. secret scan, cloud-tests, android, mobile-layout) |  |  |  |  | Kevin to re-enable on the Actions page |
 
 ## Rules for every agent (how to test and how to log it)
 

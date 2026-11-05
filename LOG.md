@@ -6,6 +6,11 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 8:40 AM (Chicago)
+- **GitHub checks are all green again** (#79 merged): the schedule-picker test is fixed, the merge marks are gone from the secret-scan list, and two made-up test keys are marked as known fakes.
+- **Composio:** your apps are in Composio's "For You" area, which Bops' developer key can't see. A "Composio (your account)" option is being built (task 50).
+- **#77** phone pairing: a reviewer is checking it, with screenshots.
+
 ### Nov 5, 8:45 AM (Chicago)
 - **[COMPETITORS.md](COMPETITORS.md) is up:** Bops compared with Meta Muse, ChatGPT Dots, Grok Bot, Claude, Gemini, Copilot, Manus, Perplexity Comet and Lindy, plus 12 ranked gaps. The gaps are on TASKS as 52 to 57; the top ones (PC tasks, phone app, widgets and dark mode) are already being built.
 - **#80** (PC tasks on your Claude plan): the security review asked for changes (2 serious). The builder is fixing them, and a second review follows before merge.
