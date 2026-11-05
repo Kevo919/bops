@@ -43,14 +43,9 @@ const hooks = registerHooks({
   load(url, context, next) {
     if (url.endsWith("/lib/server/store.ts"))
       return { format: "module", shortCircuit: true, source: "export const touchState = () => globalThis.__modelsTouchState();" };
-    // As Next gives it: require, for config/llms.cjs.
-    if (url.endsWith("/lib/server/llms.ts"))
-      return { format: "module-typescript", shortCircuit: true, source: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);\n' + readFileSync(fileURLToPath(url), "utf8") };
     // The owner check without the app's mail and store (as test-key-check.mjs).
     if (url.endsWith("/lib/server/owner-email.ts"))
       return { format: "module", shortCircuit: true, source: "export const fromThisMac = request => ['localhost','127.0.0.1','[::1]'].includes(new URL(request.url).hostname);" };
-    if (url.endsWith("/app/api/models/route.ts"))
-      return { format: "module-typescript", shortCircuit: true, source: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);\n' + readFileSync(fileURLToPath(url), "utf8") };
     return next(url, context);
   },
 });
