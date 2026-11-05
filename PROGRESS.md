@@ -59,6 +59,8 @@ The overnight ETAs for 80% slipped because the PC was locked, so Codex couldn't 
 - Repos section (#38), Connections (#40), OpenRouter presets, custom models, Auto Router and a model per routine (#44), several accounts per provider (#45), editable bot files (#39), your own tool servers per bot (#32), Word/PowerPoint/Excel from chat (#41), Goals and ideas (#51), custom schedules (#52)
 
 ## Next
+- Dark mode that turns the whole app dark, every screen (Kevin found the sidebar and Settings list stay light) (building now)
+- Settings needs a real "Your phone" item; the pairing card is buried in This PC, and the phone app needs a Scan button (#77, in progress)
 - Phone pairing with no friction: one screen with QR codes (get the app, Tailscale, pair) and a Scan button in the phone app (building now)
 - PC bot tasks on your Claude Code Max plan, plus a Settings box for an OpenAI key for anyone who prefers it (building now)
 - Composio: use the accounts you already connected in Composio (waiting on which Composio project they're in)

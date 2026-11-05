@@ -6,6 +6,13 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 8:20 AM (Chicago)
+- **GitHub checks are running again** (thanks, Kevin). They show two problems on the main branch: a schedule-picker test broken by #75, and leftover merge markers in the secret-scan ignore list. Fix: #79.
+- **From Kevin's screenshots:**
+  - Settings has no "Your phone" item, and the phone app has no Scan button. Being fixed in #77.
+  - Dark mode leaves the sidebar and the Settings list light. A builder is on it, with an automatic check that every screen is really dark.
+- **#76** (Codex: Memory screen shows a clear message when memory isn't set up): reviewed. It merges once checks pass.
+
 ### Nov 5, 8:05 AM (Chicago)
 - **New, from Kevin:** QR code pairing with no friction (desktop guide + a Scan button in the phone app), PC bot tasks on his Claude Code Max plan, and a Settings box for an OpenAI key. Builders started on both.
 - **Composio:** Bops' key belongs to a Composio project with no connected accounts, so Bops can't see the ones Kevin connected elsewhere. Asked Kevin which project.
