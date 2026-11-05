@@ -731,6 +731,9 @@ export class BrainStopped extends Error {
   }
 }
 
+/** Threads running now on the owner's Claude plan on this PC (pc-task-runner.ts, sessions.ts pcClaudeTurns): theirs ask through approveTool. */
+export const pcClaudeThreads = new Set<string>();
+
 /** Approvals a thread's CLI is waiting on, by thread: its turn isn't stuck while the user decides. */
 const asking = new Map<string, number>();
 
@@ -978,11 +981,14 @@ export async function approveTool(botId: string, sessionId: string, args: Record
   const tool = cut(str(args.tool) ?? "a tool", 80);
   const input = args.input && typeof args.input === "object" && !Array.isArray(args.input) ? (args.input as Record<string, unknown>) : {};
   const owner = ownerName();
-  if (!BRAINS_ON || !session(sessionId)?.brainRun) return JSON.stringify({ behavior: "deny", message: "Only a thread a brain runs asks this way." });
+  // A task on this PC on the owner's Claude plan (pc-task-runner.ts) asks this way too, in any build.
+  const onPc = pcClaudeThreads.has(sessionId);
+  if (!onPc && (!BRAINS_ON || !session(sessionId)?.brainRun)) return JSON.stringify({ behavior: "deny", message: "Only a thread a brain runs asks this way." });
   // Claude Code asks about one of its own tools by its name (NotebookEdit), never Bops' screen and browser
   // ones (it uses those by itself) or words of its own: anything else isn't its question (the approve tool is
   // one the model can call too), so the user is never shown a card for something made up.
-  if (!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(tool) || /^mcp__(screen|browser)__/.test(tool))
+  // On this PC the browser tools that act (a click, typing, a form) are its to ask about; never the approve tool itself.
+  if (!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(tool) || /^mcp__(screen|bops)__/.test(tool) || (!onPc && /^mcp__browser__/.test(tool)))
     return JSON.stringify({ behavior: "deny", message: "That isn't a tool Claude Code asks about. Don't call approve yourself." });
   asking.set(sessionId, (asking.get(sessionId) ?? 0) + 1);
   try {

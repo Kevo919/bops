@@ -58,8 +58,9 @@ export function AiSubscriptionsCard({ state, onShowScreen, onOpenVault }: { stat
         <button type="button" aria-pressed={!localSelected} onClick={() => setTarget("cloud")} className={!localSelected ? dark : light}>Bot cloud computer</button>
       </div>
       {localSelected ? <>
-        <p className="text-[12px] leading-5 text-[#6B6B6B]">Sign in through the official CLI in your normal browser. Its login stays on this PC across restarts. No bot computer or AI profile is needed to connect. Tasks with your plan run on a bot&apos;s cloud computer; tasks on this PC are coming later.</p>
+        <p className="text-[12px] leading-5 text-[#6B6B6B]">Sign in through the official CLI in your normal browser. Its login stays on this PC across restarts. No bot computer or AI profile is needed to connect. Once Claude is signed in here, bot tasks on this PC can run on your Claude plan: choose that below.</p>
         <LocalSubscriptions />
+        <PcTaskRunnerCard />
         <div className="rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]"><h3 className="font-semibold">z.ai GLM Coding Plan</h3><p className="my-2">Connect with a key from your Coding Plan account in Keys. This is not a browser sign-in; a saved Z.ai key alone does not verify a subscription.</p><button type="button" onClick={onOpenVault} className={light}>Manage Coding Plan key</button></div>
       </> : <>
         <p className="text-[12px] leading-5 text-[#6B6B6B]">Cloud subscriptions power tasks on the selected bot&apos;s computer. Sign-in opens on that computer&apos;s screen. This does not connect the subscription on your PC.</p>
@@ -75,6 +76,63 @@ export function AiSubscriptionsCard({ state, onShowScreen, onOpenVault }: { stat
         </>}
       </>}
     </section>
+  );
+}
+
+type PcRunnerView = { choice: "claude" | "openai" | null; runner: "claude" | "openai" | null; problem?: string; openaiKey: { set: boolean; masked: string } };
+
+/**
+ * Bot tasks on this PC: who runs them, your Claude plan (signed in above) or an OpenAI key, and that key. The key
+ * goes to this PC's .env.local through the server; it's never shown again, only that it's saved and how it ends.
+ */
+export function PcTaskRunnerCard() {
+  const [view, setView] = useState<PcRunnerView | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [key, setKey] = useState("");
+  const send = useCallback(async (body?: Record<string, unknown>) => {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/pc-task-runner", body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store" } : { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Couldn't reach Bops.");
+      setView(j as PcRunnerView);
+      setError(null);
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't reach Bops.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled) void send(); });
+    return () => { cancelled = true; };
+  }, [send]);
+  const picked = view?.choice ?? view?.runner ?? null;
+  return (
+    <div role="group" aria-label="Bot tasks on this PC" className="rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_#E6E6E3]">
+      <h3 className="font-semibold">Bot tasks on this PC</h3>
+      <p className="my-2 text-[#6B6B6B]">Who does the work when a bot runs a task here. Your Claude plan uses the Claude Code sign in above and the bot&apos;s own Chrome; it asks you before running commands, clicking or typing in the browser, or touching files outside the task&apos;s folder. It can&apos;t control your other apps yet. An OpenAI key needs credit on your OpenAI account.</p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={busy || !view} aria-pressed={picked === "claude"} onClick={() => void send({ choice: "claude" })} className={picked === "claude" ? dark : light}>Your Claude plan (signed in)</button>
+        <button type="button" disabled={busy || !view} aria-pressed={picked === "openai"} onClick={() => void send({ choice: "openai" })} className={picked === "openai" ? dark : light}>OpenAI key</button>
+      </div>
+      {view && !view.choice && view.runner && <p className="mt-2 text-[#6B6B6B]">Not chosen yet, so tasks use {view.runner === "claude" ? "your Claude plan" : "the OpenAI key"} for now.</p>}
+      {view?.problem && <p role="status" className="mt-2 text-[#B42318]">{view.problem}</p>}
+      <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); const k = key.trim(); if (!k || busy) return; setKey(""); void send({ key: k }); }}>
+        <label className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="font-medium">OpenAI key for bot tasks</span>
+          <input type="password" autoComplete="off" spellCheck={false} value={key} onChange={(e) => setKey(e.target.value)} placeholder={view?.openaiKey.set ? `Saved: ${view.openaiKey.masked}` : "Paste a key that starts with sk-"} aria-label="OpenAI key for bot tasks" className="min-w-0 rounded-lg border border-[#E6E6E3] bg-white p-2" />
+        </label>
+        <button type="submit" disabled={busy || !key.trim()} className={dark}>Save key</button>
+        {view?.openaiKey.set && <button type="button" disabled={busy} onClick={() => void send({ key: "" })} className={light}>Remove key</button>}
+      </form>
+      {view?.openaiKey.set && <p className="mt-1 text-[#6B6B6B]">Saved on this PC as {view.openaiKey.masked}. Bops never shows it again.</p>}
+      {error && <p role="alert" className="mt-2 text-[#B42318]">{error}</p>}
+    </div>
   );
 }
 
