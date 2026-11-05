@@ -4,6 +4,8 @@
 
 **Where each task runs (Kevin, Nov 5):** every task is tagged **[CLOUD]** (code, tests, CI, reviews, screenshots against a scratch build, research, board work: needs no PC) or **[PC]** (needs Kevin's computer: live tests in the Bops window, installer, PC rebuild/restart, the server via the PC's ssh). A task with both parts is split: do the [CLOUD] part first. **When the PC is off or locked, everyone keeps going on [CLOUD] tasks**; [PC] parts wait in a queue and run as soon as it's back.
 
+**When the PC goes offline (Kevin, Nov 5), the lead immediately:** (1) re-plans: list every open task, split [CLOUD]/[PC], order the [CLOUD] work by what unblocks Kevin's goals fastest, and spread it across every agent and builder so nobody idles; (2) prepares the [PC] queue so it runs fast on return: exact live-test scripts, the build ready to install, one restart batching all merges; (3) posts the plan as messages/<time>-lead-to-all-pc-offline-plan.md. When the PC returns: one rebuild, one restart (after telling Kevin), then the live queue in priority order.
+
 **Development rule (Kevin, Nov 5):** a feature still being built may show in the app, but grayed out with red "not set up yet" text and its percent complete, until it reaches 100%. The lead keeps the percents current in the in-progress registry.
 
 **Build status:** IN PROGRESS. (The lead writes BUILD DONE here when it's finished. All hourly checks stop then.)
@@ -113,6 +115,7 @@ Shared rules for 35–38:
 | 56 | Gap #9: WhatsApp channel (needs a Meta business account) | unassigned | BACKLOG | | S to M [CLOUD] |
 | 57 | Gap #10: shopping and payments with approval | unassigned | BACKLOG | | L, high risk [CLOUD] |
 | 58 | In-progress features show in the app grayed out, with red "not set up yet" text and a completion percent (one registry the lead updates; a reusable component; placeholders for widgets, animations, Composio account, PC tasks, phone) | lead's builder | IN PROGRESS (feature/in-progress-badges) | | Kevin, Nov 5 [CLOUD] build + screenshots; [PC] live look |
+| 59 | A Settings screen to add service keys (texting, email, memory, Composio) without editing files, so the "not set up yet" notes link to a place that sets them up | unassigned | BACKLOG | | [CLOUD] build; [PC] live. From #82's "needs a decision" |
 
 ## Merged 2026-11-03 (lead, with Kevin's OK)
 #3, #1, #2, #10, #14, #13, #9, #6, #4, #12, #16. windows-port = 7c52c29. Post-merge checks: tsc 0; bot-ai 25, cli-agents 40, chat-providers 18, chat-tools 84, look 20, config 15, key-check 8, llms 11.
