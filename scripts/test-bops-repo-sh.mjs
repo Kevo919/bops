@@ -9,7 +9,8 @@
 // Usage: node scripts/test-bops-repo-sh.mjs
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,6 +30,10 @@ const check = (name, fn) => {
   }
 };
 
+const sched = (name) => `case "$*" in -r*) exit 0 ;; esac
+[ -f "$STUB_DIR/accept-${name}" ] && exit 0
+[ -f "$STUB_DIR/hang-${name}" ] && exec /bin/sleep 30
+echo "${name}: you are not allowed" >&2; exit 1`;
 const STUBS = {
   id: `case "$1" in
   -u) if [ -z "\${2:-}" ]; then echo 0; else grep -qx "$2" "$STUB_DIR/users" 2>/dev/null && echo 4242 || exit 1; fi ;;
@@ -36,17 +41,33 @@ const STUBS = {
   *) grep -qx "$1" "$STUB_DIR/users" 2>/dev/null || exit 1 ;;
 esac`,
   useradd: `for a; do last=$a; done; echo "$last" >> "$STUB_DIR/users"`,
-  runuser: `case "$*" in *python3*) cat > /dev/null; echo BOPS_PROBE=ok ;; esac; exit 0`,
+  // The python probe answers ok; the scheduling probe really runs (as root here, with the stub schedulers
+  // root found), unless sched-silent is set (no answer at all).
+  runuser: `case "$*" in
+  *python3*) cat > /dev/null; echo BOPS_PROBE=ok ;;
+  *"try crontab"*) [ -f "$STUB_DIR/sched-silent" ] && exit 0; shift 3; exec "$@" ;;
+esac
+exit 0`,
+  // A scheduler: refuses what the probe tries unless accept-<name> (takes it) or hang-<name> (never answers).
+  crontab: sched("crontab"),
+  at: sched("at"),
+  "systemd-run": sched("systemd-run"),
   atq: `printf '7\\tThu Nov  5 10:00:00 2026 a repo-test\\n8\\tThu Nov  5 11:00:00 2026 a bops\\n9\\tFri Nov  6 09:00:00 2026 = repo-test\\n'`,
   pgrep: `[ -f "$STUB_DIR/pgrep" ] && cat "$STUB_DIR/pgrep"; exit 0`,
+  // The user's processes: "pgrep" a live one that won't end, "zombie" a dead one not yet reaped.
+  ps: `case "$*" in
+  *stat=*) [ -f "$STUB_DIR/pgrep" ] && echo S; [ -f "$STUB_DIR/zombie" ] && echo Z ;;
+  *ppid=*) [ -f "$STUB_DIR/zombie" ] && echo 999999 ;;
+esac
+exit 0`,
 };
-const RECORDED = ["iptables", "ip6tables", "ss", "chown", "pkill", "crontab", "atrm", "loginctl", "systemctl", "setsid", "nohup", "sleep", "python3", "git", "tar", "timeout", "curl"];
+const RECORDED = ["iptables", "ip6tables", "ss", "chown", "pkill", "incrontab", "atrm", "loginctl", "systemctl", "setsid", "nohup", "sleep", "python3", "git", "tar", "timeout", "curl"];
 
 function sandbox() {
   const dir = mkdtempSync(join(tmpdir(), "bops-test-repo-sh-"));
   const bin = join(dir, "bin");
   for (const d of ["bin", "etc", "etc/polkit-1/rules.d", "linger", "base", "keep"]) mkdirSync(join(dir, d), { recursive: true });
-  const write = (name, body) => writeFileSync(join(bin, name), `#!/bin/sh\necho "${name} $*" >> "$STUB_DIR/calls"\n${body}\n`, { mode: 0o755 });
+  const write = (name, body) => writeFileSync(join(bin, name), `#!/bin/sh\nSTUB_DIR='${dir}'\necho "${name} $*" >> "$STUB_DIR/calls"\n${body}\n`, { mode: 0o755 });
   for (const [name, body] of Object.entries(STUBS)) write(name, body);
   for (const name of RECORDED) write(name, "exit 0");
   writeFileSync(join(dir, "calls"), "");
@@ -54,6 +75,7 @@ function sandbox() {
     const r = spawnSync("bash", [SCRIPT, ...args], {
       encoding: "utf8",
       env: {
+        BOPS_REPO_PROBE_SECS: "1",
         PATH: `${bin}:/usr/bin:/bin`,
         STUB_DIR: dir,
         BOPS_REPO_ETC: join(dir, "etc"),
@@ -72,8 +94,11 @@ function sandbox() {
     if (home.startsWith("/tmp/bops-repo-")) rmSync(home, { recursive: true, force: true });
     rmSync(dir, { recursive: true, force: true });
   };
-  return { dir, run, calls, clear, etc, done };
+  const flag = (f) => writeFileSync(join(dir, f), "");
+  return { dir, run, calls, clear, etc, done, flag };
 }
+// Every process of the user frozen (a stopped process can't fork), then killed, by the user itself.
+const KILLALL = "runuser -u repo-test -- /bin/bash -c kill -STOP -1; kill -KILL -1";
 const b64 = (s) => Buffer.from(s, "utf8").toString("base64");
 
 check("the script is sound shell", () => {
@@ -120,38 +145,150 @@ check("prepare: an existing allow list loses the repo user and keeps everyone el
   }
 });
 
-check("stop: crontab, its own at jobs, lingering, user timers cleared; every process ended and checked gone", () => {
+check("stop: crontab, its own at jobs, incrontab, lingering, user manager cleared; every process frozen, killed, checked gone", () => {
   const s = sandbox();
   try {
     s.run("prepare", "t1", "repo-test", "-");
-    const home = readFileSync(join(s.dir, "keep", "t1", "home"), "utf8").trim();
-    mkdirSync(join(home, ".config", "systemd", "user"), { recursive: true });
-    writeFileSync(join(home, ".config", "systemd", "user", "evil.timer"), "[Timer]\nOnCalendar=*:*\n");
     writeFileSync(join(s.dir, "linger", "repo-test"), "");
     s.clear();
     const r = s.run("stop", "t1", "repo-test");
     assert.match(r.out, /BOPS_REPO_STOPPED=1/, r.out);
     const c = s.calls();
-    for (const want of ["crontab -r -u repo-test", "atq ", "atrm 7", "atrm 9", "loginctl disable-linger repo-test", "systemctl stop user@4242.service", "pkill -TERM -u repo-test", "pkill -KILL -u repo-test", "pgrep -u repo-test"])
+    for (const want of ["crontab -r -u repo-test", "incrontab -r -u repo-test", "atq ", "atrm 7", "atrm 9", "loginctl disable-linger repo-test", "systemctl stop user@4242.service", "pkill -TERM -u repo-test", KILLALL, "pkill -KILL -u repo-test", "ps -o stat= -u repo-test", "ps -o ppid= -u repo-test"])
       assert.ok(c.some((l) => l === want || l.startsWith(want)), `stop runs ${want}\n${c.join("\n")}`);
     assert.ok(!c.includes("atrm 8"), "another user's at job is left alone");
+    assert.ok(c.indexOf(KILLALL) > c.indexOf("pkill -TERM -u repo-test"), "frozen and killed, as the user, after the TERM");
     assert.ok(c.indexOf("crontab -r -u repo-test") < c.indexOf("pkill -TERM -u repo-test"), "what it scheduled goes before its processes are ended");
-    assert.ok(c.lastIndexOf("crontab -r -u repo-test") > c.lastIndexOf("pgrep -u repo-test"), "and once more after");
-    assert.ok(!existsSync(join(home, ".config", "systemd", "user")), "its user timers are deleted");
+    assert.ok(c.lastIndexOf("crontab -r -u repo-test") > c.lastIndexOf("ps -o stat= -u repo-test"), "and once more after");
     assert.ok(!existsSync(join(s.dir, "linger", "repo-test")), "its linger file is gone");
   } finally {
     s.done();
   }
 });
 
-check("stop: a process that won't end fails the stop (it isn't said to be stopped)", () => {
+check("stop: a process that won't end fails the stop, but only after every cleanup step ran", () => {
   const s = sandbox();
   try {
     s.run("prepare", "t1", "repo-test", "-");
     writeFileSync(join(s.dir, "pgrep"), "31337\n");
+    s.clear();
     const r = s.run("stop", "t1", "repo-test");
     assert.match(r.out, /BOPS_REPO_FAIL=procs-left/);
     assert.doesNotMatch(r.out, /BOPS_REPO_STOPPED/);
+    const c = s.calls();
+    assert.equal(c.filter((l) => l === KILLALL).length, 10, "ten freeze-and-kill rounds");
+    assert.ok(c.lastIndexOf("crontab -r -u repo-test") > c.lastIndexOf("ps -o stat= -u repo-test"), "the second cleanup still ran");
+    assert.ok(c.lastIndexOf("atrm 9") > c.lastIndexOf("ps -o stat= -u repo-test"));
+    // A zombie (dead, not yet reaped) isn't a process left: its parent is woken, and the stop passes.
+    rmSync(join(s.dir, "pgrep"));
+    s.flag("zombie");
+    assert.match(s.run("stop", "t1", "repo-test").out, /BOPS_REPO_STOPPED=1/);
+    s.flag("pgrep");
+    // reset too: it fails rather than wiping src under a live process.
+    const reset = s.run("reset", "t1", "repo-test");
+    assert.match(reset.out, /BOPS_REPO_FAIL=procs-left/);
+  } finally {
+    s.done();
+  }
+});
+
+check("root never follows the user's links: a symlinked ~/.config, src or src.tgz can't make root delete, chown or write elsewhere", () => {
+  const s = sandbox();
+  try {
+    s.run("prepare", "t1", "repo-test", "-");
+    const victim = join(s.dir, "victim");
+    mkdirSync(join(victim, "systemd", "user"), { recursive: true });
+    writeFileSync(join(victim, "systemd", "user", "keep"), "precious");
+    writeFileSync(join(victim, "file"), "precious");
+    // ~/.config (and ~/.config/systemd) a link to elsewhere: stop deletes nothing through it.
+    const home = readFileSync(join(s.dir, "keep", "t1", "home"), "utf8").trim();
+    symlinkSync(victim, join(home, ".config"));
+    assert.match(s.run("stop", "t1", "repo-test").out, /BOPS_REPO_STOPPED=1/);
+    assert.equal(readFileSync(join(victim, "systemd", "user", "keep"), "utf8"), "precious");
+    // src a link to elsewhere: reset removes the link, makes a real folder, and chowns only that.
+    const src = join(s.dir, "base", "t1", "src");
+    rmSync(src, { recursive: true, force: true });
+    symlinkSync(victim, src);
+    s.clear();
+    assert.match(s.run("reset", "t1", "repo-test").out, /BOPS_REPO_RESET=1/);
+    assert.equal(readFileSync(join(victim, "file"), "utf8"), "precious");
+    assert.ok(!lstatSync(src).isSymbolicLink() && lstatSync(src).isDirectory());
+    assert.ok(s.calls().every((l) => !l.startsWith("chown") || l === `chown -h repo-test:repo-test ${src}`), s.calls().join("\n"));
+    // src.tgz a link in the user's folder: unpack never writes there (the archive goes on stdin).
+    symlinkSync(join(victim, "file"), join(s.dir, "base", "t1", "src.tgz"));
+    const tgz = Buffer.from("not really a tarball");
+    writeFileSync(join(s.dir, "keep", "t1", "tgz.all"), tgz);
+    const sum = createHash("sha256").update(tgz).digest("hex");
+    assert.match(s.run("unpack", "t1", "repo-test", sum).out, /BOPS_REPO_UNPACKED=1/);
+    assert.equal(readFileSync(join(victim, "file"), "utf8"), "precious");
+  } finally {
+    s.done();
+  }
+});
+
+check("the probe fails closed: a scheduler that takes a job, hangs, or no answer at all fails prepare", () => {
+  for (const [setup, why] of [
+    [(s) => s.flag("accept-crontab"), /can schedule with crontab/],
+    [(s) => s.flag("accept-at"), /can schedule with at/],
+    [(s) => s.flag("accept-systemd-run"), /can schedule with systemd-run/],
+    [(s) => s.flag("hang-at"), /could not check at \(it hung\)/],
+    [(s) => s.flag("sched-silent"), /the scheduling check did not run/],
+  ]) {
+    const s = sandbox();
+    try {
+      setup(s);
+      const r = s.run("prepare", "t1", "repo-test", "-");
+      assert.match(r.out, /BOPS_REPO_FAIL=unsafe/, r.out);
+      const said = Buffer.from(r.out.match(/BOPS_REPO_WHY=(\S+)/)[1], "base64").toString("utf8");
+      assert.match(said, why);
+      assert.doesNotMatch(r.out, /BOPS_REPO_READY/);
+      const c = s.calls();
+      assert.ok(c.lastIndexOf("crontab -r -u repo-test") > c.findIndex((l) => l.startsWith("crontab -") && !l.startsWith("crontab -r")), "what it scheduled is cleared");
+    } finally {
+      s.done();
+    }
+  }
+  // Refused everywhere: it passes, and each scheduler was really tried as the user.
+  const s = sandbox();
+  try {
+    assert.match(s.run("prepare", "t1", "repo-test", "-").out, /BOPS_REPO_READY=1/);
+    const c = s.calls();
+    for (const t of ["crontab -", "at now + 1 year", "systemd-run --user --on-active=365d /bin/true"]) assert.ok(c.includes(t), `${t} tried`);
+  } finally {
+    s.done();
+  }
+});
+
+check("incron denied; polkit rule rewritten when it differs; any touch (begin, status) and the update sweep deny and clear older users", () => {
+  const s = sandbox();
+  try {
+    writeFileSync(join(s.dir, "etc", "incron.allow"), "root\nrepo-test\n");
+    writeFileSync(join(s.dir, "etc", "polkit-1", "rules.d", "49-bops-repo.rules"), "// stale\n");
+    s.run("prepare", "t1", "repo-test", "-");
+    assert.equal(s.etc("incron.allow"), "root\n");
+    assert.equal(s.etc("incron.deny"), "repo-test\n");
+    assert.match(s.etc("polkit-1/rules.d/49-bops-repo.rules"), /polkit\.Result\.NO/);
+    // A user an older bops-repo made: not in the deny lists, maybe with a crontab.
+    writeFileSync(join(s.dir, "users"), "repo-test\nrepo-old\n");
+    writeFileSync(join(s.dir, "etc", "passwd"), "root:x:0:0::/root:/bin/bash\nbops:x:1000:1000::/home/bops:/bin/bash\nrepo-test:x:998:998::/nonexistent:/usr/sbin/nologin\nrepo-old:x:997:997::/nonexistent:/usr/sbin/nologin\n");
+    s.clear();
+    assert.match(s.run("status", "t2", "repo-old").out, /BOPS_REPO_STATUS/);
+    assert.match(s.etc("cron.deny"), /^repo-old$/m);
+    assert.ok(s.calls().includes("crontab -r -u repo-old"));
+    writeFileSync(join(s.dir, "etc", "cron.deny"), "");
+    s.clear();
+    assert.match(s.run("begin", "t1", "repo-test", "run", "60", "-", b64("echo hi")).out, /BOPS_REPO_BEGUN/);
+    assert.equal(s.etc("cron.deny"), "repo-test\n");
+    assert.ok(s.calls().indexOf("crontab -r -u repo-test") >= 0);
+    writeFileSync(join(s.dir, "etc", "cron.deny"), "");
+    s.clear();
+    const swept = s.run("sweep", "all");
+    assert.match(swept.out, /BOPS_REPO_SWEPT=2/, swept.out);
+    assert.equal(s.etc("cron.deny"), "repo-test\nrepo-old\n");
+    const c = s.calls();
+    for (const u of ["repo-test", "repo-old"]) assert.ok(c.includes(`crontab -r -u ${u}`) && c.includes(`atq `), u);
+    assert.ok(!c.some((l) => l.includes("bops") && l.startsWith("crontab")), "the bot's own user is left alone");
+    assert.ok(!c.some((l) => l.startsWith("pkill") || l.includes("kill -")), "the sweep kills nothing (a server may be running)");
   } finally {
     s.done();
   }
