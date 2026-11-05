@@ -471,7 +471,7 @@ export function attentionOf(state: AppState, needs: Map<string, BotNeeds>) {
 
 /** A row in Favorites: its mark, its words, and what's on its right. */
 const ROW =
-  "group/item flex h-[34px] shrink-0 items-center gap-2.5 rounded-[10px] px-2.5 text-left outline-none hover:bg-black/[0.03] focus-visible:shadow-[inset_0_0_0_1.5px_#0A0A0A]";
+  "group/item flex h-[34px] shrink-0 items-center max-md:h-11 gap-2.5 rounded-[10px] px-2.5 text-left outline-none hover:bg-black/[0.03] focus-visible:shadow-[inset_0_0_0_1.5px_#0A0A0A]";
 
 /** A section's heading: its name, a count, and the chevron that folds it. */
 function SectionHead({ label, count, open, scope, onToggle }: { label: string; count?: number; open: boolean; scope: string; onToggle: () => void }) {
@@ -480,7 +480,7 @@ function SectionHead({ label, count, open, scope, onToggle }: { label: string; c
       onClick={onToggle}
       aria-expanded={open}
       data-list-heading
-      className="flex h-[30px] shrink-0 items-center gap-1.5 rounded-[10px] px-2.5 text-left text-[13px] font-medium leading-4 text-[#9A9A98] outline-none hover:bg-black/[0.03] hover:text-[#6B6B6B] focus-visible:shadow-[inset_0_0_0_1.5px_#0A0A0A]"
+      className="flex h-[30px] shrink-0 items-center gap-1.5 rounded-[10px] px-2.5 text-left text-[13px] font-medium leading-4 text-[#9A9A98] max-md:h-10 outline-none hover:bg-black/[0.03] hover:text-[#6B6B6B] focus-visible:shadow-[inset_0_0_0_1.5px_#0A0A0A]"
     >
       <span>{label}</span>
       {count !== undefined && <Count n={count} quiet={false} scope={scope} className="rounded-full bg-[#EEEEEC] px-1.5 text-[11.5px] leading-4 tabular-nums text-[#6B6B6B]" />}

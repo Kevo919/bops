@@ -45,6 +45,7 @@ const MAC_TAB = "tab_mac";
 import { opensMacTab, PROFILE_TAB, tabsShown } from "./tabs-shown";
 import { NameInput, Sidebar } from "./sidebar";
 import { SidebarRail } from "./sidebar-rail";
+import { useNarrow } from "./narrow";
 import type { BotMenuActions } from "./bot-menu";
 import { NewThread } from "./new-thread";
 import { readyAgents } from "@/lib/agents";
@@ -146,6 +147,16 @@ function Bops({ state }: { state: AppState | null }) {
   }, [threadId]);
   const [composing, setComposing] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
+  // A narrow window (a phone: narrow.ts) shows one column at a time: the sidebar as a list, a chat (or a page over it), or
+  // the side panel. What you open says which; each has its way back. A wide window shows them side by side and never reads this.
+  const narrow = useNarrow();
+  const [mView, setMView] = useState<"list" | "chat" | "panel">("list");
+  // Where the panel's Back goes: the list when it opened from there (Routines, Knowledge), else the chat.
+  const [panelBack, setPanelBack] = useState<"list" | "chat">("chat");
+  const toPanel = () => {
+    if (mView !== "panel") setPanelBack(mView);
+    setMView("panel");
+  };
   // The sidebar on the left, or its rail of icons once you collapse it (sidebar-rail.tsx; this Mac
   // remembers; ⌘\ or the toggle).
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window === "undefined" || localStorage.getItem(SIDEBAR_KEY) !== "0");
@@ -532,8 +543,10 @@ function Bops({ state }: { state: AppState | null }) {
   };
 
   /** Show a tab, opening it first if it isn't open yet. */
-  const openTab = (match: (t: PanelTab) => boolean, make: () => PanelTab, update?: (t: PanelTab) => PanelTab) => {
+  const openTab = (match: (t: PanelTab) => boolean, make: () => PanelTab, update?: (t: PanelTab) => PanelTab, quiet = false) => {
     const open = tabs.find(match);
+    // Narrow, the panel comes up in place of the chat, unless the app opened it on its own (`quiet`).
+    if (!quiet) toPanel();
     const t = open ?? make();
     if (!open) setTabs([...tabs, t]);
     else if (update) setTabs(tabs.map((x) => (x === open ? update(x) : x)));
@@ -548,6 +561,7 @@ function Bops({ state }: { state: AppState | null }) {
       setActive(CHAT_TAB);
       setPanelOpen(true);
       setFocus(false);
+      toPanel();
     } else openTab((t) => t.kind === "computer" && t.botId === id, () => ({ id: tabId(), kind: "computer", botId: id }));
   };
   /**
@@ -578,7 +592,7 @@ function Bops({ state }: { state: AppState | null }) {
         setActive(CHAT_TAB);
         setPanelOpen(true);
         setFocus(false);
-      } else openTab((t) => t.kind === "computer" && t.botId === ask.botId, () => ({ id: `tab_ask_${ask.id}`, kind: "computer", botId: ask.botId }));
+      } else openTab((t) => t.kind === "computer" && t.botId === ask.botId, () => ({ id: `tab_ask_${ask.id}`, kind: "computer", botId: ask.botId }), undefined, true);
     }
   }
   const openProfile = (id: string, section: Section = "details") =>
@@ -794,6 +808,7 @@ function Bops({ state }: { state: AppState | null }) {
     setActive(id);
     setFocus(false);
     setPanelOpen(true);
+    toPanel();
   };
   /**
    * A bot's browser, shown (`url`: and that page opened there, in the viewer's control): the owner's tab beside the chat's
@@ -861,6 +876,7 @@ function Bops({ state }: { state: AppState | null }) {
   };
   const openChat = (id: string) => {
     setChatId(id);
+    setMView("chat");
     setPrefill(null);
     setNewThreadFor(null);
     setThreadId(null);
@@ -884,6 +900,7 @@ function Bops({ state }: { state: AppState | null }) {
     else openChat(a.chatId);
   };
   const openThread = (s: Session) => {
+    setMView("chat");
     const inView = s.chatId === chat.id || chat.botIds.includes(s.botId);
     if (!inView) setChatId(state.chats.some((c) => c.id === s.chatId) ? s.chatId : botChatId(s.botId));
     setComposing(false);
@@ -917,13 +934,21 @@ function Bops({ state }: { state: AppState | null }) {
   }
 
   const chatColumn = composing ? (
-    <ToPicker state={state} onOpenChat={openChat} onCancel={() => setComposing(false)} />
+    <ToPicker
+      state={state}
+      onOpenChat={openChat}
+      onCancel={() => {
+        setComposing(false);
+        // Narrow, there's no chat beside it to go back to: the list.
+        if (narrow) setMView("list");
+      }}
+    />
   ) : (
     <div className="relative flex min-h-0 min-w-0 flex-col">
       <ChatView
         state={state}
         chat={chat}
-        wide={!panelOpen}
+        wide={narrow || !panelOpen}
         lookingAt={lookingAt}
         onOpenThread={openThread}
         onShowBot={(id) => openProfile(id)}
@@ -934,7 +959,9 @@ function Bops({ state }: { state: AppState | null }) {
           if (!state.credits?.usage) trackEvent("bops_upgrade_clicked", { surface: "chat" });
           openSettings("plan");
         }}
-        peek={!panelOpen && <ComputerPeek state={state} bot={bot} onOpen={() => setPanelOpen(true)} />}
+        // Narrow, the panel is never beside the chat: its peek is the way to it.
+        peek={(narrow || !panelOpen) && <ComputerPeek state={state} bot={bot} onOpen={() => (setPanelOpen(true), toPanel())} />}
+        onBack={narrow ? () => setMView("list") : undefined}
         call={call}
         onCall={setCall}
         callSlot={setCallSlot}
@@ -975,6 +1002,8 @@ function Bops({ state }: { state: AppState | null }) {
   // The chat's column, when the panel is beside it, as wide as its edge was dragged (chat-edge.tsx).
   const columns = { gridTemplateColumns: gridColumns(sidebarWidth, wide ? null : chatWidth) };
   const slide = edgeDragged ? "" : SLIDE;
+  // Narrow: the one column in sight (a computer full width is its own, over the list and the chat; a panel put away, the chat).
+  const mShow = focus ? "focus" : mView === "panel" && !panelOpen ? "chat" : mView;
   // What a bot's right-click menu does, in the sidebar and on its rail (bot-menu.tsx).
   const botMenuActions: BotMenuActions = {
     onChat: (id) => openChat(botChatId(id)),
@@ -1038,7 +1067,30 @@ function Bops({ state }: { state: AppState | null }) {
       <TooltipLayer />
       {/* A shared workspace's chats aren't the user's own: nothing of them is said as what they're looking at. */}
       <ViewReporter chatId={state.shared ? "" : chat.id} threadId={state.shared ? null : (thread?.id ?? null)} />
-      <div className="flex h-screen flex-col overflow-clip bg-white font-sans text-ink antialiased">
+      <div
+        className={`flex ${narrow ? "h-dvh pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]" : "h-screen"} flex-col overflow-clip bg-white font-sans text-ink antialiased`}
+        data-narrow={narrow ? mShow : undefined}
+      >
+        {narrow ? (
+          // Narrow, the side panel has a bar of its own over it: back to the chat, and its tabs (they scroll sideways).
+          mShow === "panel" &&
+          !covered && (
+            <div data-panel-bar className="flex h-12 shrink-0 items-center gap-1 border-b border-[#ECECEA] bg-[#F7F7F6] pl-1 pr-2">
+              <button
+                onClick={() => setMView(panelBack)}
+                aria-label={panelBack === "list" ? "Back to chats" : "Back to the chat"}
+                title={panelBack === "list" ? "Back to chats" : "Back to the chat"}
+                data-narrow-back
+                className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-[#EEEEEC]"
+              >
+                <svg width="9" height="15" viewBox="0 0 8 12" aria-hidden>
+                  <path d="M6 1.5L1.5 6 6 10.5" fill="none" stroke="#0A0A0A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <div className="flex min-w-0 flex-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none]">{tabBar}</div>
+            </div>
+          )
+        ) : (
         <TitleBar
           bare={!!pageBot || !!settings}
           columns={columns}
@@ -1053,15 +1105,19 @@ function Bops({ state }: { state: AppState | null }) {
             else setPanelOpen(!panelOpen);
           }}
         />
+        )}
         {/*
           The pages in the main area (Settings, a bot's settings page) draw over the grid's columns past the sidebar, which
           stay as they were underneath (the chat, its draft, a live computer); the sidebar stays beside them, to go anywhere.
         */}
         <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className={`grid min-h-0 flex-1 ${slide}`} style={columns}>
-          {/* The sidebar's column, its color and edge whichever it shows (an inset edge, so the sidebar's 340px fit). */}
-          <div className={`flex min-h-0 min-w-0 bg-[#F9F9F8] shadow-[inset_-1px_0_0_#ECECEA] ${sliding ? "overflow-clip" : ""}`}>
-          {!sidebarOpen ? (
+        <div className={narrow ? "grid min-h-0 flex-1" : `grid min-h-0 flex-1 ${slide}`} style={narrow ? NARROW_COLUMNS : columns}>
+          {/* The sidebar's column, its color and edge whichever it shows (an inset edge, so the sidebar's 340px fit). Narrow, the whole window, as a list. */}
+          <div className={narrow ? `min-h-0 min-w-0 bg-[#F9F9F8] ${mShow === "list" ? "flex" : "hidden"}` : `flex min-h-0 min-w-0 bg-[#F9F9F8] shadow-[inset_-1px_0_0_#ECECEA] ${sliding ? "overflow-clip" : ""}`}
+            // Narrow, a page over the list (Settings, a bot's page) has the window: the list waits under it, out of reach.
+            inert={narrow && covered}
+          >
+          {!sidebarOpen && !narrow ? (
             <SidebarRail
               state={state}
               chatId={chat.id}
@@ -1070,7 +1126,7 @@ function Bops({ state }: { state: AppState | null }) {
               onExpand={() => toggleSidebar()}
               onSearch={() => toggleSidebar("search")}
               onWorkspaces={() => toggleSidebar("workspaces")}
-              onCompose={leavePages(() => setComposing(true))}
+              onCompose={leavePages(() => (setComposing(true), setMView("chat")))}
               onOpenChat={leavePages(openChat)}
               onAccount={() => openSettings("plan")}
               onSettings={() => openSettings()}
@@ -1087,10 +1143,10 @@ function Bops({ state }: { state: AppState | null }) {
             chatId={chat.id}
             search={openWith === "search" ? "" : null}
             workspaces={openWith === "workspaces"}
-            onCollapse={() => toggleSidebar()}
+            onCollapse={narrow ? undefined : () => toggleSidebar()}
             onOpenChat={leavePages(openChat)}
             onOpenThread={leavePages(openThread)}
-            onCompose={leavePages(() => setComposing(true))}
+            onCompose={leavePages(() => (setComposing(true), setMView("chat")))}
             onSettings={() => openSettings()}
             onAccount={() => openSettings("plan")}
             onSetup={() => openSettings("mac")}
@@ -1147,10 +1203,10 @@ function Bops({ state }: { state: AppState | null }) {
             </div>
           ) : (
             <>
-              {chatColumn}
+              {narrow ? <div className={mShow === "chat" ? "contents" : "hidden"}>{chatColumn}</div> : chatColumn}
               {panelOpen && (
-                <section ref={panelRef} className="relative flex min-h-0 min-w-0 flex-col bg-white">
-                  <ChatEdge from={sidebarWidth} width={chatWidth} onWidth={setChatWidth} onDragging={setEdgeDragged} />
+                <section ref={panelRef} className={`relative ${narrow && mShow !== "panel" ? "hidden" : "flex"} min-h-0 min-w-0 flex-col bg-white`}>
+                  {!narrow && <ChatEdge from={sidebarWidth} width={chatWidth} onWidth={setChatWidth} onDragging={setEdgeDragged} />}
                   {cutBack && (
                     <div className="absolute left-1/2 top-3 z-40 flex -translate-x-1/2 animate-[screen-in_300ms_ease-out] items-center gap-2 rounded-full bg-ink py-1 pl-3 pr-1 text-[12.5px] leading-4 text-white shadow-[0_10px_24px_-10px_#00000080]">
                       <span className="max-w-[260px] truncate">New from {cutBack.name}</span>
@@ -1382,7 +1438,7 @@ function Bops({ state }: { state: AppState | null }) {
           </div>
         </div>
         {pageBot && botPage && (
-          <div className={`absolute inset-y-0 right-0 z-30 bg-white ${PAGE_SLIDE}`} style={{ left: sidebarWidth }} inert={!!settings}>
+          <div className={`absolute inset-y-0 right-0 z-30 bg-white ${PAGE_SLIDE}`} style={{ left: narrow ? 0 : sidebarWidth }} inert={!!settings}>
             <BotSettingsPage
               key={`${pageBot.id}:${botPage.atAt}`}
               state={state}
@@ -1414,7 +1470,7 @@ function Bops({ state }: { state: AppState | null }) {
         )}
         {settings && (
           // Over a bot's settings page when it opened from there (its Plan and credit, its Org chart): Back goes back to it.
-          <div className={`absolute inset-y-0 right-0 z-30 flex bg-white ${PAGE_SLIDE}`} style={{ left: sidebarWidth }}>
+          <div className={`absolute inset-y-0 right-0 z-30 flex bg-white ${PAGE_SLIDE}`} style={{ left: narrow ? 0 : sidebarWidth }}>
             {/* What opens from it goes where it goes, and the page gives way (an app's tab, a page on the web). */}
             <OpenLink.Provider value={leavePages(openWeb)}>
             <OpenCrm.Provider value={leavePages(openCrm)}>
@@ -1433,7 +1489,7 @@ function Bops({ state }: { state: AppState | null }) {
                   setSettings(false);
                   openBotPage(botId);
                 }}
-                onMakeBot={leavePages(() => setComposing(true))}
+                onMakeBot={leavePages(() => (setComposing(true), setMView("chat")))}
                 onOpenApp={leavePages(openHostedApp)}
                 onClose={() => setSettings(false)}
                 onHold={holdSettings}
@@ -1453,7 +1509,7 @@ function Bops({ state }: { state: AppState | null }) {
           <div
             className="fixed z-40"
             // Compact, it waits in the sidebar's corner over its footer; by the rail, just past it, so the rail's buttons stay clear.
-            style={callHere && slotBox ? { left: slotBox.x, top: slotBox.y, transform: "translateX(-50%)" } : { left: sidebarOpen ? 12 : 84, bottom: 76 }}
+            style={callHere && slotBox ? { left: slotBox.x, top: slotBox.y, transform: "translateX(-50%)" } : { left: sidebarOpen || narrow ? 12 : 84, bottom: 76 }}
           >
             <CallBar bot={callBot} owner={state.owner?.name} compact={!(callHere && slotBox)} onOpen={() => openChat(botChatId(callBot.id))} onClose={() => setCall(null)} onSpeaking={callTalking.set} />
           </div>
@@ -1478,6 +1534,8 @@ function Bops({ state }: { state: AppState | null }) {
   );
 }
 
+/** Narrow (narrow.ts), one column: whichever is in sight takes the window's width. */
+const NARROW_COLUMNS: React.CSSProperties = { gridTemplateColumns: "minmax(0,1fr)" };
 /** Where this Mac remembers whether the sidebar is shown ("0": hidden). */
 const SIDEBAR_KEY = "bops.sidebar";
 /** How long the sidebar takes to collapse to its rail or expand (none with reduced motion). */
@@ -2107,13 +2165,21 @@ export function Settings({
   // The look is the owner's own window (never a shared workspace's): its pane is theirs alone too.
   const fits = (p?: SettingsPane) => !!p && (p !== "domains" || domains) && (p !== "apps" || apps) && (p !== "look" || !state.shared) && (p !== "repos" || !state.shared) && (!state.shared || ((p !== "team" || adminHere) && p !== "chart" && p !== "email"));
   const [pane, setPane] = useState<SettingsPane>(fits(at) ? at! : "profile");
+  // A narrow window (narrow.ts) shows the nav or a place, never both: the nav first when Settings opened at no place in
+  // particular; a place asked for (Logins, Plan and credit) opens at it, its Back going to the nav.
+  const narrow = useNarrow();
+  const [listing, setListing] = useState(!fits(at));
   const [was, setWas] = useState(`${at}:${atAt}`);
   if (was !== `${at}:${atAt}`) {
     setWas(`${at}:${atAt}`);
-    if (fits(at)) setPane(at!);
+    if (fits(at)) {
+      setPane(at!);
+      setListing(false);
+    }
   }
   const go = (p: SettingsPane) => {
     setPane(p);
+    setListing(false);
     onPane?.(p);
   };
   // A domain being bought: nothing leaves Settings (Back, Esc, the sidebar, an app opened from it) until it's answered.
@@ -2162,7 +2228,7 @@ export function Settings({
       data-settings-nav={x.id}
       onClick={() => go(x.id)}
       aria-current={pane === x.id ? "page" : undefined}
-      className={`flex h-[30px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] ${pane === x.id ? "bg-[#EFEFEC] font-semibold text-ink" : "text-[#3A3A38] hover:bg-[#F2F2F0]"}`}
+      className={`flex h-[30px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] max-md:h-11 max-md:text-[15px] ${pane === x.id && !(narrow && listing) ? "bg-[#EFEFEC] font-semibold text-ink" : "text-[#3A3A38] hover:bg-[#F2F2F0]"}`}
     >
       {x.icon}
       <span className="min-w-0 flex-1 truncate">{x.name}</span>
@@ -2321,9 +2387,16 @@ export function Settings({
   // The places with a frame of their own (Logins, the Org chart, Your Apps) scroll inside it; the rest scroll here.
   const framed = pane === "logins" || pane === "chart" || pane === "apps";
   return (
-    <div data-settings className="motion-fade-in flex min-h-0 min-w-0 flex-1">
-      <nav aria-label="Settings" className="flex w-[240px] shrink-0 flex-col overflow-y-auto border-r border-[#E8E8E5] bg-[#FBFBFA] px-3 pb-4 pt-4">
-        <button onClick={close} disabled={buying} aria-label="Back" title="Back (Esc)" data-settings-back className="flex items-center gap-2 self-start rounded-lg px-2 py-1 text-[14px] font-semibold hover:bg-[#F2F2F0] disabled:opacity-40">
+    <div data-settings data-settings-narrow={narrow ? (listing ? "nav" : "pane") : undefined} className="motion-fade-in flex min-h-0 min-w-0 flex-1">
+      <nav
+        aria-label="Settings"
+        className={
+          narrow
+            ? `${listing ? "flex" : "hidden"} min-w-0 flex-1 flex-col overflow-y-auto bg-[#FBFBFA] px-3 pb-6 pt-2`
+            : "flex w-[240px] shrink-0 flex-col overflow-y-auto border-r border-[#E8E8E5] bg-[#FBFBFA] px-3 pb-4 pt-4"
+        }
+      >
+        <button onClick={close} disabled={buying} aria-label="Back" title="Back (Esc)" data-settings-back className="flex items-center gap-2 self-start rounded-lg px-2 py-1 text-[14px] font-semibold hover:bg-[#F2F2F0] disabled:opacity-40 max-md:min-h-11 max-md:text-[17px]">
           <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden>
             <path d="M6 1.5L1.5 6 6 10.5" fill="none" stroke="#8A8A88" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -2340,7 +2413,18 @@ export function Settings({
         {group("Workspace", shared ? "Shared with you" : "Shared with its people", workspace, switcher)}
         {team_.length > 0 && group("Orgo team only", null, team_)}
       </nav>
-      <main data-settings-pane={pane} className={`flex min-h-0 min-w-0 flex-1 flex-col ${framed ? "" : "overflow-y-auto pb-8"}`}>
+      <main data-settings-pane={pane} className={`${narrow && listing ? "hidden" : "flex"} min-h-0 min-w-0 flex-1 flex-col ${framed ? "" : "overflow-y-auto pb-8"}`}>
+        {narrow && (
+          // Narrow, the place has the window to itself: back to Settings' nav from its top.
+          <div className="sticky top-0 z-20 flex h-12 shrink-0 items-center border-b border-[#ECECEA] bg-white/95 px-1 backdrop-blur-[6px]">
+            <button onClick={() => setListing(true)} disabled={buying} aria-label="Back to Settings" data-settings-pane-back className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-[15px] font-semibold hover:bg-[#F2F2F0] disabled:opacity-40">
+              <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden>
+                <path d="M6 1.5L1.5 6 6 10.5" fill="none" stroke="#8A8A88" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Settings
+            </button>
+          </div>
+        )}
         {(pane === "profile" || pane === "ai") && <AiSubscriptionsCard state={state} onShowScreen={onShowScreen} onOpenVault={onOpenVault} />}
         {body}
       </main>

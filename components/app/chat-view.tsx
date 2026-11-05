@@ -285,6 +285,7 @@ export function ChatView({
   prefill,
   onPrefilled,
   above,
+  onBack,
 }: {
   state: AppState;
   chat: Chat;
@@ -315,6 +316,8 @@ export function ChatView({
   /** Over the message box, before anything else there: the Watch chip while the chat's bot is browsing out of sight (bops-app.tsx). */
   above?: React.ReactNode;
   onPrefilled?: () => void;
+  /** A narrow window's (bops-app.tsx): the chat alone in it, its way back to the list of chats. */
+  onBack?: () => void;
 }) {
   // Who's typing: also a bot answering on its computer, or whose computer is waking to (lib/types.ts withRemoteTyping).
   const c = withRemoteTyping(given, state.liveMoods);
@@ -671,7 +674,20 @@ export function ChatView({
       )}
       {pair && <PairSheet state={state} pairId={pair.id} focusId={pair.focus} onClose={() => setPair(null)} />}
       {saving && <SaveSkillDialog botId={saving.botId} chatId={saving.chatId} onClose={closeSaving} />}
-      <div className="absolute right-5 top-[18px] z-10 flex items-center gap-2">
+      {onBack && (
+        <button
+          onClick={onBack}
+          aria-label="Back to chats"
+          title="Back to chats"
+          data-narrow-back
+          className="absolute left-3 top-[18px] z-10 flex size-11 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_#E6E6E3,0_8px_20px_-10px_#00000040] hover:shadow-[0_0_0_1px_#C9C9C6,0_8px_20px_-10px_#00000040]"
+        >
+          <svg width="9" height="15" viewBox="0 0 8 12" aria-hidden>
+            <path d="M6 1.5L1.5 6 6 10.5" fill="none" stroke="#0A0A0A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
+      <div className={`absolute ${onBack ? "right-3" : "right-5"} top-[18px] z-10 flex items-center gap-2`}>
         {/* The chat's own menu (a bot's chat, like Call): Save as skill rereads this chat for how the bot did a job.
             Neither in a shared workspace: its bots are the owner's to call and teach. */}
         {/* A group's has Compact, Select messages and Delete all messages only. A shared workspace's, Compact alone, for a member with Write. */}
@@ -708,7 +724,7 @@ export function ChatView({
       </div>
       <div ref={scroller} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {/* The header floats over the conversation: messages soften into a blur as they pass under it. */}
-        <header className={`sticky top-0 z-[5] flex shrink-0 flex-col items-center pb-1.5 ${call && call === solo?.id ? "pt-[18px]" : "pt-3"}`}>
+        <header className={`sticky top-0 z-[5] flex shrink-0 flex-col items-center pb-1.5 ${call && call === solo?.id ? "pt-[18px]" : "pt-3 max-md:pt-5"}`}>
           <div aria-hidden className="pointer-events-none absolute inset-x-0 -bottom-8 top-0">
             <div className="absolute inset-0 backdrop-blur-[2px] [mask-image:linear-gradient(to_bottom,black_55%,transparent)]" />
             <div className="absolute inset-0 backdrop-blur-[6px] [mask-image:linear-gradient(to_bottom,black_30%,transparent_75%)]" />
@@ -722,9 +738,9 @@ export function ChatView({
               <button onClick={() => solo && onShowBot(solo.id)} className="relative top-2 z-10" title={solo ? `${solo.name}'s profile` : undefined}>
                 <ChatAvatar chat={c} bots={state.bots} size={40} />
               </button>
-              <div className="relative flex flex-col items-center rounded-[14px] bg-white px-3.5 pb-1.5 pt-2.5 shadow-[0_0_0_1px_#E6E6E3,0_6px_16px_-8px_#00000020]">
-                <span className="text-[14px] font-semibold leading-[18px]">{chatName(c, state.bots)}</span>
-                <span className="text-[12px] leading-[15px] text-[#9A9A98]">{status}</span>
+              <div className="relative flex flex-col items-center rounded-[14px] bg-white px-3.5 pb-1.5 pt-2.5 shadow-[0_0_0_1px_#E6E6E3,0_6px_16px_-8px_#00000020] max-md:max-w-[calc(100%-24px)]">
+                <span className="text-[14px] font-semibold leading-[18px] max-md:max-w-full max-md:truncate">{chatName(c, state.bots)}</span>
+                <span className="text-[12px] leading-[15px] text-[#9A9A98] max-md:max-w-full max-md:truncate">{status}</span>
               </div>
               {solo && !state.shared && <PreviewButton state={state} botId={solo.id} />}
             </>

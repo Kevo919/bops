@@ -210,13 +210,13 @@ export function FooterButton({
   onClick: () => void;
 }) {
   return (
-    <span data-footer-slot={label} data-footer-key={name} className={`motion-footer-slot relative flex h-9 min-w-9 basis-9 ${expanded ? "grow" : "grow-0"} shrink`}>
+    <span data-footer-slot={label} data-footer-key={name} className={`motion-footer-slot relative flex h-9 min-w-9 basis-9 max-md:h-11 max-md:min-w-11 max-md:basis-11 ${expanded ? "grow" : "grow-0"} shrink`}>
       <button
         onClick={onClick}
         title={expanded ? undefined : tip}
         aria-label={ariaLabel ?? label}
         aria-pressed={pressed}
-        className="flex h-9 w-full min-w-0 items-center justify-center overflow-hidden rounded-full bg-white px-2.5 text-[13.5px] font-medium text-[#3A3A38] shadow-[0_0_0_1px_#E6E6E3] transition-transform duration-100 ease-out hover:bg-[#FCFCFB] outline-none focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] active:scale-[.96] motion-reduce:transition-none"
+        className="flex h-9 w-full min-w-0 items-center justify-center overflow-hidden rounded-full bg-white px-2.5 max-md:h-11 text-[13.5px] font-medium text-[#3A3A38] shadow-[0_0_0_1px_#E6E6E3] transition-transform duration-100 ease-out hover:bg-[#FCFCFB] outline-none focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] active:scale-[.96] motion-reduce:transition-none"
       >
         {icon}
         <span

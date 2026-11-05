@@ -104,6 +104,32 @@ jobs:
       - name: Voice typing card UI tests
         run: node scripts/test-handy-card-ui.mjs
 
+  # The web UI in a phone-sized window (scripts/test-mobile-layout.mjs): a production build served on loopback, a made-up
+  # Orgo, Playwright's Chromium. Its own job, so the build doesn't hold up the web job's tests.
+  mobile-layout:
+    if: github.repository != 'OrgoAI/bops'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npx next build
+      - name: Install Playwright's Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Narrow window (phone) layout tests
+        run: node scripts/test-mobile-layout.mjs
+
   android:
     if: github.repository != 'OrgoAI/bops'
     runs-on: ubuntu-latest

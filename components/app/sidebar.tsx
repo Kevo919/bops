@@ -245,7 +245,7 @@ export function Sidebar({
   return (
     // Its color and edge are the column's (bops-app.tsx), which it keeps folded to the rail (sidebar-rail.tsx);
     // its width is its own, so sliding open it's uncovered rather than squeezed.
-    <aside className="flex min-h-0 w-[340px] shrink-0 flex-col px-2.5 pb-3 pt-3.5">
+    <aside className="flex min-h-0 w-[340px] shrink-0 flex-col px-2.5 pb-3 pt-3.5 max-md:w-full">
       <div className="flex items-center justify-between pb-3 pl-2.5 pr-2">
         {query === null ? (
           <WorkspaceSwitcher state={state} opened={workspaces} onTeamChart={onTeamChart} />
@@ -584,14 +584,14 @@ export function YouMenuView({
   const name = user?.name?.trim() || user?.email || state.owner?.name?.trim() || "You";
   const others = teamWords(team);
   return (
-    <div ref={box} data-footer-slot="You" data-footer-key="you" className={`motion-footer-slot relative flex h-9 min-w-9 basis-9 ${expanded ? "grow" : "grow-0"} shrink`}>
+    <div ref={box} data-footer-slot="You" data-footer-key="you" className={`motion-footer-slot relative flex h-9 min-w-9 basis-9 max-md:h-11 max-md:min-w-11 max-md:basis-11 ${expanded ? "grow" : "grow-0"} shrink`}>
       <button
         onClick={() => (open ? shut() : setOpen(true))}
         title={expanded ? undefined : user ? `${user.name ?? user.email ?? "Your account"}: team, account and settings` : "Team, account and settings"}
         aria-label={`${name}: team, account and settings${others ? `, ${others}` : ""}`}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`flex h-9 w-full min-w-0 items-center justify-center overflow-hidden rounded-full px-2.5 text-[13px] font-semibold outline-none transition-[background-color,color,transform] duration-150 ease-out focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] active:scale-[.96] motion-reduce:transition-none ${open ? "bg-ink text-highlighter" : "bg-[#EEEEEC] text-[#6B6B6B] hover:bg-[#E6E6E3]"}`}
+        className={`flex h-9 w-full min-w-0 items-center justify-center overflow-hidden rounded-full px-2.5 text-[13px] font-semibold max-md:h-11 outline-none transition-[background-color,color,transform] duration-150 ease-out focus-visible:shadow-[0_0_0_1.5px_#0A0A0A] active:scale-[.96] motion-reduce:transition-none ${open ? "bg-ink text-highlighter" : "bg-[#EEEEEC] text-[#6B6B6B] hover:bg-[#E6E6E3]"}`}
       >
         <span className="shrink-0">{initialsOf(state)}</span>
         <span aria-hidden className={`motion-footer-label min-w-0 truncate whitespace-nowrap text-[13.5px] font-medium ${open ? "text-highlighter" : "text-ink"} ${expanded ? "max-w-[160px] translate-x-0 pl-1.5 opacity-100" : "max-w-0 -translate-x-1 pl-0 opacity-0"}`}>
@@ -1011,7 +1011,7 @@ export function WorkspaceSwitcher({
       <button
         onClick={() => (open ? close() : setOpen(true))}
         title="Switch workspace"
-        className="-ml-1.5 flex min-w-0 items-center gap-1.5 rounded-[10px] px-1.5 py-0.5 hover:bg-black/[0.04]"
+        className="-ml-1.5 flex min-w-0 items-center gap-1.5 rounded-[10px] px-1.5 py-0.5 hover:bg-black/[0.04] max-md:min-h-10"
       >
         <span className="truncate text-[22px] font-semibold leading-7 tracking-[-0.02em]">{state.shared?.name ?? current?.name ?? "Main"}</span>
         <svg width="12" height="12" viewBox="0 0 12 12" className={`shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none ${open ? "rotate-180" : ""}`}>

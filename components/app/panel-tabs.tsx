@@ -202,7 +202,8 @@ export function TabBar({
   const browser = browserTabOf(state, chatBotId);
   const all: PanelTab[] = [{ id: CHAT_TAB, kind: "computer", botId: chatBotId }, ...(browser ? [browser] : []), ...tabs];
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+    // Narrow (narrow.ts), in the panel's own bar: as wide as its tabs, the bar scrolling them sideways.
+    <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden max-md:flex-none max-md:overflow-visible">
       {all.map((t) => (
         <Tab key={t.id} state={state} tab={t} on={t.id === active} closable={t.id !== CHAT_TAB && t.id !== BROWSER_TAB} onPick={() => onPick(t.id)} onClose={() => onClose(t.id)} />
       ))}
@@ -212,7 +213,7 @@ export function TabBar({
           onClick={onNew}
           title="New tab"
           aria-label="New tab"
-          className="flex size-7 shrink-0 items-center justify-center rounded-lg text-[#6B6B6B] hover:bg-[#EEEEEC] hover:text-ink [-webkit-app-region:no-drag]"
+          className="flex size-7 shrink-0 items-center justify-center rounded-lg text-[#6B6B6B] hover:bg-[#EEEEEC] hover:text-ink [-webkit-app-region:no-drag] max-md:size-10"
         >
           <svg width="13" height="13" viewBox="0 0 14 14">
             <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -288,7 +289,7 @@ function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState
       onAuxClick={(e) => e.button === 1 && closable && onClose()}
       title={t.kind === "web" ? t.url : t.kind === "preview" ? `${label}, ${t.url.replace(/^http:\/\//, "").replace(/\/$/, "")}` : label}
       // Clipped, so what's in a tab stays inside it while it opens up.
-      className={`group/tab flex h-[30px] min-w-0 max-w-[220px] shrink cursor-pointer items-center gap-1.5 overflow-hidden rounded-[10px] pl-2.5 ${closable ? "pr-1" : "pr-3"} text-[13px] leading-4 transition-[background-color,box-shadow,color] duration-150 ease-out motion-reduce:transition-none [-webkit-app-region:no-drag] ${
+      className={`group/tab flex h-[30px] min-w-0 max-w-[220px] shrink cursor-pointer max-md:h-11 max-md:max-w-[200px] max-md:shrink-0 items-center gap-1.5 overflow-hidden rounded-[10px] pl-2.5 ${closable ? "pr-1" : "pr-3"} text-[13px] leading-4 transition-[background-color,box-shadow,color] duration-150 ease-out motion-reduce:transition-none [-webkit-app-region:no-drag] ${
         opening ? "motion-tab-in" : ""
       } ${on ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F,0_2px_6px_-3px_#00000026]" : "text-[#6B6B6B] hover:bg-[#EEEEEC]"}`}
     >
@@ -330,7 +331,7 @@ function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState
             onClose();
           }}
           aria-label={`Close ${label}`}
-          className={`flex size-5 shrink-0 items-center justify-center rounded-md hover:bg-black/[0.06] ${on ? "" : "opacity-0 group-hover/tab:opacity-100"}`}
+          className={`flex size-5 shrink-0 items-center justify-center rounded-md hover:bg-black/[0.06] max-md:size-10 ${on ? "" : "opacity-0 group-hover/tab:opacity-100 max-md:opacity-100"}`}
         >
           <svg width="9" height="9" viewBox="0 0 12 12">
             <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -601,20 +602,20 @@ export function NewTab({
           </span>
         </button>
         <span className="px-1 text-[12px] font-medium leading-4 text-[#9A9A98]">Your bots</span>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 max-md:grid-cols-1">
           {teamOf(state).map((b) => (
             <div key={b.id} className="flex items-center gap-2.5 rounded-2xl px-3 py-2.5 shadow-[0_0_0_1px_#ECECEA]">
               <Mascot botId={b.id} color={b.color} size={28} />
               <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-[18px]">{b.name}</span>
-              <button onClick={() => onComputer(b.id)} title={`${b.name}'s computer`} className="flex size-7 items-center justify-center rounded-lg hover:bg-[#F2F2F0]">
+              <button onClick={() => onComputer(b.id)} title={`${b.name}'s computer`} className="flex size-7 items-center justify-center rounded-lg hover:bg-[#F2F2F0] max-md:size-10">
                 <MonitorIcon size={14} color="#3A3A38" />
               </button>
               {onBrowser && browsesHere(state, b) && (
-                <button onClick={() => onBrowser(b.id)} title={`${b.name}'s browser`} aria-label={`${b.name}'s browser`} className="flex size-7 items-center justify-center rounded-lg text-[#3A3A38] hover:bg-[#F2F2F0]">
+                <button onClick={() => onBrowser(b.id)} title={`${b.name}'s browser`} aria-label={`${b.name}'s browser`} className="flex size-7 items-center justify-center rounded-lg text-[#3A3A38] hover:bg-[#F2F2F0] max-md:size-10">
                   <GlobeIcon />
                 </button>
               )}
-              <button onClick={() => onProfile(b.id)} className="rounded-full px-2 py-1 text-[12px] font-medium text-[#3A3A38] hover:bg-[#F2F2F0]">
+              <button onClick={() => onProfile(b.id)} className="rounded-full px-2 py-1 text-[12px] font-medium text-[#3A3A38] hover:bg-[#F2F2F0] max-md:min-h-10 max-md:px-3">
                 Profile
               </button>
             </div>

@@ -120,7 +120,7 @@ export function BotSettingsPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const sectionName = (s: SettingsSection) => (s === "phone" && !reach ? W.sections.contact : W.sections[s]);
-  const tool = "flex size-8 items-center justify-center rounded-full bg-white/60 shadow-[0_0_0_1px_#E6E6E3] hover:bg-white";
+  const tool = "flex size-8 items-center justify-center rounded-full bg-white/60 shadow-[0_0_0_1px_#E6E6E3] hover:bg-white max-md:size-10";
   const head = headerLine(state, b);
 
   return (
@@ -135,14 +135,18 @@ export function BotSettingsPage({
         e.stopPropagation();
         onBack();
       }}
-      className="motion-fade-in grid h-full min-h-0 grid-cols-[228px_minmax(0,1fr)] bg-white"
+      // Narrow (a phone: narrow.ts), one column: the sections are a row of chips over the page, scrolling sideways.
+      className="motion-fade-in grid h-full min-h-0 grid-cols-[228px_minmax(0,1fr)] bg-white max-md:grid-cols-1 max-md:grid-rows-[auto_minmax(0,1fr)]"
     >
-      <nav aria-label={W.group} className="flex min-h-0 flex-col overflow-y-auto bg-[#FBFBFA] px-3.5 py-[18px] shadow-[inset_-1px_0_0_#ECECEA]">
-        <button type="button" onClick={onBack} data-back className="flex items-center gap-2 self-start px-2 pb-3.5 pt-1 text-[12.5px] leading-4 text-[#6B6B6B] hover:text-ink">
+      <nav
+        aria-label={W.group}
+        className="flex min-h-0 flex-col overflow-y-auto bg-[#FBFBFA] px-3.5 py-[18px] shadow-[inset_-1px_0_0_#ECECEA] max-md:flex-row max-md:items-center max-md:gap-1 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:px-1.5 max-md:py-1.5 max-md:shadow-[inset_0_-1px_0_#ECECEA] max-md:[scrollbar-width:none]"
+      >
+        <button type="button" onClick={onBack} data-back className="flex items-center gap-2 self-start px-2 pb-3.5 pt-1 text-[12.5px] leading-4 text-[#6B6B6B] hover:text-ink max-md:min-h-10 max-md:shrink-0 max-md:self-center max-md:py-0 max-md:text-[14px]">
           <span aria-hidden>‹</span>
           {W.back}
         </button>
-        <div className="flex items-center gap-2.5 px-2 pb-4 pt-1">
+        <div className="flex items-center gap-2.5 px-2 pb-4 pt-1 max-md:hidden">
           <span className="grid size-[34px] shrink-0 place-items-center rounded-full" style={{ background: `color-mix(in oklab, ${b.color} 15%, white)` }}>
             <Mascot botId={b.id} color={b.color} size={30} />
           </span>
@@ -151,7 +155,7 @@ export function BotSettingsPage({
             {wsName && <span className="truncate text-[11.5px] leading-4 text-[#6B6B6B]">{wsName}</span>}
           </span>
         </div>
-        <span className="px-2.5 pb-1.5 pt-2.5 text-[11px] uppercase leading-4 tracking-[0.02em] text-[#9A9A97]">{W.group}</span>
+        <span className="px-2.5 pb-1.5 pt-2.5 text-[11px] uppercase leading-4 tracking-[0.02em] text-[#9A9A97] max-md:hidden">{W.group}</span>
         {SETTINGS_SECTIONS.map((s) => (
           <button
             key={s}
@@ -160,7 +164,7 @@ export function BotSettingsPage({
             aria-current={picked === s ? "true" : undefined}
             data-picked={picked === s || undefined}
             data-nav={s}
-            className={`flex items-center gap-2.5 rounded-[9px] px-2.5 py-[7px] text-left text-[13.5px] leading-[18px] ${picked === s ? "bg-[#EFEFEC] font-semibold text-ink" : "text-[#3A3A38] hover:bg-black/[0.03]"}`}
+            className={`flex items-center gap-2.5 rounded-[9px] px-2.5 py-[7px] text-left text-[13.5px] leading-[18px] max-md:min-h-10 max-md:shrink-0 max-md:whitespace-nowrap ${picked === s ? "bg-[#EFEFEC] font-semibold text-ink" : "text-[#3A3A38] hover:bg-black/[0.03]"}`}
           >
             <Marker on={picked === s} color={b.color} />
             {sectionName(s)}
@@ -170,7 +174,7 @@ export function BotSettingsPage({
 
       <div ref={main} className="relative min-h-0 overflow-y-auto">
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[420px]" style={{ backgroundImage: `linear-gradient(180deg, transparent 40%, #FFFFFF 100%), ${botWash(b)}` }} />
-        <div className="absolute right-[22px] top-[18px] z-10 flex gap-2">
+        <div className="absolute right-[22px] top-[18px] z-10 flex gap-2 max-md:right-3 max-md:top-3">
           <button type="button" onClick={() => onCollapse(picked)} aria-label={W.collapse} data-tip={W.collapse} data-collapse className={tool}>
             <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden>
               <path d="M12.5 1.5L8.5 5.5M8.5 2v3.5H12M1.5 12.5L5.5 8.5M5.5 12V8.5H2" fill="none" stroke="#0A0A0A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -182,13 +186,13 @@ export function BotSettingsPage({
             </svg>
           </button>
         </div>
-        <div className="relative max-w-[900px] px-[34px] py-[22px]">
-          <div className="mt-2 flex items-center gap-5">
-            <span className="grid size-[112px] shrink-0 place-items-center rounded-full bg-white/75 shadow-[0_0_0_6px_#FFFFFF8C]">
+        <div className="relative max-w-[900px] px-[34px] py-[22px] max-md:px-4 max-md:pt-14">
+          <div className="mt-2 flex items-center gap-5 max-md:gap-3.5">
+            <span className="grid size-[112px] shrink-0 place-items-center max-md:size-[72px] max-md:[&>*]:scale-75 rounded-full bg-white/75 shadow-[0_0_0_6px_#FFFFFF8C]">
               <Mascot botId={b.id} color={b.color} size={84} />
             </span>
             <div className="flex min-w-0 flex-col">
-              <h1 ref={heading} tabIndex={-1} className="truncate text-[30px] font-bold leading-9 tracking-[-0.015em] outline-none">
+              <h1 ref={heading} tabIndex={-1} className="truncate text-[30px] font-bold leading-9 tracking-[-0.015em] outline-none max-md:text-[24px] max-md:leading-8">
                 {b.name}
               </h1>
               <span className="mt-1 flex items-center gap-1 text-[14px] leading-5 text-[#3A3A38]" data-header-line>

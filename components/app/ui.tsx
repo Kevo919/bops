@@ -253,7 +253,7 @@ export function RoundButton({ label, onClick, children, active }: { label: strin
       title={label}
       aria-label={label}
       onClick={onClick}
-      className={`flex size-[34px] shrink-0 items-center justify-center rounded-full shadow-[0_0_0_1px_#E6E6E3] ${active ? "bg-[#EEEEEC]" : "bg-white hover:bg-[#FCFCFB]"}`}
+      className={`flex size-[34px] shrink-0 items-center justify-center rounded-full shadow-[0_0_0_1px_#E6E6E3] max-md:size-10 ${active ? "bg-[#EEEEEC]" : "bg-white hover:bg-[#FCFCFB]"}`}
     >
       <svg width="15" height="15" viewBox="0 0 16 16">
         {children}
@@ -280,7 +280,7 @@ export function NeedsYouDot({ className = "" }: { className?: string }) {
 /** The round X the Account sheet closes with, for a tab on the right that reads as a page (the Vault, a bot's profile). */
 export function CloseButton({ onClick, className = "" }: { onClick: () => void; className?: string }) {
   return (
-    <button onClick={onClick} aria-label="Close" className={`flex size-8 shrink-0 items-center justify-center rounded-full shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6] ${className}`}>
+    <button onClick={onClick} aria-label="Close" className={`flex size-8 shrink-0 items-center justify-center rounded-full shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6] max-md:size-10 ${className}`}>
       <svg width="12" height="12" viewBox="0 0 12 12">
         <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="#0A0A0A" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
