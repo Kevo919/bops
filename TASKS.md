@@ -121,6 +121,7 @@ Shared rules for 35–38:
 | 62 | Copy: "Works on" says "Your Mac" on Windows; stale "Claude local subscription not enabled" text in Profile | unassigned | TODO | | [CLOUD] S |
 | 63 | Several instances of DeepSeek Harness and Hermes Agent: an "Agents you run" list (add, check, remove each; own home, address and key), and bots can hand a task to a named instance with the usual asks | lead's builder | DOING (feature/agent-instances) | | [CLOUD] research + build; [PC] live with Kevin's dsh app and the server's Hermes. Kevin, Nov 5 |
 | 64 | PC bot task: the bot's Chrome didn't start on port 9304 (found live by codex). Add plain diagnostics, fix the proven causes, retry on a busy port or stale lock | lead's builder | DOING (fix/pc-task-chrome-start) | | [CLOUD] fix; [PC] codex retest |
+| 65 | Tests already failing on windows-port that CI doesn't run or that fail locally: test-runner-mode (1), test-hosted-apps (1), test-chat-edge (won't load under react-server), test-chat-compact-ui, test-logins-ui, test-settings-page-ui, test-windows-fuses (Node 22 only), test-shared (won't load). Fix each, or mark it Node-24 only, and add the green ones to fork CI | unassigned | TODO | | [CLOUD] M. Found by builders, Nov 5 |
 
 ## Merged 2026-11-03 (lead, with Kevin's OK)
 #3, #1, #2, #10, #14, #13, #9, #6, #4, #12, #16. windows-port = 7c52c29. Post-merge checks: tsc 0; bot-ai 25, cli-agents 40, chat-providers 18, chat-tools 84, look 20, config 15, key-check 8, llms 11.
