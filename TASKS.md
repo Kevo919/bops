@@ -102,7 +102,7 @@ Shared rules for 35–38:
 | 43 | Easy phone pairing: a "Your phone" item in Settings with QR codes (get the app, Tailscale, pair); a Scan QR code button in the phone app; no confusing ":80" line | lead's builder | IN REVIEW (#77) | | Kevin, Nov 5 [CLOUD] build, tests, review; [PC] live phone pairing |
 | 44 | PC bot tasks on Kevin's Claude Code Max plan, plus a Settings box for an OpenAI key | lead's builder | APPROVED after fixes (#80), merging; live test on the PC next | | Kevin, Nov 5 [CLOUD] fixes + reviews; [PC] live task on the PC |
 | 45 | Dark mode that turns the whole app dark, every screen, with an automatic dark check | lead's builder | IN PROGRESS | | Kevin, Nov 5 [CLOUD] build + screenshot check; [PC] live look |
-| 46 | No blank screens: an automatic check of every page set up like Kevin's PC, then fixes ("How bots reach you" first) | lead's builder | IN PROGRESS | | Kevin, Nov 5 [CLOUD] check + fixes; [PC] live look |
+| 46 | No blank screens: an automatic check of every page set up like Kevin's PC, then fixes ("How bots reach you" first) | lead's builder | MERGED (#82, e0de2da); live look on the PC next | | Kevin, Nov 5 [CLOUD] check + fixes; [PC] live look |
 | 47 | Widgets, tabs and pages added by asking Boppy in chat (widgets most important) | lead's builder | IN PROGRESS (phase 1) | | Kevin, Nov 5 [CLOUD] build + tests; [PC] live try |
 | 48 | Animations: a place in Settings → Look to change them (Off, Subtle, Normal, Lively, plus speed), also by chat | lead's builder | IN PROGRESS (with 47) | | Kevin, Nov 5 [CLOUD] with 47; [PC] live try |
 | 49 | COMPETITORS.md: Bops vs Meta Muse, ChatGPT Dots, Grok Bot and other leaders, with the gaps to work on | lead (research) | IN PROGRESS | | Kevin, Nov 5 [CLOUD] done |

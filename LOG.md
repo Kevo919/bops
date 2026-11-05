@@ -6,6 +6,11 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 9:30 AM (Chicago)
+- **Merged #82: no blank screens.** An automatic check opens every page set up like Kevin's PC. It found 4 empty or broken screens and they are fixed: How bots reach you, Email and phone, Memory, and Logins without Composio. Each now says what's missing. Next, a Settings screen to add those keys without editing files (task 59, building).
+- **#80 (PC tasks on your Claude plan) passed its second security review.** It merges once its checks re-run on the latest code. A live test on the PC comes after that.
+- The PC is offline, so all of this is queued for one rebuild and restart when it's back.
+
 ### Nov 5, 8:45 AM (Chicago)
 - **Merged #76** (Codex): the Memory screen now says plainly when memory isn't set up, instead of an error. CI was all green, and it was reviewed.
 - **PC rebuild pending:** the link to Kevin's PC dropped just now. The rebuild runs when the PC reconnects.
