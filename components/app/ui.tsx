@@ -2,7 +2,7 @@
 
 import { screenNo as screenNumber } from "@/lib/screens";
 import { askKind, needsYou } from "@/lib/asks";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { live, MAIN_WORKSPACE, WAITING_FOR_OK, waitingAsks, waitsForOk, workspaceOf, type AppState, type Bot, type Chat, type Logo, type Session } from "@/lib/types";
 import { Mascot, Spinner } from "./mascot";
 import { stateArrived } from "./state-arrival";
@@ -58,6 +58,24 @@ export { quietNothing } from "@/lib/types";
 
 export { needsYou };
 
+/**
+ * What the server said when it refused this window's state (403/401: a phone whose pairing was undone or made again, a
+ * browser tab without the app's own cookie), or null while it answers. Without it the first load spins forever.
+ */
+let refused: string | null = null;
+const refusedHeard = new Set<() => void>();
+const setRefused = (why: string | null) => {
+  if (why === refused) return;
+  refused = why;
+  for (const f of refusedHeard) f();
+};
+export const useStateRefused = () =>
+  useSyncExternalStore(
+    (f) => (refusedHeard.add(f), () => void refusedHeard.delete(f)),
+    () => refused,
+    () => null,
+  );
+
 export function useAppState() {
   const [state, setState] = useState<AppState | null>(null);
   const version = useRef(-1);
@@ -70,8 +88,9 @@ export function useAppState() {
       try {
         // The version we have: an unchanged state comes back as just the version (no 400 KB to parse).
         const res = await fetch(`/api/state?v=${version.current}`, { cache: "no-store" });
-        const json = (await res.json()) as { version: number; state?: AppState };
+        const json = (await res.json()) as { version: number; state?: AppState; error?: string };
         if (seq < applied) return; // a newer fetch already landed
+        setRefused(res.status === 401 || res.status === 403 ? json.error || "Not allowed." : null);
         applied = seq;
         if (json.state && json.version !== version.current) {
           version.current = json.version;
