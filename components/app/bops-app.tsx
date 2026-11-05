@@ -1754,10 +1754,10 @@ function MobileRows({ info, onInfo }: { info: PhoneInfo; onInfo: (p: PhoneInfo) 
 function SetUpHere({ service, line, button }: { service: ServiceRow; line: string; button: string }) {
   const openSettings = useContext(OpenSettings);
   return (
-    <span className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12.5px] leading-[18px] text-[#6B6B6B]">
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12.5px] leading-[18px] text-pencil">
       {line}
       {openSettings && (
-        <button data-open-service={service} onClick={() => openSettings("services", { service })} className="rounded-full bg-[#F2F2F0] px-3 py-1 text-[12.5px] font-medium leading-4 text-ink hover:bg-[#EAEAE7]">
+        <button data-open-service={service} onClick={() => openSettings("services", { service })} className="rounded-full bg-desk px-3 py-1 text-[12.5px] font-medium leading-4 text-ink hover:bg-rule">
           {button}
         </button>
       )}
@@ -1774,7 +1774,7 @@ function ReachNotSetUp({ title = "How your bots reach you", intro }: { title?: s
   const selfHosted = useSelfHosted();
   const openSettings = useContext(OpenSettings);
   const open = (service: ServiceRow) => openSettings?.("services", { service });
-  const btn = "rounded-full bg-[#F2F2F0] px-3 py-1.5 text-[12.5px] font-medium leading-4 hover:bg-[#EAEAE7]";
+  const btn = "rounded-full bg-desk px-3 py-1.5 text-[12.5px] font-medium leading-4 hover:bg-rule";
   return (
     <div data-reach-off className="flex flex-col gap-2 px-[22px] pt-4">
       <div className="flex flex-col gap-0.5">

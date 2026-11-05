@@ -104,7 +104,7 @@ async function call(fn, init) {
 const save = (service, name, value, init = {}) => call(route.POST, { method: "POST", body: { service, name, value }, ...init });
 
 mkdirSync(join(tmp, "app"), { recursive: true });
-writeFileSync(envFile, "# Bops settings\nBOPS_SELF_HOSTED=1\nOPENAI_API_KEY=keep-this-line\n");
+writeFileSync(envFile, "# Bops settings\nBOPS_SELF_HOSTED=1\nOPENAI_API_KEY=keep-this-line\n", { mode: 0o600 });
 
 await test("owner gate: the owner's desktop window gets the boxes; saving works for them", async () => {
   const v = await call(route.GET);
@@ -166,7 +166,7 @@ await test("newline and = injection refused, with the file untouched", async () 
     ["memory", "HONCHO_API_KEY", `"${KEYS.HONCHO_API_KEY}"`],
     ["phone", "BOPS_AGENTPHONE_HOOK_URL", "https://example.com/hooks\nBOPS_SELF_HOSTED=0"],
     ["phone", "BOPS_AGENTPHONE_HOOK_URL", "http://example.com/hooks/agentphone"],
-    ["phone", "BOPS_AGENTPHONE_HOOK_URL", "https://example.com/hooks?x=1"],
+    ["phone", "BOPS_AGENTPHONE_HOOK_URL", "https://example.com/hooks#frag"],
     ["zapier", "ZAPIER_MCP_URL", "https://evil.example.com/api/mcp/s/x/mcp"],
     ["zapier", "ZAPIER_MCP_URL", "https://user:pw@mcp.zapier.com/api/mcp/s/x/mcp"],
     ["memory", "BOPS_SELF_HOSTED", "0"],
@@ -189,7 +189,7 @@ await test("newline and = injection refused, with the file untouched", async () 
 
 await test("Composio (your account): #83's own rules (https on connect.composio.dev only, a Platform ak_ key refused), saved and masked", async () => {
   assert.ok(services.looksLikeComposioMcpUrl("https://connect.composio.dev/mcp"));
-  for (const bad of ["http://connect.composio.dev/mcp", "https://evil.example/mcp", "https://connect.composio.dev:8443/mcp", "https://a:b@connect.composio.dev/mcp", "https://connect.composio.dev.evil.example/mcp", "https://connect.composio.dev/mcp?x=1"])
+  for (const bad of ["http://connect.composio.dev/mcp", "https://evil.example/mcp", "https://connect.composio.dev:8443/mcp", "https://a:b@connect.composio.dev/mcp", "https://connect.composio.dev.evil.example/mcp", "https://connect.composio.dev/mcp#x"])
     assert.ok(!services.looksLikeComposioMcpUrl(bad), bad);
   const ak = ["ak", "x".repeat(12)].join("_");
   const ck = ["ck", "x".repeat(12), "K9z8"].join("_");
@@ -244,7 +244,7 @@ await test("the atomic write: other lines kept, the setting replaced not doubled
   assert.equal(text.match(/^AGENTMAIL_API_KEY=/gm).length, 1, "one line per setting");
   assert.ok(text.includes(`AGENTMAIL_API_KEY=${newer}\n`));
   assert.equal(envLocal.readEnvLocalValue(envFile, "AGENTMAIL_API_KEY"), newer);
-  if (process.platform !== "win32") assert.equal(statSync(envFile).mode & 0o777, 0o600, "owner only");
+  if (process.platform !== "win32") assert.equal(statSync(envFile).mode & 0o777, 0o600, "owner only, as it was");
   assert.ok(!readdirSync(join(tmp, "app")).some((f) => f.endsWith(".tmp")), "no .tmp file left");
   // A move that fails (the target is a folder): plain words, no path, no copy of the key left behind.
   const blocked = join(tmp, "blocked", ".env.local");
@@ -293,8 +293,80 @@ await test("signed in with Orgo: status from Bops Cloud, no boxes, no self-hoste
   assert.ok(v.json.services.every((s) => !s.fields && !/\.env\.local/.test(s.words)));
 });
 
+await test("$ (expanded by dotenv-expand), # and NUL refused in every kind of value; = in an address is quoted instead", async () => {
+  const before = readFileSync(envFile, "utf8");
+  const dollar = ["$", "HOME"].join("");
+  const nul = String.fromCharCode(0);
+  const bad = [
+    ["memory", "HONCHO_API_KEY", `${KEYS.HONCHO_API_KEY}${dollar}`],
+    ["memory", "HONCHO_API_KEY", `${KEYS.HONCHO_API_KEY}${nul}`],
+    ["phone", "BOPS_AGENTPHONE_HOOK_URL", `https://hooks.example.com/${dollar}/agentphone`],
+    ["phone", "BOPS_AGENTPHONE_HOOK_URL", `https://hooks.example.com/a${nul}b`],
+    ["phone", "BOPS_AGENTPHONE_HOOK_URL", 'https://hooks.example.com/a"b'],
+    ["zapier", "ZAPIER_MCP_URL", `https://mcp.zapier.com/api/mcp/s/${dollar}/mcp`],
+    ["zapier", "ZAPIER_MCP_URL", "https://mcp.zapier.com/api/mcp/s/abc/mcp#x"],
+    ["zapier", "ZAPIER_MCP_URL", `https://mcp.zapier.com/api/mcp/s/a${nul}b/mcp`],
+    ["composio-account", "COMPOSIO_MCP_URL", `https://connect.composio.dev/mcp/${dollar}`],
+    ["composio-account", "COMPOSIO_MCP_URL", "https://connect.composio.dev/mcp#x"],
+    ["composio-account", "COMPOSIO_MCP_URL", `https://connect.composio.dev/mc${nul}p`],
+    ["composio-account", "COMPOSIO_MCP_KEY", ["ck", "x".repeat(12) + dollar].join("_")],
+  ];
+  for (const [service, name, value] of bad) assert.equal((await save(service, name, value)).status, 400, `${name} ${JSON.stringify(value)}`);
+  assert.equal(readFileSync(envFile, "utf8"), before);
+  // The writer refuses them whoever calls it, even with a validator that lets anything through.
+  for (const v of [`abc${dollar}def`, `abc${nul}def`, 'abc"def', "abc\\def"]) assert.throws(() => envLocal.setEnvLocal(envFile, "HONCHO_API_KEY", v, () => true), /doesn't look like a key/, JSON.stringify(v));
+  // An address with a query string is written in double quotes, read back whole.
+  const withQuery = "https://hooks.example.com/hooks/agentphone?team=main&x=1";
+  assert.equal((await save("phone", "BOPS_AGENTPHONE_HOOK_URL", withQuery)).status, 200);
+  assert.ok(readFileSync(envFile, "utf8").includes(`BOPS_AGENTPHONE_HOOK_URL="${withQuery}"\n`));
+  assert.equal(envLocal.readEnvLocalValue(envFile, "BOPS_AGENTPHONE_HOOK_URL"), withQuery);
+  assert.equal((await save("phone", "BOPS_AGENTPHONE_HOOK_URL", "https://hooks.example.com/hooks/agentphone")).status, 200);
+});
+
+await test("the file's own line endings and permissions are kept", async () => {
+  const crlf = join(tmp, "crlf", ".env.local");
+  mkdirSync(join(tmp, "crlf"), { recursive: true });
+  writeFileSync(crlf, "# Windows\r\nBOPS_SELF_HOSTED=1\r\n", { mode: 0o644 });
+  envLocal.setEnvLocal(crlf, "HONCHO_API_KEY", KEYS.HONCHO_API_KEY);
+  assert.equal(readFileSync(crlf, "utf8"), `# Windows\r\nBOPS_SELF_HOSTED=1\r\nHONCHO_API_KEY=${KEYS.HONCHO_API_KEY}\r\n`);
+  if (process.platform !== "win32") assert.equal(statSync(crlf).mode & 0o777, 0o644, "its permissions as they were");
+  const fresh = join(tmp, "fresh", ".env.local");
+  envLocal.setEnvLocal(fresh, "HONCHO_API_KEY", KEYS.HONCHO_API_KEY);
+  assert.equal(readFileSync(fresh, "utf8"), `HONCHO_API_KEY=${KEYS.HONCHO_API_KEY}\n`);
+  if (process.platform !== "win32") assert.equal(statSync(fresh).mode & 0o777, 0o600, "a new file is owner only");
+});
+
+await test("masking: the last four only for a key of 16 or more characters, also one from the running environment", async () => {
+  assert.equal(envLocal.maskKey("x".repeat(15)), "saved");
+  assert.equal(envLocal.maskKey(["k", "x".repeat(14), "Ab12"].join("")), "ends in Ab12");
+  assert.equal(envLocal.maskKey(undefined), "");
+  const short = fake("sh", "x".repeat(7)); // 10 characters
+  assert.equal((await save("mail", "AGENTMAIL_API_KEY", short)).status, 200);
+  let mail = (await call(route.GET)).json.services.find((s) => s.id === "mail");
+  assert.equal(mail.fields[0].shown, "saved", "a short key shows none of itself");
+  // A key Bops started with from its environment, not in .env.local: masked the same way.
+  const fromEnv = fake("env", "only", "x".repeat(8), "Q7r6");
+  const envOnly = join(tmp, "envonly", ".env.local");
+  mkdirSync(join(tmp, "envonly"), { recursive: true });
+  writeFileSync(envOnly, "BOPS_SELF_HOSTED=1\n");
+  process.env.BOPS_ENV_LOCAL = envOnly;
+  process.env.AGENTMAIL_API_KEY = fromEnv;
+  try {
+    mail = (await call(route.GET)).json.services.find((s) => s.id === "mail");
+    assert.equal(mail.status, "on");
+    assert.equal(mail.fields[0].shown, "ends in Q7r6");
+    process.env.AGENTMAIL_API_KEY = "envshort1";
+    mail = (await call(route.GET)).json.services.find((s) => s.id === "mail");
+    assert.equal(mail.fields[0].shown, "saved");
+  } finally {
+    delete process.env.AGENTMAIL_API_KEY;
+    process.env.BOPS_ENV_LOCAL = envFile;
+  }
+  globalThis.__more = [short, fromEnv, "envshort1"];
+});
+
 await test("keys never in any answer, log line or the state", async () => {
-  const secrets = [...Object.values(KEYS), fake("fake", "mail", "y".repeat(8), "N9e0"), ZAPIER_URL, globalThis.__ck];
+  const secrets = [...Object.values(KEYS), fake("fake", "mail", "y".repeat(8), "N9e0"), ZAPIER_URL, globalThis.__ck, ...(globalThis.__more ?? [])];
   const everything = [...answers, ...logs, JSON.stringify(fakeState)].join("\n");
   for (const k of secrets) assert.ok(!everything.includes(k), `a key leaked (one ending ${k.slice(-4)})`);
   assert.ok(answers.length > 20, "every answer above was looked at");

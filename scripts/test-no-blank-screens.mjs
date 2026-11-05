@@ -46,7 +46,15 @@ const warnings = [];
 async function check(name, fn) {
   if (process.env.ONLY && !new RegExp(process.env.ONLY, "i").test(name)) return;
   try {
-    await fn();
+    try {
+      await fn();
+    } catch (e) {
+      // The browser's tab crashed (not the app): a new tab, and this screen once more.
+      if (!(crashed || /Target crashed|Page crashed|Target page, context or browser has been closed/.test(String(e.message ?? e)))) throw e;
+      results.push(`info ${name}: the browser's tab crashed; tried again in a new tab`);
+      await newTab();
+      await fn();
+    }
     results.push(`ok   ${name}`);
   } catch (e) {
     failed++;
@@ -220,22 +228,35 @@ await ctx.route("**/*", async (route) => {
   }
   return route.continue();
 });
-const page = await ctx.newPage();
 let seen = { errors: [], api5xx: [] };
-page.on("pageerror", (e) => seen.errors.push(`threw: ${String(e).slice(0, 200)}`));
-page.on("console", (m) => {
-  if (m.type() !== "error") return;
-  const t = m.text();
-  if (/ERR_BLOCKED_BY_CLIENT/.test(t)) return; // our own refusal of the internet, above
-  const at = m.location()?.url ? ` (${new URL(m.location().url).pathname})` : "";
-  // An app's logo is fetched from the web by the server, refused here (the preload): a 404 the page draws a letter for.
-  if (/status of 404/.test(t) && /\/api\/apps\/logo\//.test(at)) return;
-  seen.errors.push(`console: ${t.slice(0, 200)}${at}`);
-});
-page.on("response", (r) => {
-  const u = new URL(r.url());
-  if (u.pathname.startsWith("/api/") && r.status() >= 500) seen.api5xx.push(`${r.status()} ${r.request().method()} ${u.pathname}`);
-});
+/**
+ * The tab every screen is looked at in. Headless Chromium's renderer can crash on this machine (out of memory, not
+ * the app: it shows as "Target crashed" with no page error first); then a new tab takes its place, and the screen it
+ * crashed on is tried once more (check, above), so one crash doesn't fail every screen after it.
+ */
+let page;
+let crashed = false;
+async function newTab() {
+  if (page && !page.isClosed()) await page.close().catch(() => {});
+  page = await ctx.newPage();
+  crashed = false;
+  page.on("crash", () => (crashed = true));
+  page.on("pageerror", (e) => seen.errors.push(`threw: ${String(e).slice(0, 200)}`));
+  page.on("console", (m) => {
+    if (m.type() !== "error") return;
+    const t = m.text();
+    if (/ERR_BLOCKED_BY_CLIENT/.test(t)) return; // our own refusal of the internet, above
+    const at = m.location()?.url ? ` (${new URL(m.location().url).pathname})` : "";
+    // An app's logo is fetched from the web by the server, refused here (the preload): a 404 the page draws a letter for.
+    if (/status of 404/.test(t) && /\/api\/apps\/logo\//.test(at)) return;
+    seen.errors.push(`console: ${t.slice(0, 200)}${at}`);
+  });
+  page.on("response", (r) => {
+    const u = new URL(r.url());
+    if (u.pathname.startsWith("/api/") && r.status() >= 500) seen.api5xx.push(`${r.status()} ${r.request().method()} ${u.pathname}`);
+  });
+}
+await newTab();
 
 const shots = process.env.SHOTS || "/tmp/claude-0/qa-shots";
 mkdirSync(shots, { recursive: true });
@@ -294,24 +315,65 @@ async function judge(name, sel, head) {
   assert.deepEqual(problems, [], `${name}`);
 }
 
+/** One wait, with its own timeout, failing with what it was waiting for (not just "Timeout exceeded"). */
+async function step(label, ms, fn) {
+  try {
+    return await fn(ms);
+  } catch (e) {
+    throw new Error(`waiting for ${label} (${ms} ms): ${String(e.message ?? e).split("\n")[0]}`);
+  }
+}
+
+/**
+ * The window, loaded afresh and ready: the page, the sidebar, the state's first answer, and the account button that
+ * opens Settings (no fixed sleep: each is waited for, each with its own timeout).
+ */
 async function fresh() {
   seen = { errors: [], api5xx: [] };
-  await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
-  await page.locator("aside").first().waitFor({ timeout: 30000 });
-  await page.waitForTimeout(600);
+  if (crashed || page.isClosed()) await newTab();
+  const stateRead = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/state" && r.request().method() === "GET", { timeout: 30000 }).catch(() => null);
+  await step("the page to load", 30000, (ms) => page.goto(`${BASE}/`, { waitUntil: "domcontentloaded", timeout: ms }));
+  await step("the sidebar", 30000, (ms) => page.locator("aside").first().waitFor({ state: "visible", timeout: ms }));
+  await stateRead;
+  await step("the account button", 15000, (ms) => button(/team, account and settings/, false).waitFor({ state: "visible", timeout: ms }));
+  await step("the page to settle", 10000, (ms) => page.waitForLoadState("load", { timeout: ms }));
 }
 const button = (name, exact = true) => page.getByRole("button", { name, exact }).first();
 const row = (name) => page.locator("aside button").filter({ hasText: new RegExp(`^\\s*${name}`) }).first();
+/** Settings, from the account menu: tried again (up to three times) when a click lands before the menu is ready. */
 async function openSettings() {
-  await button(/team, account and settings/, false).click();
-  await page.getByRole("menuitem", { name: "Settings", exact: true }).first().click();
-  await page.locator('nav[aria-label="Settings"]').waitFor({ state: "visible" });
+  const nav = page.locator('nav[aria-label="Settings"]');
+  for (let i = 1; ; i++) {
+    try {
+      await step("the account menu's button", 10000, (ms) => button(/team, account and settings/, false).click({ timeout: ms }));
+      await step("the account menu's Settings", 5000, (ms) => page.getByRole("menuitem", { name: "Settings", exact: true }).first().click({ timeout: ms }));
+      await step("Settings to open", 5000, (ms) => nav.waitFor({ state: "visible", timeout: ms }));
+      return;
+    } catch (e) {
+      if (i >= 3) throw new Error(`Settings didn't open after ${i} tries: ${e.message}`);
+      await page.keyboard.press("Escape").catch(() => {});
+    }
+  }
 }
 
 try {
   // ---- Settings: every place in its nav ----------------------------------------------------------------------------
   await fresh();
   await openSettings();
+  // Some places come in once their own read answers (Your phone, after /api/remote): read the nav once it has held
+  // still for a second (at most 8 seconds), not at the first paint.
+  await step("Settings' nav to settle", 8000, async (ms) => {
+    let last = -1;
+    let still = 0;
+    for (const end = Date.now() + ms; Date.now() < end; ) {
+      const n = await page.locator("[data-settings-nav]").count();
+      still = n === last ? still + 1 : 0;
+      last = n;
+      if (still >= 4) return;
+      await page.waitForTimeout(250);
+    }
+    throw new Error(`still changing (${last} places)`);
+  });
   const places = await page.locator("[data-settings-nav]").evaluateAll((els) => els.map((e) => [e.getAttribute("data-settings-nav"), e.innerText.trim().split("\n")[0]]));
   results.push(`info Settings' nav here: ${places.map(([, n]) => n).join(", ")}`);
   await check("Settings' nav names This PC (a Windows PC's words)", async () => {
@@ -321,8 +383,14 @@ try {
     await check(`Settings, ${label}`, async () => {
       await fresh();
       await openSettings();
-      await page.locator(`[data-settings-nav="${p}"]`).click();
-      await page.locator(`main[data-settings-pane="${p}"]`).waitFor({ state: "visible" });
+      // Logins reads Composio's accounts again as it opens (PATCH /api/apps): wait for that answer, and its page.
+      const synced = p === "logins" ? page.waitForResponse((r) => new URL(r.url()).pathname === "/api/apps" && r.request().method() === "PATCH", { timeout: 20000 }) : null;
+      await step(`${label} in the nav`, 10000, (ms) => page.locator(`[data-settings-nav="${p}"]`).click({ timeout: ms }));
+      await step(`the ${label} pane`, 15000, (ms) => page.locator(`main[data-settings-pane="${p}"]`).waitFor({ state: "visible", timeout: ms }));
+      if (synced) {
+        await step("the Logins page", 15000, (ms) => page.locator("[data-logins]").waitFor({ state: "visible", timeout: ms }));
+        await step("PATCH /api/apps to answer", 20000, () => synced);
+      }
       await judge(`settings-${p}`, `main[data-settings-pane="${p}"]`, "[data-pane-head]");
     });
 
@@ -331,6 +399,7 @@ try {
     await fresh();
     await openSettings();
     await page.locator('[data-settings-nav="logins"]').click();
+    await step("the Logins page", 15000, (ms) => page.locator("[data-logins]").waitFor({ state: "visible", timeout: ms }));
     await button("Connect").click();
     await page.getByRole("button", { name: /^An app/ }).click();
     await page.locator("[data-app-picker]").waitFor({ state: "visible" });
@@ -372,6 +441,7 @@ try {
     await fresh();
     await openSettings();
     await page.locator('[data-settings-nav="logins"]').click();
+    await step("the Logins page", 15000, (ms) => page.locator("[data-logins]").waitFor({ state: "visible", timeout: ms }));
     await button("Connect").click();
     await page.getByRole("button", { name: /^An app/ }).click();
     await page.locator("[data-app-picker] [data-open-service=apps]").click();

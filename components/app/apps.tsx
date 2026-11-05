@@ -64,7 +64,7 @@ function AppsOff() {
         Keys and website logins work without it, and your bots can still use any app on their computer.
       </span>
       {selfHosted && openSettings && (
-        <button data-open-service="apps" onClick={() => openSettings("services", { service: "apps" })} className="mt-1 self-start rounded-full bg-[#F2F2F0] px-3 py-1.5 text-[12.5px] font-medium leading-4 text-ink hover:bg-[#EAEAE7]">
+        <button data-open-service="apps" onClick={() => openSettings("services", { service: "apps" })} className="mt-1 self-start rounded-full bg-desk px-3 py-1.5 text-[12.5px] font-medium leading-4 text-ink hover:bg-rule">
           Add a Composio key
         </button>
       )}

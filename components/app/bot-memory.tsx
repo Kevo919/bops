@@ -120,7 +120,7 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
                 : "Bops Cloud runs memory for you while you're signed in with Orgo, and it isn't on for your account right now. Until then, use Edit to write down what it should remember."}
           </span>
           {selfHosted && !state.shared && openSettings && (
-            <button data-open-service="memory" onClick={() => openSettings("services", { service: "memory" })} className="self-start rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F2F2F0]">
+            <button data-open-service="memory" onClick={() => openSettings("services", { service: "memory" })} className="self-start rounded-full bg-paper px-3 py-1.5 text-[12.5px] font-medium leading-4 shadow-[0_0_0_1px_var(--color-rule)] hover:bg-desk">
               Add a Honcho key
             </button>
           )}

@@ -51,7 +51,8 @@ type Service = {
  * (your account) uses composio-mcp.ts's own, below.)
  */
 const onHost = (v: string, ok: (host: string) => boolean) => {
-  if (/[\s=]/.test(v) || v.length > 1000) return false;
+  // No space, `$`, `#` (a fragment) or NUL; `=` (a query string) is fine: it's written quoted (env-local.ts).
+  if (/[\s$#\0]/.test(v) || v.length > 1000) return false;
   try {
     const u = new URL(v);
     const host = u.hostname.toLowerCase().replace(/\.$/, "");
@@ -61,7 +62,7 @@ const onHost = (v: string, ok: (host: string) => boolean) => {
   }
 };
 /** Composio (your account): #83's own rules (composio-mcp.ts), so this screen and the chat agree on what's usable. */
-export const looksLikeComposioMcpUrl = (v: string) => !/[\s=]/.test(v) && !!composioMcpUrl(v);
+export const looksLikeComposioMcpUrl = (v: string) => !/[\s$#\0]/.test(v) && v.length <= 1000 && !!composioMcpUrl(v);
 export const looksLikeZapierMcpUrl = (v: string) => onHost(v, (h) => h === "zapier.com" || h.endsWith(".zapier.com"));
 export { composioMcpKeyProblem };
 
