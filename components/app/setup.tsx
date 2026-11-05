@@ -749,9 +749,12 @@ type Remote = {
   help?: { app: string; tailscale: string };
 };
 
-/** A QR code the server made itself (qrcode), never anything from outside, on white with its quiet zone. */
+/**
+ * A QR code the server made itself (qrcode), never anything from outside, on white with its quiet zone (drawn in the
+ * SVG, so it scales with it). `px` wide where there's room; on a narrow window it shrinks to the width, never cut off.
+ */
 function Qr({ svg, px, label }: { svg: string; px: number; label: string }) {
-  return <div role="img" aria-label={label} data-qr={label} className="shrink-0 rounded-[10px] bg-white shadow-[0_0_0_1px_#E6E6E3] [&>svg]:block [&>svg]:size-full" style={{ width: px, height: px }} dangerouslySetInnerHTML={{ __html: svg }} />;
+  return <div role="img" aria-label={label} data-qr={label} data-size={px} className="aspect-square w-full shrink-0 overflow-hidden rounded-[10px] bg-white shadow-[0_0_0_1px_#E6E6E3] [&>svg]:block [&>svg]:h-full [&>svg]:w-full" style={{ maxWidth: px }} dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
 function Step({ n, title, done, children }: { n: number; title: string; done?: boolean; children: React.ReactNode }) {
@@ -802,14 +805,18 @@ export function PhoneCard() {
   const [qr, setQr] = useState<string | null>(null);
   // Unpair and Pair again lock out the phone paired now at once: each is asked in place first.
   const [asking, setAsking] = useState<"unpair" | "again" | null>(null);
-  const load = useCallback(() => void fetch("/api/remote").then((x) => (x.ok ? x.json() : null)).then(setR).catch(() => {}), []);
+  // help=1: the app and Tailscale QR codes too, made only while this is open.
+  const load = useCallback(() => void fetch("/api/remote?help=1").then((x) => (x.ok ? x.json() : null)).then(setR).catch(() => {}), []);
+  const [refused, setRefused] = useState<string | null>(null);
   useEffect(load, [load]);
   if (!r) return null;
   // Never a home-network (plain http) address: the code would cross the wifi unencrypted.
   const where = r.addresses.public ?? r.addresses.tailnet[0] ?? null;
   const pairNow = async () => {
     const res = await post("/api/remote", {});
-    const body = (await res.json().catch(() => null)) as Remote | null;
+    const body = (await res.json().catch(() => null)) as (Remote & { error?: string }) | null;
+    // The server pairs only with an address a phone can use: without one it says so, and nothing changed.
+    setRefused(res.ok ? null : (body?.error ?? "Couldn't pair. Try again."));
     if (body?.code) setCode(body.code);
     setQr(body?.qr ?? null);
     load();
@@ -833,13 +840,13 @@ export function PhoneCard() {
         </div>
       </Step>
       <Step n={2} title="Tailscale" done={!!where}>
-        {r.addresses.tailnet.length ? (
-          <span data-tailscale="ready">
-            Ready. This computer&apos;s Tailscale address is <code className="select-all font-mono">{r.addresses.tailnet[0]}</code>. Turn on Tailscale on your phone too, signed in to the same account.
-          </span>
-        ) : r.addresses.public ? (
+        {r.addresses.public ? (
           <span data-tailscale="public">
             Not needed. This Bops has a secure public address, <code className="select-all font-mono">{r.addresses.public}</code>.
+          </span>
+        ) : r.addresses.tailnet.length ? (
+          <span data-tailscale="ready">
+            Ready. This computer&apos;s Tailscale address is <code className="select-all font-mono">{r.addresses.tailnet[0]}</code>. Turn on Tailscale on your phone too, signed in to the same account.
           </span>
         ) : (
           <div data-tailscale="missing" className="flex flex-col gap-1.5">
@@ -885,12 +892,17 @@ export function PhoneCard() {
             </span>
             <span className="text-pencil">This code is shown only now. Anyone with it can use your bots, so keep it to yourself.</span>
           </div>
+        ) : !where ? (
+          <span data-no-address>Finish step 2 first. Then press {r.paired ? "Pair again" : "Pair a phone"}, and a QR code shows here for the Bops app to scan.</span>
         ) : r.paired ? (
           <span>Your phone is paired. To use a different phone, press Pair again.</span>
-        ) : where ? (
-          <span>Press Pair a phone. A big QR code shows here for the Bops app to scan.</span>
         ) : (
-          <span data-no-address>Finish step 2 first. Then press Pair a phone, and a QR code shows here for the Bops app to scan.</span>
+          <span>Press Pair a phone. A big QR code shows here for the Bops app to scan.</span>
+        )}
+        {refused && !code && (
+          <span role="alert" className="text-[#B00020]">
+            {refused}
+          </span>
         )}
       </Step>
     </ol>
@@ -909,8 +921,8 @@ export function PhoneCard() {
             ? "Not paired. Three steps below."
             : "Not paired. Install Tailscale on this computer and your phone first (step 2)."
       }
-      // Paired with nothing new to show: the steps stay out of the way until Pair again.
-      below={!r.paired || code ? guide : undefined}
+      // Paired with nothing new to show and an address to use: the steps stay out of the way until Pair again.
+      below={!r.paired || code || !where ? guide : undefined}
     >
       {asking && r.paired ? (
         <div role="alertdialog" aria-label={asking === "unpair" ? "Unpair your phone" : "Pair a new phone"} className="flex flex-col gap-1.5 text-[12.5px] leading-5">
@@ -926,7 +938,8 @@ export function PhoneCard() {
         </div>
       ) : (
         <div className="flex gap-1.5">
-          <button onClick={() => (r.paired ? setAsking("again") : void pairNow())} className={r.paired ? light : dark}>
+          {/* Nothing to pair with until there's an address a phone can use (step 2): never a "Paired" no phone can reach. */}
+          <button onClick={() => (r.paired ? setAsking("again") : void pairNow())} disabled={!where} title={where ? undefined : "Do step 2 first: Tailscale"} className={r.paired ? light : dark}>
             {r.paired ? "Pair again" : "Pair a phone"}
           </button>
           {r.paired && (

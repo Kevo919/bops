@@ -56,4 +56,29 @@ class PairLinkTest {
         val scanned = PairLink.parse(link("http://100.101.102.103:3210")) as PairLink.Ok
         assertEquals("100.101.102.103:3210", PairLink.targetOf(PairLink.entered(scanned.address)))
     }
+
+    private val good = "a=http%3A%2F%2F100.64.0.1%3A3210&c=" + "a".repeat(43)
+
+    @Test fun otherParamsRefused() {
+        assertEquals(PairLink.Bad(PairLink.NOT_BOPS), PairLink.parse("bops://pair?$good&next=https%3A%2F%2Fevil.example.com"))
+        assertEquals(PairLink.Bad(PairLink.NOT_BOPS), PairLink.parse("bops://pair?x=1&$good"))
+        assertEquals(PairLink.Bad(PairLink.NOT_BOPS), PairLink.parse("bops://pair?$good&A=http%3A%2F%2F100.64.0.2%3A3210"))
+    }
+
+    @Test fun pathOnTheLinkRefused() {
+        assertEquals(PairLink.Bad(PairLink.NOT_BOPS), PairLink.parse("bops://pair/?$good"))
+        assertEquals(PairLink.Bad(PairLink.NOT_BOPS), PairLink.parse("bops://pair/extra?$good"))
+    }
+
+    @Test fun userInfoOnTheLinkRefused() =
+        assertEquals(PairLink.Bad(PairLink.NOT_BOPS), PairLink.parse("bops://someone@pair?$good"))
+
+    @Test fun portOnTheLinkRefused() =
+        assertEquals(PairLink.Bad(PairLink.NOT_BOPS), PairLink.parse("bops://pair:8080?$good"))
+
+    @Test fun fragmentOnTheLinkRefused() =
+        assertEquals(PairLink.Bad(PairLink.NOT_BOPS), PairLink.parse("bops://pair?$good#more"))
+
+    @Test fun theExactLinkBopsMakesStillWorks() =
+        assertEquals(PairLink.Ok("http://100.64.0.1:3210", "a".repeat(43)), PairLink.parse("bops://pair?$good"))
 }

@@ -83,10 +83,12 @@ const NONE = { tailnet: [], home: ["http://192.168.1.20:3210"], public: null };
 globalThis.__remote = { paired: false, addresses: TAILNET };
 // Whether this is the owner's own Bops window: when not, /api/remote says no (403), as the route's check does.
 let window_ = true;
+const calls = [];
 // The page's fetch goes straight to the real route handlers.
 globalThis.fetch = async (input, init = {}) => {
   const path = typeof input === "string" ? input : input.url;
-  if (path !== "/api/remote") return new Response("{}", { status: 404 });
+  if (path.split("?")[0] !== "/api/remote") return new Response("{}", { status: 404 });
+  calls.push(`${init.method ?? "GET"} ${path}`);
   if (!window_) return new Response(JSON.stringify({ error: "A phone can only be paired in the Bops app." }), { status: 403 });
   const method = init.method ?? "GET";
   return route[method](new Request(`http://localhost:3210${path}`, { method }));
@@ -119,7 +121,13 @@ const click = async (box, label) => {
 };
 const step = (box, n) => box.querySelector(`[data-step="${n}"]`);
 const qr = (box, label) => box.querySelector(`[data-qr="${label}"]`);
-const px = (el) => Number(/width:\s*(\d+)px/.exec(el.getAttribute("style") ?? "")?.[1] ?? 0);
+// How wide a QR code is drawn where there's room: its max width (it shrinks to a narrow window, never cut off).
+const px = (el) => {
+  const max = Number(/max-width:\s*(\d+)px/.exec(el.getAttribute("style") ?? "")?.[1] ?? 0);
+  assert.match(el.getAttribute("class"), /\bw-full\b/, "fills the width up to it");
+  assert.match(el.getAttribute("class"), /\baspect-square\b/, "stays square as it shrinks");
+  return max;
+};
 const DASHES = /[‐‑‒–—―]| - /;
 // Shown text only: links and codes are what they are (the APK link has dashes in it).
 const words = (el) => {
@@ -175,11 +183,14 @@ await test("no Tailscale address: says exactly what to do, with Google Play QR, 
   assert.doesNotMatch(m.box.textContent, /192\.168\.1\.20/, "never offers the home address");
   assert.match(step(m.box, 3).textContent, /Finish step 2 first/);
   assert.doesNotMatch(m.box.textContent, /none yet\b(?! \(see step 2\))/);
-  // Pairing anyway: no QR (no safe address), and what to do instead of a bare "none yet".
+  // Nothing to pair with: Pair a phone is off, and pressing it anyway sends nothing.
+  const pairButton = [...m.box.querySelectorAll("button")].find((b) => b.textContent.trim() === "Pair a phone");
+  assert.ok(pairButton.disabled, "Pair a phone is off without a usable address");
+  calls.length = 0;
   await click(m.box, "Pair a phone");
-  const s3 = step(m.box, 3);
-  assert.equal(qr(s3, "Pairing QR code"), null);
-  assert.match(s3.querySelector("[data-no-address]").textContent, /no Tailscale address yet.*Do step 2, then press Pair again/);
+  assert.deepEqual(calls.filter((c) => c.startsWith("POST")), [], "nothing sent");
+  assert.equal(globalThis.__remote.paired, false, "not paired");
+  assert.equal(qr(step(m.box, 3), "Pairing QR code"), null);
   await m.done();
 });
 
@@ -211,9 +222,55 @@ await test("the pairing QR carries a bops://pair link with the Tailscale address
   const QR = (await import("qrcode")).default;
   const expected = await QR.toString(`bops://pair?a=${encodeURIComponent("http://100.64.0.7:3210")}&c=${"x".repeat(43)}`, { type: "svg", margin: 4, width: 264, errorCorrectionLevel: "M" });
   assert.equal(body.qr, expected);
+});
+
+await test("the server refuses to pair without a usable address, before it makes a code: no Paired that no phone can reach", async () => {
   globalThis.__remote = { paired: false, addresses: NONE };
-  const none = await (await route.POST(new Request("http://localhost:3210/api/remote", { method: "POST" }))).json();
-  assert.equal(none.qr, null, "no QR without a Tailscale or https address");
+  const res = await route.POST(new Request("http://localhost:3210/api/remote", { method: "POST" }));
+  assert.equal(res.status, 409);
+  const body = await res.json();
+  assert.equal(body.code, undefined, "no code");
+  assert.equal(body.qr, undefined, "no QR");
+  assert.match(body.error, /no Tailscale address yet/);
+  assert.equal(globalThis.__remote.paired, false, "pair() never ran");
+  // A phone paired before keeps working: a refused Pair again changes nothing.
+  globalThis.__remote = { paired: true, addresses: NONE };
+  assert.equal((await route.POST(new Request("http://localhost:3210/api/remote", { method: "POST" }))).status, 409);
+  assert.equal(globalThis.__remote.paired, true);
+});
+
+await test("paired but the address went away: the Tailscale step shows, and Pair again is off", async () => {
+  globalThis.__remote = { paired: true, addresses: NONE };
+  const m = await mount();
+  assert.ok(step(m.box, 2)?.querySelector('[data-tailscale="missing"]'), "step 2 says what to do");
+  assert.ok([...m.box.querySelectorAll("button")].find((b) => b.textContent.trim() === "Pair again").disabled);
+  assert.match(step(m.box, 3).textContent, /Finish step 2 first/);
+  await m.done();
+});
+
+await test("step 2 and the pairing QR show the same address (an https address wins over Tailscale in both)", async () => {
+  const both = { tailnet: ["http://100.64.0.7:3210"], home: [], public: "https://bops.example.com" };
+  globalThis.__remote = { paired: false, addresses: both };
+  const m = await mount();
+  const s2 = step(m.box, 2);
+  assert.ok(s2.querySelector('[data-tailscale="public"]'));
+  assert.equal(s2.querySelector("code").textContent, "https://bops.example.com");
+  await click(m.box, "Pair a phone");
+  assert.match(step(m.box, 3).textContent, /Address: https:\/\/bops\.example\.com/);
+  const body = await (await route.POST(new Request("http://localhost:3210/api/remote", { method: "POST" }))).json();
+  const QR = (await import("qrcode")).default;
+  assert.equal(body.qr, await QR.toString(`bops://pair?a=${encodeURIComponent("https://bops.example.com")}&c=${"x".repeat(43)}`, { type: "svg", margin: 4, width: 264, errorCorrectionLevel: "M" }));
+  await m.done();
+});
+
+await test("the app and Tailscale QR codes are made only for the open Your phone pane (help=1), never for Settings' plain check", async () => {
+  globalThis.__remote = { paired: false, addresses: TAILNET };
+  const plain = await (await route.GET(new Request("http://localhost:3210/api/remote"))).json();
+  assert.equal(plain.help, undefined, "no QR codes for a plain GET");
+  const open = await (await route.GET(new Request("http://localhost:3210/api/remote?help=1"))).json();
+  assert.match(open.help.app, /^<svg/);
+  const pairedBody = await (await route.POST(new Request("http://localhost:3210/api/remote", { method: "POST" }))).json();
+  assert.equal(pairedBody.help, undefined, "pairing makes only its own QR");
 });
 
 await test("paired: the steps stay out of the way until Pair again, which still asks first", async () => {
@@ -280,13 +337,17 @@ const press = (el) =>
 
 await test("Settings has Your phone right after How bots reach you, and it opens the three step pairing flow", async () => {
   window_ = true;
+  calls.length = 0;
   globalThis.__remote = { paired: false, addresses: TAILNET };
   const m = await mountEl(settings());
+  assert.ok(calls.includes("GET /api/remote"), "Settings asks the plain way, with no QR codes made");
+  assert.ok(!calls.some((c) => c.includes("help=1")), "no QR codes before Your phone opens");
   const ids = navIds(m.box);
   assert.equal(ids[ids.indexOf("reach") + 1], "phone", `Your phone right after How bots reach you: ${ids.join(", ")}`);
   const item = m.box.querySelector('[data-settings-nav="phone"]');
   assert.equal(item.textContent.trim(), "Your phone");
   await press(item);
+  assert.ok(calls.includes("GET /api/remote?help=1"), "the QR codes once Your phone is open");
   const main = m.box.querySelector('main[data-settings-pane="phone"]');
   assert.ok(main, "the Your phone pane");
   assert.match(main.textContent, /^Your phone/, "its heading first");

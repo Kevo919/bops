@@ -26,12 +26,16 @@ sealed class PairLink {
             val text = raw?.trim().orEmpty()
             val uri = try { URI(text) } catch (_: Exception) { return Bad(NOT_BOPS) }
             if (uri.scheme?.lowercase(Locale.ROOT) != "bops" || uri.host?.lowercase(Locale.ROOT) != "pair") return Bad(NOT_BOPS)
+            // Exactly bops://pair?…: no user information, port, path or fragment riding along on the link itself.
+            if (uri.rawUserInfo != null || uri.port != -1 || !uri.rawPath.isNullOrEmpty() || uri.rawFragment != null) return Bad(NOT_BOPS)
             val params = mutableMapOf<String, MutableList<String>>()
             for (part in uri.rawQuery.orEmpty().split('&')) {
                 if (part.isEmpty()) continue
                 val i = part.indexOf('=')
                 val key = decode(if (i < 0) part else part.substring(0, i)) ?: return Bad(NOT_BOPS)
                 val value = decode(if (i < 0) "" else part.substring(i + 1)) ?: return Bad(NOT_BOPS)
+                // Only a and c: anything else isn't what Bops makes, so the whole link is refused.
+                if (key != "a" && key != "c") return Bad(NOT_BOPS)
                 params.getOrPut(key) { mutableListOf() }.add(value)
             }
             // One of each, never two: no guessing which address or code was meant.
