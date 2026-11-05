@@ -2,6 +2,8 @@
 
 **TOP PRIORITY (Kevin, 2026-11-03 13:45 UTC): subscriptions. codex: 18 → 43 first, then the rest.**
 
+**Development rule (Kevin, Nov 5):** a feature still being built may show in the app, but grayed out with red "not set up yet" text and its percent complete, until it reaches 100%. The lead keeps the percents current in the in-progress registry.
+
 **Build status:** IN PROGRESS. (The lead writes BUILD DONE here when it's finished. All hourly checks stop then.)
 
 **PC HOLD:** LIFTED. PC GO as of 2026-11-03 13:10 UTC (Kevin restarted). Keep RAM use sane: stop Docker and emulators when you are done with them, and only one heavy build at a time. Before a build, check %TEMP%\bops-build.lock and create it while you build.
@@ -108,6 +110,7 @@ Shared rules for 35–38:
 | 55 | Gap #8: video, podcast and voice-over generation | unassigned | BACKLOG | | M |
 | 56 | Gap #9: WhatsApp channel (needs a Meta business account) | unassigned | BACKLOG | | S to M |
 | 57 | Gap #10: shopping and payments with approval | unassigned | BACKLOG | | L, high risk |
+| 58 | In-progress features show in the app grayed out, with red "not set up yet" text and a completion percent (one registry the lead updates; a reusable component; placeholders for widgets, animations, Composio account, PC tasks, phone) | lead's builder | IN PROGRESS (feature/in-progress-badges) | | Kevin, Nov 5 |
 
 ## Merged 2026-11-03 (lead, with Kevin's OK)
 #3, #1, #2, #10, #14, #13, #9, #6, #4, #12, #16. windows-port = 7c52c29. Post-merge checks: tsc 0; bot-ai 25, cli-agents 40, chat-providers 18, chat-tools 84, look 20, config 15, key-check 8, llms 11.
