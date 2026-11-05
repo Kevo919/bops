@@ -1840,7 +1840,7 @@ const NAMES_A_SITE = /\b(?:apps?|sites?|website|web ?pages?)\b/i;
 export const ASKS_ABOUT_LOOK = /\b(?:look\w*|theme\w*|colou?r\w*|dark\w*|light\w*|font\w*|text size|bigger|smaller|larger|compact|roomy|spacing|css|style\w*|accent\w*|zoom|sidebar|animat\w*|motion\w*|moving|movement|lively|subtle)\b/i;
 
 /** The owner's words about their widgets, pages or tabs (change_widgets). */
-export const ASKS_ABOUT_WIDGETS = /\b(?:widgets?|dashboards?|pages?|tabs?|home|homepage|clocks?|notes?|sticky|checklists?|to ?do|counters?|countdowns?|bookmarks?|links?|routines?|quick ask|status|needs you|pin\w*|unpin\w*|reorder|resize|move|remove|delete)\b/i;
+export const ASKS_ABOUT_WIDGETS = /\b(?:widgets?|dashboards?|pages?|tabs?|homepage|home ?screen)\b/i;
 
 /** Whether the owner's own latest message is about their widgets (change_widgets), on the same terms as the look's. */
 function ownerAskedForWidgets(chatId: string): boolean {

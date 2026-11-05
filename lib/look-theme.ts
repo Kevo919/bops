@@ -200,14 +200,20 @@ const MOTION_REACH: Record<MotionLevel, number> = { off: 0, subtle: 0.4, normal:
 const SPEED_TIME: Record<MotionSpeed, number> = { slow: 1.6, normal: 1, fast: 0.6 };
 const MOVING = '[class*="motion-"], [class*="mascot-"], [class*="animate-"], [class*="boppy-"]';
 const STILL = `${MOVING.split(", ").map((s) => `${s}, ${s}::before, ${s}::after`).join(", ")} {\n  animation: none !important;\n  transition: none !important;\n}`;
+/**
+ * And everything else that moves: every Tailwind transition (duration-200 and the rest), the pages sliding in, a
+ * scroll that glides. Durations go to nothing, so what changes is just there; nothing loops.
+ */
+const STILL_ALL = `*, *::before, *::after {\n  transition-duration: 0s !important;\n  transition-delay: 0s !important;\n  animation-duration: 0s !important;\n  animation-delay: 0s !important;\n  animation-iteration-count: 1 !important;\n  scroll-behavior: auto !important;\n}`;
 
 export function motionCss(level: MotionLevel = "normal", speed: MotionSpeed = "normal"): string {
-  if (level === "off") return `:root {\n  --motion-time: 0;\n  --motion-reach: 0;\n}\n${STILL}`;
+  if (level === "off") return `:root {\n  --motion-time: 0;\n  --motion-reach: 0;\n}\n${STILL}\n${STILL_ALL}`;
   const lines: string[] = [];
   const time = Math.round(MOTION_TIME[level] * SPEED_TIME[speed] * 100) / 100;
   const reach = MOTION_REACH[level];
-  if (time !== 1 || reach !== 1) lines.push(`:root {\n  --motion-time: ${time};\n  --motion-reach: ${reach};\n}`);
-  if (lines.length) lines.push(`@media (prefers-reduced-motion: reduce) {\n${STILL}\n}`);
+  // Tailwind's transitions with no duration of their own take --default-transition-duration (150ms): scaled the same.
+  if (time !== 1 || reach !== 1) lines.push(`:root {\n  --motion-time: ${time};\n  --motion-reach: ${reach};\n  --default-transition-duration: ${Math.round(150 * time)}ms;\n}`);
+  if (lines.length) lines.push(`@media (prefers-reduced-motion: reduce) {\n${STILL}\n${STILL_ALL}\n}`);
   return lines.join("\n");
 }
 

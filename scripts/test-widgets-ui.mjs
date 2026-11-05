@@ -75,6 +75,7 @@ const LAYOUT = {
         { id: "w_check", kind: "checklist", size: "medium", title: "This week", items: [{ text: "Collect rent", done: true }, { text: "Fix the fence", done: false }, { text: "Renew insurance", done: false }] },
         { id: "w_count2", kind: "countdown", size: "small", title: "Closing day", date: new Date(Date.now() + 12 * 864e5).toISOString().slice(0, 10) },
         { id: "w_evil", kind: "script", size: "wide" },
+        { id: "w_ghost", kind: "bot-status", size: "small", title: "Ghost", botId: "ghost" },
       ],
     },
     { id: "p_rent", name: "Rentals", widgets: [{ id: "w_rcheck", kind: "checklist", size: "wide", title: "Turnover", items: [{ text: "Paint unit 2", done: false }] }, { id: "w_rroutines", kind: "routines", size: "medium", botId: "rook" }] },
@@ -274,7 +275,8 @@ try {
     await p.locator('[data-widget-page="home"]').waitFor();
     await settle(p, 700);
     const kinds = await p.locator("[data-widget]").evaluateAll((els) => els.map((e) => e.dataset.widget));
-    assert.deepEqual(kinds, ["clock", "clock", "note", "routines", "needs-you", "bot-status", "quick-ask", "links", "counter", "checklist", "countdown"]);
+    assert.deepEqual(kinds, ["clock", "clock", "note", "routines", "needs-you", "bot-status", "quick-ask", "links", "counter", "checklist", "countdown", "bot-status"]);
+    assert.match(await p.locator('[data-widget-id="w_ghost"]').innerText(), /That bot isn't in this workspace/, "a bot from elsewhere is said, not swapped for the main bot");
     await noBlanks(p, "Home");
     assert.equal(await p.locator('[data-widget="links"] a').count(), 2, "only the two good links");
     assert.equal(await p.locator('a[href^="javascript"]').count(), 0);
@@ -295,6 +297,9 @@ try {
     await p.locator("[data-edit-widgets]").click();
     await settle(p);
     await shot(p, "home-edit");
+    const cut = await p.locator("[data-widget-title]").evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.innerText));
+    assert.deepEqual(cut, [], "titles cut short in Edit");
+    assert.equal(await p.locator('[data-widget-id="w_chi"] [data-widget-title]').innerText(), "CHICAGO");
     const first = p.locator("[data-widget]").first();
     await first.getByRole("radio", { name: "Wide" }).click();
     await settle(p);
@@ -354,6 +359,8 @@ try {
     await settle(p);
     assert.equal(await p.locator('[data-widget-page="home"]').count(), 1, "Esc closed Settings only, not the page under it");
     assert.equal(await anim(), "none", "Off: the widget's arrival doesn't play");
+    const slide = await p.locator("[data-widget-page]").evaluate((e) => getComputedStyle(e.parentElement).transitionDuration);
+    assert.equal(slide, "0s", "Off: the page's slide (a Tailwind duration-200) doesn't move either");
     await look({ action: "set", look: { motion: "lively", motion_speed: "slow" } });
     await settle(p, 900);
     assert.equal(await anim(), "widget-in");
@@ -386,6 +393,9 @@ try {
     const js = await fetch(`${BASE}/api/widgets`, { method: "POST", headers: owner, body: JSON.stringify({ changes: [{ action: "add_widget", kind: "links", links: [{ label: "x", url: "javascript:alert(1)" }] }] }) });
     assert.equal(js.status, 400);
     assert.match((await js.json()).error, /may only open a web page/);
+    const sneaky = await fetch(`${BASE}/api/widgets`, { method: "POST", headers: owner, body: JSON.stringify({ quiet: true, changes: [{ action: "add_page", name: "Sneaky" }] }) });
+    assert.equal(sneaky.status, 400, "quiet is only for using a widget");
+    assert.match((await sneaky.json()).error, /can skip Undo/);
     const kind = await fetch(`${BASE}/api/widgets`, { method: "POST", headers: owner, body: JSON.stringify({ changes: [{ action: "add_widget", kind: "iframe" }] }) });
     assert.equal(kind.status, 400);
   });

@@ -72,6 +72,25 @@ export type LayoutOp = {
   date?: string | null;
   tab?: string | null;
 };
+/** What using a widget changes (typing in a note, ticking a box, pressing a counter): the only fields a quiet change may carry. */
+export const CONTENT_FIELDS = ["text", "items", "value"] as const;
+/** The fields that only say which widget a change is about. */
+const WHICH = new Set(["action", "page", "widget"]);
+/**
+ * Whether every change only uses a widget (update_widget with nothing but CONTENT_FIELDS), the one kind of change
+ * kept off Undo's history (quiet). Adding, removing, moving, resizing and page changes always go on it.
+ */
+export function contentOnly(ops: unknown): boolean {
+  const list = Array.isArray(ops) ? ops : [ops];
+  return (
+    list.length > 0 &&
+    list.every((o) => {
+      if (!o || typeof o !== "object" || (o as LayoutOp).action !== "update_widget") return false;
+      const keys = Object.entries(o as Record<string, unknown>).filter(([, v]) => v !== undefined && v !== null).map(([k]) => k);
+      return keys.some((k) => (CONTENT_FIELDS as readonly string[]).includes(k)) && keys.every((k) => WHICH.has(k) || (CONTENT_FIELDS as readonly string[]).includes(k));
+    })
+  );
+}
 export const ACTIONS: readonly LayoutOp["action"][] = ["add_widget", "update_widget", "remove_widget", "move_widget", "add_page", "rename_page", "remove_page", "pin_tab", "unpin_tab"];
 
 /* ---------------- Checking one value ---------------- */

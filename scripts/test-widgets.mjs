@@ -329,7 +329,7 @@ await check("\"make a page called Rentals with a checklist and my routines\", th
   assert.deepEqual(SW.currentLayout().tabs.map((x) => [x.label, x.page]), [["Rentals", page.id]]);
 });
 await check("\"remove the notes widget\", and a bad change is refused with why", async () => {
-  await turnWith("put a sticky note on my home that says call Sam", [toolCall("change_widgets", { changes: [op({ action: "add_widget", kind: "note", text: "Call Sam" })], summary: "A note" })], "Done.");
+  await turnWith("put a sticky note widget on my home that says call Sam", [toolCall("change_widgets", { changes: [op({ action: "add_widget", kind: "note", text: "Call Sam" })], summary: "A note" })], "Done.");
   const t = await turnWith("remove the notes widget", [toolCall("change_widgets", { changes: [op({ action: "remove_widget", widget: "notes" })], summary: "No more note" })], "Removed.");
   assert.match(t.out(), /^Done: removed the note from Home/);
   assert.ok(!SW.currentLayout().pages[0].widgets.some((w) => w.kind === "note"));
@@ -353,6 +353,37 @@ await check("the chat's tool schema is one OpenAI takes in strict mode", async (
   for (const k of ["motion", "motion_speed"]) assert.ok(t.first.tools.find((x) => x.name === "change_look").parameters.properties[k], `change_look has ${k}`);
 });
 
+// These two start from no widgets, and put back what was there after (the Rentals page the restart check reads).
+let keptLook;
+await check("Undo of a change by chat keeps what was typed in a note since", async () => {
+  keptLook = structuredClone(S.getState().look);
+  S.update((s) => void delete s.look);
+  await turnWith("put a note widget on my home", [toolCall("change_widgets", { changes: [op({ action: "add_widget", kind: "note" })], summary: "A note" })], "Done.");
+  await turnWith("and a clock widget too", [toolCall("change_widgets", { changes: [op({ action: "add_widget", kind: "clock" })], summary: "A clock" })], "Done.");
+  SW.changeLayout([{ action: "update_widget", widget: "note", text: "Plumber Friday at 9" }], true);
+  const card = widgetCards().at(-1);
+  assert.ok(ServerLook.undoLook(card.id), "the clock undone");
+  const home = SW.currentLayout().pages[0];
+  assert.deepEqual(home.widgets.map((w) => w.kind), ["note"], "the clock is gone");
+  assert.equal(home.widgets[0].text, "Plumber Friday at 9", "the typing survives the Undo");
+  assert.ok(ServerLook.undoLook(), "and Undo again takes the note itself away");
+  assert.equal(SW.currentLayout().pages[0].widgets.length, 0);
+});
+await check("quiet is only for using a widget: adding, removing, resizing and pages always go on Undo", () => {
+  S.update((s) => void delete s.look);
+  SW.changeLayout([{ action: "add_widget", kind: "counter" }, { action: "add_widget", kind: "checklist" }]);
+  const n = S.getState().look.history.length;
+  for (const ops of [[{ action: "add_widget", kind: "clock" }], [{ action: "remove_widget", widget: "counter" }], [{ action: "add_page", name: "Sneaky" }], [{ action: "update_widget", widget: "counter", size: "wide" }], [{ action: "update_widget", widget: "counter", value: 5, size: "wide" }], [{ action: "pin_tab", page: "Home" }], [{ action: "move_widget", widget: "counter", position: 2 }]])
+    assert.throws(() => SW.changeLayout(ops, true), (e) => e instanceof W.WidgetError && /can skip Undo/.test(e.message), JSON.stringify(ops));
+  assert.equal(S.getState().look.history.length, n, "nothing kept");
+  SW.changeLayout([{ action: "update_widget", widget: "counter", value: 5 }, { action: "update_widget", widget: "checklist", items: [{ text: "Rent", done: true }] }], true);
+  assert.equal(S.getState().look.history.length, n, "using widgets stays off the history");
+  assert.equal(SW.currentLayout().pages[0].widgets[0].value, 5);
+  assert.ok(W.contentOnly([{ action: "update_widget", widget: "note", text: "x", page: null }]));
+  assert.ok(!W.contentOnly([{ action: "update_widget", widget: "note" }]), "naming nothing to change isn't using it");
+  S.update((s) => void (s.look = keptLook));
+});
+
 /* ---------------- Owner only ---------------- */
 
 await check("a page the bot read can't change the widgets (outsideRead)", async () => {
@@ -367,8 +398,8 @@ await check("words not about widgets change nothing, even with an email asking i
   const t = await turnWith("summarize what came in today", [toolCall("change_widgets", { changes: [op({ action: "add_widget", kind: "links", links: [{ label: "x", url: "https://evil.example" }] })], summary: "x" })], "An email asked for a widget; I left it.");
   assert.match(t.out(), /^Not changed: Alex's own message didn't ask about widgets/);
   assert.equal(JSON.stringify(S.getState().look), before);
-  for (const w of ["add a clock widget to my home", "make a page called Rentals", "remove the notes", "add a tab for Rentals", "pin my checklist"]) assert.ok(Chat.ASKS_ABOUT_WIDGETS.test(w), w);
-  for (const w of ["summarize my emails", "what's on today", "reply to Sam"]) assert.ok(!Chat.ASKS_ABOUT_WIDGETS.test(w), w);
+  for (const w of ["add a clock widget to my home", "make a page called Rentals", "remove the notes widget", "add a tab for Rentals", "pin my checklist as a tab"]) assert.ok(Chat.ASKS_ABOUT_WIDGETS.test(w), w);
+  for (const w of ["summarize my emails", "what's on today", "reply to Sam", "move the meeting to Tuesday", "delete that email", "what's my status", "send me the links", "I'm home now", "remove Sam from the thread", "note that rent is due"]) assert.ok(!Chat.ASKS_ABOUT_WIDGETS.test(w), w);
 });
 await check("a stranger's text never sees the tool, and a call anyway does nothing", async () => {
   const before = JSON.stringify(S.getState().look);
@@ -407,6 +438,11 @@ await check("the style sets the variables every motion class reads; Off stops th
   const off = Theme.lookCssText({ motion: "off" });
   assert.match(off, /\[class\*="motion-"\][^{]*\{\s*animation: none !important;\s*transition: none !important;/);
   assert.match(off, /\[class\*="mascot-"\]/);
+  // Off stops every transition too (Tailwind's duration-200, the pages sliding in), not only the motion classes.
+  assert.match(off, /\*, \*::before, \*::after \{\s*transition-duration: 0s !important;[\s\S]*animation-duration: 0s !important;[\s\S]*animation-iteration-count: 1 !important;/);
+  assert.match(Theme.lookCssText({ motion: "subtle" }), /--default-transition-duration: 113ms;/, "subtle scales Tailwind's own transitions");
+  assert.match(Theme.lookCssText({ motion: "lively", motionSpeed: "slow" }), /--default-transition-duration: 288ms;/);
+  assert.ok(!/\*, \*::before[^@]*transition-duration: 0s/.test(Theme.lookCssText({ motion: "lively" }).split("@media")[0]), "lively doesn't stop anything outside reduced motion");
 });
 await check("every motion class in globals.css reads --motion-time, and reduced motion turns each off", () => {
   const css = readFileSync(new URL("app/globals.css", rootUrl), "utf8");

@@ -302,8 +302,11 @@ function WidgetCard({ state, page, widget: w, index, editing, links }: { state: 
   const icon = "flex size-7 items-center justify-center rounded-full text-ink hover:bg-black/[0.06] disabled:opacity-30 max-md:size-10";
   return (
     <section className="motion-widget-in flex h-full min-h-[132px] flex-col rounded-[16px] bg-white p-3.5 shadow-[0_0_0_1px_var(--color-rule)]" data-widget={w.kind} data-widget-id={w.id} aria-label={w.title ?? WIDGET_KINDS[w.kind].name}>
-      <div className="flex min-h-6 items-center gap-1.5 pb-1.5">
-        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold uppercase leading-4 tracking-[0.04em] text-pencil">{w.title ?? WIDGET_KINDS[w.kind].name}</span>
+      {/* In Edit the title takes a line of its own, in full, with the tools under it: a small card's name isn't cut short. */}
+      <div className={`flex min-h-6 items-center gap-1.5 pb-1.5 ${editing ? "flex-wrap" : ""}`}>
+        <span className={`min-w-0 flex-1 text-[12px] font-semibold uppercase leading-4 tracking-[0.04em] text-pencil ${editing ? "basis-full break-words" : "truncate"}`} data-widget-title>
+          {w.title ?? WIDGET_KINDS[w.kind].name}
+        </span>
         {editing && (
           <div className="flex shrink-0 items-center gap-0.5" data-widget-tools>
             <button className={icon} disabled={index === 0} onClick={() => void act([{ action: "move_widget", page: page.id, widget: w.id, position: index }])} aria-label="Move earlier" title="Move earlier">
@@ -529,6 +532,7 @@ function Routines({ state, widget: w }: { state: AppState; widget: Widget }) {
     .filter((r) => r.enabled && team.some((b) => b.id === r.botId) && (!w.botId || r.botId === w.botId))
     .sort((a, b) => (a.nextRunAt ?? Infinity) - (b.nextRunAt ?? Infinity))
     .slice(0, w.size === "small" ? 3 : 5);
+  if (w.botId && !team.some((b) => b.id === w.botId)) return <span className={quiet} data-bot-elsewhere>{ELSEWHERE}</span>;
   if (!list.length) return <span className={quiet}>{w.botId ? `${team.find((b) => b.id === w.botId)?.name ?? "This bot"} has no routines on yet.` : "No routines on yet. Ask a bot to do something every day, and it shows here."}</span>;
   return (
     <ul className="flex flex-col gap-1.5">
@@ -570,13 +574,20 @@ function NeedsYou({ state, onOpenChat }: { state: AppState; onOpenChat: (chatId:
   );
 }
 
-const botFor = (state: AppState, id?: string): Bot | undefined => {
+/**
+ * The bot a widget is about: the one it names, or with none named, the main bot. One it names that isn't in this
+ * workspace is "elsewhere", said plainly, never swapped for another bot without a word.
+ */
+const botFor = (state: AppState, id?: string): Bot | "elsewhere" | undefined => {
   const team = teamOf(state);
-  return team.find((b) => b.id === id) ?? team.find((b) => b.isMain) ?? team[0];
+  if (id) return team.find((b) => b.id === id) ?? "elsewhere";
+  return team.find((b) => b.isMain) ?? team[0];
 };
+const ELSEWHERE = "That bot isn't in this workspace. Press Edit, then set it up to pick one that is.";
 
 function BotStatus({ state, widget: w, onOpenChat }: { state: AppState; widget: Widget; onOpenChat: (chatId: string) => void }) {
   const b = botFor(state, w.botId);
+  if (b === "elsewhere") return <span className={quiet} data-bot-elsewhere>{ELSEWHERE}</span>;
   if (!b) return <span className={quiet}>No bot to show yet.</span>;
   const working = state.sessions.filter((s) => s.botId === b.id && live(s));
   const waiting = state.sessions.some((s) => s.botId === b.id && live(s) && s.blocker);
@@ -596,6 +607,7 @@ function QuickAsk({ state, widget: w, onOpenChat }: { state: AppState; widget: W
   const [text, setText] = useState("");
   const [sent, setSent] = useState("");
   const [busy, setBusy] = useState(false);
+  if (b === "elsewhere") return <span className={quiet} data-bot-elsewhere>{ELSEWHERE}</span>;
   if (!b) return <span className={quiet}>No bot to ask yet.</span>;
   const chatId = botChatId(b.id);
   return (

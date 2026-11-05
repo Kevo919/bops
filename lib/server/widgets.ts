@@ -1,7 +1,8 @@
 import "server-only";
 import { addMessage, getState } from "./store";
 import { currentLook, setLook } from "./look";
-import { applyLayoutOps, normalizeLayout, WidgetError, type LayoutContext, type LayoutOp, type WidgetLayout } from "../widgets";
+import { update } from "./store";
+import { applyLayoutOps, CONTENT_FIELDS, contentOnly, normalizeLayout, WidgetError, type LayoutContext, type LayoutOp, type WidgetLayout } from "../widgets";
 import { normalizeLook } from "../look-theme";
 import type { Bot } from "../types";
 
@@ -24,9 +25,38 @@ const context = (): LayoutContext => ({ bots: getState().bots.map((b) => ({ id: 
  * note, a box ticked, a counter pressed), in place. Throws a WidgetError saying why when one is wrong.
  */
 export function changeLayout(ops: unknown, quiet = false): { layout: WidgetLayout; said: string[] } {
-  const r = applyLayoutOps(currentLayout(), ops, context());
+  // Only using a widget stays off Undo's history: anything else asked to be quiet is refused, not let through.
+  if (quiet && !contentOnly(ops)) throw new WidgetError("Only typing in a note, ticking a box or counting can skip Undo. Other changes must be undoable.");
+  const was = currentLayout();
+  const r = applyLayoutOps(was, ops, context());
   setLook({ ...currentLook(), layout: r.layout }, quiet);
+  if (quiet) keepThroughUndo(was, r.layout);
   return r;
+}
+
+/**
+ * What was typed, ticked or counted is the owner's newest content, not a change to undo: it's written into every
+ * look on the history that has that widget too, so an Undo of an earlier change (a widget added, a page made)
+ * never takes the typing back with it.
+ */
+function keepThroughUndo(was: WidgetLayout, layout: WidgetLayout) {
+  // The widgets whose content this change moved (they're named by kind or title in a change, so found by comparing).
+  const before = new Map(was.pages.flatMap((p) => p.widgets).map((w) => [w.id, w]));
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  const now = new Map(layout.pages.flatMap((p) => p.widgets).filter((w) => CONTENT_FIELDS.some((f) => !same(w[f], before.get(w.id)?.[f]))).map((w) => [w.id, w]));
+  if (!now.size) return;
+  update((s) => {
+    for (const look of s.look?.history ?? [])
+      for (const page of look.layout?.pages ?? [])
+        for (const w of page.widgets ?? []) {
+          const fresh = now.get(w.id);
+          if (!fresh || fresh.kind !== w.kind) continue;
+          for (const f of CONTENT_FIELDS) {
+            if (fresh[f] === undefined) delete w[f];
+            else (w as Record<string, unknown>)[f] = structuredClone(fresh[f]);
+          }
+        }
+  });
 }
 
 /** What one change from the chat may carry: the fields a LayoutOp has, nothing else. */
