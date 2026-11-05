@@ -2507,7 +2507,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
         : [
             fn(
               "change_widgets",
-              `Change ${owner}'s widgets, pages and pinned tabs in the Bops window, when ${owner} asks ("add a clock widget to my home", "make a page called Rentals with a checklist and my routines", "remove the notes widget", "add a tab for Rentals"). Widgets are built in kinds with settings only: ${WIDGET_KIND_LIST.join(", ")}. Home always exists; other pages show in the sidebar. Give every change in order in one call (make a page, then add its widgets with page set to its name), then say what changed. ${owner} can Undo it in the chat.`,
+              `Change ${owner}'s widgets, pages and pinned tabs in the Bops window, when ${owner} asks ("add a clock widget to my home", "make a page called Rentals with a checklist and my routines", "remove the notes widget", "add a tab for Rentals"). Widgets are built in kinds with settings only: ${WIDGET_KIND_LIST.join(", ")}. Home always exists; other pages show in the sidebar. Give every change in order in one call (make a page, then add its widgets with page set to its name, each with its own settings: a note's words in text, links in links), then say what changed. ${owner} can Undo it in the chat.`,
               {
                 changes: {
                   type: "array",
@@ -2526,8 +2526,8 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
                       name: { type: ["string", "null"], description: "add_page, rename_page: the page's name (at most 30 characters). pin_tab: the tab's label. Null otherwise." },
                       position: { type: ["integer", "null"], description: "Where on the page, counted from 1. Null for the end, or to keep." },
                       to_page: { type: ["string", "null"], description: "move_widget: the page to move it to. Null to stay on its page." },
-                      time_zone: { type: ["string", "null"], description: "clock: an IANA time zone like America/Chicago. Null for this computer's." },
-                      text: { type: ["string", "null"], description: "note: what it says, at most 1000 characters." },
+                      time_zone: { type: ["string", "null"], description: "clock: an IANA time zone like America/Chicago (a city alone, like Chicago, works too). Null for this computer's." },
+                      text: { type: ["string", "null"], description: "note: the words the note shows, at most 1000 characters. The one field for a note's words, on Home or any other page (not title, name, content or body). Null for other kinds." },
                       bot: { type: ["string", "null"], description: "routines, bot-status, quick-ask: the bot by name. Null for every bot (routines) or the main bot." },
                       links: {
                         type: ["array", "null"],

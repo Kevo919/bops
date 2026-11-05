@@ -91,6 +91,80 @@ export function contentOnly(ops: unknown): boolean {
     })
   );
 }
+/** Every field a change may carry, by its one true name (the chat tool's schema names these). */
+export const OP_FIELDS = ["action", "page", "widget", "kind", "size", "title", "name", "position", "to_page", "time_zone", "text", "bot", "links", "value", "step", "items", "date", "tab"] as const;
+
+/**
+ * Other names a model sends for a field when it isn't held to the schema (Claude and the other providers in
+ * chat-providers.ts don't use OpenAI's strict mode): a note's words as content or body, a counter's start as
+ * count, a clock's zone as timezone or a city. Each is read as the true name, so nothing asked for is dropped.
+ */
+const OP_ALIASES: Record<string, (typeof OP_FIELDS)[number]> = {
+  content: "text",
+  body: "text",
+  note: "text",
+  note_text: "text",
+  message: "text",
+  words: "text",
+  timezone: "time_zone",
+  timeZone: "time_zone",
+  tz: "time_zone",
+  zone: "time_zone",
+  city: "time_zone",
+  count: "value",
+  start: "value",
+  increment: "step",
+  by: "step",
+  checklist: "items",
+  tasks: "items",
+  todos: "items",
+  until: "date",
+  day: "date",
+  target_date: "date",
+  bookmarks: "links",
+  bot_id: "bot",
+  page_name: "page",
+  toPage: "to_page",
+};
+
+/**
+ * One change from the chat, its fields by their true names: an alias is read as its field (the true name wins
+ * when both are there), a single link given as url and label becomes links, and a link's address or label under
+ * another name is read too. A field it doesn't know refuses the change, saying which, so a bot never hears
+ * "Done" for words that were dropped.
+ */
+export function opFromChat(x: unknown): LayoutOp {
+  const raw = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  const unknown: string[] = [];
+  const singleLink: { url?: unknown; label?: unknown } = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (v === undefined || v === null) continue;
+    if ((OP_FIELDS as readonly string[]).includes(k)) out[k] = v;
+    else if (k === "url" || k === "href") singleLink.url = v;
+    else if (k === "label") singleLink.label = v;
+    else if (!Object.hasOwn(OP_ALIASES, k)) unknown.push(k);
+  }
+  for (const [k, v] of Object.entries(raw)) {
+    const to = Object.hasOwn(OP_ALIASES, k) ? OP_ALIASES[k] : undefined;
+    if (to && v !== undefined && v !== null && !given(out[to])) out[to] = v;
+  }
+  if (unknown.length) throw new WidgetError(`A change had ${unknown.length === 1 ? "a field" : "fields"} there isn't: ${unknown.slice(0, 5).map((k) => k.slice(0, 30)).join(", ")}. A note's words go in text. The fields are ${OP_FIELDS.join(", ")}.`);
+  if (!given(out.links) && given(singleLink.url)) out.links = [singleLink];
+  if (Array.isArray(out.links))
+    out.links = out.links.map((l) => {
+      if (typeof l === "string") return { url: l };
+      const r = (l && typeof l === "object" ? l : {}) as Record<string, unknown>;
+      return { label: r.label ?? r.name ?? r.title ?? r.text, url: r.url ?? r.href ?? r.address ?? r.link };
+    });
+  // A note added with its words only as a name (which only pages and tabs have) shows them, not an empty note.
+  if (out.action === "add_widget" && out.kind === "note" && !given(out.text) && typeof out.name === "string") {
+    out.text = out.name;
+    delete out.name;
+  }
+  return out as LayoutOp;
+}
+
 export const ACTIONS: readonly LayoutOp["action"][] = ["add_widget", "update_widget", "remove_widget", "move_widget", "add_page", "rename_page", "remove_page", "pin_tab", "unpin_tab"];
 
 /* ---------------- Checking one value ---------------- */
@@ -147,6 +221,12 @@ export function urlOf(v: unknown): string {
 
 /** An IANA time zone this computer knows ("America/Chicago", "UTC"). */
 function zoneOf(v: unknown): string {
+  // A city alone ("Chicago", "new york"): the zone named for it, when this computer knows one.
+  if (typeof v === "string" && /^[A-Za-z][A-Za-z .'-]{1,40}$/.test(v.trim()) && !/^(?:utc|gmt)$/i.test(v.trim()) && !v.includes("/")) {
+    const city = v.trim().replace(/\s+/g, "_").toLowerCase();
+    const zone = quietly(() => Intl.supportedValuesOf("timeZone"))?.find((z) => z.split("/").at(-1)!.toLowerCase() === city);
+    if (zone) return zone;
+  }
   if (typeof v !== "string" || !/^[A-Za-z][A-Za-z0-9_+-]*(?:\/[A-Za-z0-9_+-]+){0,2}$/.test(v.trim()) || v.length > 64) throw new WidgetError(`"${String(v).slice(0, 60)}" isn't a time zone (like America/Chicago).`);
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: v.trim() });
