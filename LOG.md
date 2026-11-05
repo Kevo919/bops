@@ -6,6 +6,11 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 7:55 AM (Chicago)
+- **PC unlocked.** Codex has the go to test every feature in the real Bops window (list in messages/2026-11-05-1345-lead-to-codex-pc-unlocked-go.md).
+- **Testing score: 67%.** The server passes everything on the latest version (c313758), including #73/#74.
+- **Asked Kevin:** Gmail sign-in in Logins, turn GitHub checks back on, pick a fix for PC bot tasks, Zapier address (optional).
+
 ### Nov 5, 7:50 AM (Chicago)
 - **Testing score: 66%.** One new feature row was added, so the number moved a little even though more is tested.
 - **Merged:** #73 (z.ai: a half-typed custom schedule can't be saved; the phone's Logins message says to use the desktop app). The lead's review found it stopped you typing a custom schedule in the starter popup; **#74** fixes that (reviewed and tested).
