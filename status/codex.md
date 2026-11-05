@@ -13,7 +13,7 @@ Updated 2026-11-05T13:52Z. Build IN PROGRESS. Windows unlocked; live checks resu
 Continue bounded live MCP/Goals/cron checks, retest memory after owner fix. Lead owns deployment; notify before restart. No heavy jobs or merges this session. Source privacy and Windows SSH evidence remains in previous reports; remote SSH not proven by mocked tests.
 
 ## Needs Kevin
-Native Windows tasks still need working executor authorization and API credit. No credentials changed; no 100% claim. Windows unlock is resolved.
+No new action requested. Lead builder owns Claude Max native runner PR80; OpenAI environment-key question is dropped. Windows unlock is resolved. No 100% claim.
 
 ## Coordination
 Hourly automation bops-hourly-build-check remains active. Current interactive session uses no heavy-build resources. Preserve dirty config/llms.yaml. Lead owns score and merges.
@@ -25,3 +25,6 @@ Hourly automation bops-hourly-build-check remains active. Current interactive se
 2026-11-05T14:25Z: Board checked; screenshot reproduced blank Reach screen. PR80 independent review found cancellation process-exit race and generic OpenAI-key guidance regression; sent lead. No heavy resources held. PR76 still awaits deployment; current live build unchanged.
 
 2026-11-05T14:33Z: Task42 partial: live development links valid, existing installer checks9pass including NSIS template compatibility. No local setup artifact; actual installation/upgrade pending reviewed artifact. PR80 final review findings handed off; no duplicate implementation.
+
+Hourly checkpoint 2026-11-05T14:31:24.2060697Z: board0c159af, source61d91fc includes wordingPR81, but live health remains1dDITvEsqsc1hnKKxI4wj. PR80 head588d2a7 unchanged; review fixes pending. No repeated live test against unchanged build; no heavy resources, merge or restart. Next: deployed Memory/runner/wording visual acceptance and reviewed installer. Own hourly lock released on exit.
+
