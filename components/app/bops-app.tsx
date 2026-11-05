@@ -52,7 +52,7 @@ import { readyAgents } from "@/lib/agents";
 import { footerPageOf, openFooterPage } from "./sidebar-footer";
 import { CloudUnreachable, SignIn, useAuthStatus } from "./sign-in";
 import { PickComputer, useSizePick } from "./computer-size";
-import { AiSubscriptionsCard, ThisMacSettings } from "./setup";
+import { AiSubscriptionsCard, PhoneCard, ThisMacSettings, usePhonePairable } from "./setup";
 import { TooltipLayer } from "./tooltip";
 import { LoginsPage } from "./logins";
 import { MacPreviews } from "./mac-tab";
@@ -2023,7 +2023,7 @@ function WhereBotsWork({ state }: { state: AppState }) {
 }
 
 /** Settings' places: Account (yours, in every workspace), then Workspace (the one open now), then Orgo's team's own. */
-export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains" | "look" | "repos" | "services";
+export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "phone" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains" | "look" | "repos" | "services";
 
 /** A place in Settings' nav: its name, its glyph, and a quiet value on the right. */
 type NavItem = { id: SettingsPane; name: string; icon: React.ReactNode; value?: string | number };
@@ -2038,6 +2038,7 @@ const GLYPHS: Record<SettingsPane, string> = {
   plan: "M2 4.5h12v7H2zM2 7h12M4.5 9.5h2",
   usage: "M3 13V9M6.3 13V6M9.6 13V8M13 13V3.5",
   reach: "M5 2h6v12H5zM7.3 12h1.4",
+  phone: "M5 1.8h6v12.4H5zM7.3 12.3h1.4M2.6 5.5a3.6 3.6 0 0 1 0 5M13.4 5.5a3.6 3.6 0 0 0 0 5",
   ai: "M8 2l1.3 3.4L13 6.7l-3.7 1.3L8 11.5 6.7 8 3 6.7l3.7-1.3z",
   privacy: "M8 2l5 1.9v3.9c0 3.1-2.1 5.6-5 6.6-2.9-1-5-3.5-5-6.6V3.9z",
   mac: "M2.5 3.5h11v7.5h-11zM1.5 13h13",
@@ -2247,10 +2248,12 @@ export function Settings({
   // The workspace's domains (bought through Orgo): only where apps are shown (an @orgo.ai account, its own workspace).
   const domains = appsOwnShown(state);
   const apps = appsShown(state);
+  // Your phone only where pairing works: the owner's own Bops window (the server says, /api/remote), never a shared workspace.
+  const pairable = usePhonePairable(!state.shared);
   // An Admin of a shared workspace has its Team too (who's in: lib/server/shared-people.ts); never its chart or email.
   const adminHere = state.shared?.role === "admin";
   // The look is the owner's own window (never a shared workspace's): its pane is theirs alone too.
-  const fits = (p?: SettingsPane) => !!p && (p !== "domains" || domains) && (p !== "apps" || apps) && (p !== "look" || !state.shared) && (p !== "repos" || !state.shared) && (!state.shared || ((p !== "team" || adminHere) && p !== "chart" && p !== "email"));
+  const fits = (p?: SettingsPane) => !!p && (p !== "domains" || domains) && (p !== "apps" || apps) && (p !== "look" || !state.shared) && (p !== "repos" || !state.shared) && (p !== "phone" || !state.shared) && (!state.shared || ((p !== "team" || adminHere) && p !== "chart" && p !== "email"));
   const [pane, setPane] = useState<SettingsPane>(fits(at) ? at! : "profile");
   // A narrow window (narrow.ts) shows the nav or a place, never both: the nav first when Settings opened at no place in
   // particular; a place asked for (Logins, Plan and credit) opens at it, its Back going to the nav.
@@ -2293,6 +2296,7 @@ export function Settings({
     item("plan", "Plan and credit"),
     item("usage", "Usage"),
     item("reach", "How bots reach you"),
+    ...(pairable && !shared ? [item("phone", "Your phone")] : []),
     ...(BRAINS_ON ? [item("ai", "AI plans")] : []),
     ...(!selfHosted ? [item("privacy", "Privacy")] : []),
     item("look", "Look"),
@@ -2385,6 +2389,15 @@ export function Settings({
       <>
         <PaneHead title="How bots reach you" sub="Your numbers and emails: how your bots know it's you." />
         <ReachSettings />
+      </>
+    );
+  else if (pane === "phone" && !shared)
+    body = (
+      <>
+        <PaneHead title="Your phone" sub="Bops on your phone: get the app, turn on Tailscale, and pair with one scan." />
+        <div className="flex flex-col gap-2 px-[22px] pt-4">
+          <PhoneCard />
+        </div>
       </>
     );
   else if (pane === "ai" && BRAINS_ON)
