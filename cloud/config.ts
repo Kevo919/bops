@@ -15,6 +15,16 @@ export const config = {
    */
   publicUrl: () => env("BOPS_CLOUD_PUBLIC_URL").replace(/\/+$/, ""),
   databaseUrl: () => env("BOPS_DATABASE_URL"),
+  /** The longest any one database statement may run (ms) before Postgres cancels it (db.ts). */
+  dbStatementTimeoutMs: () => Number(env("BOPS_DB_STATEMENT_TIMEOUT_MS")) || 30_000,
+  /** The longest a write exempt from the statement timeout waits on a lock (ms; db.ts ownObject): it holds one of the pool's 10 connections meanwhile. */
+  dbLockWaitMs: () => Number(env("BOPS_DB_LOCK_WAIT_MS")) || 60_000,
+  /**
+   * The file billable use goes on when it can't be written to the database (usage-queue.ts), replayed
+   * at the start: BOPS_USAGE_SPOOL, else usage-spool.jsonl in systemd's StateDirectory (bops-cloud.service).
+   * None: such use is kept in memory, and logged whole if the cloud stops before it's written.
+   */
+  usageSpool: () => env("BOPS_USAGE_SPOOL") || (env("STATE_DIRECTORY") ? `${env("STATE_DIRECTORY").split(":")[0]}/usage-spool.jsonl` : ""),
   /** 32+ random bytes, base64: encrypts the provider secrets the cloud keeps (crypto.ts). */
   secret: () => env("BOPS_CLOUD_SECRET"),
   orgoOrigin: () => (env("BOPS_ORGO_ORIGIN") || "https://www.orgo.ai").replace(/\/+$/, ""),

@@ -19,7 +19,8 @@ import { accountFor, composioUserId, honchoPrefix, ownsWorkspace, podKeyOf } fro
 import { loadState } from "./state.ts";
 import { DELETED_CLOSE } from "./tunnel.ts";
 import { admitTurn, follow, userStopped, verdict, watchSession, type Start } from "./turn-guard.ts";
-import { isWebSearch, liveSecondsOf, recordImages, recordJev, recordTokens, recordTranscription, recordTreg, recordUsage, recordUsageFor, recordWebSearch } from "./usage.ts";
+import { isWebSearch, liveSecondsOf, recordImages, recordJev, recordTokens, recordTranscription, recordTreg, recordUsageFor, recordWebSearch } from "./usage.ts";
+import { keepUsage, track } from "./usage-queue.ts";
 
 /**
  * /proxy/<provider>/*: the Mac's calls to OpenAI, AgentPhone, Honcho, Composio, Typesafe and treg, sent on
@@ -363,7 +364,8 @@ async function own(call: Call, provider: Provider, kind: string, id: string, mod
 }
 
 /** Usage is counted on the side: a failure to count never fails the call. */
-const counted = (p: Promise<unknown>) => void p.catch((e: Error) => console.warn(`[proxy] usage: ${e.message}`));
+/** A write the call doesn't wait for: a stop waits for it (usage-queue.ts track). Billable use the proxy counts itself goes through keepUsage instead, which retries and spools. */
+const counted = (p: Promise<unknown>) => void track(p.catch((e: Error) => console.warn(`[proxy] usage: ${e.message}`)));
 
 /** A file upload's one text field `name` (undefined: not there). Sent twice, it's refused: the provider might read the other. */
 function formField(call: Call, name: string): string | undefined {
@@ -761,7 +763,7 @@ function countText(call: Call) {
   const body = isObject(call.json) ? call.json : {};
   const mms = Object.entries(body).some(([k, v]) => MEDIA_KEYS.has(norm(k)) && (Array.isArray(v) ? v.length > 0 : !!v));
   const text = typeof body.body === "string" ? body.body : "";
-  counted(recordUsage(call.user.id, "agentphone.sms", mms ? 1 : smsSegments(text), { direction: "out", ...(mms ? { mms: true } : {}) }));
+  keepUsage(call.user.id, "agentphone.sms", mms ? 1 : smsSegments(text), { direction: "out", ...(mms ? { mms: true } : {}) });
 }
 
 /** What a text out from a number paused for its month is refused with (NUMBER_UNPAID). */
@@ -857,7 +859,7 @@ const agentphone: Spec = {
         await recordBought(call, data);
         const n = numbersIn(data)[0];
         const asked = numberAsked(call);
-        counted(recordUsage(call.user.id, "agentphone.numbers", 1, { numberId: n?.id, type: n?.type ?? asked.type, ...(asked.imessageType ? { imessageType: asked.imessageType } : {}) }));
+        keepUsage(call.user.id, "agentphone.numbers", 1, { numberId: n?.id, type: n?.type ?? asked.type, ...(asked.imessageType ? { imessageType: asked.imessageType } : {}) });
       },
     }),
     rule("GET v1/numbers/:number", { json: recordNumbers }),
@@ -929,7 +931,7 @@ function countHoncho(call: Call) {
   const last = call.path.at(-1);
   // Messages saved, or a file uploaded as messages; a list of them (messages/list) is a read.
   const route = last === "chat" ? "chat" : last === "search" ? "search" : last === "messages" || (last === "upload" && call.path.at(-2) === "messages") ? "messages" : undefined;
-  if (route) counted(recordUsage(call.user.id, "honcho.calls", 1, { route, ...(call.bot ? { botId: call.bot } : {}) }));
+  if (route) keepUsage(call.user.id, "honcho.calls", 1, { route, ...(call.bot ? { botId: call.bot } : {}) });
 }
 
 /** Honcho: the user's own workspaces, and anything inside them. */
@@ -1148,10 +1150,18 @@ const recordAccount = (field: string) => async (call: Call, data: unknown) => {
  * tool is for the bot the session was made for), at Composio's price (pricing.ts: $0 while it's negotiated).
  */
 const countComposio = (tool: (call: Call) => string) => (call: Call) =>
-  counted(
+  void track(
     (async () => {
-      const botId = call.bot ?? (call.params.session ? (await objectInfo("composio", call.params.session)).botId : null);
-      await recordUsage(call.user.id, "composio.calls", 1, { tool: tool(call), ...(call.app ? { app: call.app } : {}), ...(botId ? { botId } : {}) });
+      // The bot is only a label: a read that fails counts the call without it, never not at all.
+      const botId =
+        call.bot ??
+        (call.params.session
+          ? await objectInfo("composio", call.params.session).then(
+              (o) => o.botId,
+              () => null,
+            )
+          : null);
+      keepUsage(call.user.id, "composio.calls", 1, { tool: tool(call), ...(call.app ? { app: call.app } : {}), ...(botId ? { botId } : {}) });
     })(),
   );
 

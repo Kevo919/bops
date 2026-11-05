@@ -1,7 +1,7 @@
 import { trackCloudEvent } from "./analytics.ts";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { config } from "./config.ts";
-import { db, ensureUserRow, query } from "./db.ts";
+import { db, ensureUserRow, query, unbounded } from "./db.ts";
 import { currentHandle, MAIN_WORKSPACE } from "./handles.ts";
 import { HttpError, readBody, sendJson, type Route } from "./http.ts";
 import { lineDigits } from "./lines.ts";
@@ -219,7 +219,8 @@ export function locked<T>(userId: string, work: () => Promise<T>): Promise<T> {
   return oneOfFew(async () => {
     const c = await db().connect();
     try {
-      await c.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [`bops-plan:${userId}`]);
+      // The holder may be buying or giving back numbers at a provider (or deleting the user): wait it out.
+      await unbounded(c, () => c.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [`bops-plan:${userId}`]));
       return await work();
     } finally {
       await c.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [`bops-plan:${userId}`]).catch(() => {});

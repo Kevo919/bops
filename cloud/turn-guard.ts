@@ -66,6 +66,8 @@ export const guardTiming = {
   /** Sessions read at once for one user, and sessions watched or starting at once for one user. */
   parallel: 4,
   perUser: 24,
+  /** How long a start waits on the user's balance before it's refused (503) rather than holding up their next starts. */
+  balanceReadMs: 5_000,
 };
 
 /** The guard's clock (ms): tests move it forward. */
@@ -170,11 +172,13 @@ function release(userId: string, claim: Claim) {
  * every reserve at once and checking them all after one read of the balance counted the starts that
  * were about to be refused too: of a burst, all could be refused though the credit covered one.) 402
  * with none left, 403 with too little, 429 past the count. The reserve lapses once the guard has read
- * the start's session (it holds the turn itself then), or a minute on.
+ * the start's session (it holds the turn itself then), or a minute on. A refused start gives its
+ * reserve back before anything else is awaited; a balance that can't be read within `balanceReadMs`
+ * refuses the start with 503.
  */
 export async function admitTurn(userId: string, session: string | undefined, model: string | null | undefined): Promise<Start> {
   if (!creditsOn()) return { release: () => {}, session: () => {} };
-  return inTurn(userId, async () => {
+  const decided = await inTurn(userId, async (): Promise<Start | "out" | "short"> => {
     const known = !!session && watched.has(session);
     const unwatched = startingFor(userId).filter((c) => !c.session || !watched.has(c.session)).length;
     if (!known && usersWatched(userId).length + unwatched >= guardTiming.perUser)
@@ -182,32 +186,39 @@ export async function admitTurn(userId: string, session: string | undefined, mod
     const claim: Claim = { micros: startReserve(session, model), at: guardClock.now(), session };
     starting.set(userId, (starting.get(userId) ?? new Set()).add(claim));
     setTimeout(() => release(userId, claim), 60_000).unref?.();
+    let left: number;
     try {
-      const left = await creditLeft(userId);
-      if (left <= 0) throw outOfCredit(await billingFor(userId));
-      const held = usersWatched(userId).reduce((sum, w) => sum + w.held, 0) + startingFor(userId).reduce((sum, c) => sum + c.micros, 0);
-      if (held > left) throw shortOfCredit(await billingFor(userId));
+      // Bounded (db.ts queryWithin): a balance read that hangs refuses this start, and the user's next ones aren't kept waiting behind it.
+      left = await creditLeft(userId, guardTiming.balanceReadMs);
     } catch (e) {
       release(userId, claim);
-      throw e;
+      console.warn(`[guard] ${userId}'s credit couldn't be read for a start: ${(e as Error).message}`);
+      throw new HttpError(503, "Your credit couldn't be checked just now. Try again in a moment.");
     }
-    return { release: () => release(userId, claim), session: (id) => (claim.session ??= id) };
+    const held = usersWatched(userId).reduce((sum, w) => sum + w.held, 0) + startingFor(userId).reduce((sum, c) => sum + c.micros, 0);
+    if (left > 0 && held <= left) return { release: () => release(userId, claim), session: (id) => (claim.session ??= id) };
+    // Refused: its reserve is given back at once, before the words are looked up, so the next start is decided without it.
+    release(userId, claim);
+    return left <= 0 ? "out" : "short";
   });
+  if (decided === "out") throw outOfCredit(await billingFor(userId));
+  if (decided === "short") throw shortOfCredit(await billingFor(userId));
+  return decided;
 }
 
-/** Each user's starts being decided: the last one's end, which the next waits for. */
-const deciding = new Map<string, Promise<void>>();
+/** Each user's starts being decided (admitTurn): the last one's end, which the next waits for. */
+const admitQueue = new Map<string, Promise<void>>();
 
 /** Run `decide` once the user's starts before it are decided (let through or refused), and none of theirs meanwhile. */
 function inTurn<T>(userId: string, decide: () => Promise<T>): Promise<T> {
-  const run = (deciding.get(userId) ?? Promise.resolve()).then(decide);
+  const run = (admitQueue.get(userId) ?? Promise.resolve()).then(decide);
   const ended = run.then(
     () => {},
     () => {},
   );
-  deciding.set(userId, ended);
+  admitQueue.set(userId, ended);
   void ended.then(() => {
-    if (deciding.get(userId) === ended) deciding.delete(userId);
+    if (admitQueue.get(userId) === ended) admitQueue.delete(userId);
   });
   return run;
 }

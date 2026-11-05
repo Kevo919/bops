@@ -29,6 +29,7 @@ import * as state from "./state.ts";
 import * as tunnel from "./tunnel.ts";
 import * as turns from "./turns.ts";
 import * as usage from "./usage.ts";
+import { drainUsage, startUsageReplays } from "./usage-queue.ts";
 import * as verify from "./verify.ts";
 
 /**
@@ -243,6 +244,9 @@ async function main() {
   const stopAppPolicy = startAppPolicy();
   // Chat turns whose runner went quiet are owed again or ended, and late ones end with a note (turns.ts).
   const stopTurns = turns.startTurns();
+  // Billable use that couldn't be written yet is written from the spool, now and every minute (usage-queue.ts).
+  if (!config.usageSpool()) console.warn("[cloud] no usage spool (BOPS_USAGE_SPOOL or STATE_DIRECTORY): use that can't be written is kept in memory only");
+  const stopUsageReplays = startUsageReplays();
   const server = makeServer();
   server.listen(config.port(), "127.0.0.1", () => console.log(`[cloud] listening on 127.0.0.1:${config.port()}`));
   const stop = () => {
@@ -260,9 +264,13 @@ async function main() {
     live.closeAll();
     // Every bot's browser stream and runner socket ends too: each reconnects to the next start (browser.ts).
     browser.closeBrowser();
-    // Usage events still queued go out first (up to 2 seconds).
-    void shutdownTelemetry().finally(() => server.close(() => process.exit(0)));
-    setTimeout(() => process.exit(0), 5_000).unref();
+    stopUsageReplays();
+    // Usage being written is waited for (up to 3 seconds; what's not in by then goes on the spool), and
+    // usage events still queued go out (up to 2 seconds), at once. systemd waits 10 (TimeoutStopSec).
+    void Promise.allSettled([drainUsage(3_000).then((left) => left && console.warn(`[cloud] ${left} use(s) left for the spool`)), shutdownTelemetry()]).finally(() =>
+      server.close(() => process.exit(0)),
+    );
+    setTimeout(() => process.exit(0), 8_000).unref();
   };
   process.on("SIGTERM", stop);
   process.on("SIGINT", stop);

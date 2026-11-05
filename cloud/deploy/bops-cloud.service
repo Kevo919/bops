@@ -32,6 +32,9 @@ RestrictSUIDSGID=true
 LockPersonality=true
 CapabilityBoundingSet=
 ReadOnlyPaths=/opt/bops
+# /var/lib/bops-cloud (STATE_DIRECTORY): the usage spool, billable use not yet in the database (usage-queue.ts).
+StateDirectory=bops-cloud
+StateDirectoryMode=0700
 
 [Install]
 WantedBy=multi-user.target

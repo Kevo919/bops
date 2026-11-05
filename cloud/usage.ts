@@ -85,8 +85,9 @@ export async function recordUsage(userId: string, kind: string, units: number, d
 /**
  * Use that can be seen more than once (an agent turn's tokens come in its event and again when it's
  * looked up; a call's seconds grow while it runs): one row per `ref`, keeping the largest count (and
- * the detail that came with it). The row is priced again each time, and only what it costs beyond
- * what was paid for it already is taken.
+ * the detail that came with it). Only a larger count is paid, and only up to what it costs less what
+ * was paid for the ref already: the same count again (a retry, a replay, the same use with other
+ * detail) or a smaller one (an older sighting) changes nothing and charges nothing.
  */
 export async function recordUsageFor(userId: string, kind: string, ref: string, units: number, detail: Record<string, unknown> = {}): Promise<void> {
   let paid = 0;
@@ -109,19 +110,25 @@ export async function recordUsageFor(userId: string, kind: string, ref: string, 
         )
       ).rows[0];
       const was = seen ? Number(seen.units) : 0;
-      // A smaller count is an older sighting: the larger one's detail stands.
-      const keep = units >= was ? { units, detail: { ...detail, ref } } : { units: was, detail: { ...(seen?.detail ?? {}), ref } };
+      // The same count or a smaller one is a sighting already counted (or an older one): nothing is
+      // paid and the row stands as it is, detail and all. Pricing it from its own detail instead lets
+      // sightings that differ only in detail (cached tokens or not) charge again on every swap.
+      if (seen && units <= was) return;
+      const keep = { ...detail, ref };
       const before = seen ? Number(seen.cost_micros) : 0;
-      const cost = Math.max(costOf(kind, keep.units, keep.detail), before);
-      paid = cost - before;
+      // A larger count: paid up to what it costs, less what was paid for this ref already, so what's
+      // paid for a ref never comes to more than its largest sighting costs (and a price change never
+      // charges what was counted before).
+      paid = Math.max(0, costOf(kind, units, keep) - before);
+      const cost = before + paid;
       if (seen)
-        await c.query("UPDATE bops.cloud_usage SET units = $2, detail = $3::jsonb, cost_micros = $4 WHERE id = $1", [seen.id, keep.units, JSON.stringify(keep.detail), cost]);
+        await c.query("UPDATE bops.cloud_usage SET units = $2, detail = $3::jsonb, cost_micros = $4 WHERE id = $1", [seen.id, units, JSON.stringify(keep), cost]);
       else
         await c.query("INSERT INTO bops.cloud_usage (user_id, kind, units, detail, cost_micros) VALUES ($1, $2, $3, $4::jsonb, $5)", [
           userId,
           kind,
-          keep.units,
-          JSON.stringify(keep.detail),
+          units,
+          JSON.stringify(keep),
           cost,
         ]);
       if (paid > 0 && creditsOn()) ranOut = (await spend(c, userId, paid, spendKindOf(kind))).ranOut;
