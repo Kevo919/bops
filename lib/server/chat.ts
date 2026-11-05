@@ -1264,7 +1264,9 @@ const NOT_IN_BACKGROUND = new Set(["react", "schedule", "manage_routine", "watch
 /** All a sample (BackgroundJob.sample) has: finding an app's actions and running the ones that only read. */
 const SAMPLE_TOOLS = new Set(["find_app_actions", "use_app"]);
 
-const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "create_bot", "open_repo", "run_repo", "make_doc", "set_goal", "save_idea"]);
+// A teammate answers with its owner's memory and private conversation context. Outside senders cannot
+// reach those indirectly after their own turn's MEMORY.md has been withheld.
+const NOT_FROM_OUTSIDE = new Set(["schedule", "manage_routine", "watch", "stop_watch", "create_skill", "update_skill", "make_app", "change_app", "work_on_app", "deploy_app", "local_app", "change_look", "create_bot", "open_repo", "run_repo", "make_doc", "set_goal", "save_idea", "ask_teammate"]);
 
 /**
  * What a member's turn (TurnOptions.member) never has: what sets up or changes what the bots do on their own
@@ -2665,6 +2667,8 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
      * or a data lookup answered), whose addresses are then written down (bringIn).
      */
     const lookup = async (name: string, a: Args, bring: (text: string) => void, approved = false, askedPlan?: string): Promise<string> => {
+      // Keep this boundary even if an old or forged model response asks for a tool not offered now.
+      if (name === "ask_teammate" && opts.outside) return "Not available: someone from outside Bops cannot ask a teammate for the owner's private context.";
       if (name === "remember" && bg) return "Not saved: a routine's run doesn't save to memory.";
       if (!offered.has(name)) return `${name} isn't a tool you have here.`;
       // Whose words it reads (a proposal's card says so); use_app's are its read log's, a page's and an API's said where they're read.
