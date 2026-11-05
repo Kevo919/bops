@@ -400,6 +400,41 @@ try {
     await shot(p, "rentals-tab-dark");
     await look({ action: "set", look: { theme: "light" } });
   });
+  await check("a page made the way the chat makes it: its note shows its words, in light and dark, and after a reload", async () => {
+    // The live bug: "make a Test Rentals page with a note that says Verification" left the note on the new page blank.
+    const made = await fetch(`${BASE}/api/widgets`, {
+      method: "POST",
+      headers: owner,
+      body: JSON.stringify({ changes: [{ action: "add_page", name: "Test Rentals" }, { action: "add_widget", page: "Test Rentals", kind: "note", text: "Verification" }, { action: "add_widget", page: "Test Rentals", kind: "links", links: [{ label: "Zillow", url: "https://www.zillow.com" }] }] }),
+    });
+    assert.equal(made.status, 200, await made.clone().text());
+    const st = await fetch(`${BASE}/api/state`, { headers: owner }).then((r) => r.json());
+    const testPage = st.state.look.current.layout.pages.find((x) => x.name === "Test Rentals");
+    assert.equal(testPage.widgets[0].text, "Verification", "kept with its words");
+    const noteShows = async (where) => {
+      await p.locator(`[data-page-row="${testPage.id}"]`).click();
+      await p.locator(`[data-widget-page="${testPage.id}"]`).waitFor();
+      await settle(p, 700);
+      const note = p.locator(`[data-widget-page="${testPage.id}"] [data-widget="note"] textarea`);
+      assert.equal(await note.inputValue(), "Verification", `${where}: the note's words`);
+      // Readable: the words' color isn't the note's own background.
+      const [fg, bg] = await note.evaluate((e) => [getComputedStyle(e).color, getComputedStyle(e).backgroundColor]);
+      assert.notEqual(fg, bg, `${where}: the words can be seen`);
+      assert.equal(await p.locator(`[data-widget-page="${testPage.id}"] [data-widget="links"] a`).innerText(), "Zillow");
+      await noBlanks(p, where);
+    };
+    await noteShows("Test Rentals, light");
+    await shot(p, "test-rentals-light");
+    await look({ action: "set", look: { theme: "dark" } });
+    await settle(p, 900);
+    await noteShows("Test Rentals, dark");
+    await shot(p, "test-rentals-dark");
+    await look({ action: "set", look: { theme: "light" } });
+    await open(p);
+    await noteShows("Test Rentals, after a reload");
+    await p.getByRole("button", { name: "Close the page" }).click();
+    await settle(p);
+  });
   await check("the server refuses a paired phone's change, a script link and an unknown kind", async () => {
     const phone = await fetch(`${BASE}/api/widgets`, { method: "POST", headers: { cookie: `bops_remote=${phoneCode}`, "x-bops-remote": "1", "content-type": "application/json" }, body: JSON.stringify({ changes: [{ action: "add_widget", kind: "clock" }] }) });
     assert.equal(phone.status, 403);

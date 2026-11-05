@@ -340,6 +340,72 @@ await check("\"remove the notes widget\", and a bad change is refused with why",
   const t3 = await turnWith("add an iframe widget to home", [toolCall("change_widgets", { changes: [op({ action: "add_widget", kind: "iframe" })], summary: "x" })], "There's no such widget.");
   assert.match(t3.out(), /^Not changed: There's no widget kind "iframe"/);
 });
+// The live bug: a page made by chat with a note on it kept the note but not its words. These put back what was there after.
+await check("\"make a Test Rentals page with a note that says Verification\": the note on the new page keeps its words", async () => {
+  const kept = structuredClone(S.getState().look);
+  S.update((s) => void delete s.look);
+  try {
+    const t = await turnWith(
+      "make a page called Test Rentals with a note that says Verification and a link to Zillow",
+      [toolCall("change_widgets", { changes: [op({ action: "add_page", name: "Test Rentals" }), op({ action: "add_widget", page: "Test Rentals", kind: "note", text: "Verification" }), op({ action: "add_widget", page: "Test Rentals", kind: "links", links: [{ label: "Zillow", url: "https://www.zillow.com" }] })], summary: "A Test Rentals page" })],
+      "Made it.",
+    );
+    assert.match(t.out(), /^Done: made the page Test Rentals, added a note widget to Test Rentals, added a links widget to Test Rentals\./);
+    const page = SW.currentLayout().pages.find((p) => p.name === "Test Rentals");
+    assert.deepEqual(page.widgets.map((w) => w.kind), ["note", "links"]);
+    assert.equal(page.widgets[0].text, "Verification", "the stored note has its words");
+    assert.deepEqual(page.widgets[1].links, [{ label: "Zillow", url: "https://www.zillow.com/" }]);
+    // And as the state file keeps it (what a reload reads).
+    await S.flushState();
+    const saved = JSON.parse(readFileSync(join(work, ".data", "state.json"), "utf8"));
+    assert.equal(saved.look.current.layout.pages.find((p) => p.name === "Test Rentals").widgets[0].text, "Verification");
+  } finally {
+    S.update((s) => void (s.look = kept));
+  }
+});
+await check("a model not held to strict mode: other names for a field are read, an unknown one refuses the change", async () => {
+  const kept = structuredClone(S.getState().look);
+  S.update((s) => void delete s.look);
+  try {
+    // As Claude and the other providers send it: only the fields it uses, some by another name.
+    const t = await turnWith(
+      "make a page called Test Two with a note that says Verification, a link to Zillow, a counter from 3 by 2 and a clock for Chicago",
+      [
+        toolCall("change_widgets", {
+          changes: [
+            { action: "add_page", name: "Test Two" },
+            { action: "add_widget", page: "Test Two", kind: "note", content: "Verification" },
+            { action: "add_widget", page: "Test Two", kind: "note", body: "Second" },
+            { action: "add_widget", page: "Test Two", kind: "note", name: "Third" },
+            { action: "add_widget", page: "Test Two", kind: "links", url: "zillow.com", label: "Zillow" },
+            { action: "add_widget", page: "Test Two", kind: "links", title: "Sites", links: [{ name: "Redfin", href: "https://redfin.com" }, "https://trulia.com"] },
+            { action: "add_widget", page: "Test Two", kind: "counter", count: 3, increment: 2 },
+            { action: "add_widget", page: "Test Two", kind: "clock", city: "Chicago" },
+            { action: "add_widget", page: "Test Two", kind: "clock", timezone: "Europe/London", title: "London" },
+          ],
+        }),
+      ],
+      "Made it.",
+    );
+    assert.match(t.out(), /^Done: made the page Test Two/);
+    const w = SW.currentLayout().pages.find((p) => p.name === "Test Two").widgets;
+    assert.deepEqual(w.filter((x) => x.kind === "note").map((x) => x.text), ["Verification", "Second", "Third"]);
+    assert.deepEqual(w[3].links, [{ label: "Zillow", url: "https://zillow.com/" }]);
+    assert.deepEqual(w[4].links, [{ label: "Redfin", url: "https://redfin.com/" }, { label: "trulia.com", url: "https://trulia.com/" }]);
+    assert.deepEqual([w[5].value, w[5].step], [3, 2]);
+    assert.equal(w[6].timeZone, "America/Chicago");
+    assert.equal(w[7].timeZone, "Europe/London");
+    // The true name wins over another.
+    assert.equal(W.opFromChat({ action: "add_widget", kind: "note", text: "Real", content: "Other" }).text, "Real");
+    // A field there isn't: nothing kept, and the bot hears which and where a note's words go.
+    const before = JSON.stringify(S.getState().look);
+    const t2 = await turnWith("add a note widget on the Test Two page that says hi", [toolCall("change_widgets", { changes: [{ action: "add_widget", page: "Test Two", kind: "note", words_here: "hi" }] })], "I couldn't.");
+    assert.match(t2.out(), /^Not changed: A change had a field there isn't: words_here\. A note's words go in text\./);
+    assert.equal(JSON.stringify(S.getState().look), before, "nothing kept");
+  } finally {
+    S.update((s) => void (s.look = kept));
+  }
+});
 await check("the chat's tool schema is one OpenAI takes in strict mode", async () => {
   answers.push(reply("Ok."));
   const n = asked.length;

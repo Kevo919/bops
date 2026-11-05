@@ -2,7 +2,7 @@ import "server-only";
 import { addMessage, getState } from "./store";
 import { currentLook, setLook } from "./look";
 import { update } from "./store";
-import { applyLayoutOps, CONTENT_FIELDS, contentOnly, normalizeLayout, WidgetError, type LayoutContext, type LayoutOp, type WidgetLayout } from "../widgets";
+import { applyLayoutOps, CONTENT_FIELDS, contentOnly, normalizeLayout, opFromChat, WidgetError, type LayoutContext, type WidgetLayout } from "../widgets";
 import { normalizeLook } from "../look-theme";
 import type { Bot } from "../types";
 
@@ -59,13 +59,6 @@ function keepThroughUndo(was: WidgetLayout, layout: WidgetLayout) {
   });
 }
 
-/** What one change from the chat may carry: the fields a LayoutOp has, nothing else. */
-const OP_FIELDS = ["action", "page", "widget", "kind", "size", "title", "name", "position", "to_page", "time_zone", "text", "bot", "links", "value", "step", "items", "date", "tab"] as const;
-const opOf = (x: unknown): LayoutOp => {
-  const raw = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
-  return Object.fromEntries(OP_FIELDS.filter((k) => raw[k] !== undefined && raw[k] !== null).map((k) => [k, raw[k]])) as LayoutOp;
-};
-
 /**
  * Change the widgets from the chat (change_widgets): check every change, make them all or none, and leave the
  * card the chat shows (what changed, with Undo). Answers the bot in plain words: what it did, or why nothing
@@ -73,10 +66,11 @@ const opOf = (x: unknown): LayoutOp => {
  */
 export function changeWidgetsFromChat(b: Bot, input: unknown, chatId: string): string {
   const raw = (input && typeof input === "object" ? input : {}) as { changes?: unknown; summary?: unknown };
-  const ops = Array.isArray(raw.changes) ? raw.changes.map(opOf) : [];
   const was = normalizeLook(currentLook());
   let said: string[];
   try {
+    // Each change by its fields' true names (lib/widgets.ts opFromChat): another name is read, an unknown one refused.
+    const ops = Array.isArray(raw.changes) ? raw.changes.map(opFromChat) : [];
     said = changeLayout(ops).said;
   } catch (e) {
     if (e instanceof WidgetError) return `Not changed: ${e.message}`;
