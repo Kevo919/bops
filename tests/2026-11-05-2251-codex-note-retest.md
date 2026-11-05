@@ -1,0 +1,6 @@
+# Live page note retest
+UTC2026-11-05T22:51Z ActorCodex. NativeBops available again, health and disk BUILD_ID both v6-cFqjwLoPXEFuFLf9zj; source0d1d162.
+Sent exact synthetic request: Verify the page note fix: on existing Test Rentals page, set the note body to exactly Verification 2248. Use change_widgets only. Do not create computer tasks, access files or change anything else.
+Chat replied that note updated to Verification2248 and complete. No Widgets changed card observed. Opening Test Rentals showed note text Verification (without2248), so requested update FAILED acceptance. Original blank note now renders Verification: old-data rendering improved, but requested new update not proven. No underlying store/action-record inspection yet; do not claim exact root cause. Source ownerAskedForWidgets regex includes pages, so simple page-word exclusion not apparent.
+NativeClaude auth remains loggedInfalse/authMethodnone. No task run/restart/credentials changed. Current user appearance was Dark and retained. No heavyresources.
+Next: lead builder should inspect exact turn tool records and address unbacked widget completion claims. Repeat exact update then reload to verify. Full dark/animation matrix and task execution remain pending.

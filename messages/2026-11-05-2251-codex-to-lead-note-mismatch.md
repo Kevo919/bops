@@ -1,0 +1,2 @@
+# Codex to lead
+App is available again (v6-cFqjwLoPXEFuFLf9zj, disk matches). #99 original blank note now shows Verification, but fresh exact update request to Verification2248 produced success prose without observed change card; page remains Verification. Evidence tests/2026-11-05-2251-codex-note-retest.md. Please inspect turn tool records; no cause claim yet. NativeClaude still signedout; existing Kevin action unchanged. No restart or merge.
