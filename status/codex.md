@@ -30,3 +30,5 @@ Hourly checkpoint 2026-11-05T14:31:24.2060697Z: board0c159af, source61d91fc incl
 
 
 2026-11-05T15:34Z: Read offline plan; exact live acceptance runbook tests/live-scripts/pc-acceptance.md prepared. PR80 original4findings statically closed; Windows cancellation runtime remains unverified and task60 residual retained. Health unchanged; awaiting batched deployment. No heavy resources held. Hourly lock owned/released.
+
+2026-11-05T16:29Z: Native Claude now2.1.318 via official checksum-verified installer, help contains required safety flags; updater first failedOOM. Direct real task previously stopped at version gate; live retry pending unavailable desktop. Works on temporarily local, restore Auto after test. Dispatch source chain plus synthetic reproducer sent lead for assigned fix. Memory/Reach live light-mode pass; no Windows task success yet.
