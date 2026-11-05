@@ -63,6 +63,8 @@ export type RepoRun = {
   /** The repo's name as shown (a recipe's, or owner/name). */
   name?: string;
   planId: string;
+  /** Visibility of the source in the approved plan. Older runs omit it: their output is owner-only. */
+  private?: boolean;
   computerId: string;
   commit: string;
   state: RepoRunState;
