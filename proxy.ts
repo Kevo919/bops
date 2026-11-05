@@ -120,7 +120,7 @@ export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const method = request.method.toUpperCase();
   // Local CLI accounts belong to this desktop, never to a paired phone or hosted browser.
-  if (path === "/api/local-subscriptions" && (!token || !LOOPBACK.has(hostname(host)) || request.headers.has("x-bops-remote") || request.cookies.has("bops_remote") || !fromWindow(request, token)))
+  if ((path === "/api/local-subscriptions" || path === "/api/pc-task-runner") && (!token || !LOOPBACK.has(hostname(host)) || request.headers.has("x-bops-remote") || request.cookies.has("bops_remote") || !fromWindow(request, token)))
     return NextResponse.json({ error: "Local subscriptions are only available in the desktop app." }, { status: 403 });
   const open = TAILNET_PATHS.has(path) || TUNNEL_PATHS.has(path) || method === "OPTIONS" || (READS.has(method) && OPEN_READS(path));
   if (token && !open && !phone && !fromWindow(request, token)) return NextResponse.json({ error: "Only the Bops app can do that." }, { status: 403 });

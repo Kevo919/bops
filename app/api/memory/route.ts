@@ -11,6 +11,8 @@ import { notReady } from "@/lib/server/ready";
 export async function GET(request: Request) {
   const u = new URL(request.url).searchParams;
   const botId = u.get("bot");
+  // No memory service here (no Honcho key on a self-hosted Bops): a bot's Memory tab says so, not a failed fetch.
+  if (botId && !memoryOn()) return Response.json({ off: true, workspace: "", ws: "", card: [], facts: [] });
   try {
     if (botId) return Response.json(await memoryFor(botId, { q: u.get("q") ?? undefined, mine: u.get("mine") === "1" }));
     return Response.json(await memoryInfo(u.get("ws") ?? currentWorkspaceId()));
