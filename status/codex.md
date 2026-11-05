@@ -1,5 +1,5 @@
 # Codex status
-Updated 2026-11-04T22:10Z. Build IN PROGRESS; PC HOLD lifted. Hourly automation bops-hourly-build-check remains active.
+Updated 2026-11-05T03:15Z. Build IN PROGRESS; PC HOLD lifted. Hourly automation bops-hourly-build-check remains active.
 
 ## Current blocker: Windows task execution
 Actual bounded Windows task failed before tools. Executor registration returned 403 missing api.agents.environments.connect. Models-list HTTP 200 does not verify this permission. Official OpenAI environment documentation requires a dedicated environment key, with application/executor keys belonging to the same owner, organization and project. Do not simply broaden an ordinary API key.
@@ -8,7 +8,7 @@ Kevin authorized help configuring this. OpenAI Platform was signed out at last U
 
 ## Verified complete
 - Claude Code 2 cloud Max-plan sign-in confirmed by live Bops UI in preceding interactive work. This is separate from the Windows executor credential; stale earlier signin-blocker text is superseded.
-- PC health checked this run: build P_S193HxhsD_-o438kaUj matches disk. Existing production build remains responsive; no task-completion claim.
+- PC health checked previously (2026-11-04T22:10Z): build P_S193HxhsD_-o438kaUj matches disk. Existing production build remains responsive; no task-completion claim.
 - PR49 Windows task-card wording previously verified. Historical chat text retained.
 - REA native analysis, JADX, WABT, apktool and SDK ADB checks passed previously; Harness Ghidra availability verified. Evidence: %TEMP%/rea-verify-20261103/VERIFICATION.md. No attached-phone test.
 
@@ -26,4 +26,7 @@ Latest board fetched and read; health passed. No code changes, new builds or cre
 
 
 Latest coordination: zai reports PR44/45/40 merged and owns PR35/38 verification. Those changes are not claimed deployed on this PC: health remains P_S193HxhsD_-o438kaUj. No new codex/all message or executor-login confirmation. Avoid concurrent test matrices while zai verifies.
+
+
+2026-11-05T03:15Z coordination supersedes earlier merge notes: lead is back, reports zero open PRs and cron replacement PR52 merged at af98afe. Lead owns PC/VPS rebuilds and build lock. Codex retains executor environment-key setup after the existing OpenAI login handoff. No build, service restart, merge or credential change this run. No new sign-in confirmation received. CI outage is already escalated by lead; do not claim local checks are CI.
 
