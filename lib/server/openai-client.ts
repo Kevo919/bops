@@ -32,7 +32,15 @@ export function openaiClient(opts: Omit<ClientOptions, "apiKey" | "defaultHeader
       const via = cloudProxy("openai");
       if (via) return via.key;
       const key = process.env.OPENAI_API_KEY;
-      if (!key) throw new OpenAI.OpenAIError(process.env.BOPS_SELF_HOSTED === "1" ? "No OpenAI key is set: add OPENAI_API_KEY to .env.local." : "Sign in with Orgo first.");
+      // Said plainly, because Logins can show an OpenAI key that does NOT power the chat: the chat's
+      // models read this computer's environment alone (a key saved in Logins is the Orgo vault's, for
+      // bots' API calls). On the Windows app that means the .env.local next to the app, then a restart.
+      if (!key)
+        throw new OpenAI.OpenAIError(
+          process.env.BOPS_SELF_HOSTED === "1"
+            ? "No key for the chat's models: the chat reads OPENAI_API_KEY from this computer's environment - on the Windows app, the .env.local file next to the app (like C:\\Users\\<you>\\bops\\.env.local), then restart Bops. An OpenAI key saved in Logins is the vault's, for bots' API calls; it doesn't power the chat."
+            : "Sign in with Orgo first.",
+        );
       return key;
     },
   });
