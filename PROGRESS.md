@@ -1,6 +1,6 @@
 # Bops build: progress for Kevin
 
-Plain-English status of the build, kept up to date by the lead. Last updated **2026-11-04 8:45 PM Chicago time**.
+Plain-English status of the build, kept up to date by the lead. Last updated **2026-11-04 10:15 PM Chicago time**.
 
 **Quick links**
 - **Test log** (every feature, how and when it was tested, by whom): [TESTS.md](https://github.com/Kevo919/bops/blob/team/TESTS.md)
@@ -12,6 +12,16 @@ Plain-English status of the build, kept up to date by the lead. Last updated **2
 - Changes waiting for review: [open pull requests](https://github.com/Kevo919/bops/pulls)
 - Everything merged so far: [closed pull requests](https://github.com/Kevo919/bops/pulls?q=is%3Apr+is%3Amerged)
 - The Android app: [download the APK](https://github.com/Kevo919/bops/releases/download/android-latest/bops-remote.apk)
+
+## Testing target: 100% (now 57%)
+
+| Score | What gets it there | Who | ETA (Chicago) |
+|---|---|---|---|
+| 80% | Every feature tested in the real app on your PC | Codex | ~1:30 AM Nov 5 |
+| 85% | Every feature tested on the server | z.ai | ~3 AM Nov 5 |
+| 90% | The last review fixes (Repos, bot memory files) merged and re-tested; a bot task on the cloud computer | z.ai + lead | ~9 AM Nov 5 |
+| 95% | Your items: Gmail sign-in, GitHub checks back on, phone set up, a fix chosen for PC bot tasks | Kevin, then the agents | ~1 hour after you do them |
+| 100% | Zapier address, a real OpenRouter preset and second key, ChatGPT plan sign-in, the other 10 repo recipes, the z.ai China quota (resets Nov 8) | Kevin + agents | Nov 8 |
 
 ## The MVP (the version to use every day)
 

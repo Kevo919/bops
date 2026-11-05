@@ -6,6 +6,12 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 4, 10:15 PM (Chicago)
+- **Testing score: 57%** (64.5 of 113 checks; see [TESTS.md](TESTS.md)). Target: 100%.
+- **Merged:** #55 (fixes from the post-merge review: Goals, OpenAI accounts, tool servers), #54 (Word/Excel downloads in the desktop app), #53 (4 repo recipes checked in Docker; a paperless-ngx bug found and fixed).
+- **Server** updated and healthy. **PC** rebuilding with #54 and #55, then Codex tests every feature in the app.
+- **ETA:** 80% about 1:30 AM; 85% about 3 AM; 90% about 9 AM; 95% and 100% need Kevin's items (see PROGRESS.md).
+
 ### Nov 4, 9:46 PM (Chicago)
 - **Your PC now runs everything merged so far** (build V2Lm2…). Codex is testing each feature in the real app, and each result goes into [TESTS.md](TESTS.md).
 - Composio key added and accepted. Gmail needs connecting in Bops (Settings → Logins → Gmail → Continue to sign in).
