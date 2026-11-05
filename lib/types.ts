@@ -2377,6 +2377,8 @@ export type AppApproval = {
   askedFor?: string;
   /** A repo run's ask (lib/server/repos.ts): the id of the exact plan whose text the card showed; the yes settles only that plan. */
   repoPlan?: string;
+  /** Asked every time: no Always allow and no Allow for this thread (sandbox code, raw HTTP, a run naming no action; composio-mcp-chat.ts). */
+  onceOnly?: boolean;
 };
 
 /** How the user answers a request (OpenCode's reply, Codex's ReviewDecision approved / approved_for_session / denied). */
