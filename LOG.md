@@ -6,6 +6,13 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 5, 12:15 PM (Chicago)
+- **Merged #88:** Windows wording. "Your PC" replaces "your Mac", and the Claude card now says what bot tasks really do.
+- **Hermes on the server is ready for Bops.** With Kevin's OK, only the Hermes container was changed: its API is now reachable on the tailnet only and needs its key. Backups were kept.
+- **Kevin's PC is signed out of Tailscale.** It needs signing in for Hermes, phone pairing and the server to work.
+- **Security:** the Repos persistence hole (z.ai's #89 didn't close it) is now with a lead builder.
+- **New PRs:** #91, DeepSeek Harness and Hermes instances (security review running). Tasks 61 and 64 (no false "task started", and the bot's Chrome start) are building.
+
 ### Nov 5, 11:10 AM (Chicago)
 - **Merged #84: your "in progress" rule is now in the app.**
   - Unfinished features show grayed out, with red "Not set up yet" text and a percent.

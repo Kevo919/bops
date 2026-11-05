@@ -43,6 +43,7 @@ In this table, the Bops user id is `bops-<install id>`, because COMPOSIO_USER_ID
 | Orgo | PC .env.local | set | |
 | z.ai Coding Plan (China) | PC .env.local | quota resets Nov 8 | |
 | OpenAI | PC .env.local | key set, no credit | |
+| Hermes Agent API (server) | server: Hermes container, API on 127.0.0.1:8642 shared to the tailnet only (tailscale serve tcp 8642); its own API_SERVER_KEY | health 200 on the tailnet; 401 without the key; not reachable on the public address | 2026-11-05 lead |
 | Ollama | server | works but slow (2 CPUs) | 2026-11-03 lead |
 | Honcho memory | PC .env.local | not set (blank) | 2026-11-05 lead |
 | Claude Code (Max plan) | PC, official CLI sign-in | signed in | 2026-11-05 Kevin |
@@ -50,5 +51,6 @@ In this table, the Bops user id is `bops-<install id>`, because COMPOSIO_USER_ID
 | GitHub (Kevo919/bops) | agents' gh CLI | REST works; GraphQL blocked; Actions on since Nov 5 | 2026-11-05 lead |
 
 ## History
+- 2026-11-05 18:12 UTC, lead (Kevin OK'd changing only the Hermes container): API_SERVER_HOST=0.0.0.0 in Hermes' data/.env, port 127.0.0.1:8642 published, `tailscale serve --tcp 8642`. Backups: docker-compose.yml.bak-20261105-181104 and data/.env.bak-20261105-181104. Note: Hermes' dashboard (port 32769) is published on the public address with a password (Hostinger's default setup), unchanged.
 - 2026-11-05 15:40 UTC, lead: #83 (in review) reaches For You at https://connect.composio.dev/mcp with a `ck_` key (header x-consumer-api-key), per Composio's docs. After it merges, Kevin pastes his For You address and key (task 59 screen), and the lead lists every app and tool it finds here.
 - 2026-11-05 14:50 UTC, lead: file created. The Platform project has auth configs for 5 apps but no live accounts. Kevin's Gmail and Drive are in For You. Task 50 is building "Composio (your account)" via the For You MCP address.
