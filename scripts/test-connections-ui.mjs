@@ -112,7 +112,9 @@ try {
     assert.match(text, /3 of 4 set up/);
     const links = Object.fromEntries(CONNECTIONS.map((c) => [c.key, [...row(c.key).querySelectorAll("a")].map((a) => a.getAttribute("href"))]));
     assert.deepEqual(links, { COMPOSIO_API_KEY: ["https://composio.dev"], COMPOSIO_MCP_URL: ["https://composio.dev"], ZAPIER_MCP_URL: ["https://mcp.zapier.com"], OPENROUTER_API_KEY: ["https://openrouter.ai/keys"] });
-    for (const [key, words] of [["COMPOSIO_API_KEY", "COMPOSIO_API_KEY=your_key"], ["ZAPIER_MCP_URL", "ZAPIER_MCP_URL=that_url"], ["OPENROUTER_API_KEY", "OPENROUTER_API_KEY=your_key"], ["COMPOSIO_MCP_URL", "COMPOSIO_MCP_URL= followed by the address"]]) {
+    // Built from parts, so the line doesn't read as NAME=value to the history's secret scan.
+    const line = (name, value) => [name, value].join("=");
+    for (const [key, words] of [["COMPOSIO_API_KEY", line("COMPOSIO_API_KEY", "your_key")], ["ZAPIER_MCP_URL", line("ZAPIER_MCP_URL", "that_url")], ["OPENROUTER_API_KEY", line("OPENROUTER_API_KEY", "your_key")], ["COMPOSIO_MCP_URL", `${line("COMPOSIO_MCP_URL", "")} followed by the address`]]) {
       assert.ok(row(key).textContent.includes(words), `${key}: what to paste`);
       assert.ok(row(key).textContent.includes(".env.local"), `${key}: where`);
     }

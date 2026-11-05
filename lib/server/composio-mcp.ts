@@ -100,45 +100,73 @@ export function maskedComposioMcp(): string | undefined {
 export const META = {
   reads: new Set(["COMPOSIO_SEARCH_TOOLS", "COMPOSIO_GET_TOOL_SCHEMAS"]),
   runs: "COMPOSIO_MULTI_EXECUTE_TOOL",
-  /** Code in Composio's sandbox, and changing your connections: anything could happen, so always ask. */
-  asks: new Set(["COMPOSIO_REMOTE_WORKBENCH", "COMPOSIO_REMOTE_BASH_TOOL", "COMPOSIO_MANAGE_CONNECTIONS"]),
+  /** Code in Composio's sandbox, raw HTTP to a connected app, and changing your connections: anything could happen, so always ask. */
+  asks: new Set(["COMPOSIO_REMOTE_WORKBENCH", "COMPOSIO_REMOTE_BASH_TOOL", "COMPOSIO_PROXY_EXECUTE", "COMPOSIO_MANAGE_CONNECTIONS"]),
+  /** Of those, the ones never allowed for good (no Always allow, no Allow for this thread): each call asks. */
+  everyTime: new Set(["COMPOSIO_REMOTE_WORKBENCH", "COMPOSIO_REMOTE_BASH_TOOL", "COMPOSIO_PROXY_EXECUTE"]),
 };
 
+/** Words that mean a slug (or a tool's name) changes something, sends, pays or runs code: any one of them asks, whatever else it says. */
 const CHANGES = new Set(
-  "SEND REPLY FORWARD POST CREATE ADD INSERT NEW UPDATE EDIT MODIFY PATCH PUT SET CHANGE RENAME REPLACE MOVE COPY DELETE REMOVE TRASH UNTRASH DESTROY CLEAR PURGE ARCHIVE UNARCHIVE UPLOAD SHARE UNSHARE INVITE PAY PAYMENT CHARGE REFUND TRANSFER PURCHASE BUY ORDER SUBSCRIBE UNSUBSCRIBE CANCEL APPROVE REJECT PUBLISH SCHEDULE DRAFT MARK STAR UNSTAR LABEL TAG ASSIGN EXECUTE RUN TRIGGER START STOP ENABLE DISABLE ACCEPT DECLINE BATCH IMPORT MERGE".split(" "),
+  (
+    "SEND REPLY FORWARD POST CREATE ADD INSERT NEW UPDATE UPSERT SAVE SUBMIT WRITE APPEND COMMENT EDIT MODIFY PATCH PUT SET CHANGE RENAME REPLACE MOVE COPY " +
+    "DELETE REMOVE TRASH UNTRASH DESTROY CLEAR PURGE ARCHIVE UNARCHIVE UPLOAD SHARE UNSHARE INVITE PAY PAYMENT CHARGE REFUND TRANSFER PURCHASE BUY ORDER " +
+    "SUBSCRIBE UNSUBSCRIBE CANCEL APPROVE REJECT PUBLISH SCHEDULE DRAFT MARK STAR UNSTAR LABEL TAG ASSIGN EXECUTE RUN TRIGGER START STOP ENABLE DISABLE " +
+    "ACCEPT DECLINE BATCH IMPORT MERGE " +
+    // Raw queries and requests: a query language or HTTP can change things too.
+    "QUERY SQL RAW PROXY GRAPHQL GQL SOQL COMMAND SCRIPT CODE REQUEST HTTP API EXEC CALL INVOKE"
+  ).split(" "),
 );
-const READS = new Set("GET LIST FETCH SEARCH FIND READ QUERY LOOKUP RETRIEVE VIEW DOWNLOAD DESCRIBE COUNT".split(" "));
+/** The only words that make a slug a read; a slug without one asks. */
+const READS = new Set("GET LIST SEARCH FETCH READ FIND DESCRIBE COUNT".split(" "));
 
-/** A Composio action's slug (GMAIL_FETCH_EMAILS) only reads when it says so and says nothing that changes things. */
+const wordsOf = (name: string) => name.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+
+/** A Composio action's slug (GMAIL_FETCH_EMAILS) only reads when it says so and says nothing that changes things. Anything not clearly a read asks. */
 export function slugReads(slug: string): boolean {
-  const words = slug.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
-  if (words.some((w) => CHANGES.has(w))) return false;
+  const words = wordsOf(slug);
+  if (!words.length || words.some((w) => CHANGES.has(w))) return false;
   return words.some((w) => READS.has(w));
 }
 
-/** Every action slug a COMPOSIO_MULTI_EXECUTE_TOOL call names (tools[].tool_slug, wherever it is put). */
-export function slugsIn(args: unknown, depth = 0): string[] {
-  if (depth > 5 || !args || typeof args !== "object") return [];
-  if (Array.isArray(args)) return args.flatMap((x) => slugsIn(x, depth + 1));
-  const out: string[] = [];
-  for (const [k, v] of Object.entries(args as Record<string, unknown>)) {
-    if ((k === "tool_slug" || k === "slug") && typeof v === "string" && v) out.push(v);
-    else if (v && typeof v === "object") out.push(...slugsIn(v, depth + 1));
+/** Whether a name (a slug, a tool's name) says it changes something: such a name asks even if the server marks it read only. */
+export const nameChanges = (name: string) => wordsOf(name).some((w) => CHANGES.has(w));
+
+/** The fields a tools[] entry may name its action in. */
+const SLUG_FIELDS = ["tool_slug", "slug"] as const;
+
+/**
+ * The actions a COMPOSIO_MULTI_EXECUTE_TOOL call runs: its tools[] entries, each with its slug. `complete`: every
+ * entry names one (an entry without a slug, or no tools[] at all, can't be judged, so the call asks).
+ */
+export function runEntries(args: unknown): { slugs: string[]; complete: boolean } {
+  const tools = args && typeof args === "object" && !Array.isArray(args) ? (args as { tools?: unknown }).tools : undefined;
+  if (!Array.isArray(tools) || !tools.length) return { slugs: [], complete: false };
+  const slugs: string[] = [];
+  let complete = true;
+  for (const e of tools) {
+    const slug = e && typeof e === "object" && !Array.isArray(e) ? SLUG_FIELDS.map((f) => (e as Record<string, unknown>)[f]).find((v): v is string => typeof v === "string" && !!v.trim()) : undefined;
+    if (slug) slugs.push(slug.trim());
+    else complete = false;
   }
-  return out;
+  return { slugs, complete };
 }
 
-/** What a call does, for the ask: the slugs it runs, or the tool's own name. Empty slugs on a run: ask. */
-export function judgeCall(tool: McpTool, args: Record<string, unknown>): { reads: boolean; slugs: string[] } {
+/**
+ * What a call does, for the ask: whether it only reads, the slugs it runs (for the ask's words), and whether it asks
+ * every time (`onceOnly`: sandbox code, raw HTTP, or a run that can't be judged). A change word in a name beats the
+ * server's readOnlyHint.
+ */
+export function judgeCall(tool: McpTool, args: Record<string, unknown>): { reads: boolean; slugs: string[]; onceOnly: boolean } {
   const n = tool.name.toUpperCase();
-  if (META.asks.has(n)) return { reads: false, slugs: [] };
+  if (META.asks.has(n)) return { reads: false, slugs: [], onceOnly: META.everyTime.has(n) };
   if (n === META.runs) {
-    const slugs = slugsIn(args);
-    return { reads: slugs.length > 0 && slugs.every(slugReads), slugs };
+    const { slugs, complete } = runEntries(args);
+    return { reads: complete && slugs.every(slugReads), slugs, onceOnly: !complete };
   }
-  if (META.reads.has(n)) return { reads: true, slugs: [] };
-  if (tool.annotations?.destructiveHint === true) return { reads: false, slugs: [] };
-  return { reads: tool.annotations?.readOnlyHint === true || slugReads(n), slugs: [] };
+  if (META.reads.has(n)) return { reads: true, slugs: [], onceOnly: false };
+  if (tool.annotations?.destructiveHint === true || nameChanges(n)) return { reads: false, slugs: [], onceOnly: false };
+  return { reads: tool.annotations?.readOnlyHint === true || slugReads(n), slugs: [], onceOnly: false };
 }
 
 /* ---------------- The connection ---------------- */
@@ -158,10 +186,7 @@ const client = remoteMcp("composio-mcp", {
     return k ? { [KEY_HEADER]: k } : {};
   },
   secrets,
-  readOnly: (tool) => {
-    const n = tool.name.toUpperCase();
-    return !META.asks.has(n) && n !== META.runs && (META.reads.has(n) || slugReads(n));
-  },
+  readOnly: (tool) => judgeCall(tool, {}).reads,
   words: {
     notSet: "Composio (your account) isn't connected: put COMPOSIO_MCP_URL in .env.local, then restart Bops.",
     badAddress: () =>

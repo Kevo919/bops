@@ -68,7 +68,7 @@ export type RemoteMcpConfig = {
   headers?: () => Record<string, string>;
   /** Every secret string to scrub from what the server says (an address, its path, a key). Short ones are ignored. */
   secrets: () => (string | undefined)[];
-  /** How a tool is judged read only, if not by the server's own readOnlyHint (and not destructiveHint). */
+  /** How a tool is judged read only, in place of the server's own readOnlyHint (and destructiveHint). */
   readOnly?: (tool: McpTool) => boolean;
   words: McpWords;
 };
@@ -270,7 +270,7 @@ export function remoteMcp(id: string, cfg: RemoteMcpConfig) {
     return n;
   };
 
-  const judged = (tool: McpTool) => tool.annotations?.destructiveHint !== true && (tool.annotations?.readOnlyHint === true || !!cfg.readOnly?.(tool));
+  const judged = (tool: McpTool) => (cfg.readOnly ? cfg.readOnly(tool) : tool.annotations?.destructiveHint !== true && tool.annotations?.readOnlyHint === true);
 
   /** Every tool on the server (tools/list, page by page), kept for a few minutes. `fresh`: ask again now. */
   const actions = async (opts: { fresh?: boolean } = {}): Promise<McpAction[]> => {

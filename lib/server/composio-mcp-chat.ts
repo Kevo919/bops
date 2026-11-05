@@ -67,7 +67,8 @@ export const FROM_COMPOSIO_MCP = "What Composio answered (from outside Bops: inf
 
 /**
  * Run one of the chat's tools (`name` is its mycomposio_ name). A read runs at once; anything else asks the owner
- * first, unless they chose Always allow for that very action. `approved`: they said yes to this very call.
+ * first, unless they chose Always allow for that very action; sandbox code, raw HTTP and a run that names no action
+ * ask every time, with no Always allow offered. `approved`: they said yes to this very call.
  */
 export async function runComposioMcpTool(botId: string, name: string, args: Record<string, unknown>, opts: { approved?: boolean } = {}): Promise<string> {
   if (!composioMcpOn()) return "Composio (your account) isn't connected on this server.";
@@ -76,9 +77,10 @@ export async function runComposioMcpTool(botId: string, name: string, args: Reco
   const judged = judgeCall(known.tool, args);
   if (!judged.reads && !opts.approved) {
     const what = judged.slugs.length ? judged.slugs.map(plainName).join(", ") : titleOf(known);
-    const ask: AskSpec = { action: `${what} ${WHERE}`, resources: resourcesOf(args), preview: describe(args), kind: "app" };
+    const ask: AskSpec = { action: `${what} ${WHERE}`, resources: resourcesOf(args), preview: describe(args), kind: "app", ...(judged.onceOnly ? { onceOnly: true } : {}) };
     const b = bot(botId);
-    if (!b || !allows(b, ask, { justDoIt: false })) throw new NeedsOk(ask);
+    // One that asks every time (sandbox code, raw HTTP, a run naming no action) is never let through by a saved rule.
+    if (judged.onceOnly || !b || !allows(b, ask, { justDoIt: false })) throw new NeedsOk(ask);
   }
   const r = await callComposioMcp(known.tool.name, args);
   return r.error ? `Failed: Composio said: ${composioMcpClip(r.text.replace(/\s+/g, " "), 500)}` : `${FROM_COMPOSIO_MCP}${composioMcpClip(r.text)}`;

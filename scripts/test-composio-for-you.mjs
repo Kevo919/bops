@@ -99,6 +99,9 @@ const TOOLS = [
   { name: "COMPOSIO_REMOTE_BASH_TOOL", description: "Runs bash in a sandbox.", inputSchema: { type: "object", properties: { command: { type: "string" } } }, annotations: { readOnlyHint: true } },
   { name: "COMPOSIO_MANAGE_CONNECTIONS", description: "Connects toolkits.", inputSchema: { type: "object", properties: { toolkits: { type: "array" } } } },
   { name: "GMAIL_FETCH_EMAILS", description: `Fetches emails. Key ${KEY}`, inputSchema: { type: "object", properties: { query: { type: "string" } } } },
+  // Marked read only, but named like a send: the name wins, it asks.
+  { name: "GMAIL_SEND_EMAIL", description: "Sends an email.", inputSchema: { type: "object", properties: { to: { type: "string" } } }, annotations: { readOnlyHint: true } },
+  { name: "COMPOSIO_PROXY_EXECUTE", description: "Raw HTTP to a connected app.", inputSchema: { type: "object", properties: { endpoint: { type: "string" } } }, annotations: { readOnlyHint: true } },
 ];
 const z = { got: [], on: {}, tools: TOOLS, sessions: 0, liveSession: null };
 const server = createServer((req, res) => {
@@ -235,10 +238,11 @@ await check("the key goes as x-consumer-api-key, to that address only; tools lis
   for (const g of z.got) assert.equal(g.headers["x-consumer-api-key"], KEY);
   assert.equal(z.got[0].headers.authorization, undefined);
   assert.equal(z.got[0].path, `/mcp/${PATH_SECRET}`);
-  assert.deepEqual(list.map((k) => k.name), ["mycomposio_COMPOSIO_SEARCH_TOOLS", "mycomposio_COMPOSIO_MULTI_EXECUTE_TOOL", "mycomposio_COMPOSIO_REMOTE_BASH_TOOL", "mycomposio_COMPOSIO_MANAGE_CONNECTIONS", "mycomposio_GMAIL_FETCH_EMAILS"]);
+  assert.deepEqual(list.map((k) => k.name), ["mycomposio_COMPOSIO_SEARCH_TOOLS", "mycomposio_COMPOSIO_MULTI_EXECUTE_TOOL", "mycomposio_COMPOSIO_REMOTE_BASH_TOOL", "mycomposio_COMPOSIO_MANAGE_CONNECTIONS", "mycomposio_GMAIL_FETCH_EMAILS", "mycomposio_GMAIL_SEND_EMAIL", "mycomposio_COMPOSIO_PROXY_EXECUTE"]);
+  assert.deepEqual(list.filter((k) => k.readOnly).map((k) => k.tool.name), ["COMPOSIO_SEARCH_TOOLS", "GMAIL_FETCH_EMAILS"], "a hint never makes a send, sandbox code or raw HTTP a read");
   const r = await K.checkKey("COMPOSIO_MCP_URL");
   assert.equal(r.status, "works");
-  assert.match(r.message, /Composio answered with 5 tools: apps: Gmail; 4 tools to find and use your connected apps \(search tools, multi execute tool, remote bash tool, manage connections\)/);
+  assert.match(r.message, /Composio answered with 7 tools: apps: Gmail; 5 tools to find and use your connected apps \(search tools, multi execute tool, remote bash tool, manage connections, proxy execute\)/);
   assert.match(r.message, /sends, changes, deletes or pays asks you first/);
   assert.ok(!/—|–/.test(r.message), "no dashes");
   assert.equal(r.shown, `127.0.0.1:${server.address().port}/•••, key ck_•••••••• saved`);
@@ -278,8 +282,8 @@ await check("clear errors: key turned down, key missing, address unknown, nothin
 /* ---------------- What reads and what asks ---------------- */
 
 await check("judging a call: reads run, anything that sends, changes, deletes or pays asks", async () => {
-  for (const s of ["GMAIL_FETCH_EMAILS", "GMAIL_LIST_THREADS", "GOOGLEDRIVE_FIND_FILE", "GOOGLEDRIVE_DOWNLOAD_FILE", "GMAIL_GET_PROFILE", "GMAIL_LIST_DRAFTS"]) assert.equal(C.slugReads(s), true, s);
-  for (const s of ["GMAIL_SEND_EMAIL", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_REPLY_TO_THREAD", "GOOGLEDRIVE_DELETE_FILE", "GMAIL_MOVE_TO_TRASH", "STRIPE_CREATE_PAYMENT_INTENT", "GOOGLEDRIVE_UPDATE_FILE_PUT", "GMAIL_BATCH_MODIFY_MESSAGES", "GOOGLEDRIVE_SHARE_FILE", "SOMETHING_ELSE", "GET_AND_DELETE"]) assert.equal(C.slugReads(s), false, s);
+  for (const s of ["GMAIL_FETCH_EMAILS", "GMAIL_LIST_THREADS", "GOOGLEDRIVE_FIND_FILE", "GMAIL_GET_PROFILE", "GMAIL_LIST_DRAFTS"]) assert.equal(C.slugReads(s), true, s);
+  for (const s of ["GMAIL_SEND_EMAIL", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_REPLY_TO_THREAD", "GOOGLEDRIVE_DELETE_FILE", "GMAIL_MOVE_TO_TRASH", "STRIPE_CREATE_PAYMENT_INTENT", "GOOGLEDRIVE_UPDATE_FILE_PUT", "GMAIL_BATCH_MODIFY_MESSAGES", "GOOGLEDRIVE_SHARE_FILE", "SOMETHING_ELSE", "GET_AND_DELETE", "GOOGLEDRIVE_DOWNLOAD_FILE"]) assert.equal(C.slugReads(s), false, s);
   const t = (name, annotations) => ({ name, annotations });
   assert.equal(C.judgeCall(t("COMPOSIO_SEARCH_TOOLS"), {}).reads, true);
   assert.equal(C.judgeCall(t("COMPOSIO_MULTI_EXECUTE_TOOL"), { tools: [{ tool_slug: "GMAIL_FETCH_EMAILS" }, { tool_slug: "GOOGLEDRIVE_FIND_FILE" }] }).reads, true);
@@ -289,6 +293,44 @@ await check("judging a call: reads run, anything that sends, changes, deletes or
   assert.equal(C.judgeCall(t("COMPOSIO_REMOTE_BASH_TOOL", { readOnlyHint: true }), {}).reads, false, "sandbox code always asks");
   assert.equal(C.judgeCall(t("COMPOSIO_MANAGE_CONNECTIONS"), {}).reads, false);
   assert.equal(C.judgeCall(t("GMAIL_FETCH_EMAILS", { destructiveHint: true }), {}).reads, false);
+});
+
+await check("review 1: a change word in a name beats readOnlyHint; COMPOSIO_PROXY_EXECUTE always asks, every time", async () => {
+  const t = (name, annotations) => ({ name, annotations });
+  for (const n of ["GMAIL_SEND_EMAIL", "GOOGLEDRIVE_DELETE_FILE", "STRIPE_CREATE_PAYMENT", "SLACK_POST_MESSAGE"]) assert.equal(C.judgeCall(t(n, { readOnlyHint: true }), {}).reads, false, n);
+  assert.equal(C.judgeCall(t("GMAIL_FETCH_EMAILS", { readOnlyHint: true }), {}).reads, true);
+  assert.ok(C.META.asks.has("COMPOSIO_PROXY_EXECUTE"));
+  assert.deepEqual(C.judgeCall(t("COMPOSIO_PROXY_EXECUTE", { readOnlyHint: true }), { endpoint: "/x", method: "GET" }), { reads: false, slugs: [], onceOnly: true });
+});
+
+await check("review 2: every tools[] entry needs its own slug (tool_slug or slug); one without asks, every time", async () => {
+  const run = { name: "COMPOSIO_MULTI_EXECUTE_TOOL" };
+  assert.deepEqual(C.judgeCall(run, { tools: [{ tool_slug: "GMAIL_FETCH_EMAILS" }, { slug: "GOOGLEDRIVE_FIND_FILE" }] }), { reads: true, slugs: ["GMAIL_FETCH_EMAILS", "GOOGLEDRIVE_FIND_FILE"], onceOnly: false });
+  assert.deepEqual(C.judgeCall(run, { tools: [{ tool_slug: "GMAIL_FETCH_EMAILS" }, { arguments: { tool_slug: "GMAIL_FETCH_EMAILS" } }] }), { reads: false, slugs: ["GMAIL_FETCH_EMAILS"], onceOnly: true }, "a slug inside arguments doesn't count for its entry");
+  for (const args of [{}, { tools: [] }, { tools: "GMAIL_FETCH_EMAILS" }, { tools: [{ tool_slug: "" }] }, { tools: [null] }, { tool_slug: "GMAIL_FETCH_EMAILS" }]) {
+    const j = C.judgeCall(run, args);
+    assert.equal(j.reads, false, JSON.stringify(args));
+    assert.equal(j.onceOnly, true, JSON.stringify(args));
+  }
+  assert.equal(C.judgeCall(run, { tools: [{ tool_slug: "GMAIL_SEND_EMAIL" }] }).onceOnly, false, "a named send can be allowed for good");
+});
+
+await check("review 3: only clear read verbs read; the added write verbs, raw queries and SQL ask", async () => {
+  for (const w of "UPSERT SAVE SUBMIT WRITE APPEND COMMENT ARCHIVE MOVE SHARE INVITE PUBLISH POST REPLY FORWARD RUN TRIGGER ENABLE DISABLE APPROVE".split(" ")) {
+    assert.equal(C.slugReads(`APP_GET_${w}_ITEM`), false, w);
+    assert.equal(C.judgeCall({ name: `APP_LIST_${w}`, annotations: { readOnlyHint: true } }, {}).reads, false, w);
+  }
+  for (const s of ["POSTGRES_RUN_QUERY", "SUPABASE_QUERY_TABLE", "GOOGLESHEETS_QUERY", "SNOWFLAKE_EXECUTE_SQL", "BIGQUERY_GET_QUERY_RESULTS", "SALESFORCE_SOQL_SEARCH", "GITHUB_GRAPHQL_FETCH", "HUBSPOT_RAW_GET"]) assert.equal(C.slugReads(s), false, s);
+  for (const s of ["GMAIL_SUMMARIZE_THREAD", "DRIVE_LOOKUP_FILE", "NOTION_VIEW_PAGE", "GMAIL"]) assert.equal(C.slugReads(s), false, `${s}: not clearly a read`);
+  for (const s of ["GMAIL_GET_PROFILE", "GMAIL_LIST_LABELS", "GOOGLEDRIVE_SEARCH_FILES", "GMAIL_FETCH_EMAILS", "NOTION_READ_PAGE", "GOOGLEDRIVE_FIND_FOLDER", "SLACK_DESCRIBE_CHANNEL", "GMAIL_COUNT_UNREAD"]) assert.equal(C.slugReads(s), true, s);
+});
+
+await check("review 5: the validation is exported for the Services screen's paste box", async () => {
+  for (const f of ["composioMcpUrl", "composioMcpKeyProblem", "maskedComposioMcp", "composioMcpSet", "composioMcpOn"]) assert.equal(typeof C[f], "function", f);
+  assert.ok(C.composioMcpUrl("https://connect.composio.dev/mcp"));
+  assert.equal(C.composioMcpUrl("https://evil.example/mcp"), null);
+  assert.match(C.composioMcpKeyProblem(["ak", "fake", "z".repeat(8)].join("_")), /Platform project key/);
+  assert.equal(C.composioMcpKeyProblem(KEY), null);
 });
 
 /* ---------------- In the chat ---------------- */
@@ -380,6 +422,8 @@ await check("a send asks the owner first: an approval, and nothing sent to Compo
     [MULTI, { tools: [{ arguments: {} }] }],
     ["mycomposio_COMPOSIO_REMOTE_BASH_TOOL", { command: "ls" }],
     ["mycomposio_COMPOSIO_MANAGE_CONNECTIONS", { toolkits: ["gmail"] }],
+    ["mycomposio_GMAIL_SEND_EMAIL", { to: "sam@example.com" }],
+    ["mycomposio_COMPOSIO_PROXY_EXECUTE", { endpoint: "/gmail/v1/users/me/messages/send" }],
   ])
     await assert.rejects(CC.runComposioMcpTool("boppy", name, args), (e) => e instanceof NeedsOk, `${name} ${JSON.stringify(args)}`);
   assert.equal(calls().length, 0, "still nothing sent");
@@ -392,6 +436,37 @@ await check("on the owner's yes it runs, once, and the chat says so", async () =
   assert.equal(calls()[0].msg.params.arguments.tools[0].tool_slug, "GMAIL_SEND_EMAIL");
   for (let i = 0; i < 100 && !S.getState().messages.some((m) => m.chatId === chatId && /did it in Composio/.test(m.text ?? "")); i++) await new Promise((r) => setTimeout(r, 50));
   assert.ok(S.getState().messages.some((m) => m.chatId === chatId && /did it in Composio: COMPOSIO_MULTI_EXECUTE_TOOL/.test(m.text ?? "")));
+});
+
+await check("review 4: sandbox code, raw HTTP and a run naming no slug ask every time: no Always allow, a saved rule doesn't count", async () => {
+  const P = await import(`${rootUrl}/lib/server/permission.ts`);
+  reset();
+  sent.length = 0;
+  next.push(() => json(callTool("call_b", "mycomposio_COMPOSIO_REMOTE_BASH_TOOL", { command: "ls" })), () => json(chatSays("Listed.")));
+  await Chat.handleMessage(chatId, "List the sandbox");
+  const ask = (S.getState().appApprovals ?? []).find((a) => /remote bash tool in Composio/.test(a.action) && !a.reply);
+  assert.ok(ask, "an approval is waiting");
+  assert.equal(ask.onceOnly, true);
+  const before = JSON.stringify(S.getState().bots.find((b) => b.id === "boppy")?.permissions ?? []);
+  assert.equal(P.replyToAsk(ask.id, "always"), undefined);
+  const answered = S.getState().appApprovals?.find((a) => a.id === ask.id);
+  if (answered?.reply) assert.equal(answered.reply.reply, "once", "Always allow counts as once");
+  assert.equal(JSON.stringify(S.getState().bots.find((b) => b.id === "boppy")?.permissions ?? []), before, "no rule saved");
+  for (let i = 0; i < 100 && !calls().length; i++) await new Promise((r) => setTimeout(r, 50));
+  assert.equal(calls().length, 1, "ran on that yes, once");
+  // Even with a rule that allows it (saved some other way), each call asks again.
+  S.update((s) => {
+    const b = s.bots.find((x) => x.id === "boppy");
+    if (b) b.permissions = [...(b.permissions ?? []), { action: "remote bash tool in Composio (your account)", resource: "*", effect: "allow" }, { action: "proxy execute in Composio (your account)", resource: "*", effect: "allow" }, { action: "multi execute tool in Composio (your account)", resource: "*", effect: "allow" }];
+  });
+  for (const [name, args] of [["mycomposio_COMPOSIO_REMOTE_BASH_TOOL", { command: "ls" }], ["mycomposio_COMPOSIO_PROXY_EXECUTE", { endpoint: "/x" }], [MULTI, { tools: [{ arguments: {} }] }]])
+    await assert.rejects(CC.runComposioMcpTool("boppy", name, args), (e) => e instanceof NeedsOk && e.ask.onceOnly === true, name);
+  // The cards hide Always allow and Allow for this thread for these.
+  for (const f of ["components/app/chat-view.tsx", "components/app/sidebar-sections.tsx"]) {
+    const src = readFileSync(`${rootPath}/${f}`, "utf8");
+    assert.match(src, /\{!a\.onceOnly && \(\s*<button[\s\S]{0,120}?decide\("always"\)/, `${f}: Always allow hidden`);
+    assert.match(src, /!a\.onceOnly && \(a\.kind === "app"/, `${f}: Allow for this thread hidden`);
+  }
 });
 
 await check("the secret is never in the state on disk, in memory, or in anything logged", async () => {
