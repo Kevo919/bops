@@ -59,7 +59,7 @@ const good = { id: "sample-feature", name: "A sample", percent: 25, left: "Wire 
 
 check("the list parses, with the features being built now and their percents", () => {
   const byId = Object.fromEntries(F.FEATURES_IN_PROGRESS.map((f) => [f.id, f.percent]));
-  assert.deepEqual(byId, { "widgets-by-chat": 10, "animations-setting": 10, "composio-for-you": 85, "pc-tasks-claude-plan": 85, "phone-pairing": 75 });
+  assert.deepEqual(byId, { "widgets-by-chat": 10, "animations-setting": 10, "composio-for-you": 85, "pc-tasks-claude-plan": 85, "agents-you-run": 70, "agents-dsh-remote": 10, "agents-dsh-desktop": 5, "phone-pairing": 75, "phone-verify-codes": 0 });
   for (const f of F.FEATURES_IN_PROGRESS) assert.ok(f.name && f.left, f.id);
   assert.deepEqual(F.checkFeatures([good]), [{ ...good, state: "building" }]);
   for (const id of ["pc-tasks-claude-plan", "composio-for-you"]) assert.equal(F.FEATURES_IN_PROGRESS.find((f) => f.id === id).state, "testing", id);
@@ -207,7 +207,7 @@ check("the placeholders are wired where they go, each tiny and self-contained", 
   const at = (file) => readFileSync(new URL(file, rootUrl), "utf8");
   assert.match(at("components/app/bops-app.tsx"), /<InProgressRow id="widgets-by-chat" name="Widgets"/);
   assert.doesNotMatch(at("components/app/bops-app.tsx"), /WipCard|pc-tasks-claude-plan/, "the Bot tasks placeholder is still there");
-  assert.match(at("components/app/setup.tsx"), /<InProgress id="pc-tasks-claude-plan">\s*<PcTaskRunnerCard \/>\s*<\/InProgress>/);
+  assert.match(at("components/app/setup.tsx"), /<InProgress id="pc-tasks-claude-plan">\s*<PcTaskRunnerCard(?: onView=\{setPcView\})? \/>\s*<\/InProgress>/);
   assert.match(at("components/app/look-settings.tsx"), /<InProgress id="animations-setting"/);
   assert.doesNotMatch(at("components/app/logins.tsx"), /InProgress|composio-for-you/, "the Composio placeholder is still in Logins");
   assert.match(at("components/app/connections-card.tsx"), /c\.key === "COMPOSIO_MCP_URL" \? \(\s*<InProgress key=\{c\.key\} id="composio-for-you">\s*\{row\}/);
