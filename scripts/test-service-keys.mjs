@@ -232,7 +232,9 @@ await test("masked display: a key shows as 'ends in' its last four, an address w
   assert.equal((await save("phone", "BOPS_AGENTPHONE_HOOK_URL", "https://hooks.example.com/hooks/agentphone")).status, 200);
   const phone = (await call(route.GET)).json.services.find((s) => s.id === "phone");
   assert.equal(phone.fields[1].shown, "https://hooks.example.com/hooks/agentphone");
-  assert.match(phone.words, /add the agentphone key too/, "texting needs both");
+  // The key is what sets it up (placing calls and texts needs only the key; the address is for ones coming in).
+  assert.equal(phone.status, "off", "the address alone isn't set up");
+  assert.ok(!phone.phone, "no AgentPhone panel before a key is saved");
 });
 
 await test("the atomic write: other lines kept, the setting replaced not doubled, owner-only, no .tmp left, even on failure", async () => {
@@ -363,6 +365,32 @@ await test("masking: the last four only for a key of 16 or more characters, also
     process.env.BOPS_ENV_LOCAL = envFile;
   }
   globalThis.__more = [short, fromEnv, "envshort1"];
+});
+
+await test("AgentPhone: its panel is the owner's only; with the key alone it's set up to call and text out, and says incoming needs the address", async () => {
+  const was = process.env.BOPS_ENV_LOCAL;
+  const only = join(tmp, "only-key", ".env.local");
+  mkdirSync(join(tmp, "only-key"), { recursive: true });
+  writeFileSync(only, `AGENTPHONE_API_KEY=${KEYS.AGENTPHONE_API_KEY}\n`, { mode: 0o600 });
+  process.env.BOPS_ENV_LOCAL = only;
+  try {
+    const mine = (await call(route.GET)).json.services.find((s) => s.id === "phone");
+    assert.equal(mine.status, "restart", "saved, not what Bops started with");
+    assert.ok(mine.phone, "the owner sees the AgentPhone panel");
+    assert.equal(mine.phone.key, "ends in P1a2");
+    for (const headers of [{ "x-bops-remote": "1" }, { cookie: "bops_remote=abc" }]) {
+      const theirs = (await call(route.GET, { headers })).json.services.find((s) => s.id === "phone");
+      assert.equal(theirs.phone, undefined, `no panel for ${JSON.stringify(headers)}`);
+    }
+    // Running with it (as after a restart): set up to place calls and texts, and incoming still needs the address.
+    process.env.AGENTPHONE_API_KEY = KEYS.AGENTPHONE_API_KEY;
+    const running = (await call(route.GET, { headers: { "x-bops-remote": "1" } })).json.services.find((s) => s.id === "phone");
+    assert.equal(running.status, "on");
+    assert.match(running.words, /^Set up to place calls and texts\. Texts and calls coming in still need the public address/);
+  } finally {
+    delete process.env.AGENTPHONE_API_KEY;
+    process.env.BOPS_ENV_LOCAL = was;
+  }
 });
 
 await test("keys never in any answer, log line or the state", async () => {
