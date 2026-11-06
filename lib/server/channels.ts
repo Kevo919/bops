@@ -1,4 +1,5 @@
 import "server-only";
+import { computerWordsFor } from "@/lib/computer-words";
 import { randomInt, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import type { SlackLinkIn, SlackLinksBody, SlackLinksResult } from "@/cloud/protocol";
@@ -477,7 +478,7 @@ async function tokenOf(l: ChannelLink) {
   // Its token is in the Mac's Keychain, which a computer's runner hasn't.
   if (onRunner()) throw new Error(`${KIND_NAME[l.kind]} works from the Bops app on your Mac, not from a bot's computer`);
   const t = await getUserSecret(secretOf(l.id));
-  if (!t) throw new Error(`${KIND_NAME[l.kind]} token is missing from the Keychain`);
+  if (!t) throw new Error(computerWordsFor(process.platform)`${KIND_NAME[l.kind]} token is missing from the Keychain`);
   return t;
 }
 

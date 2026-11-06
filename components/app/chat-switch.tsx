@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { workBot, workspaceOf, type AppState } from "@/lib/types";
 import { currentWorkspace, post } from "./ui";
+import { useOwnComputerWords } from "./computer-words";
 
 /**
  * Settings, General: whether the open workspace's bots answer with every Mac closed (chat through Bops Cloud: its bots'
@@ -57,6 +58,8 @@ export async function setChat(wsId: string, on: boolean, shared = false): Promis
 export function ChatSwitch({ state }: { state: AppState }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Fixed words only, for this computer: a shared workspace's are the owner's computers, which this one can't name.
+  const ownWords = useOwnComputerWords(state);
   const view = chatSwitchOf(state);
   if (!view) return null;
   const flip = async () => {
@@ -72,14 +75,14 @@ export function ChatSwitch({ state }: { state: AppState }) {
       <span className="text-[13px] font-semibold">Chat</span>
       <div className="flex items-center gap-3 rounded-[14px] p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         <div className="flex flex-1 flex-col gap-0.5">
-          <span className="text-[13px] font-medium">{state.shared ? "Answer with every Mac closed" : "Answer with your Mac closed"}</span>
-          <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{view.line}</span>
+          <span className="text-[13px] font-medium">{ownWords(state.shared ? "Answer with every Mac closed" : "Answer with your Mac closed")}</span>
+          <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{ownWords(view.line)}</span>
         </div>
         <button
           type="button"
           role="switch"
           aria-checked={view.on}
-          aria-label={state.shared ? "Answer with every Mac closed" : "Answer with your Mac closed"}
+          aria-label={ownWords(state.shared ? "Answer with every Mac closed" : "Answer with your Mac closed")}
           disabled={busy}
           onClick={() => void flip()}
           className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors disabled:opacity-60 ${view.on ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-e6e6e3)]"}`}

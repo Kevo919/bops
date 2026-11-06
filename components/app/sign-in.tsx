@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { computerWordsFor } from "@/lib/computer-words";
+import { useComputerPlatform } from "./computer-words";
 import { PRIVACY, TERMS } from "@/lib/links";
 import { Mascot, Spinner } from "./mascot";
 import { useTelemetryHere } from "./usage-data";
@@ -317,12 +319,17 @@ function Retry({
   onRetry: () => void;
   onBack: () => void;
 }) {
+  const platform = useComputerPlatform();
+  const computerWords = computerWordsFor(platform);
   const copy =
     step.kind === "expired"
       ? { title: "That code expired", line: "Codes last a few minutes. Get a new one and finish in your browser.", action: "Get a new code" }
       : step.kind === "denied"
-        ? { title: "Sign-in was declined", line: "This Mac wasn't approved. If that was a mistake, start again.", action: "Try again" }
-        : PROBLEMS[step.problem];
+        ? { title: "Sign-in was declined", line: computerWords("This Mac wasn't approved. If that was a mistake, start again."), action: "Try again" }
+        : step.problem === "keychain" && platform !== "darwin"
+          ? // Not a Mac: no Keychain. The sign-in goes in an encrypted store in Bops' folder (lib/server/secret-file.ts).
+            { ...PROBLEMS.keychain, line: computerWords("This Mac didn't let Bops keep it in its encrypted store. Check that the Bops folder can be written to, then try again.") }
+          : PROBLEMS[step.problem];
   return (
     <>
       <Heading title={copy.title} line={copy.line} />

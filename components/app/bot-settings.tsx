@@ -25,6 +25,7 @@ import { FactChips, InnerLabel, Sequences, TodayRow, useBotSave } from "./sequen
 import { botSkills } from "./skills";
 import { BotTeamFields, CHART_WORDS, Lock, Switch, useChartEditor } from "./team-chart";
 import { botWash, post } from "./ui";
+import { useComputerWords, useOwnComputerWords } from "./computer-words";
 
 /*
  * A bot's settings, expanded: a page over the whole window (bops-app.tsx draws it over the sidebar, the chat and the
@@ -246,8 +247,9 @@ const Note = ({ children, tone }: { children: React.ReactNode; tone?: "error" })
 );
 
 /** How it works on its computer, in a line (the Computer card's, as ComputerChoice words it). */
-export function computerLine(state: AppState, b: Bot): string {
-  if (!state.shared && state.host === "mac") return `Works on ${yourMac(state)}`;
+export function computerLine(state: AppState, b: Bot, words: (text: string) => string = (t) => t): string {
+  // Only the fixed line goes through this computer's words (bots' names never do).
+  if (!state.shared && state.host === "mac") return words(`Works on ${yourMac(state)}`);
   if (sharesComputer(b)) return b.isMain ? `Works on ${your(state)} free Bops computer` : `Works on ${workBot({ ...b, computer: "shared" }, state.bots).name}'s computer`;
   return b.freeComputer ? "Its own Bops computer" : "Its own cloud computer";
 }
@@ -273,6 +275,7 @@ export function BotSettingsBody({
   sectionName: (s: SettingsSection) => string;
 }) {
   const older = useOlderBops();
+  const computerWords = useComputerWords();
   const contact = contactOf(state, b, plan);
   const { reach, line, main } = contact;
   const today = todayOf(state, b);
@@ -312,7 +315,7 @@ export function BotSettingsBody({
     routines: () =>
       card("routines", nRoutines ? routineCount(nRoutines) : W.noRoutines, <BotRoutines state={state} bot={b} app={only} onApp={setOnly} onOpenAutopilot={links.onOpenAutopilot} onAsk={links.onAsk} />),
     memory: () => card("memory", ownMemory(state, b.id) ? W.memoryOwn : W.memoryTeam, <BotMemory state={state} bot={b} onOpenThread={links.onOpenThread} />),
-    computer: () => card("computer", computerLine(state, b), <ComputerBody state={state} bot={b} links={links} onRoutines={(app) => (setOnly(app), onToggle("routines"))} />),
+    computer: () => card("computer", computerLine(state, b, computerWords), <ComputerBody state={state} bot={b} links={links} onRoutines={(app) => (setOnly(app), onToggle("routines"))} />),
   };
   return (
     <>
@@ -356,6 +359,7 @@ function ShareAndPause({ state, bot: b }: { state: AppState; bot: Bot }) {
 
 function TeamBody({ state, bot: b, older, onOpenChart }: { state: AppState; bot: Bot; older: boolean; onOpenChart?: (botId: string) => void }) {
   const ed = useChartEditor(state);
+  const ownWords = useOwnComputerWords(state);
   const listed = (ed.people ?? []).filter((p) => !p.invited);
   if (!ed.ws || !ed.t.bots.some((x) => x.id === b.id)) return null;
   return (
@@ -388,7 +392,7 @@ function TeamBody({ state, bot: b, older, onOpenChart }: { state: AppState; bot:
           )}
         </span>
       )}
-      {older && <Note>{CHART_WORDS.olderBops}</Note>}
+      {older && <Note>{ownWords(CHART_WORDS.olderBops)}</Note>}
       {onOpenChart && (
         <button type="button" onClick={() => onOpenChart(b.id)} data-open-chart className="mt-3 text-[12.5px] font-medium leading-4 text-ink hover:underline">
           {W.openChart} ›
@@ -489,6 +493,7 @@ type Contact = ReturnType<typeof contactOf>;
 
 function EmailBody({ state, bot: b, set, plan, contact, today, older, onUpgrade }: { state: AppState; bot: Bot; set: BotSettings; plan: PhonePlan; contact: Contact; today: ReturnType<typeof todayOf>; older: boolean; onUpgrade: () => void }) {
   const { busy, error, send } = useBotSave(b.id);
+  const ownWords = useOwnComputerWords(state);
   const { emailRoom, emailOnAsk } = contact;
   if (!b.email)
     return (
@@ -533,7 +538,7 @@ function EmailBody({ state, bot: b, set, plan, contact, today, older, onUpgrade 
       <InnerLabel>{W.ifSendFails}</InnerLabel>
       <FactChips items={W.mailFails} plain />
       <TodayRow text={today.mailIn || today.replied || today.mailFailed ? W.mailToday({ in: today.mailIn, replied: today.replied, held: today.held, failed: today.mailFailed }) : W.nothingToday} />
-      {older && <Note>{W.olderBops}</Note>}
+      {older && <Note>{ownWords(W.olderBops)}</Note>}
     </div>
   );
 }
@@ -542,6 +547,7 @@ function EmailBody({ state, bot: b, set, plan, contact, today, older, onUpgrade 
 
 function PhoneBody({ state, bot: b, set, reach, today, older, onOpenChat }: { state: AppState; bot: Bot; set: BotSettings; reach: string; today: ReturnType<typeof todayOf>; older: boolean; onOpenChat: () => void }) {
   const { busy, error, send } = useBotSave(b.id);
+  const ownWords = useOwnComputerWords(state);
   const line = state.workspaces?.find((w) => w.id === workspaceOf(b))?.line;
   const number = spacedPhone(reach);
   const answers = set.answersCalls !== false;
@@ -559,7 +565,7 @@ function PhoneBody({ state, bot: b, set, reach, today, older, onOpenChat }: { st
       <div className="mt-3 flex flex-col gap-1" data-answers>
         <Switch label={W.answersCalls} on={answers} disabled={busy} onFlip={(on) => void send({ answersCalls: on })} />
         <span className="text-[11.5px] leading-4 text-[color:var(--ht-6b6b6b)]">
-          {answers ? (set.sequencesOff?.othersCalls ? W.answersOnYou(number) : W.answersOn(number)) : `${W.answersOff(b.name)}${CLOUD_HONOURS_CALL_SETTINGS ? "" : ` ${W.cloudStillAnswers}`}`}
+          {answers ? (set.sequencesOff?.othersCalls ? W.answersOnYou(number) : W.answersOn(number)) : `${W.answersOff(b.name)}${CLOUD_HONOURS_CALL_SETTINGS ? "" : ` ${ownWords(W.cloudStillAnswers)}`}`}
         </span>
         {error && (
           <span role="alert" className="text-[12px] leading-4 text-[color:var(--ht-b42318)]">
@@ -568,7 +574,7 @@ function PhoneBody({ state, bot: b, set, reach, today, older, onOpenChat }: { st
         )}
       </div>
       <Sequences bot={b} set={set} channel="phone" today={today} />
-      {set.sequencesOff?.othersCalls && !CLOUD_HONOURS_CALL_SETTINGS && <Note>{W.cloudStillAnswers}</Note>}
+      {set.sequencesOff?.othersCalls && !CLOUD_HONOURS_CALL_SETTINGS && <Note>{ownWords(W.cloudStillAnswers)}</Note>}
       <InnerLabel>{W.loopGuard}</InnerLabel>
       <FactChips items={W.phoneGuard} />
       <InnerLabel>{W.ifTextFails}</InnerLabel>
@@ -581,7 +587,7 @@ function PhoneBody({ state, bot: b, set, reach, today, older, onOpenChat }: { st
           </button>
         }
       />
-      {older && <Note>{W.olderBops}</Note>}
+      {older && <Note>{ownWords(W.olderBops)}</Note>}
     </div>
   );
 }

@@ -158,6 +158,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Narrow window (phone) layout tests
         run: node scripts/test-mobile-layout.mjs
+      - name: Windows wording on the screens (no Mac words on a PC, scripts/test-windows-wording.mjs)
+        run: node scripts/test-windows-wording.mjs
       - name: AgentPhone panel in Settings, Services (light and dark)
         run: node scripts/test-agentphone-services-ui.mjs
 

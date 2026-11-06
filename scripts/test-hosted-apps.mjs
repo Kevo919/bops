@@ -1295,6 +1295,8 @@ globalThis.fetch = async (input, init) => {
   const url = new URL(req.url);
   if (url.origin === ORGO) return orgoWeb(req);
   if (url.origin === INGOT) {
+    if (/\/repos$/.test(url.pathname) && req.method === "GET") central.listsTried = (central.listsTried ?? 0) + 1;
+    if (central.hold) await central.hold;
     if (central.down) throw new TypeError("fetch failed (Ingot is down)");
     if (central.proxyDown) return new Response("Bad gateway", { status: 502 });
     const text = await req.text();
@@ -1393,7 +1395,10 @@ const until = async (fn, ms = 3000) => {
 };
 const forgetReady = () => globalThis.bopsIngotReady?.clear();
 /** The repos each computer listed last (kept a few seconds for the Apps page): read again. */
-const forgetListed = () => globalThis.bopsIngotListed?.clear();
+const forgetListed = () => {
+  globalThis.bopsIngotListed?.clear();
+  globalThis.bopsIngotMissed?.clear();
+};
 const callsSince = (n, method, re) => web.calls.slice(n).filter((c) => c.method === method && re.test(c.path));
 const get = async (Route, path, params) => {
   const res = await Route.GET(new Request(`http://localhost:3210${path}`), params ? { params: Promise.resolve(params) } : undefined);
@@ -1948,6 +1953,56 @@ await check("A repo in the workspace's Ingot that isn't an app yet: the note nam
   assert.match(line, /; site-a \(no preview yet; not published yet\)/);
   assert.doesNotMatch(line, /not on a computer yet/);
   S.update((st) => (st.sessions = st.sessions.filter((x) => x.id !== "ses_site_plain")));
+});
+
+await check("While Ingot is down or slow, a turn's read of the repos ahead is kept as a miss for 30 seconds: turns after it neither ask nor wait, and once it's over they ask again", async () => {
+  const tried = () => central.listsTried ?? 0;
+  const now = Date.now;
+  forgetListed();
+  try {
+    central.down = true;
+    let n = tried();
+    await H.reposReadBy(H.readReposAhead("boppy"));
+    assert.equal(tried() - n, 1, "the first turn asks");
+    n = tried();
+    let t = performance.now();
+    await H.reposReadBy(H.readReposAhead("boppy"));
+    assert.equal(tried() - n, 0, "the next doesn't ask");
+    assert.ok(performance.now() - t < 100, "nor wait");
+    Date.now = () => now() + 31_000;
+    central.down = false;
+    n = tried();
+    await H.reposReadBy(H.readReposAhead("boppy"));
+    assert.equal(tried() - n, 1, "30 seconds on, it asks again");
+    // A read that answered clears the miss: the next turn (past the kept list's few seconds) asks as usual.
+    Date.now = () => now() + 40_000;
+    n = tried();
+    await H.reposReadBy(H.readReposAhead("boppy"));
+    assert.equal(tried() - n, 1, "asked again after an answer");
+    // Slow: a read still unanswered when the note stops waiting (1 s) counts as a miss too.
+    Date.now = now;
+    forgetListed();
+    let release;
+    central.hold = new Promise((r) => (release = r));
+    t = performance.now();
+    const held = H.readReposAhead("boppy");
+    await H.reposReadBy(held);
+    const waited = performance.now() - t;
+    assert.ok(waited >= 900 && waited < 1500, `waited ${Math.round(waited)} ms, about the second`);
+    n = tried();
+    t = performance.now();
+    await H.reposReadBy(H.readReposAhead("boppy"));
+    assert.equal(tried() - n, 0, "after a slow read, the next turn doesn't ask");
+    assert.ok(performance.now() - t < 100, "nor wait");
+    release();
+    central.hold = undefined;
+    await held;
+  } finally {
+    Date.now = now;
+    central.down = false;
+    central.hold = undefined;
+    forgetListed();
+  }
 });
 
 await check("No work_on_app or deploy_app on a routine's run or a turn someone else started; on a turn that read something from outside, only when Alex's own words asked", async () => {
@@ -5358,7 +5413,7 @@ await check("Local: Start puts bops-local on the app's computer (once, never ove
   const vite = await localAsk({ action: "start", port: 5173 });
   assert.deepEqual([vite.body.sites["field-notes"].port, vite.body.sites["field-notes"].devPort], [5173, 5173]);
   assert.equal(boppy.localAsked.findLast((x) => x[0] === "start")[7], "5173");
-  for (const [port, words] of [[80, "Use a port from 1024 to 65535."], [3210, "Bops uses 3210 on this Mac. Pick another."], ["x", "Use a port from 1024 to 65535."]]) {
+  for (const [port, words] of [[80, "Use a port from 1024 to 65535."], [3210, ({ darwin: "Bops uses 3210 on this Mac. Pick another.", win32: "Bops uses 3210 on this PC. Pick another." })[process.platform] ?? "Bops uses 3210 on this computer. Pick another."], ["x", "Use a port from 1024 to 65535."]]) {
     const bad = await localAsk({ action: "start", port });
     assert.deepEqual([bad.status, bad.body.error, bad.body.field], [400, words, "port"]);
   }

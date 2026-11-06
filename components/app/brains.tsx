@@ -7,6 +7,7 @@ import { BotChip, BotChips, PencilIcon, rowIconBtn, rowTrashBtn, TrashIcon } fro
 import { Mascot } from "./mascot";
 import { undash } from "./side-group";
 import { currentWorkspace, post, teamOf } from "./ui";
+import { useComputerWords } from "./computer-words";
 
 /*
  * Brain (lib/server/brains.ts): what a bot's tasks run on. Bops agent, Bops' own, on your credit; or a brain
@@ -212,6 +213,7 @@ const BRAIN_CHOICES: { id: "use" | "may" | "none"; name: string; hint: string }[
  * has a computer it isn't signed in on), Rename and Remove as icons; then its bots, a chip each.
  */
 function BrainRow({ state, brain: x, keys, onShowScreen }: { state: AppState; brain: Brain; keys?: string[]; onShowScreen: Shown }) {
+  const computerWords = useComputerWords();
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState(x.name);
   const [sure, setSure] = useState(false);
@@ -286,7 +288,7 @@ function BrainRow({ state, brain: x, keys, onShowScreen }: { state: AppState; br
           choices={BRAIN_CHOICES}
           level={who}
           // Picked, but its tasks all run on this Mac, where Bops agent runs them (brainRuns).
-          note={(b) => (who(b) === "may" ? "not picked" : who(b) === "use" && brainRuns(b, state) === "none" ? "on your Mac, Bops agent" : undefined)}
+          note={(b) => (who(b) === "may" ? "not picked" : who(b) === "use" && brainRuns(b, state) === "none" ? computerWords("on your Mac, Bops agent") : undefined)}
           what={x.name}
           disabled={busy}
           onSet={(b, level) => void run(() => call("/api/brains", { id: x.id, botId: b.id, level }, "PATCH"))}
@@ -373,6 +375,7 @@ export function AddBrain({
   onOpenVault: () => void;
   onDone: () => void;
 }) {
+  const computerWords = useComputerWords();
   const team = teamOf(state);
   const main = team.find((b) => b.isMain) ?? team[0];
   const [kind, setKind] = useState<BrainKind | null>(startKind ?? null);
@@ -487,7 +490,7 @@ export function AddBrain({
         <button type="button" disabled={busy} onClick={onDone} className={light}>
           {made ? "Done" : "Cancel"}
         </button>
-        {auth === "plan" && state.host === "mac" && <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">Your bots work on this Mac, so there&apos;s no bot computer to sign in on.</span>}
+        {auth === "plan" && state.host === "mac" && <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{computerWords("Your bots work on this Mac, so there's no bot computer to sign in on.")}</span>}
         {error && (
           <span role="alert" className="min-w-0 text-[12px] leading-4 text-[color:var(--ht-b42318)]">
             {error}
@@ -506,6 +509,7 @@ export function AddBrain({
  * brain has it.
  */
 export function BotBrain({ state, bot: b, onShowScreen, className }: { state: AppState; bot: Bot; onShowScreen?: Shown; className: string }) {
+  const computerWords = useComputerWords();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mine = (state.brains ?? []).filter((x) => x.bots.includes(b.id));
@@ -530,10 +534,10 @@ export function BotBrain({ state, bot: b, onShowScreen, className }: { state: Ap
     ? runs
     : where === "none"
       ? state.host === "mac"
-        ? "Your bots work on this Mac, so they run on Bops agent, on your credit"
-        : `${b.name} works on your Mac, so its tasks run on Bops agent, on your credit`
+        ? computerWords("Your bots work on this Mac, so they run on Bops agent, on your credit")
+        : computerWords`${b.name} works on your Mac, so its tasks run on Bops agent, on your credit`
       : where === "some"
-        ? `${runs} · tasks on your Mac run on Bops agent`
+        ? computerWords`${runs} · tasks on your Mac run on Bops agent`
         : runs;
   const pick = async (brainId: string | null) => {
     setBusy(true);

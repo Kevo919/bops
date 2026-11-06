@@ -1,4 +1,5 @@
 import "server-only";
+import { computerWords } from "@/lib/computer-words";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -565,7 +566,7 @@ export async function startSignIn(brainId: string, botId: string): Promise<{ bot
   const b = bot(botId);
   if (!b) throw new BrainError("No such bot.", 404);
   if (!x.bots.includes(botId)) throw new BrainError(`Let ${b.name} use ${x.name} first.`, 400);
-  if (getState().host === "mac") throw new BrainError("Your bots work in browsers on this Mac (Settings, Where your bots work), so there's no bot computer to sign in on.", 400);
+  if (getState().host === "mac") throw new BrainError(computerWords("Your bots work in browsers on this Mac (Settings, Where your bots work), so there's no bot computer to sign in on.", process.platform), 400);
   const fresh = sameState();
   let c = workComputer(b);
   if (!c.computerId || c.computerStatus !== "ready") {

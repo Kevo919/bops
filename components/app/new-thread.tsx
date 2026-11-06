@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent as KeyEvent, type RefObject } from "react";
+import { useOwnComputerWords } from "./computer-words";
 import { AGENTS, agentLabel, agentName, agentState, aiOf, anyModel, modelsFor, modelShort, OPENCODE_OTHER, paysLabel, readyAgents, upper, type AgentState } from "@/lib/agents";
 import { workBot, workspaceOf, type AppState, type Bot, type BotAgent, type Session } from "@/lib/types";
 import { AgentMark } from "./agent-marks";
@@ -57,10 +58,11 @@ export const DefaultPill = () => <span className="shrink-0 rounded-full bg-[colo
 export function AgentPick({ state, bot: b, value, keys, onPick, onSetUp }: { state: AppState; bot: Bot; value: string; keys?: ReadonlySet<string>; onPick: (x: BotAgent) => void; onSetUp?: (agentId: string) => void }) {
   const ai = aiOf(b, state);
   const at = { bot: b, state };
+  const ownWords = useOwnComputerWords(state);
   return (
     <div role="group" aria-label="Agent" className="flex flex-wrap gap-2">
       {ai.agents.map((x) => {
-        const st = agentState(x, b, state, keys);
+        const st = agentState(x, b, state, keys, ownWords);
         const on = x.id === value;
         return (
           <div key={x.id} className={`flex min-w-[140px] max-w-full flex-col rounded-[14px] bg-white ${on ? "shadow-[0_0_0_1.5px_var(--h-0a0a0a)]" : "shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:shadow-[0_0_0_1px_var(--h-c9c9c6)]"}`}>
@@ -245,10 +247,11 @@ export function AgentChipPick({ state, bot: b, value, keys, defaultOpen = false,
   const box = useRef<HTMLDivElement>(null);
   const menuId = useId();
   useDismiss(open, () => setOpen(false), box);
+  const ownWords = useOwnComputerWords(state);
   const { options, now, def, defReady } = boxAgents(state, b, value, keys);
   if (options.length < 2 || state.shared) return null;
   const at = { bot: b, state };
-  const off = (x: BotAgent) => (x.id === def.id && !defReady ? notReadyWords(agentState(x, b, state, keys)) : "");
+  const off = (x: BotAgent) => (x.id === def.id && !defReady ? notReadyWords(agentState(x, b, state, keys, ownWords)) : "");
   // Its name, or (not ready) its kind and why, which a narrow chip mustn't cut off; the menu and its name say which.
   const label = off(now) ? `${AGENTS[now.kind].name} · ${off(now)}` : agentName(now, at);
   return (

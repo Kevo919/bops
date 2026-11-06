@@ -396,6 +396,7 @@ const MENU_ITEM = "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-
  * picked it, so it says so, with Confirm (keeps it as the owner's) and Change (the same menu).
  */
 function LabelChip({ label, labels, busy, auto, onPick }: { label: string; labels: string[]; busy: boolean; auto?: boolean; onPick: (label: string) => void }) {
+  const computerWords = useComputerWords();
   const [open, setOpen] = useState(false);
   return (
     <span className="relative flex items-center gap-1.5">
@@ -416,7 +417,7 @@ function LabelChip({ label, labels, busy, auto, onPick }: { label: string; label
       </button>
       {auto && (
         <>
-          <span className={CHIP} data-tip="Bops picked this label. It stays on this Mac until you confirm it">
+          <span className={CHIP} data-tip={computerWords("Bops picked this label. It stays on this Mac until you confirm it")}>
             auto
           </span>
           <button type="button" disabled={busy} data-label-confirm onClick={() => onPick(label)} className="text-[12px] font-medium leading-4 text-ink disabled:opacity-50">
@@ -759,7 +760,7 @@ function SkillView({
           </span>
         )
       ) : detail.missing ? (
-        <span className="text-[13px] leading-[19px] text-[color:var(--ht-6b6b6b)]">Its folder isn&apos;t on this Mac.</span>
+        <span className="text-[13px] leading-[19px] text-[color:var(--ht-6b6b6b)]">{computerWords("Its folder isn't on this Mac.")}</span>
       ) : (
         <>
           {detail.files.length > 0 && (

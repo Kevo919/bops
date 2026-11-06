@@ -187,6 +187,7 @@ function DeletedRow({ item, busy, act }: { item: DeletedItem; busy: boolean; act
 
 /** Settings → Your data. Nothing until it's loaded, or when the server won't say (a shared workspace, outside the Bops window, a hosted server). */
 export function YourData() {
+  const computerWords = useComputerWords();
   const [info, setInfo] = useState<PrivacyInfo | null>(null);
   const [busy, setBusy] = useState(false);
   /** A shorter keep, or fewer days for what's deleted, waiting on the user's yes: with what it deletes (null: Bops couldn't say). */
@@ -244,7 +245,7 @@ export function YourData() {
     if (now) setInfo(now);
     const g = now?.goesNow;
     const goes = g && g.olderThan === k && (g.bot ?? "") === clearBot ? g : null;
-    if (goes && !clearGoesAny(goes)) return setClearNote(clearLine(goes, now!.deletedDays, botName(clearBot)));
+    if (goes && !clearGoesAny(goes)) return setClearNote(clearLine(goes, now!.deletedDays, botName(clearBot), computerWords));
     setAskingClear({ choice, goes });
   };
   const clearIt = async (choice: ClearChoice) => {
@@ -294,7 +295,7 @@ export function YourData() {
         <div className="flex flex-col gap-0.5">
           <span className="text-[13px] font-medium">Keep chats and calls</span>
           <span className={sub}>
-            Older messages and finished threads are deleted from Bops Cloud and all your Macs, with each Mac&apos;s call notes, last screens, and the images and pages no kept message shows.
+            {computerWords("Older messages and finished threads are deleted from Bops Cloud and all your Macs, with each Mac's call notes, last screens, and the images and pages no kept message shows.")}
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -306,7 +307,7 @@ export function YourData() {
         </div>
         {asking && (
           <div className="flex flex-col gap-2 rounded-[10px] bg-[color:var(--hb-fff4f2)] p-3">
-            <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{goesLine(asking.keepDays, asking.goes)}</span>
+            <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{computerWords(goesLine(asking.keepDays, asking.goes))}</span>
             <div className="flex gap-2">
               <button type="button" disabled={busy} onClick={() => void send({ keepDays: asking.keepDays }).then(() => setAsking(null))} className={danger}>
                 Delete and keep {KEEP_NAMES.get(asking.keepDays)}
@@ -321,7 +322,7 @@ export function YourData() {
         <div className="flex flex-col gap-2 border-t border-[color:var(--h-f0f0ee)] pt-2.5">
           <div className="flex flex-col gap-0.5">
             <span className="text-[13px] font-medium">Delete now</span>
-            <span className={sub}>Deletes messages and finished threads once, from Bops Cloud and all your Macs. What you keep above stays as it is.</span>
+            <span className={sub}>{computerWords("Deletes messages and finished threads once, from Bops Cloud and all your Macs. What you keep above stays as it is.")}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {CLEAR_OPTIONS.map((k) => (
@@ -354,7 +355,7 @@ export function YourData() {
           </div>
           {askingClear && (
             <div className="flex flex-col gap-2 rounded-[10px] bg-[color:var(--hb-fff4f2)] p-3">
-              <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{clearLine(askingClear.goes, info.deletedDays, botName(askingClear.choice.bot))}</span>
+              <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{clearLine(askingClear.goes, info.deletedDays, botName(askingClear.choice.bot), computerWords)}</span>
               <div className="flex gap-2">
                 <button type="button" disabled={busy} onClick={() => void clearIt(askingClear.choice)} className={danger}>
                   Delete
@@ -375,8 +376,8 @@ export function YourData() {
           <span className={sub}>
             Messages, threads and group chats you delete leave your chats and Bops Cloud at once.
             {info.deletedDays
-              ? " A copy stays on this Mac only, so you can restore it. Bops Cloud never gets the copy, and what you kept between us is never copied."
-              : " Its images on this Mac go too."}
+              ? computerWords(" A copy stays on this Mac only, so you can restore it. Bops Cloud never gets the copy, and what you kept between us is never copied.")
+              : computerWords(" Its images on this Mac go too.")}
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -388,7 +389,7 @@ export function YourData() {
         </div>
         {askingDeleted && (
           <div className="flex flex-col gap-2 rounded-[10px] bg-[color:var(--hb-fff4f2)] p-3">
-            <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{deletedGoesLine(askingDeleted.deletedDays, askingDeleted.goes)}</span>
+            <span className="text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">{computerWords(deletedGoesLine(askingDeleted.deletedDays, askingDeleted.goes))}</span>
             <div className="flex gap-2">
               <button type="button" disabled={busy} onClick={() => void send({ deletedDays: askingDeleted.deletedDays }).then(() => setAskingDeleted(null))} className={danger}>
                 {askingDeleted.deletedDays ? `Delete and keep ${askingDeleted.deletedDays} days` : "Delete and keep none"}

@@ -326,9 +326,8 @@ export async function orgoPlan({ fresh = false } = {}): Promise<OrgoPlan | null>
   // computers read again at once, as before.)
   void read.plan.then((p) => {
     if (g.bopsOrgoPlan !== read) return;
-    // (A plan after misses used to keep the misses' doubled keep, and pass it on to every read after.)
-    if (p) read.keep = KEEP_MS;
-    else read.keep = Math.min(read.keep * 2, FAIL_KEEP_MAX_MS);
+    // (A plan after misses started this read at the misses' keep: it goes back to the minute, as promised above.)
+    read.keep = p ? KEEP_MS : Math.min(read.keep * 2, FAIL_KEEP_MAX_MS);
   });
   return read.plan;
 }

@@ -86,14 +86,15 @@ export async function recordUsage(userId: string, kind: string, units: number, d
  * Use that can be seen more than once (an agent turn's tokens come in its event and again when it's
  * looked up; a call's seconds grow while it runs; a write tried again, or replayed from the spool):
  * one row per `ref`, keeping the largest count (and the detail that came with it). What's paid for a
- * ref is never more than its dearest sighting costs: each sighting pays what it costs less what was
- * paid for the ref already (cost_micros), and only when
- * - its count is larger, or
- - its count is the same and its detail is dearer, at today's prices, than the row's (the model
- *   became known late, fewer tokens were cached than first said), and doesn't leave out the row's
- *   model: the row takes this sighting's detail. The same detail again (a retry, a replay, even after a price change) is never dearer.
- * A smaller count (an older sighting), or the same count with detail no dearer, changes nothing and
- * charges nothing. So sightings A, B, A pay what the dearer of A and B costs, once.
+ * ref (cost_micros) is never more than its dearest sighting costs at today's prices. A sighting that
+ * doesn't say the model is priced at the row's model, when the row has one. A sighting pays
+ * - when its count is larger (or it's the first): what it costs, less what was paid for the ref;
+ * - when its count is the same and its detail is dearer than the row's, both priced at today's
+ *   prices (the model became known late, fewer tokens were cached than first said): only that
+ *   difference, and never past what it costs less what was paid. The row takes this sighting's detail.
+ * A smaller count (an older sighting), or the same count with detail no dearer (a retry, a replay,
+ * even after a price change), changes nothing and charges nothing. So sightings A, B, A pay what the
+ * dearer of A and B costs, once.
  */
 export async function recordUsageFor(userId: string, kind: string, ref: string, units: number, detail: Record<string, unknown> = {}): Promise<void> {
   let paid = 0;
@@ -118,22 +119,27 @@ export async function recordUsageFor(userId: string, kind: string, ref: string, 
       const was = seen ? Number(seen.units) : 0;
       // A smaller count is an older sighting: nothing is paid and the row stands as it is.
       if (seen && units < was) return;
-      const keep = { ...detail, ref };
+      // A sighting that doesn't say the model takes the row's: a model not known is priced as the
+      // dearest (pricing.ts), and that's for when no sighting of this use ever said it, not news about it.
+      const rowModel = seen?.detail?.model;
+      const keep = { ...detail, ...(typeof detail.model !== "string" && typeof rowModel === "string" ? { model: rowModel } : {}), ref };
       const before = seen ? Number(seen.cost_micros) : 0;
       const costs = costOf(kind, units, keep);
       if (seen && units === was) {
-        // The same count: paid only when this detail is dearer than what was paid, and dearer than the
-        // row's own detail at today's prices (so a retry of the same detail after a price rise pays
-        // nothing). Never pricing past what was paid keeps swaps (A, B, A) from paying again. A
-        // sighting that doesn't know the model the row has isn't dearer either: a model not known is
-        // priced as the dearest (pricing.ts), and that's not news about this use.
+        // The same count: both details priced at today's prices, and only what this one costs beyond
+        // the row's is paid, and never past what this one costs in all (less what was paid). So a
+        // price rise is never paid on the whole use again (a dearer sighting after it pays only the
+        // detail's difference), a retry or replay of the same detail is never dearer, and swaps
+        // (A, B, A) pay once. A detail dearer than the row's is kept even when nothing is left to pay
+        // (it was paid at a price since lowered), so the row is always the dearest sighting.
         const stood = costOf(kind, was, { ...(seen.detail ?? {}), ref });
-        if (costs <= before || costs <= stood) return;
-        if (typeof seen.detail?.model === "string" && typeof detail.model !== "string") return;
+        if (costs <= stood) return;
+        paid = Math.max(0, Math.min(costs - stood, costs - before));
+      } else {
+        // A larger count (or the first): paid up to what it costs, less what was paid for this ref
+        // already, so what's paid for a ref never comes to more than its dearest sighting costs.
+        paid = Math.max(0, costs - before);
       }
-      // Paid up to what it costs, less what was paid for this ref already, so what's paid for a ref
-      // never comes to more than its dearest sighting costs.
-      paid = Math.max(0, costs - before);
       const cost = before + paid;
       if (seen)
         await c.query("UPDATE bops.cloud_usage SET units = $2, detail = $3::jsonb, cost_micros = $4 WHERE id = $1", [seen.id, units, JSON.stringify(keep), cost]);

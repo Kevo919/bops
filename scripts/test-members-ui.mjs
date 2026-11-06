@@ -56,6 +56,8 @@ globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({})
 const S = await import(`${rootUrl}/components/app/members.tsx`);
 const M = await import(`${rootUrl}/lib/members.ts`);
 const A = await import(`${rootUrl}/lib/member-access.ts`);
+// The sheet's fixed words as the window shows them before /api/config says which computer this is (neutral; "PC" on a PC).
+const { computerWords: shownWords } = await import(`${rootUrl}/lib/computer-words.ts`);
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement: h } = await import("react");
 
@@ -128,13 +130,13 @@ await test("the picker: Every bot first, then each bot with its mascot, one line
     rows.map((r) => `${r.name}: ${r.levels}${r.mascot ? " (mascot)" : ""}`),
     ["Every bot, new ones too: [None] Read Write", "Boppy: None [Read] Write (mascot)", "Sam: None Read [Write] (mascot)", "Use its computer: [Off] On"],
   );
-  for (const r of rows.slice(0, -1)) assert.deepEqual(r.tips.slice(-3), [M.ACCESS_TIPS.none, M.ACCESS_TIPS.read, M.ACCESS_TIPS.write], `${r.name}: each level says what it does`);
+  for (const r of rows.slice(0, -1)) assert.deepEqual(r.tips.slice(-3), [M.ACCESS_TIPS.none, M.ACCESS_TIPS.read, M.ACCESS_TIPS.write].map((t) => shownWords(t, "unknown")), `${r.name}: each level says what it does`);
   assert.equal(M.ACCESS_TIPS.write, "Can chat with this bot, have it do work, answer what it asks and stop it. Never your logins, keys or Macs.");
   // Under the rows, what each level means, said plainly once.
   const levels = html.match(/<ul data-access-levels[^>]*>([\s\S]*?)<\/ul>/)?.[1] ?? "";
   assert.deepEqual(
     [...levels.matchAll(/<li>([\s\S]*?)<\/li>/g)].map(([, li]) => li.replace(/<[^>]+>/g, "").replace(/&#x27;/g, "'")),
-    ["None: can't see this bot in Bops. On orgo.ai they still see its computer.", "Read: sees everything this bot does, including your chats with it.", "Write: can chat with this bot, have it do work, answer what it asks and stop it. Never your logins, keys or Macs."],
+    ["None: can't see this bot in Bops. On orgo.ai they still see its computer.", "Read: sees everything this bot does, including your chats with it.", "Write: can chat with this bot, have it do work, answer what it asks and stop it. Never your logins, keys or computers."], // (Rendered before /api/config says which computer this is: the neutral words. On a PC: "PC".)
   );
   assert.equal((html.match(/truncate/g) ?? []).length, 4, "every name is cut short, not wrapped");
   assert.match(html, /aria-label="What they can do with Sam"/);
@@ -434,7 +436,7 @@ await test("an Admin's row says what they have, with no bots to pick; making som
   await click(buttonOf(rowOf(box, "Jamie Lee"), "Admin"));
   assert.equal(fake.sent.length, 0, "nothing sent before the answer");
   assert.ok(rowOf(box, "Jamie Lee").textContent.includes(M.ADMIN_WORDS.confirmTitle("Jamie Lee")));
-  assert.ok(rowOf(box, "Jamie Lee").textContent.includes(M.ADMIN_WORDS.confirmBody));
+  assert.ok(rowOf(box, "Jamie Lee").textContent.includes(shownWords(M.ADMIN_WORDS.confirmBody, "unknown")));
   await click(buttonOf(rowOf(box, "Jamie Lee"), M.ADMIN_WORDS.confirm));
   assert.deepEqual(fake.sent.at(-1), { method: "PATCH", body: { memberId: "m1", role: "admin" } });
   // Ada made a Member: at once, and the row says they keep only the bots they had, and a copied password outlasts it.
@@ -508,7 +510,7 @@ await test("Member and None say what people get, and keys on the computers are s
   held.info.keysOnComputers = true;
   let { box, done } = await mount(h(S.Members, { state: base, onClose: noop, onUpgrade: noop }));
   assert.ok(held.info.people.every((p) => p.role === "viewer"));
-  assert.match(box.textContent, new RegExp(esc(M.WORDS.keysHeld)), "View only can read them through Orgo's agent");
+  assert.match(box.textContent, new RegExp(esc(shownWords(M.WORDS.keysHeld, "unknown"))), "View only can read them through Orgo's agent");
   assert.match(box.textContent, /can ask Orgo's agent to work on it\. Never your saved logins\./);
   assert.ok(!/Never your saved logins or keys/.test(box.textContent));
   await done();
@@ -517,7 +519,7 @@ await test("Member and None say what people get, and keys on the computers are s
   invited.info.keysOnComputers = true;
   invited.info.people = [];
   ({ box, done } = await mount(h(S.Members, { state: base, onClose: noop, onUpgrade: noop })));
-  assert.match(box.textContent, new RegExp(esc(M.WORDS.keysHeld)));
+  assert.match(box.textContent, new RegExp(esc(shownWords(M.WORDS.keysHeld, "unknown"))));
   await done();
   // Nobody else: nothing to say yet.
   const alone = bops();
@@ -525,14 +527,14 @@ await test("Member and None say what people get, and keys on the computers are s
   alone.info.people = [];
   alone.info.invites = [];
   ({ box, done } = await mount(h(S.Members, { state: base, onClose: noop, onUpgrade: noop })));
-  assert.ok(!box.textContent.includes(M.WORDS.keysHeld));
+  assert.ok(!box.textContent.includes(shownWords(M.WORDS.keysHeld, "unknown")));
   await done();
   // Full access off for them, someone in: that they can still be read is said with it.
   const off = bops();
   off.info.keysOnComputers = true;
   off.info.fullAccess = "off";
   ({ box, done } = await mount(h(S.Members, { state: base, onClose: noop, onUpgrade: noop })));
-  assert.ok(box.textContent.includes(`${M.WORDS.keysOff} ${M.WORDS.keysOffAnyone}`));
+  assert.ok(box.textContent.includes(shownWords(`${M.WORDS.keysOff} ${M.WORDS.keysOffAnyone}`, "unknown")));
   await done();
 });
 
@@ -612,7 +614,7 @@ await test("Your Apps: a row of its own beside the bots under Access, Read for a
   older = true;
   m = await mount(h(S.Members, { state: team, onClose: noop, onUpgrade: noop }));
   await click(buttonOf(rowOf(m.box, "Jamie Lee"), "Access"));
-  assert.equal(rowOf(m.box, "Jamie Lee").querySelector("[data-apps-older]").textContent, "One of your Macs runs an older Bops. A change made there can hide Your Apps from someone until this Mac is on again.");
+  assert.equal(rowOf(m.box, "Jamie Lee").querySelector("[data-apps-older]").textContent, "One of your computers runs an older Bops. A change made there can hide Your Apps from someone until this computer is on again.");
   await m.done();
   // Not set yet (someone shared with before the scope): no level picked, and a bot changed sends none.
   fake.info.people[0].access = { others: "none", bots: { boppy: "read" } };
@@ -765,7 +767,9 @@ await test("an Admin's sheet: the owner's row has no controls and says what stay
   fake.info.seats = { ...fake.info.seats, canAdd: false, used: 5, limit: 5, upgrade: "max" };
   const admin = { ...base, shared: { projectId: "p9", name: "Acme", owner: "tess@example.com", role: "admin", wsId: "shared_p9", adminActs: true } };
   const { box, done } = await mount(h(S.Members, { state: admin, onClose: noop, onUpgrade: noop, source: "/api/workspaces/shared/people" }));
-  assert.ok(urls.length && urls.every((u) => u === "/api/workspaces/shared/people"), "the shared workspace's people, never the user's own");
+  // (/api/config: which computer this is, for the sheet's words: computer-words.ts.)
+  const asked = urls.filter((u) => u !== "/api/config");
+  assert.ok(asked.length && asked.every((u) => u === "/api/workspaces/shared/people"), "the shared workspace's people, never the user's own");
   const owner = rowOf(box, "Tess Ito");
   assert.ok(owner.textContent.includes(M.ADMIN_SHEET_WORDS.owner));
   assert.ok(!owner.querySelector("button"), "nothing to change on the owner");

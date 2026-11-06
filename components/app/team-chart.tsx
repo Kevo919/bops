@@ -24,6 +24,7 @@ import { sharesComputer, workBot, workspaceOf, type AppState, type Bot } from "@
 import { Mascot } from "./mascot";
 import { LevelPicker, withLevel } from "./members";
 import { CloseButton, currentWorkspace, refreshState } from "./ui";
+import { useOwnComputerWords } from "./computer-words";
 
 /*
  * The team chart (lib/chain.ts): who each bot of the open workspace answers to, who may ask whom, and who
@@ -512,6 +513,7 @@ export function TeamChart({
   onOpenPeople?: () => void;
 }) {
   const { ws, chain, t, byId, name, toast, setToast, say, save, people, room, older, levelFor, setLevel, makeTheirs, giveWriteFor, undo, bringIn, giveComputer } = useChartEditor(state, givenPeople);
+  const ownWords = useOwnComputerWords(state);
   const [picked, setPicked] = useState<string | null>(focus ?? null);
   const [popover, setPopover] = useState<{ a: string; b: string; x: number; y: number } | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
@@ -685,7 +687,7 @@ export function TeamChart({
             {/* A Mac or runner on the account on a Bops from before the chart: it runs turns by the old rules until it updates. */}
             {older && (
               <p className="px-[26px] pt-2 text-[12px] leading-4 text-[color:var(--ht-b54708)]" data-older-bops>
-                {CHART_WORDS.olderBops}
+                {ownWords(CHART_WORDS.olderBops)}
               </p>
             )}
 

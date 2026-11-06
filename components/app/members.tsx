@@ -33,6 +33,7 @@ import { AskInPlace, NeedsYouDot, teamOf } from "./ui";
 import { Badge } from "./vault";
 import { ChartIcon } from "./team-chart";
 import { AppsIcon } from "./made-apps";
+import { useComputerWords } from "./computer-words";
 
 /*
  * Team: who sees the user's bots, a section of Settings (from the user's initials at the bottom left of the sidebar). They're the
@@ -146,6 +147,7 @@ export function Members({
   /** Where it reads and changes who's in: the user's own (app/api/members), or, for an Admin, the shared workspace open (app/api/workspaces/shared/people). */
   source?: string;
 }) {
+  const computerWords = useComputerWords();
   const [read, setRead] = useState<Read | null>(null);
   const [loading, setLoading] = useState(true);
   // The route itself failed (a 500, or not JSON): Team says so and offers a retry.
@@ -267,7 +269,7 @@ export function Members({
                     )
                   }
                 >
-                  {read.why === "rejected" ? WORDS.rejected : WORDS.noKey}
+                  {read.why === "rejected" ? computerWords(WORDS.rejected) : WORDS.noKey}
                 </Notice>
                 {leaving.ask}
               </>
@@ -310,6 +312,7 @@ export function Members({
 
 /** Who has access, and adding people: the section once Orgo has said. */
 function ReadyView({ info, state, act, onRetry, onUpgrade }: { info: Ready; state: AppState; act: Act; onRetry: () => void; onUpgrade: () => void }) {
+  const computerWords = useComputerWords();
   // Bops' own keys on the computers: said whenever anyone else is in (View only too: Orgo's agent, which
   // they may use on any of the computers, runs as root there), and when they're why the app has no Full access.
   const someoneElse = info.people.length > 0 || info.invites.length > 0;
@@ -331,9 +334,9 @@ function ReadyView({ info, state, act, onRetry, onUpgrade }: { info: Ready; stat
       {!info.shared && (keys || info.host === "mac" || !bots) && (
         <div className="flex flex-col gap-2 px-[22px] pt-[18px]">
           {!bots && <Notice>{WORDS.sharedOpen}</Notice>}
-          {keys && <Notice>{info.fullAccess === "off" ? `${WORDS.keysOff}${someoneElse ? ` ${WORDS.keysOffAnyone}` : ""}` : WORDS.keysHeld}</Notice>}
+          {keys && <Notice>{computerWords(info.fullAccess === "off" ? `${WORDS.keysOff}${someoneElse ? ` ${WORDS.keysOffAnyone}` : ""}` : WORDS.keysHeld)}</Notice>}
           {info.host === "mac" && (
-            <Notice>Right now your bots work on this Mac, whose screens people you add never see. They see the chats and threads of the bots you pick, and your bots&apos; cloud computers.</Notice>
+            <Notice>{computerWords("Right now your bots work on this Mac, whose screens people you add never see. They see the chats and threads of the bots you pick, and your bots' cloud computers.")}</Notice>
           )}
         </div>
       )}
@@ -355,6 +358,12 @@ function ReadyView({ info, state, act, onRetry, onUpgrade }: { info: Ready; stat
  * the user's own sheet.
  */
 const SheetScope = createContext<{ me: string; can: boolean; line?: string } | null>(null);
+/** This computer's words for the sheet's fixed copy, in the owner's own sheet only: an Admin's sheet (SheetScope) is about the owner's computers, which this one can't name. */
+function useSheetWords() {
+  const shared = useContext(SheetScope);
+  const computerWords = useComputerWords();
+  return (text: string) => (shared ? text : computerWords(text));
+}
 
 /* ---------------- Which bots they see ---------------- */
 
@@ -429,6 +438,7 @@ export const withComputer = (access: MemberAccess, on: boolean): MemberAccess =>
 export function BotAccess({ bots, value, onChange, disabled, invite }: { bots: Bot[]; value: MemberAccess; onChange: (next: MemberAccess) => void; disabled?: boolean; invite?: boolean }) {
   const mixed = bots.some((b) => levelOf(value, b.id) !== value.others);
   const scope = useContext(AppsScope);
+  const sheetWords = useSheetWords();
   const ids = bots.map((b) => b.id);
   // Your Apps comes with a bot: none seen, nothing of the workspace opens for them.
   const hasBot = value.others !== "none" || bots.some((b) => levelOf(value, b.id) !== "none");
@@ -489,14 +499,14 @@ export function BotAccess({ bots, value, onChange, disabled, invite }: { bots: B
       <ul data-access-levels className="flex flex-col gap-0.5 px-1 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
         {ACCESS_LEVELS.map((level) => (
           <li key={level}>
-            <span className="font-medium text-[color:var(--ht-3a3a38)]">{ACCESS_LABELS[level]}:</span> {ACCESS_TIPS[level].charAt(0).toLowerCase() + ACCESS_TIPS[level].slice(1)}
+            <span className="font-medium text-[color:var(--ht-3a3a38)]">{ACCESS_LABELS[level]}:</span> {sheetWords(ACCESS_TIPS[level].charAt(0).toLowerCase() + ACCESS_TIPS[level].slice(1))}
           </li>
         ))}
         {scope.shown && <li data-apps-legend>{APPS_WORDS.legend}</li>}
       </ul>
       {scope.shown && scope.older && (
         <span data-apps-older className="px-1 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
-          {APPS_WORDS.older}
+          {sheetWords(APPS_WORDS.older)}
         </span>
       )}
     </div>
@@ -603,6 +613,7 @@ export function LevelPicker({
   disabled?: boolean;
   tips?: Record<AccessLevel, string>;
 }) {
+  const sheetWords = useSheetWords();
   return (
     <div role="radiogroup" aria-label={label} aria-describedby={describedBy} className={`flex shrink-0 gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[2px] ${disabled ? "opacity-50" : ""}`}>
       {ACCESS_LEVELS.map((level) => {
@@ -614,7 +625,7 @@ export function LevelPicker({
             role="radio"
             aria-checked={on}
             disabled={disabled}
-            data-tip={tips[level]}
+            data-tip={sheetWords(tips[level])}
             onClick={() => (!on || loose) && onChange(level)}
             className={`rounded-full px-2 py-0.5 text-[11.5px] leading-4 ${on && !loose ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : on ? "bg-white/60 text-[color:var(--ht-3a3a38)] hover:text-ink" : "text-[color:var(--ht-6b6b6b)] hover:text-ink"}`}
           >
@@ -993,6 +1004,7 @@ function WhoHasAccess({ info, bots, act }: { info: Ready; bots: Bot[] | null; ac
  */
 function PersonRow({ person: p, bots, act }: { person: Person; bots: Bot[] | null; act: Act }) {
   const summary = useSummary();
+  const computerWords = useComputerWords();
   const scopeShown = useContext(AppsScope).shown;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1140,7 +1152,7 @@ function PersonRow({ person: p, bots, act }: { person: Person; bots: Bot[] | nul
       {asking === "full" && (
         <Confirm
           title={ADMIN_WORDS.confirmTitle(p.name)}
-          line={sheet ? ADMIN_WORDS.confirmBodyShared : ADMIN_WORDS.confirmBody}
+          line={sheet ? ADMIN_WORDS.confirmBodyShared : computerWords(ADMIN_WORDS.confirmBody)}
           action={ADMIN_WORDS.confirm}
           busy={busy}
           error={confirmError}

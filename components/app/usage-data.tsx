@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { startAnalytics, type AnalyticsInfo } from "@/lib/analytics";
 import type { AppState } from "@/lib/types";
 import { post } from "./ui";
+import { useComputerWords } from "./computer-words";
 
 const readInfo = async (): Promise<AnalyticsInfo | null> => {
   try {
@@ -56,6 +57,7 @@ export function useTelemetryHere() {
 
 /** Settings → You → Share usage data: the account's switch for usage events (README, Privacy). */
 export function UsageData() {
+  const computerWords = useComputerWords();
   const [info, setInfo] = useState<AnalyticsInfo | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -78,7 +80,7 @@ export function UsageData() {
           <span className="text-[13px] font-medium">Share usage data</span>
           <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">
             Sends Orgo counts of what you do in Bops, like bots made and tasks run, and error reports. Never your messages, files, screens, contacts or keys.
-            {info.locked && " Turned off on this Mac."}
+            {info.locked && computerWords(" Turned off on this Mac.")}
           </span>
         </div>
         <button
