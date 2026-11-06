@@ -472,6 +472,10 @@ test("moved back to the Mac while a member's turn waits on its computer: the Mac
     assert.deepEqual(await turnOf(s.owner, mine), { state: "failed", note: "toMac" });
     const pending = await pendingOf(s.owner);
     assert.equal(pending.filter((p) => p.stored && p.messageId === a.messageId).length, 1, "the Mac answers the member's message");
+    // The member's note is written with the move; the owner's once it's in (turns.ts handedBack: ended), so a read
+    // right after the move can come a moment before it.
+    const ownNote = async () => (await readAllMessages(s.owner)).find((m) => m.id === "msg_o_key-auto-hbown_note");
+    await until(ownNote, "the owner's note");
     const all = await readAllMessages(s.owner);
     const note = all.find((m) => m.id === `${a.messageId}_note`)?.json?.text;
     assert.equal(note, "Tara's Mac answers Max for now, so Max will answer once Tara opens Bops.");

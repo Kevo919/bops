@@ -232,6 +232,18 @@ const unknownCall = (call) => (honcho.unknown.push(`${call.method} ${call.path}`
 /** What the model says each fact is about, by the fact's text: its answer is a function of what it was asked. */
 const SORTS = new Map();
 /** One item as the model gives it (every field is required by the schema). */
+/**
+ * The invoice's due date, a few days from the real today: Orbit leaves out a to-do two weeks past due
+ * (settled() in lib/memory-categories.ts), and the clock isn't frozen here, so a fixed date (it was
+ * 2026-10-16) dropped it from orbit_read once that was two weeks gone.
+ */
+const dayFromNow = (days) => {
+  const d = new Date(Date.now() + days * 86_400_000);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const INVOICE_DUE = dayFromNow(3);
+/** The car registration's due date, likewise (it was 2026-12-01): the to-do reopened must not be two weeks past due. */
+const REGISTRATION_DUE = dayFromNow(26);
 const item = (category, title, more = {}) => ({ category, title, detail: "", key: "", when: "", who: "", done: false, ...more });
 // Each call (its body, its input parsed, the fact texts, the SDK's timeout and retry headers); `fail(call)`
 // answers instead, `hold(call)` waits for releaseOpenai().
@@ -575,7 +587,7 @@ await section("A first look at memory: the card first, then the newest facts, so
         "f5",
         50,
         "Tiger needs to send the invoice to Acme by Friday.",
-        [item("todos", "Send the invoice to Acme", { key: "send invoice acme", when: "2026-10-16", who: "Acme" }), item("companies", "Acme Inc", { key: "Acme Inc", detail: "Gets your invoice" })],
+        [item("todos", "Send the invoice to Acme", { key: "send invoice acme", when: INVOICE_DUE, who: "Acme" }), item("companies", "Acme Inc", { key: "Acme Inc", detail: "Gets your invoice" })],
       ],
       ["f6", 60, "Dana promised to send Tiger the signed contract by Monday.", [item("promises", "Dana sends the signed contract", { key: "dana signed contract", who: "Dana Reyes", when: "next Monday" })]],
       ["f7", 70, "Tiger is building Bops, an app for teams of AI assistants.", [item("projects", "Bops", { key: "Project Bops", detail: "An app for teams of AI assistants." })]],
@@ -691,7 +703,7 @@ await section("A first look at memory: the card first, then the newest facts, so
   assert.deepEqual([leo.private, leo.sources[0].private, leo.sources[0].from, leo.sources[0].how], [true, true, "Your other agents", "saved"]);
   for (const i of items.filter((x) => x !== leo)) assert.equal(i.private, undefined, `${i.title} isn't private`);
   // To-dos and promises: when they're due (a date the app can read, or none), who for.
-  assert.deepEqual(pick(one(items, "todos", "Send the invoice to Acme"), ["when", "who", "done"]), { when: "2026-10-16", who: "Acme", done: undefined });
+  assert.deepEqual(pick(one(items, "todos", "Send the invoice to Acme"), ["when", "who", "done"]), { when: INVOICE_DUE, who: "Acme", done: undefined });
   assert.deepEqual(pick(one(items, "promises", "Dana sends the signed contract"), ["when", "who"]), { when: undefined, who: "Dana Reyes" }, "\"next Monday\" isn't a date");
   assert.deepEqual(pick(one(items, "projects", "Bops"), ["key", "detail"]), { key: "projects:bops", detail: "An app for teams of AI assistants" }, "\"Project Bops\" is Bops; no full stop");
   noDashes(one(items, "decisions", "Pro plan at 40 dollars a month").detail);
@@ -2302,7 +2314,7 @@ await section("When a fact goes, its item is worked out again from the facts lef
       ["a1", 10, "Leo lives at 12 Elm Street.", [item("people", "Leo", { key: "leo", detail: "Lives at 12 Elm Street" })]],
       ["a2", 20, "Leo is Tiger's climbing partner.", [item("people", "Leo", { key: "leo", detail: "Your climbing partner" })]],
       ["r1", 30, "Tiger renewed the car registration.", [item("todos", "Renew the car registration", { key: "renew car registration", done: true })]],
-      ["r2", 40, "Tiger has to renew the car registration by December 1.", [item("todos", "Renew the car registration", { key: "renew car registration", when: "2026-12-01" })]],
+      ["r2", 40, `Tiger has to renew the car registration by ${REGISTRATION_DUE}.`, [item("todos", "Renew the car registration", { key: "renew car registration", when: REGISTRATION_DUE })]],
       ["m1", 50, "Mara's phone number is +44 7700 900123.", [item("people", "Mara", { key: "mara", detail: "Phone number on file" })]],
       ["m2", 60, "Mara is Tiger's editor.", [item("people", "Mara", { key: "mara", detail: "Your editor" })]],
     ]);
@@ -2312,7 +2324,7 @@ await section("When a fact goes, its item is worked out again from the facts lef
     assert.deepEqual(pick(leo, ["detail", "private"]), { detail: "Lives at 12 Elm Street", private: true });
     assert.deepEqual(leo.sources.map((s) => [s.fact, !!s.private]), [[F.a1.id, true], [F.a2.id, false]]);
     assert.ok(!Object.hasOwn(leo, "detailPrivate"), "the window doesn't get the engine's own field");
-    assert.deepEqual(pick(one(r.items, "todos", "Renew the car registration"), ["done", "when"]), { done: true, when: "2026-12-01" });
+    assert.deepEqual(pick(one(r.items, "todos", "Renew the car registration"), ["done", "when"]), { done: true, when: REGISTRATION_DUE });
     await check("The model is told what known items are, but never a line that's locked (it came from a private fact)", async () => {
       const n = openai.calls.length;
       newFact(ws, "Leo and Mara met at the climbing gym.", []);
@@ -2328,7 +2340,7 @@ await section("When a fact goes, its item is worked out again from the facts lef
     r = await refresh(ws);
     leo = one(r.items, "people", "Leo");
     assert.deepEqual(pick(leo, ["detail", "private", "first", "last"]), { detail: "Your climbing partner", private: undefined, first: F.a2.at, last: F.a2.at });
-    assert.deepEqual(pick(one(r.items, "todos", "Renew the car registration"), ["done", "when"]), { done: undefined, when: "2026-12-01" });
+    assert.deepEqual(pick(one(r.items, "todos", "Renew the car registration"), ["done", "when"]), { done: undefined, when: REGISTRATION_DUE });
     assert.ok(!readFileSync(fileFor(bank), "utf8").includes("Elm Street"), "the address is nowhere in the categories' file");
     // Mara: locked too, her line from her phone number.
     const mara = one(r.items, "people", "Mara");

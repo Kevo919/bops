@@ -554,11 +554,28 @@ await L.orgoPlan();
 assert.equal(limitsAsked() - n, 1);
 assert.equal(calls.at(-1).auth, "Bearer sk_test_two");
 globalThis.bopsOrgoKey = "sk_test_one";
-// A read that got nothing isn't kept: the next look asks again.
+// A read that got nothing is kept too, with a back-off that doubles each miss in a row (plan.ts, the
+// 1505 review's #78: a 404ing Orgo was asked ~25 times a minute while a miss wasn't kept); fresh asks
+// at once, and a plan read again goes back to the plain minute.
 onPlan("startup_v2", 4, 1, { replies: { "GET /api/user/subscription": () => json(503, {}), "GET /api/billing/compute-limits": () => json(503, {}) } });
+n = limitsAsked();
 assert.equal(await L.orgoPlan(), null);
+assert.equal(limitsAsked() - n, 1, "the miss was read");
 replies = answers("startup_v2", 4, 1);
-assert.equal((await L.orgoPlan()).inUse, 1, "asked again");
+assert.equal(await L.orgoPlan(), null, "a miss is kept: Orgo isn't asked again at once");
+Date.now = () => now() + 61_000;
+assert.equal(await L.orgoPlan(), null, "a miss's keep doubled: still kept a minute on");
+assert.equal(limitsAsked() - n, 1, "not asked while the miss is kept");
+Date.now = () => now() + 121_000;
+assert.equal((await L.orgoPlan()).inUse, 1, "asked again once the doubled keep is over");
+assert.equal(limitsAsked() - n, 2);
+Date.now = () => now() + 182_000;
+assert.equal((await L.orgoPlan()).inUse, 1);
+assert.equal(limitsAsked() - n, 3, "a plan read resets the keep to the plain minute");
+Date.now = now;
+n = limitsAsked();
+assert.equal((await L.orgoPlan({ fresh: true })).inUse, 1);
+assert.equal(limitsAsked() - n, 1, "fresh asks at once");
 
 /* ---------------- One at a time, and a plan's computers all fit ---------------- */
 

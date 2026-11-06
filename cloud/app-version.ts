@@ -56,16 +56,33 @@ export function noteIphoneVersion(userId: string, version: string | null): void 
   note(`ios:${userId}`, version, "UPDATE bops.cloud_accounts SET ios_version = $2, ios_seen_at = now() WHERE user_id = $1", userId);
 }
 
+/**
+ * Each key's last write queued: a key's writes go one after another, in the order its calls came. (Sent at once,
+ * two quick changes ran on two of the pool's connections and could land the wrong way round, keeping the older
+ * version while `noted` held the newer one for NOTE_MS, so nothing put it right.)
+ */
+const writing = new Map<string, Promise<void>>();
+
 /** Written when it changes, and otherwise at most every few minutes. */
 function note(key: string, version: string | null, sql: string, userId: string) {
   const last = noted.get(key);
   if (last && last.version === version && Date.now() - last.at < NOTE_MS) return;
   if (noted.size > 50_000) noted.clear();
-  noted.set(key, { version, at: Date.now() });
-  void query(sql, [userId, version]).catch((e: Error) => {
-    noted.delete(key);
-    console.warn(`[cloud] app version: ${e.message}`);
-  });
+  const mine = { version, at: Date.now() };
+  noted.set(key, mine);
+  const write: Promise<void> = (writing.get(key) ?? Promise.resolve())
+    .then(() => query(sql, [userId, version]))
+    .then(
+      () => {},
+      (e: Error) => {
+        if (noted.get(key) === mine) noted.delete(key);
+        console.warn(`[cloud] app version: ${e.message}`);
+      },
+    )
+    .finally(() => {
+      if (writing.get(key) === write) writing.delete(key);
+    });
+  writing.set(key, write);
 }
 
 export const UPDATE_BOPS = "This version of Bops is too old to keep working. Update it from bops.bot to keep going.";
@@ -157,3 +174,5 @@ export function requireIphoneVersion(version: string | null): void {
 
 /** For tests: forget which versions were kept. */
 export const forgetNotedVersions = () => noted.clear();
+/** For tests: once every version write queued now is done. */
+export const versionWritesDone = async () => void (await Promise.all([...writing.values()]));
