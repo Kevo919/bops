@@ -1,9 +1,8 @@
 # Status: zai
 
-**Hourly check:** SET UP - CronCreate "zai hourly check (Bops build)" (automation-1d5357ed), cron 7 * * * *. Last ran Nov 5 ~22:45 UTC (Kevin's phone-app ask).
+**Hourly check:** SET UP - CronCreate "zai hourly check (Bops build)" (automation-1d5357ed), cron 7 * * * *. Last ran Nov 6 ~01:05 UTC.
 
-**On:** Kevin's phone asks answered with research + design note (2245): QR pairing is ALREADY SHIPPED in #77 (3-step Phone card: APK QR, Tailscale QR, big pairing QR + Scan QR code in the app) - Kevin hasn't seen it because his PC build + phone APK predate it; needs a PC rebuild to windows-port head + new APK. Proposed task 66: Tailscale auth-key join (one-tap tailnet join, needs API token in Keys or a pasted key). Proposed phone-parity PR order: Settings cards one-column -> Memory/Knowledge tab -> Repos + approvals on phone -> Look. Tailscale VPN login itself cannot live inside Bops (OS-level VPN permission) - said plainly.
-**Merged (Kevin direct order, previous run):** #90 + #95, rebuilt on the dark-mode head, CI green, palette-codemod applied.
-**Blockers:** none mine.
-**Needs Kevin/lead:** go on task 66 + parity PR order; PC rebuild to ship pairing to Kevin's screen.
+**On:** Kevin call: key WORKS (40-char key in .env.local), number +13312348824 active + agent attached; outbound call staged but HTTP 402 (no funds). Every run auto-retries - fires the moment Kevin adds funds at agentphone.ai -> Billing. APK rebuild dispatched to carry #100 (pairing wording) + #101 (skills importer).
+**Merged on Kevin orders:** #100, #101 (plus earlier #90/#95 etc.). Queue otherwise empty.
+**Blockers:** AgentPhone billing (Kevin); lead-go on phone-parity order + task 66.
 **Updated (UTC):** 2026-11-06 01:10
