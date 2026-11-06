@@ -196,3 +196,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 03:27 lead: #107 (usage pricing edges, task 76) review = APPROVE WITH NITS, 363/363; merge-when-green running; nits are task 77.
 - 03:34 lead: merged #107 (usage pricing edges).
 - 04:06 lead: #108 (claims per turn, task 66) re-review = APPROVE WITH NITS (inverted to a read allowlist); merge-when-green running; nits are task 78. #109 (red tests, task 65): reviewer found the code sound but a plan.ts conflict with #104; builder resolving.
+- 04:12 lead: merged #108 (claims per turn, task 66) at d1e15b6, CI green.
