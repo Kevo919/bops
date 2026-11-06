@@ -20,6 +20,7 @@ import { OWNER_WHO, saveToMemory, scopeOf } from "./memory";
 import { saveUpload } from "./uploads";
 import { plainLinks } from "./style";
 import { addMessage, bot, getState, ofThisUser, ownerName, patchSession, react, sameState, stateEpoch, stateReady, stateUser, update, userDir } from "./store";
+import { noteSentOut } from "./turn-deeds";
 import { recordCallMinutes, recordUsage } from "./usage";
 import { checkVerification, forgetVerification, pendingConsentAt, pendingVerifications, startVerification, toE164, verifyOn } from "./verify";
 
@@ -614,6 +615,8 @@ export async function textOwner(botId: string, body: string) {
   const text = via.from.id === b.id ? body : `${b.name}: ${body}`;
   const m = addMessage({ chatId: botChatId(b.id), role: "system", text: `Texted you: ${body}` });
   await sendText(via.from.id, to, text, { tag: m.id });
+  // It went: the turn whose text_me sent it is told (turn-deeds.ts), never another bot's in the same moment.
+  noteSentOut();
   return `Texted ${ownerName()} from ${prettyPhone(via.line.phone)}.`;
 }
 
