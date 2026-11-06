@@ -102,6 +102,42 @@ export function ServicesSettings({ focus }: { focus?: { id: ServiceRow; at: numb
   );
 }
 
+/** A line of the AgentPhone panel: what it is, how it stands (a dot), and its plain words. */
+function PanelLine({ label, state, words, link }: { label: string; state: "ok" | "wait" | "bad" | "none"; words: string; link?: string }) {
+  const dot = { ok: "bg-[var(--svc-ok-dot)]", wait: "bg-[var(--svc-wait-dot)]", bad: "bg-destructive", none: "bg-pencil/40" }[state];
+  return (
+    <div className="flex min-w-0 items-start gap-2" data-agentphone-line={label}>
+      <span className={`mt-[5px] size-[7px] shrink-0 rounded-full ${dot}`} />
+      <span className="min-w-0 text-[12px] leading-4">
+        <span className="font-medium">{label}: </span>
+        <span className={state === "bad" ? "text-destructive" : "text-ink/80"}>{words}</span>
+        {link && (
+          <>
+            {" "}
+            <a className="underline" href={link} target="_blank" rel="noopener noreferrer">
+              Open
+            </a>
+          </>
+        )}
+      </span>
+    </div>
+  );
+}
+
+/** AgentPhone, once a key is saved: the key (last four only), the number and agent found, and whether calls and texts are ready. */
+function AgentPhonePanel({ p }: { p: NonNullable<ServiceView["phone"]> }) {
+  const calls = p.calls === "working" || p.calls === "ready" ? "ok" : p.calls === "needs funds" ? "bad" : "none";
+  const texts = p.texts === "working" || p.texts === "enabled" ? "ok" : p.texts === "activating" ? "wait" : p.texts === "registration needed" ? "bad" : "none";
+  return (
+    <div data-agentphone-panel className="flex flex-col gap-1.5 rounded-lg bg-desk/60 px-2.5 py-2">
+      <PanelLine label="Key" state="ok" words={`saved, ${p.key}`} />
+      <PanelLine label="Number" state={p.number ? "ok" : "none"} words={p.number ? `${p.number}${p.agent ? `, agent "${p.agent}"` : ""}` : (p.problem ?? (p.checked ? "None found" : "Press Check to look it up"))} />
+      <PanelLine label="Calls" state={calls} words={p.callsWords} link={p.calls === "needs funds" ? "https://agentphone.ai/dashboard" : undefined} />
+      <PanelLine label="Texts" state={texts} words={p.textsWords} link={p.texts === "registration needed" ? "https://agentphone.ai/register" : undefined} />
+    </div>
+  );
+}
+
 /** One service: what it does, how it stands, its boxes (the owner's), where to get the key, Check, and Restart when needed. */
 function ServiceCard({ s, editable, focused, onView }: { s: ServiceView; editable: boolean; focused: boolean; onView: (v: ServicesView) => void }) {
   const canRestart = useCanRestart();
@@ -152,6 +188,12 @@ function ServiceCard({ s, editable, focused, onView }: { s: ServiceView; editabl
         <span data-service-words className="text-[12px] leading-4 text-pencil">
           {s.words}
         </span>
+      )}
+      {s.phone && (
+        // Calls and texts from the user's own number (lib/feature-status.ts "agentphone-calls-texts"): usable, being tested.
+        <InProgress id="agentphone-calls-texts">
+          <AgentPhonePanel p={s.phone} />
+        </InProgress>
       )}
       {editable &&
         s.fields?.map((f) => {

@@ -59,10 +59,10 @@ const good = { id: "sample-feature", name: "A sample", percent: 25, left: "Wire 
 
 check("the list parses, with the features being built now and their percents", () => {
   const byId = Object.fromEntries(F.FEATURES_IN_PROGRESS.map((f) => [f.id, f.percent]));
-  assert.deepEqual(byId, { "widgets-by-chat": 85, "animations-setting": 85, "composio-for-you": 85, "pc-tasks-claude-plan": 85, "agents-you-run": 70, "agents-dsh-remote": 10, "agents-dsh-desktop": 5, "phone-pairing": 75, "phone-verify-codes": 0 });
+  assert.deepEqual(byId, { "widgets-by-chat": 85, "animations-setting": 85, "composio-for-you": 85, "pc-tasks-claude-plan": 85, "agents-you-run": 70, "agents-dsh-remote": 10, "agents-dsh-desktop": 5, "phone-pairing": 75, "phone-verify-codes": 0, "agentphone-calls-texts": 80 });
   for (const f of F.FEATURES_IN_PROGRESS) assert.ok(f.name && f.left, f.id);
   assert.deepEqual(F.checkFeatures([good]), [{ ...good, state: "building" }]);
-  for (const id of ["pc-tasks-claude-plan", "composio-for-you"]) assert.equal(F.FEATURES_IN_PROGRESS.find((f) => f.id === id).state, "testing", id);
+  for (const id of ["pc-tasks-claude-plan", "composio-for-you", "agentphone-calls-texts"]) assert.equal(F.FEATURES_IN_PROGRESS.find((f) => f.id === id).state, "testing", id);
   assert.equal(F.checkFeatures([{ ...good, state: "testing" }])[0].state, "testing");
 });
 

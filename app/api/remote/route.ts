@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   if (!allowed(request)) return no();
   const p = pairing();
   const help = new URL(request.url).searchParams.get("help") === "1";
-  return Response.json({ paired: !!p, created: p?.created ?? null, addresses: addresses(), tailscale: tailscaleState(), ...(help ? { help: await helpQrs() } : {}) });
+  return Response.json({ paired: !!p, created: p?.created ?? null, addresses: addresses(), tailscale: await tailscaleState(), ...(help ? { help: await helpQrs() } : {}) });
 }
 
 /**
