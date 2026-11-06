@@ -16,7 +16,8 @@
 // - only this turn's own sends back its claim (turn-deeds.ts): two bots in the same moment, A sends and B says it sent,
 //   B gets the note and A doesn't;
 // - an app's read (Zapier gmail_find_email) or a write that only marks (mark as read) never backs "I sent the email";
-//   only an action that sends does (sendsOut);
+//   only an action that sends does (sendsOut), including one Zapier's execute_zapier_write_action names and a slug
+//   Composio's COMPOSIO_MULTI_EXECUTE_TOOL runs;
 // - notes that only say what didn't happen never become "Done.".
 //
 // OpenAI and OpenRouter are fakes (fetch), sessions.ts is a stand-in that records the tasks started and runs nothing,
@@ -35,6 +36,8 @@ process.env.BOPS_SELF_HOSTED = "1";
 // Fake keys, made up here: never a real one, and never written as a name and its value.
 const fakeKey = (...parts) => ["fake", ...parts].join("-");
 for (const k of Object.keys(process.env)) if (k.startsWith("ZAPIER_")) delete process.env[k];
+delete process.env.COMPOSIO_MCP_URL;
+delete process.env.COMPOSIO_MCP_KEY;
 process.env.OPENAI_API_KEY = fakeKey("openai");
 process.env.OPENROUTER_API_KEY = fakeKey("or", "default");
 process.env.OPENROUTER_API_KEY__WORK = fakeKey("or", "work");
@@ -97,6 +100,11 @@ const ZAP_TOOLS = [
   { name: "gmail_find_email", title: "Gmail: Find Email", description: "Finds an email.", inputSchema: { type: "object", properties: { instructions: { type: "string" } } }, annotations: { readOnlyHint: true } },
   { name: "gmail_mark_email_as_read", title: "Gmail: Mark Email as Read", description: "Marks an email read.", inputSchema: { type: "object", properties: { instructions: { type: "string" } } } },
   { name: "gmail_send_email", title: "Gmail: Send Email", description: "Sends an email.", inputSchema: { type: "object", properties: { instructions: { type: "string" }, to: { type: "string" } } } },
+  { name: "execute_zapier_write_action", title: "Run a Zapier write action", description: "Runs an action by its key.", inputSchema: { type: "object", properties: { selected_api: { type: "string" }, action: { type: "string" }, params: { type: "object" } } } },
+];
+/** Composio's For You MCP server: its meta tool runs actions by slug. */
+const COMPOSIO_TOOLS = [
+  { name: "COMPOSIO_MULTI_EXECUTE_TOOL", description: "Runs tools by slug.", inputSchema: { type: "object", properties: { tools: { type: "array", items: { type: "object", properties: { tool_slug: { type: "string" }, arguments: { type: "object" } } } } } } },
 ];
 const zapCalls = [];
 const response = (id, output) => ({ id, object: "response", model: "gpt-test", status: "completed", output, usage: { input_tokens: 100, output_tokens: 10, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } });
@@ -133,12 +141,12 @@ globalThis.fetch = async (input, init) => {
     await ottoGate;
     return json({ count: 0, limit: 10, messages: [] });
   }
-  if (url.host === "mcp.zapier.com") {
+  if (url.host === "mcp.zapier.com" || url.host === "connect.composio.dev") {
     const msg = JSON.parse((await req.text()) || "{}");
-    zapCalls.push(msg);
+    zapCalls.push({ host: url.host, ...msg });
     if (msg.method === "initialize") return new Response(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "zapier", version: "1" } } }), { status: 200, headers: { "content-type": "application/json", "mcp-session-id": "zs1" } });
     if (msg.method === "notifications/initialized") return new Response(null, { status: 202 });
-    if (msg.method === "tools/list") return json({ jsonrpc: "2.0", id: msg.id, result: { tools: ZAP_TOOLS } });
+    if (msg.method === "tools/list") return json({ jsonrpc: "2.0", id: msg.id, result: { tools: url.host === "mcp.zapier.com" ? ZAP_TOOLS : COMPOSIO_TOOLS } });
     if (msg.method === "tools/call") return json({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: msg.params?.name === "gmail_find_email" ? "Found 1 email from Dana: the quote." : "Done in Gmail." }] } });
     return json({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "no such method" } });
   }
@@ -424,12 +432,42 @@ await check("an app read (Zapier gmail_find_email) or a mark-as-read, then 'I se
   await resumeWith({ name: "zapier_gmail_send_email", arguments: JSON.stringify({ instructions: "send Dana the quote", to: "dana@acme.example" }) }, "once");
   assert.ok(zapCalls.some((c) => c.method === "tools/call" && c.params?.name === "gmail_send_email"), "the send ran");
   assert.equal(lastBot().text, "I've sent the email to Dana.");
+  // Zapier's execute_zapier_write_action: by the action key it names. A send backs the claim; a label doesn't.
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith({ name: "zapier_execute_zapier_write_action", arguments: JSON.stringify({ selected_api: "GoogleMailV2CLIAPI", action: "send_email", params: { to: "dana@acme.example" } }) }, "once");
+  assert.ok(zapCalls.some((c) => c.method === "tools/call" && c.params?.name === "execute_zapier_write_action" && c.params?.arguments?.action === "send_email"), "the write action ran");
+  assert.equal(lastBot().text, "I've sent the email to Dana.");
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith({ name: "zapier_execute_zapier_write_action", arguments: JSON.stringify({ selected_api: "GoogleMailV2CLIAPI", action: "add_label_to_email", params: {} }) }, "once");
+  assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
   delete process.env.ZAPIER_MCP_URL;
 });
 
+await check("Composio For You's multi-execute meta tool: a real GMAIL_SEND_EMAIL in it backs 'sent'; a read in it, then the claim, gets the note", async () => {
+  process.env.COMPOSIO_MCP_URL = "https://connect.composio.dev/mcp";
+  const META = "mycomposio_COMPOSIO_MULTI_EXECUTE_TOOL";
+  // A read through the meta tool runs at once (a fetch), and the model then says it sent the email.
+  answers.push(calling(toolCall(META, { tools: [{ tool_slug: "GMAIL_FETCH_EMAILS", arguments: { max_results: 1 } }] })), reply("I've sent the email to Dana."));
+  const k = asked.length;
+  await Chat.handleMessage(chatId, "Read Dana's email and send her the quote");
+  assert.ok(asked[k].tools.some((t) => t.name === META), "Composio's meta tool offered");
+  assert.ok(zapCalls.some((c) => c.host === "connect.composio.dev" && c.method === "tools/call" && c.params?.arguments?.tools?.[0]?.tool_slug === "GMAIL_FETCH_EMAILS"), "the read ran");
+  assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
+  // The same read approved in a paused round: still a read.
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith({ name: META, arguments: JSON.stringify({ tools: [{ tool_slug: "GMAIL_FETCH_EMAILS", arguments: {} }] }) }, "once");
+  assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
+  // A real send through the meta tool, approved and done: backed, no note.
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith({ name: META, arguments: JSON.stringify({ tools: [{ tool_slug: "GMAIL_SEND_EMAIL", arguments: { recipient_email: "dana@acme.example", subject: "Quote", body: "Here's the quote." } }] }) }, "once");
+  assert.ok(zapCalls.some((c) => c.host === "connect.composio.dev" && c.method === "tools/call" && c.params?.arguments?.tools?.[0]?.tool_slug === "GMAIL_SEND_EMAIL"), "the send ran");
+  assert.equal(lastBot().text, "I've sent the email to Dana.");
+  delete process.env.COMPOSIO_MCP_URL;
+});
+
 await check("sendsOut(): only an action that sends backs 'sent', never a read, a mark or a draft", () => {
-  for (const a of ["GMAIL_SEND_EMAIL", "GMAIL_SEND_DRAFT", "GMAIL_REPLY_TO_THREAD", "zapier_slack_send_channel_message", "SLACK_CHAT_POST_MESSAGE", "OUTLOOK_FORWARD_MESSAGE", "TWILIO_CREATE_MESSAGE", "mycomposio_GMAIL_SEND_EMAIL", "sendMessage"]) assert.equal(Chat.sendsOut(a), true, a);
-  for (const a of ["GMAIL_FETCH_EMAILS", "GMAIL_LIST_THREADS", "zapier_gmail_find_email", "GMAIL_MARK_AS_READ", "zapier_gmail_mark_email_as_read", "GMAIL_ADD_LABEL_TO_EMAIL", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_GET_SEND_AS", "SLACK_LIST_MESSAGES", "read_messages", ""]) assert.equal(Chat.sendsOut(a), false, a);
+  for (const a of ["GMAIL_SEND_EMAIL", "GMAIL_SEND_DRAFT", "GMAIL_REPLY_TO_THREAD", "zapier_slack_send_channel_message", "SLACK_CHAT_POST_MESSAGE", "OUTLOOK_FORWARD_MESSAGE", "TWILIO_CREATE_MESSAGE", "mycomposio_GMAIL_SEND_EMAIL", "sendMessage", "slack.chat.postMessage", "SLACK_SENDS_A_MESSAGE_TO_A_SLACK_CHANNEL"]) assert.equal(Chat.sendsOut(a), true, a);
+  for (const a of ["GMAIL_FETCH_EMAILS", "GMAIL_LIST_THREADS", "zapier_gmail_find_email", "GMAIL_MARK_AS_READ", "zapier_gmail_mark_email_as_read", "GMAIL_ADD_LABEL_TO_EMAIL", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_GET_SEND_AS", "SLACK_LIST_MESSAGES", "read_messages", "send_status", "postStatus", "GMAIL_SEND_AS_SETTINGS", "execute_zapier_write_action", "TWILIO_MESSAGE_SEND_HISTORY_EXPORT", ""]) assert.equal(Chat.sendsOut(a), false, a);
 });
 
 await check("a turn whose only notes say what didn't happen: never 'Done.'", async () => {
@@ -440,6 +478,9 @@ await check("a turn whose only notes say what didn't happen: never 'Done.'", asy
   console.log(`     reply: ${JSON.stringify(reply_)}`);
   assert.notEqual(reply_, "Done.");
   assert.equal(reply_, "That didn't go through.");
+  // Only the failure notes' own format counts: a success note that quotes "can't" or "couldn't" is still a success.
+  for (const n of ["Couldn't find that task", "Didn't start \"x\": it would open an address on evil.example that the message didn't give", "Not handed off: Max isn't under Boppy on the org chart.", "Boppy didn't do it: send the email"]) assert.equal(Chat.saysNotDone(n), true, n);
+  for (const n of ["Sent to Research: “they couldn't come, so book Friday”", "Read https://example.com/why-you-can't-sleep", "Remembered: Dana can't do mornings", "Deleted routine \"Can't miss\"", "Moved Tidy to your Mac: “if you can't, skip it”"]) assert.equal(Chat.saysNotDone(n), false, n);
 });
 
 await check("unbacked(): each kind of claim, and what backs it", () => {

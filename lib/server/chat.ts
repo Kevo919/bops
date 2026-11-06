@@ -8,6 +8,7 @@ import { isSecret, learn, memoryBlock, memoryOn, recall, rememberMessage, saveTo
 import { APP_TOOLS, findAppActions, runAppAction } from "./composio";
 import { isZapierTool, runZapierTool, zapierChatTools, zapierForTurn } from "./zapier-chat";
 import { composioMcpChatTools, composioMcpForTurn, isComposioMcpTool, runComposioMcpTool } from "./composio-mcp-chat";
+import { COMPOSIO_MCP_PREFIX, META, runEntries } from "./composio-mcp";
 import { agentChatTools, agentsForTurn, isAgentTool, runAgentTool } from "./agent-instances-chat";
 import { CALL_TOOL, isOutboundTool, outboundChatTools, outboundForTurn, outboundOn, runOutboundTool } from "./agentphone-outbound";
 import { callApi, callApiTool, usableKeys } from "./keys";
@@ -1384,27 +1385,56 @@ const withoutUnbacked = (text: string, backed: Backed) => {
  */
 export const asksToAct = (words: string) =>
   /(?:^|[.!?]\s+|\b(?:please|can you|could you|would you|will you|go ahead and|I want you to|I need you to|I'd like you to)\s+)(?:please\s+)?(?:start|run|launch|kick off|send|email|text|post|schedule|remind|book|buy|order|create|build|set up|research|fill|sign in|reply|tidy|clean up|make|write|open)\b/i.test(words.trim());
-/** A chat note that only says something didn't happen (refused, failed, declined): with nothing else, the reply isn't "Done.". */
-const saysNotDone = (note: string) => /^(?:Couldn't|Didn't|Not |No |Can't|Cannot)\b|\b(?:didn't do it|couldn't|can't|wasn't|isn't allowed)\b/.test(note);
+/**
+ * A chat note that only says something didn't happen, in the failure notes' own format: one that starts "Couldn't …",
+ * "Didn't …", "Not handed off: …", "Can't …", or "<bot> didn't do it: …". Never one that only quotes such words
+ * ("Sent to Research: “they couldn't come”"). With nothing else, such notes make the reply "That didn't go through.".
+ */
+export const saysNotDone = (note: string) => /^(?:Couldn't|Didn't|Can't|Cannot)\s|^Not [a-z]+(?: [a-z]+)?:\s|^[^:\n“"]{1,60} didn't do it:\s/.test(note);
 /** Whether the owner's own computer (This PC; "mac" in the state) can take a task now. */
 const pcReady = () => getState().host === "mac" || !!getState().mac?.ready;
 /**
  * An app's action that sends something to someone, by its name: GMAIL_SEND_EMAIL, zapier_slack_send_channel_message,
- * SLACK_CHAT_POST_MESSAGE, OUTLOOK_REPLY_TO_EMAIL, TWILIO_CREATE_MESSAGE. Never one that reads, or only marks or files
- * what's there (GMAIL_FETCH_EMAILS, gmail_find_email, GMAIL_LIST_THREADS, GMAIL_MARK_AS_READ, GMAIL_ADD_LABEL_TO_EMAIL),
- * nor a draft (GMAIL_CREATE_EMAIL_DRAFT): only an action like this that ran backs "I sent it".
+ * SLACK_CHAT_POST_MESSAGE, OUTLOOK_REPLY_TO_EMAIL, TWILIO_CREATE_MESSAGE, slack.chat.postMessage. The verb is a whole
+ * word at the start of the action (after its app's name, and a sub-area at most), or of its last segment, and isn't
+ * about a send's status (send_status, postStatus). Never one that reads, or only marks or files what's there
+ * (GMAIL_FETCH_EMAILS, gmail_find_email, GMAIL_LIST_THREADS, GMAIL_MARK_AS_READ, GMAIL_ADD_LABEL_TO_EMAIL), nor a
+ * draft (GMAIL_CREATE_EMAIL_DRAFT): only an action like this that ran backs "I sent it".
  */
 export function sendsOut(action: string): boolean {
-  const words = action
-    .replace(/([a-z])([A-Z])/g, "$1_$2")
+  const last = action.split(/[./:]/).filter((x) => x.trim()).at(-1) ?? "";
+  const words = last
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
     .toUpperCase()
     .split(/[^A-Z0-9]+/)
     .filter(Boolean);
+  // Bops' own prefixes for Zapier's and Composio's tools aren't part of the action.
+  while (words[0] === "ZAPIER" || words[0] === "MYCOMPOSIO") words.shift();
   if (words.some((w) => NOT_SENDS.has(w))) return false;
-  return words.some((w) => SENDS.has(w)) || /(?:^|_)CREATE_(?:A_)?(?:MESSAGE|SMS|TEXT|TWEET|POST|COMMENT|REPLY)(?:_|$)/.test(words.join("_"));
+  const verbAt = (i: number) => SENDS.has(words[i]) || (words[i] === "CREATE" && SENT_THINGS.has(words[i + 1] === "A" ? words[i + 2] : words[i + 1]));
+  for (let i = 0; i < Math.min(3, words.length); i++) {
+    if (!verbAt(i)) continue;
+    const next = words[i + 1];
+    return !next || !ABOUT_A_SEND.has(next);
+  }
+  return false;
 }
 const SENDS = new Set(["SEND", "SENDS", "REPLY", "REPLIES", "FORWARD", "FORWARDS", "POST", "POSTS", "PUBLISH", "TWEET", "NOTIFY", "INVITE", "DM"]);
+const SENT_THINGS = new Set(["MESSAGE", "SMS", "TEXT", "TWEET", "POST", "COMMENT", "REPLY"]);
 const NOT_SENDS = new Set(["FETCH", "LIST", "GET", "SEARCH", "FIND", "READ", "RETRIEVE", "LOOKUP", "CHECK", "COUNT", "MARK", "LABEL", "ARCHIVE", "MOVE"]);
+/** Words after a send verb that make it about sends, not one: send_status, postStatus, SEND_AS_SETTINGS. */
+const ABOUT_A_SEND = new Set(["STATUS", "STATUSES", "STATE", "STATS", "SETTINGS", "AS", "LIMIT", "LIMITS", "QUOTA", "HISTORY", "LOG", "LOGS", "CONFIG", "INFO", "DETAILS"]);
+/**
+ * The action a Zapier tool sends with: its own name, or for Zapier's execute_zapier_write_action the action key it
+ * names (action, else selected_api). Zapier's read meta tool never sends.
+ */
+const zapierSendsOut = (name: string, a: Record<string, unknown>) => {
+  if (/(?:^|_)execute_zapier_write_action$/i.test(name)) return [a.action, a.selected_api].some((x) => typeof x === "string" && sendsOut(x));
+  return sendsOut(name);
+};
+/** What a Composio (For You) tool sends with: its name, or the slugs a COMPOSIO_MULTI_EXECUTE_TOOL call runs (any one that sends). */
+const composioSendsOut = (name: string, a: Record<string, unknown>) =>
+  name.slice(COMPOSIO_MCP_PREFIX.length).toUpperCase() === META.runs ? runEntries(a).slugs.some(sendsOut) : sendsOut(name);
 /** A bot's routines and watches, by id: a new one after a tool ran means it was set up. */
 const standingIds = (botId: string) => new Set([...getState().routines.filter((r) => r.botId === botId).map((r) => r.id), ...(getState().watches ?? []).filter((w) => w.botId === botId).map((w) => w.id)]);
 /** Said in place of a reply when the chat's model can't take tools and was asked to do something: plain, with one that can. */
@@ -3148,7 +3178,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
             if (approved) {
               const ok = !out.startsWith("Failed");
               // A read or a mark-as-read that ran isn't a send: only a Zapier action that sends backs "sent" (sendsOut).
-              if (ok && sendsOut(name)) doneNow.send = true;
+              if (ok && zapierSendsOut(name, a)) doneNow.send = true;
               addMessage({ chatId, role: "system", text: ok ? `${b.name} did it in Zapier: ${name.slice("zapier_".length)}` : `${b.name} couldn't do it in Zapier: ${out.replace(/^Failed:\s*/, "").slice(0, 160)}`, appResult: { action: name, ok, output: out } });
             }
             if (!out.startsWith("Failed")) {
@@ -3164,7 +3194,8 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
           .then((out) => {
             if (approved) {
               const ok = !out.startsWith("Failed");
-              if (ok && sendsOut(name)) doneNow.send = true;
+              // Through For You's multi-execute meta tool, by the slugs it ran (a GMAIL_SEND_EMAIL in it sends; a fetch doesn't).
+              if (ok && composioSendsOut(name, a)) doneNow.send = true;
               addMessage({ chatId, role: "system", text: ok ? `${b.name} did it in Composio: ${name.slice("mycomposio_".length)}` : `${b.name} couldn't do it in Composio: ${out.replace(/^Failed:\s*/, "").slice(0, 160)}`, appResult: { action: name, ok, output: out } });
             }
             if (!out.startsWith("Failed")) {
