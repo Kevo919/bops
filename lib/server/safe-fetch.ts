@@ -1,4 +1,5 @@
 import "server-only";
+import { computerWords, computerWordsFor } from "@/lib/computer-words";
 import type { LookupAddress } from "node:dns";
 import { lookup } from "node:dns/promises";
 import http from "node:http";
@@ -198,7 +199,7 @@ function allowedForTests(u: URL): boolean {
   return list.split(",").some((entry) => entry.trim().toLowerCase() === key);
 }
 
-const PRIVATE = "That address is on this Mac or a private network, so Bops won't open it.";
+const PRIVATE = computerWords("That address is on this Mac or a private network, so Bops won't open it.", process.platform);
 
 /**
  * The checks that need no lookup: a valid http(s) address, no password, port 80 or 443, and not a
@@ -249,7 +250,7 @@ async function addressesOf(u: URL, signal: AbortSignal): Promise<LookupAddress[]
   }
   if (!found.length) throw new Error(`Couldn't find a website called ${host}.`);
   const nets = localNetworks();
-  if (!allowedForTests(u) && found.some((a) => isBlockedAddress(a.address) || onThisNetwork(a.address, nets))) throw new FetchRefused(`${host} points to this Mac or a private network, so Bops won't open it.`);
+  if (!allowedForTests(u) && found.some((a) => isBlockedAddress(a.address) || onThisNetwork(a.address, nets))) throw new FetchRefused(computerWordsFor(process.platform)`${host} points to this Mac or a private network, so Bops won't open it.`);
   return found;
 }
 

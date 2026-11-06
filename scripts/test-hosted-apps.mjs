@@ -5358,7 +5358,7 @@ await check("Local: Start puts bops-local on the app's computer (once, never ove
   const vite = await localAsk({ action: "start", port: 5173 });
   assert.deepEqual([vite.body.sites["field-notes"].port, vite.body.sites["field-notes"].devPort], [5173, 5173]);
   assert.equal(boppy.localAsked.findLast((x) => x[0] === "start")[7], "5173");
-  for (const [port, words] of [[80, "Use a port from 1024 to 65535."], [3210, "Bops uses 3210 on this Mac. Pick another."], ["x", "Use a port from 1024 to 65535."]]) {
+  for (const [port, words] of [[80, "Use a port from 1024 to 65535."], [3210, ({ darwin: "Bops uses 3210 on this Mac. Pick another.", win32: "Bops uses 3210 on this PC. Pick another." })[process.platform] ?? "Bops uses 3210 on this computer. Pick another."], ["x", "Use a port from 1024 to 65535."]]) {
     const bad = await localAsk({ action: "start", port });
     assert.deepEqual([bad.status, bad.body.error, bad.body.field], [400, words, "port"]);
   }

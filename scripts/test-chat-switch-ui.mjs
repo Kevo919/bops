@@ -113,13 +113,14 @@ await test("a click sends the owner's choice: off is the Mac, on gives Bops Clou
   answer = { ok: true, status: 200, body: { ok: true } };
 });
 
-await test("rendered: the switch, its state and its line; nothing where it isn't shown", () => {
+await test("rendered: the switch, its state and its line; nothing where it isn't shown", async () => {
   const on = renderToStaticMarkup(h(S.ChatSwitch, { state: stateWith({ chatAuto: true }) }));
-  assert.ok(on.includes("Answer with your Mac closed"));
+  assert.ok(on.includes("Answer with your computer closed")); // (Rendered before /api/config says which computer this is: the neutral words. On a PC: "PC".)
   assert.ok(on.includes('aria-checked="true"'));
-  assert.ok(on.includes(S.CHAT_LINES.soon));
+  const { computerWords } = await import(fileUrl("lib/computer-words.ts"));
+  assert.ok(on.includes(computerWords(S.CHAT_LINES.soon, "unknown")));
   const off = renderToStaticMarkup(h(S.ChatSwitch, { state: stateWith({ chatOn: "mac" }) }));
-  assert.ok(off.includes('aria-checked="false"') && off.includes(S.CHAT_LINES.mac));
+  assert.ok(off.includes('aria-checked="false"') && off.includes(computerWords(S.CHAT_LINES.mac, "unknown")));
   assert.equal(renderToStaticMarkup(h(S.ChatSwitch, { state: stateWith({}) })), "");
 });
 

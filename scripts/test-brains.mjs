@@ -55,6 +55,8 @@ process.chdir(work);
 /* ---------------- Loading the app's modules ---------------- */
 
 const fileUrl = (p) => pathToFileURL(join(rootPath, p)).href;
+// The server's own computer, in its words (lib/computer-words.ts): "PC" on Windows, "Mac" on a Mac, "computer" elsewhere.
+const HERE = { win32: "PC", darwin: "Mac" }[process.platform] ?? "computer";
 // sessions.ts is the app's task runner: here, the takeover and the computer's setup, as calls written down.
 const SESSIONS_OWN = `
 import { update } from ${JSON.stringify(fileUrl("lib/server/store.ts"))};
@@ -618,7 +620,7 @@ await test("a sign-in can be stopped, and tried again on a bot with no free scre
   S.update((s) => (s.watches = []));
   await assert.rejects(B.startSignIn(planId, "boppy"), /Let Boppy use Claude Code first/);
   S.update((s) => (s.host = "mac"));
-  await assert.rejects(B.startSignIn(planId, "rook"), /browsers on this Mac/);
+  await assert.rejects(B.startSignIn(planId, "rook"), new RegExp(`browsers on this ${HERE} \\(Settings`));
   S.update((s) => (s.host = "orgo"));
 });
 
@@ -854,11 +856,12 @@ await test("a bot's Brain: Bops agent or the brains it's on, and Sign in where i
   assert.match(rook, /^Brain Signing in on Rook's computer .* Claude Code's sign-in is open on its screen\. Show$/);
   // Its tasks on this Mac run on Bops agent, on AI credit, whatever its brain: it says so.
   const onMac = text(renderToStaticMarkup(h(BotBrain, { state: { ...withBrain(view(BRAINS), "boppy", "b_key"), host: "mac" }, bot: { ...bot("boppy"), brain: "b_key" }, onShowScreen: noop, className: "" })));
-  assert.equal(onMac, "Brain Your bots work on this Mac, so they run on Bops agent, on your credit Bops agent Claude Code 2");
+  // (Rendered before /api/config says which computer this is: the neutral words. On a PC: "PC".)
+  assert.equal(onMac, "Brain Your bots work on this computer, so they run on Bops agent, on your credit Bops agent Claude Code 2");
   const macBot = text(renderToStaticMarkup(h(BotBrain, { state: withBrain(view(BRAINS), "rook", "b_max"), bot: { ...bot("rook"), brain: "b_max", runsOn: "mac" }, onShowScreen: noop, className: "" })));
-  assert.match(macBot, /^Brain Rook works on your Mac, so its tasks run on Bops agent, on your credit Bops agent Claude Code Claude Code 3$/, macBot);
+  assert.match(macBot, /^Brain Rook works on your computer, so its tasks run on Bops agent, on your credit Bops agent Claude Code Claude Code 3$/, macBot);
   const some = text(renderToStaticMarkup(h(BotBrain, { state: { ...withBrain(view(BRAINS), "boppy", "b_key"), mac: { ready: true } }, bot: { ...bot("boppy"), brain: "b_key", runsOn: "auto" }, onShowScreen: noop, className: "" })));
-  assert.equal(some, "Brain Claude Code on your Anthropic key · tasks on your Mac run on Bops agent Bops agent Claude Code 2");
+  assert.equal(some, "Brain Claude Code on your Anthropic key · tasks on your computer run on Bops agent Bops agent Claude Code 2");
   noDashes(onMac + macBot + some, "a bot's Brain on the Mac");
 });
 

@@ -258,19 +258,19 @@ export function deletedGoesLine(deletedDays: DeletedDays, goes: DeletedGoes | nu
  * (`deletedDays`), which this Mac's files and notes never can; and that Knowledge keeps what it learned. With
  * `goes` null (Bops couldn't say), it still asks, in general.
  */
-export function clearLine(goes: ClearGoes | null, deletedDays: DeletedDays, bot?: string) {
+export function clearLine(goes: ClearGoes | null, deletedDays: DeletedDays, bot?: string, /** This computer's words (components/app/computer-words.ts), for the fixed words only: never the bot's name. */ words: (text: string) => string = (t) => t) {
   const knowledge = " Knowledge keeps what it learned from them.";
-  if (!goes) return `Bops couldn't check what this deletes. It deletes ${bot ? `${bot}'s messages and threads` : "your messages and threads"} from Bops Cloud and all your Macs.${knowledge}`;
+  if (!goes) return `Bops couldn't check what this deletes. It deletes ${bot ? `${bot}'s messages and threads` : "your messages and threads"}${words(" from Bops Cloud and all your Macs.")}${knowledge}`;
   const age = goes.olderThan === null ? "" : ` ${ageOf(goes.olderThan)}`;
   const all = listed([goes.messages ? many(goes.messages, "message") : "", goes.threads ? many(goes.threads, "thread") : ""].filter(Boolean));
   const mine = listed([goes.files ? many(goes.files, "file") : "", goes.lines ? many(goes.lines, "line of notes", "lines of notes") : ""].filter(Boolean));
   if (!all && !mine) return `${bot ? `${bot} has nothing` : "There's nothing"}${age} to delete.`;
-  const everywhere = all ? `${bot ? `${bot}'s ` : ""}${all}${age} from Bops Cloud and all your Macs` : "";
-  const here = mine ? `${mine}${all ? "" : age} from this Mac` : "";
+  const everywhere = all ? `${bot ? `${bot}'s ` : ""}${all}${age}${words(" from Bops Cloud and all your Macs")}` : "";
+  const here = mine ? `${mine}${all ? "" : age}${words(" from this Mac")}` : "";
   const back = !all
     ? " It can't be undone."
     : deletedDays
-      ? ` You can restore the messages and threads from Recently deleted on this Mac for ${deletedDays} days.${mine ? " The files and notes can't be restored." : ""}`
+      ? words(` You can restore the messages and threads from Recently deleted on this Mac for ${deletedDays} days.${mine ? " The files and notes can't be restored." : ""}`)
       : " It can't be undone.";
   return `This deletes ${everywhere}${everywhere && here ? ", and " : ""}${here}.${back}${all ? knowledge : ""}`;
 }

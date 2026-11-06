@@ -1,4 +1,5 @@
 import "server-only";
+import { computerWords } from "@/lib/computer-words";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -214,7 +215,7 @@ const patch = (messageId: string, proposalId: string, fn: (p: SkillProposal) => 
 
 /** What changed since a proposal was made, in words, or null when nothing did. `own`: this Mac's own turn made it as it is (ownHere); else it's always shown on what the skill is now. */
 function staleWhy(p: SkillProposal, version: string, now: { text: string | null; changed: boolean }, own: boolean): string | null {
-  if (!own && !p.unchecked) return "It wasn't made on this Mac, so here's the change on what it is now.";
+  if (!own && !p.unchecked) return computerWords("It wasn't made on this Mac, so here's the change on what it is now.", process.platform);
   if (version !== p.base) return version ? `It's at version ${version} now${p.base ? `, and this was proposed for ${p.base}` : ""}.` : "It was proposed for a version it no longer has.";
   if (now.changed) return "It has changes not published yet, which accepting this publishes too.";
   if (p.baseSha && sha256Hex(now.text ?? "") !== p.baseSha) return `${p.file} changed since this was proposed.`;
@@ -247,7 +248,7 @@ export function acceptProposal(messageId: string, proposalId: string, seen?: str
   if (!r) return { ok: false, status: 404, error: "That skill was deleted." };
   if (going.has(p.id)) return { ok: false, status: 409, error: "It's being applied." };
   const now = skillFileText(p.ws, r, p.file, "folder");
-  if (!now) return { ok: false, status: 404, error: "Its folder is gone from this Mac." };
+  if (!now) return { ok: false, status: 404, error: computerWords("Its folder is gone from this Mac.", process.platform) };
   if (now.binary) return { ok: false, status: 400, error: `${p.file} is a binary file now, so this can't change it.` };
   const next = proposedText(p, now.text);
   const why = staleWhy(p, r.version ?? "", now, ownHere(p));
@@ -294,7 +295,7 @@ export function proposalDiff(messageId: string, proposalId: string): { ok: true;
   const r = findRef(f.p.ws, f.p.kind, f.p.slug);
   if (!r) return { ok: false, status: 404, error: "That skill was deleted." };
   const now = skillFileText(f.p.ws, r, f.p.file, "folder");
-  if (!now) return { ok: false, status: 404, error: "Its folder is gone from this Mac." };
+  if (!now) return { ok: false, status: 404, error: computerWords("Its folder is gone from this Mac.", process.platform) };
   const next = proposedText(f.p, now.text);
   if ("error" in next) return { ok: false, status: 409, error: next.error };
   return { ok: true, lines: lineDiff(now.text ?? "", next.text), why: staleWhy(f.p, r.version ?? "", now, ownHere(f.p)) };

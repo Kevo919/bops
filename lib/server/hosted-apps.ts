@@ -1,4 +1,5 @@
 import "server-only";
+import { computerWords } from "@/lib/computer-words";
 import { createHash, randomInt } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -4135,7 +4136,7 @@ function devPortOf(v: unknown): number | "auto" | undefined {
   if (v === undefined || v === null || v === "") return undefined;
   const n = typeof v === "number" ? v : typeof v === "string" && /^\s*\d{1,5}\s*$/.test(v) ? Number(v) : NaN;
   if (!Number.isInteger(n) || n < 1024 || n > 65535) throw new HostedAppError("Use a port from 1024 to 65535.", 400, { field: "port" });
-  if (n === 3210) throw new HostedAppError("Bops uses 3210 on this Mac. Pick another.", 400, { field: "port" });
+  if (n === 3210) throw new HostedAppError(computerWords("Bops uses 3210 on this Mac. Pick another.", process.platform), 400, { field: "port" });
   return n;
 }
 

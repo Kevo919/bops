@@ -1,4 +1,5 @@
 import "server-only";
+import { computerWords, computerWordsFor } from "@/lib/computer-words";
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { MAIN_WORKSPACE, procedureKey, workBot, workspaceOf, type Procedure, type ScriptApproval, type SkillKind, type SkillRef, type SkillRisk, type Workspace } from "@/lib/types";
@@ -1043,7 +1044,7 @@ export function publishSkill(wsId: string, kind: SkillKind, slug: string, opts: 
   const r = findRef(wsId, kind, slug);
   if (!r) throw new SkillError(`That ${kind} was deleted.`, 404);
   const b = readBundle(skillDir(wsId, kind, slug));
-  if (!b) throw new SkillError(`Its folder is gone from this Mac. Delete it, or import the folder again.`, 404);
+  if (!b) throw new SkillError(computerWords("Its folder is gone from this Mac. Delete it, or import the folder again.", process.platform), 404);
   // Checked again: the folder may have been changed in Finder since.
   checkFiles(b.body, b.files);
   const versions = r.versions ?? [];
@@ -1095,7 +1096,7 @@ export function rollbackSkill(wsId: string, kind: SkillKind, slug: string, versi
   if (!r) throw new SkillError(`That ${kind} was deleted.`, 404);
   if (!r.versions?.some((v) => v.version === version)) throw new SkillError(`It has no version ${version}.`, 404);
   const dir = versionDir(wsId, kind, slug, version);
-  if (!dir || !existsSync(/*turbopackIgnore: true*/ dir)) throw new SkillError(`Version ${version} isn't on this Mac.`, 404);
+  if (!dir || !existsSync(/*turbopackIgnore: true*/ dir)) throw new SkillError(computerWordsFor(process.platform)`Version ${version} isn't on this Mac.`, 404);
   // The folder goes back to that version too, so what's worked on next starts from it.
   cpSync(/*turbopackIgnore: true*/ dir, skillDir(wsId, kind, slug)!, { recursive: true, force: true });
   patchRef(wsId, kind, slug, (x) => {
@@ -1276,7 +1277,7 @@ export function readSkill(botId: string, nameOrSlug: string, file?: string | nul
   }
   const wsId = workspaceOf(b);
   const bundle = publishedBundle(wsId, r);
-  if (!bundle) return `"${r.name}" isn't on this Mac right now.`;
+  if (!bundle) return computerWordsFor(process.platform)`"${r.name}" isn't on this Mac right now.`;
   if (file?.trim()) {
     const n = normalizePath(file.trim());
     const f = "reason" in n ? undefined : bundle.files.find((x) => x.path === n.path);
@@ -1330,7 +1331,7 @@ export function applySkillFile(wsId: string, kind: SkillKind, slug: string, file
   if (file === "SKILL.md") updateSkill(wsId, kind, slug, { body: text });
   else {
     const now = readBundle(skillDir(wsId, kind, slug));
-    if (!now) throw new SkillError("Its folder is gone from this Mac.", 404);
+    if (!now) throw new SkillError(computerWords("Its folder is gone from this Mac.", process.platform), 404);
     const files: FileIn[] = now.files.filter((f) => f.path !== file).map((f) => ({ path: f.path, content: f.content, data: f.data, executable: f.executable }));
     const had = now.files.find((f) => f.path === file);
     files.push({ path: file, content: text, executable: !!had?.executable });
