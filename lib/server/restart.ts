@@ -1,4 +1,5 @@
 import "server-only";
+import { computerWords } from "@/lib/computer-words";
 import { stopCloud } from "./cloud-tunnel";
 import { forgetPlan } from "./plan";
 import { flushState, stateInCloud } from "./store";
@@ -26,5 +27,5 @@ export async function prepareRestart() {
   const saved = await flushState(SAVE_MS).catch(() => false);
   await stopCloud();
   forgetPlan();
-  if (!saved) throw new Error(stateInCloud() ? "Some changes hadn't reached Bops Cloud yet; they're sent once more on the way out, and kept on this Mac until they're up." : "The last save didn't finish; it's tried once more on the way out.");
+  if (!saved) throw new Error(stateInCloud() ? computerWords("Some changes hadn't reached Bops Cloud yet; they're sent once more on the way out, and kept on this Mac until they're up.", process.platform) : "The last save didn't finish; it's tried once more on the way out.");
 }

@@ -1,4 +1,5 @@
 import "server-only";
+import { computerWords, computerWordsFor } from "@/lib/computer-words";
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { accessSync, constants, readFileSync } from "node:fs";
 import { hostname } from "node:os";
@@ -258,7 +259,7 @@ async function availability(fresh = false) {
     sup.avail = { until: Date.now() + 30_000, ok: true, online: devices.find((d) => d.id === deviceId)?.online ?? null, rendezvous };
   } catch (e) {
     sup.avail = orgoUnavailable(e)
-      ? { until: Date.now() + 10 * 60_000, ok: false, reason: "Routing through your Mac isn't available on your Orgo account yet." }
+      ? { until: Date.now() + 10 * 60_000, ok: false, reason: computerWords("Routing through your Mac isn't available on your Orgo account yet.", process.platform) }
       : { until: Date.now() + 5_000, ok: false, reason: "Couldn't reach Orgo just now. Try again in a moment." };
   }
   return sup.avail;
@@ -272,15 +273,15 @@ const routed = () =>
 /** Where routing stands. `fresh` asks Orgo again rather than going by its last answer (availability). */
 export async function relayStatus(fresh = false): Promise<RelayStatus> {
   const relay = getState().relay;
-  const base = { on: !!relay?.on, running: running(), routedComputers: routed(), ...(relay?.deviceId ? { device: { id: relay.deviceId, name: relay.deviceName ?? "This Mac" } } : {}) };
-  if (onPostgres()) return { ...base, available: false, reason: "Routing through your Mac works in the Bops app on your Mac." };
+  const base = { on: !!relay?.on, running: running(), routedComputers: routed(), ...(relay?.deviceId ? { device: { id: relay.deviceId, name: relay.deviceName ?? computerWords("This Mac", process.platform) } } : {}) };
+  if (onPostgres()) return { ...base, available: false, reason: computerWords("Routing through your Mac works in the Bops app on your Mac.", process.platform) };
   if (!(await loadOrgoKey())) return { ...base, available: false, reason: "Sign in to Orgo first." };
   if (!relayBin()) return { ...base, available: false, reason: "This copy of Bops doesn't include the relay yet." };
   const a = await availability(fresh);
   if (!a.ok) return { ...base, available: false, reason: a.reason };
   const here = await agentConnected();
   const online = here ?? a.online ?? undefined;
-  const reason = relay?.on && !running() && sup.lastError ? `The relay on this Mac stopped (${sup.lastError}). Bops is starting it again.` : undefined;
+  const reason = relay?.on && !running() && sup.lastError ? computerWordsFor(process.platform)`The relay on this Mac stopped (${sup.lastError}). Bops is starting it again.` : undefined;
   return { ...base, on: !!relay?.on || !relay?.turnedOff, available: true, ...(online === undefined ? {} : { online }), ...(reason ? { reason } : {}) };
 }
 

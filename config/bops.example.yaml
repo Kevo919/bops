@@ -25,7 +25,7 @@
 #   diskGB:                       # Disk size (GB)
 #   computerTool: true            # Use OpenAI's computer tool
 
-# This computer. Bots doing tasks on this PC (or Mac), in a Chrome of their own. Full access is
+# This computer. Bots doing tasks on this computer, in a Chrome of their own. Full access is
 # its own switch in Settings.
 # thisComputer:
 #   enabled: true

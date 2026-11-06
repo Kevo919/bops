@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useComputerWords } from "./computer-words";
 
 /*
  * A newer Bops. The Mac app asks bops.bot for the newest release at launch and every hour and
@@ -44,6 +45,7 @@ export function UpdateNotice() {
  */
 export function UpdateButton({ onOpen }: { onOpen: () => void }) {
   const { info } = useUpdate();
+  const computerWords = useComputerWords();
   if (!info) return null;
   const phase = info.phase ?? "manual";
   if (phase === "downloading" && !info.asked) return null;
@@ -53,7 +55,7 @@ export function UpdateButton({ onOpen }: { onOpen: () => void }) {
       : phase === "downloading"
         ? `Bops ${info.version} is downloading`
         : phase === "available" && info.failed && info.why === "space"
-          ? "Not enough space on this Mac to update"
+          ? computerWords("Not enough space on this Mac to update")
           : phase === "available" && info.failed
             ? "The download didn't finish"
           : `Bops ${info.version} is out`;
@@ -95,6 +97,7 @@ function useUpdate() {
 
 /** The notice itself, for where the update is at. Nothing while it downloads unasked (it shows once ready). */
 export function UpdateCard({ info, late, onDismiss }: { info: UpdateInfo; late: boolean; onDismiss: () => void }) {
+  const computerWords = useComputerWords();
   if (!info) return null;
   // An app from before phases (or a copy that can't update itself) only sends the user to bops.bot.
   const phase = info.phase ?? "manual";
@@ -112,7 +115,7 @@ export function UpdateCard({ info, late, onDismiss }: { info: UpdateInfo; late: 
             <span className="font-medium text-ink">Bops {info.version} is downloading.</span>
           ) : phase === "available" && info.failed && info.why === "space" ? (
             <>
-              <span className="font-medium text-ink">Not enough space on this Mac to update.</span> Bops needs about 2 GB free.
+              <span className="font-medium text-ink">{computerWords("Not enough space on this Mac to update.")}</span> Bops needs about 2 GB free.
             </>
           ) : phase === "available" && info.failed ? (
             <span className="font-medium text-ink">The download didn&apos;t finish.</span>

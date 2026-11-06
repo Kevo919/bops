@@ -8,6 +8,7 @@ import { AppLogo, accountTitle, botApps } from "./apps";
 import { BotKeys } from "./keys";
 import { botSkills, skillsIn, workspaceLabelsOf } from "./skills";
 import { post } from "./ui";
+import { useOwnComputerWords } from "./computer-words";
 import { undash } from "./side-group";
 import { you, yourMac } from "@/lib/shared";
 
@@ -42,6 +43,7 @@ export function BotSkills({
   /** Skills, in Knowledge, at one of them ("skill:<slug>"). */
   onOpenSkills: (focus?: string) => void;
 }) {
+  const ownWords = useOwnComputerWords(state);
   const skills = botSkills(state, b);
   const apps = botApps(state, b);
   const keyed = !!b.keys?.length;
@@ -99,7 +101,7 @@ export function BotSkills({
       <div className={`flex w-full flex-col gap-2 rounded-2xl px-4 py-3 ${GLASS}`}>
         <span className="text-[13px] font-semibold leading-4">Built in</span>
         <span className="flex flex-wrap gap-1.5">
-          {builtIn(state, b).map((x) => (
+          {builtIn(state, b, ownWords).map((x) => (
             <span key={x} className="rounded-full bg-[color:var(--bops-tint)]/[0.05] px-2.5 py-1 text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">
               {x}
             </span>
@@ -125,7 +127,7 @@ export function BotSkills({
  * pictures and pages, its computer, and only what's set up of email, texts, calls, Orbit, business data
  * and teammates. A bot with no number shows no texting. Only the main bot hands work off; the others ask.
  */
-function builtIn(state: AppState, b: Bot): string[] {
+function builtIn(state: AppState, b: Bot, ownWords: (text: string) => string): string[] {
   const line = state.workspaces?.find((w) => w.id === workspaceOf(b))?.line;
   const ownLine = !!b.phone && !!b.phoneLine && !b.phoneLine.paused;
   // Calls reach the workspace's number (its main bot) or a bot's own, as on Details.
@@ -136,7 +138,7 @@ function builtIn(state: AppState, b: Bot): string[] {
     "Searches and reads the web",
     "Makes pictures and pages",
     // (A shared workspace's bot never works on the viewer's own Mac, whatever their app's host: only on the owner's, when it's set to.)
-    b.runsOn === "mac" || (!state.shared && state.host === "mac") ? `Works on ${yourMac(state)}` : host.id === b.id ? "Works on its computer" : `Works on ${host.name}'s computer`,
+    b.runsOn === "mac" || (!state.shared && state.host === "mac") ? ownWords(`Works on ${yourMac(state)}`) : host.id === b.id ? "Works on its computer" : `Works on ${host.name}'s computer`,
     b.email && !b.mail?.paused ? "Email" : "",
     line || ownLine ? `Texts ${you(state)}` : "",
     calls ? "Takes calls" : "",

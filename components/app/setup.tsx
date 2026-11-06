@@ -18,7 +18,7 @@ import { ModelsCard } from "./models-card";
 import { ConnectionsCard } from "./connections-card";
 import { HandyCard } from "./handy-card";
 import { checkVoiceAddress } from "@/lib/voice-address";
-import { claudeLocalLine } from "@/lib/local-plan-words";
+import { claudeLocalLine, codexLocalLine } from "@/lib/local-plan-words";
 import { APP_URL, TAILSCALE_ANDROID_URL, TAILSCALE_WINDOWS_URL } from "@/lib/remote-links";
 
 /*
@@ -218,7 +218,7 @@ export function LocalSubscriptions({ runner }: { /** Who runs bot tasks on this 
       const link = kind === "codex" && s?.state === "connecting" ? loginLink(s.loginUrl) : undefined;
       return <div key={kind} className="flex flex-col gap-2 rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         <h3 className="text-[13px] font-semibold">{kind === "codex" ? "ChatGPT Plus/Pro" : "Claude Pro/Max"} · This PC</h3>
-        <p>{kind === "codex" ? "Connect the official Codex account on this PC. ChatGPT subscription chat and local subscription tasks are not enabled yet." : claudeLocalLine(!!s?.connected, runner)}</p>
+        <p data-local-line={kind}>{kind === "codex" ? codexLocalLine(s?.connected) : claudeLocalLine(s?.connected, runner)}</p>
         <p role="status">{!s ? "Status not checked yet." : s.state === "missing" ? `${kind === "codex" ? "Codex" : "Claude Code"} CLI was not found on this PC.` : s.state === "connecting" ? "Finish signing in in your normal browser. Bops will check automatically." : s.state === "error" ? "The subscription could not be confirmed." : s.connected ? `Connected: your ${provider}${knownPlan ? ` ${knownPlan}` : ""} subscription` : "Not signed in on this PC."}</p>
         {s?.error && <p role="alert" className="text-[color:var(--ht-b00020)]">{s.error}</p>}
         {s?.state === "missing" && <p>{kind === "codex" ? "Install the official Codex CLI on this PC" : "Install Claude Code using its official native installer (the npm claude.cmd launcher is not used)"}, then check the connection again.</p>}

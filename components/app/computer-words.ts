@@ -17,6 +17,17 @@ function subscribe(listener: () => void) {
 }
 /** Server identity, not the viewing phone/browser's OS. Neutral wording until loaded. */
 export function useComputerWords() {
-  const host = useSyncExternalStore(subscribe, () => platform, () => "unknown");
-  return computerWordsFor(host);
+  return computerWordsFor(useComputerPlatform());
+}
+/** The server's platform ("win32", "darwin", "linux"), "unknown" until /api/config answers: for copy no word swap can say. */
+export function useComputerPlatform() {
+  return useSyncExternalStore(subscribe, () => platform, () => "unknown");
+}
+/**
+ * The same words for the user's own workspace only: in one shared with them, "the owner's Mac" is the owner's own
+ * computer, which this window can't name (it may well be a Mac), so its words stay as they are.
+ */
+export function useOwnComputerWords(state: { shared?: unknown }) {
+  const words = useComputerWords();
+  return (text: string | TemplateStringsArray, ...values: unknown[]) => state.shared ? (typeof text === "string" ? text : text.map((part, i) => part + (i < values.length ? String(values[i]) : "")).join("")) : words(text, ...values);
 }

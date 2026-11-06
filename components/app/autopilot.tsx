@@ -5,7 +5,8 @@ import { flushSync } from "react-dom";
 import { describeSchedule, whenText } from "@/cloud/schedule";
 import { appNameFor, canonicalApp, CHECK_TEMPLATE, CHECK_TIMES, sameApp, templateById } from "@/lib/routine-catalog";
 import { botChatId, computerWait, DISPLAYS, isScreenWatch, onceDone, runningNow, waitingAsks, type AppState, type Bot, type Delivery, type Routine, type RoutineRun, type RoutineSource, type Session, type Watch } from "@/lib/types";
-import { you, your, yourMac } from "@/lib/shared";
+import { you, your } from "@/lib/shared";
+import { useOwnComputerWords } from "./computer-words";
 import { Fold } from "./fold";
 import { Mascot } from "./mascot";
 import {
@@ -217,9 +218,10 @@ function everyWords(min: number) {
 const shortUrl = (url: string) => url.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/$/, "");
 
 /** What a watch looks at, in words: a page, a window on the user's Mac, or one of a bot's screens. */
-function whereWords(w: Watch, state: AppState) {
+function whereWords(w: Watch, state: AppState, ownWords: (text: TemplateStringsArray, ...values: unknown[]) => string) {
   if (w.page) return shortUrl(w.page.url);
-  if (w.mac) return `${w.mac.app} on ${yourMac(state)}`;
+  // The app's name stays as it is: only the fixed words go through ownWords.
+  if (w.mac) return ownWords`${w.mac.app} on ${your(state)} Mac`;
   return `${state.bots.find((b) => b.id === w.botId)?.name ?? "Bot"}'s screen ${DISPLAYS.indexOf(w.display) + 1}`;
 }
 
@@ -1523,6 +1525,7 @@ export function MonitorRow({
   onShow: () => void;
 }) {
   const { busy, error, sure, ask, run, cancelRemove, remove, row, removeButton } = useActions("monitor", w.id, open);
+  const ownWords = useOwnComputerWords(state);
   // What Check now found when there was nothing new (a failure shows as the error).
   const [found, setFound] = useState<string | null>(null);
   if (!open && found) setFound(null);
@@ -1610,7 +1613,7 @@ export function MonitorRow({
                 {shortUrl(url)}
               </a>
             ) : (
-              whereWords(w, state)
+              whereWords(w, state, ownWords)
             ),
           ],
           ["Looks for", undash(w.lookFor)],

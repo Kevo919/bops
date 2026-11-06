@@ -197,7 +197,7 @@ export function LoginForm({ state, login, onDone }: { state: AppState; login?: V
           Cancel
         </button>
         <span className="flex-1" />
-        <span className="text-[11.5px] leading-4 text-[color:var(--ht-9a9a98)]">{computerWords("Stored in your Mac&apos;s Keychain")}</span>
+        <span className="text-[11.5px] leading-4 text-[color:var(--ht-9a9a98)]">{computerWords("Stored in your Mac's Keychain")}</span>
       </div>
     </form>
   );

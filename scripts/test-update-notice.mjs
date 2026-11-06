@@ -15,6 +15,22 @@ const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/,
 const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
+  // computer-words.ts (the notice's PC words) imports through "@/" and without its extension.
+  resolve(specifier, context, next) {
+    if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
+    try {
+      return next(specifier, context);
+    } catch (e) {
+      if (/^(\.{1,2}\/|\/|file:)/.test(specifier))
+        for (const ext of [".ts", ".tsx"])
+          try {
+            return next(specifier + ext, context);
+          } catch {
+            /* the next one */
+          }
+      throw e;
+    }
+  },
   load(url, context, next) {
     if (!url.endsWith(".tsx")) return next(url, context);
     const source = readFileSync(fileURLToPath(url), "utf8");
@@ -67,7 +83,8 @@ test("a download that didn't finish: Try again", () => {
 
 test("out of disk space: says so and how much to free, with Try again", () => {
   const s = shown({ ...base, phase: "available", failed: true, why: "space" });
-  assert.equal(s.line, "Not enough space on this Mac to update. Bops needs about 2 GB free.");
+  // (The window's words before /api/config says which computer this is: neutral. On a PC, "this PC".)
+  assert.equal(s.line, "Not enough space on this computer to update. Bops needs about 2 GB free.");
   assert.equal(s.button, "Try again");
 });
 

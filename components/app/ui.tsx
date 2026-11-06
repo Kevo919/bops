@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { live, MAIN_WORKSPACE, WAITING_FOR_OK, waitingAsks, waitsForOk, workspaceOf, type AppState, type Bot, type Chat, type Logo, type Session } from "@/lib/types";
 import { Mascot, Spinner } from "./mascot";
 import { stateArrived } from "./state-arrival";
+import { useComputerWords } from "./computer-words";
 import { setLlms } from "@/lib/agents";
 import { answersAsk, readOnlyLine, writesThread } from "@/lib/shared";
 export { botBezel, botOnInk, botWash, DESKTOP_BG } from "@/lib/look";
@@ -166,11 +167,12 @@ export function StatusIcon({ session: s, size = 13, dark, owner, member, okWait 
   // Each state says what it means on hover (the tooltip layer reads data-tip).
   // Waiting on the user (where it runs, or their OK: lib/server/permission.ts) shows as needing them, not working.
   const waits = (live(s) && needsYou(s) && !!s.askWhere) || (live(s) && !!okWait);
+  const computerWords = useComputerWords();
   const tip =
     s.askWhere && live(s)
       ? owner
         ? "Waiting for the owner: their Mac or the cloud?"
-        : "Waiting for you: your Mac or the cloud?"
+        : computerWords("Waiting for you: your Mac or the cloud?")
       : waits
         ? owner
           ? "Waiting for the owner's OK"
