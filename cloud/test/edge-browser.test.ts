@@ -162,8 +162,11 @@ test("the owner and a member with Write and Use its computer watch the bot's bro
   mine.close();
   theirs.close();
   await until(() => viewersOf(owner, "max") === 0, "both streams to end");
-  const left = await until(() => r.got.findLast((m) => m.t === "watch"), "the runner to hear they left");
-  assert.deepEqual(left.t === "watch" && left.viewers, [], "nobody watches: the runner stops capturing");
+  // (The streams end in the cloud before the runner's socket carries the news: the newest "watch" it has may still
+  // be the one with both for a moment, so wait for the one that says nobody, then hold that it's the newest.)
+  const left = await until(() => r.got.findLast((m) => m.t === "watch" && m.viewers.length === 0), "the runner to hear they left");
+  assert.equal(r.got.findLast((m) => m.t === "watch"), left, "nobody watches: the runner stops capturing");
+  assert.deepEqual(left.t === "watch" && left.viewers, []);
   r.close();
 });
 

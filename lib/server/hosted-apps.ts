@@ -166,6 +166,8 @@ const g = globalThis as unknown as {
   bopsAppWork?: Map<string, { kind: AppWork; done: Promise<void> }>;
   /** Each workspace's repos as Ingot listed them last, and when: the Apps page reads them every few seconds while a deploy runs. */
   bopsIngotListed?: Map<string, { at: number; repos: IngotRepo[] }>;
+  /** When a turn's read of each workspace's repos last failed or ran past its wait (readReposAhead): for a while, turns don't ask. */
+  bopsIngotMissed?: Map<string, number>;
   /** Domains being bought now ("<project>/<domain>"), from the app's tab or Settings: a second buy of one waits for none, it's refused (buyingOnce). */
   bopsDomainBuys?: Set<string>;
   /** Preview passwords being set now, by "<computer>/<public URL>" (passwordNow): a second ask waits for the first. */
@@ -481,6 +483,13 @@ export async function botLeftApp(botId: string, wsId: string, name: string): Pro
 
 const LIST_MS = 5000;
 const listed = (g.bopsIngotListed ??= new Map());
+const missed = (g.bopsIngotMissed ??= new Map<string, number>());
+
+/** The repos kept for a workspace forgotten (they changed), and with them a read that failed: Ingot just answered. */
+function forgetRepos(wsId: string) {
+  listed.delete(wsId);
+  missed.delete(wsId);
+}
 
 /** The workspace's repos, or null when Ingot can't say now (it isn't answering, the workspace isn't on Orgo yet, no one is signed in). */
 async function reposOf(wsId: string): Promise<IngotRepo[] | null> {
@@ -506,13 +515,47 @@ function reposAtHand(wsId: string): IngotRepo[] | undefined {
 
 /**
  * As a bot's turn starts (chat.ts), the workspace's repos are read again from Ingot in the background when the list
- * kept is older than a few seconds, so the turn's note (hostedAppsLine) has them by the time it's written. Never
- * waited on: Ingot slow or down only means the note says nothing of them. Nothing for a workspace not on Orgo yet.
+ * kept is older than a few seconds, so the turn's note (hostedAppsLine) has them by the time it's written. The read
+ * goes on alongside the turn's other work; the note waits for what's left of it at most REPOS_AHEAD_WAIT_MS
+ * (reposReadBy): Ingot slow or down only means the note says nothing of them. (Not waited on at all, a quick turn
+ * wrote its note a moment before a quick answer came, and a repo just put in Ingot went unsaid.) A read that failed
+ * or ran past the wait is kept REPOS_MISS_MS, so while Ingot is down turns don't each wait for it. Nothing for a
+ * workspace not on Orgo yet. Never rejects.
  */
-export function readReposAhead(botId: string) {
+export function readReposAhead(botId: string): Promise<void> {
   const b = bot(botId);
   const wsId = b ? workspaceOf(b) : undefined;
-  if (wsId && workspace(wsId)?.orgoProjectId) void reposOf(wsId);
+  if (!wsId || !workspace(wsId)?.orgoProjectId) return Promise.resolve();
+  // A read that failed, or hadn't answered by the time a note stopped waiting, lately: Ingot is down or slow, so for
+  // REPOS_MISS_MS turns neither ask nor wait (each would wait the whole REPOS_AHEAD_WAIT_MS for nothing).
+  const miss = missed.get(wsId);
+  if (miss !== undefined && Date.now() - miss < REPOS_MISS_MS) return Promise.resolve();
+  let settled = false;
+  const slow = setTimeout(() => void (settled || missed.set(wsId, Date.now())), REPOS_AHEAD_WAIT_MS);
+  slow.unref?.();
+  const done = (ok: boolean) => {
+    settled = true;
+    clearTimeout(slow);
+    if (ok) missed.delete(wsId);
+    else missed.set(wsId, Date.now());
+  };
+  return reposOf(wsId).then(
+    (repos) => done(!!repos),
+    () => done(false),
+  );
+}
+
+/** The longest a turn's note waits for the repos read as it started (readReposAhead). */
+const REPOS_AHEAD_WAIT_MS = 1000;
+/** How long after a failed or slow read turns don't read the repos ahead (readReposAhead). */
+const REPOS_MISS_MS = 30_000;
+
+/** Once `read` (readReposAhead's) is done, or REPOS_AHEAD_WAIT_MS on, whichever comes first. */
+export async function reposReadBy(read: Promise<void> | undefined): Promise<void> {
+  if (!read) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([read, new Promise<void>((resolve) => (timer = setTimeout(resolve, REPOS_AHEAD_WAIT_MS)))]);
+  clearTimeout(timer);
 }
 
 /* ---------------- Whether deploying can work ---------------- */
@@ -3734,7 +3777,7 @@ async function takeAppDown(wsId: string, name: string, repo: boolean, ours: () =
       Promise.reject(e instanceof IngotError ? new HostedAppError(`${sites.length || behind.length ? "Its sites are off the web, but its code wasn't deleted" : "Its code wasn't deleted"}: ${e.message}`, e.offline ? 503 : 502) : e),
     );
     held(ours);
-    listed.delete(wsId);
+    forgetRepos(wsId);
   }
   // Its Locals on its computer and on any it moved off: best effort, so one that can't be reached never keeps it.
   for (const c of new Set([...(h.lost ? [] : [h.computerId]), ...behind.map((b) => b.computerId)])) await forgetLocals(wsId, name, c, repo, ours).catch(() => {});
@@ -4558,7 +4601,7 @@ export async function readyAppForTask(sessionId: string, computerId: string, sig
   if (copy) keepCopy(a.wsId, a.name, s.botId);
   await ingot.createRepo(a.wsId, a.name, authorOf(s.botId), signal);
   stillOurs(ours);
-  listed.delete(a.wsId);
+  forgetRepos(a.wsId);
   const said = await readyWorkFolder(computerId, a.wsId, a.name, s.botId, ours, { signal, copy });
   await keepHeads(sessionId, a, ours, signal);
   return said;
@@ -4627,7 +4670,7 @@ export async function addApp(wsId: string, ask: { name?: unknown; what?: unknown
   const why = await closedHere();
   held(ours);
   if (why) throw new HostedAppError(why, 403);
-  listed.delete(wsId);
+  forgetRepos(wsId);
   const repos = await reposOf(wsId);
   const { startSession } = await import("./sessions");
   held(ours);
@@ -5167,7 +5210,7 @@ async function restoreTo(wsId: string, name: string, h: AppHosting, want: string
     plan = await planOn(r.stale);
     if (!plan.changes.length) return already();
   }
-  listed.delete(wsId);
+  forgetRepos(wsId);
   update((st) => {
     for (const m of st.messages) if (m.appChange && m.appChange.ws === wsId && m.appChange.app === name && m.appChange.from === want) m.appChange.restored = true;
   });

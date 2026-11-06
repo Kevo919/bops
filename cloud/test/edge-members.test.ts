@@ -204,19 +204,23 @@ test("the member's stream hears the owner's write with the fingerprint a read gi
   await until(() => got.some((g) => g.type === "reset"), "the stream to start");
   const version = (await (await fetch(`${cloud.url}/v1/state/head`, { headers: headers(owner) })).json()) as { version: number };
   assert.equal((await fetch(`${cloud.url}/v1/state`, { method: "PUT", headers: headers(owner), body: JSON.stringify({ base: version.version, state: blob("done") }) })).status, 200);
-  const ev = await until(() => got.find((g) => g.type === "state"), "the state event");
+  // The state write's event is the one with a fingerprint: a "state" for messages written carries a seq instead,
+  // and the last test's messages can still be announced (state.ts announce, after the write) once this stream is open.
+  const ev = await until(() => got.find((g) => g.type === "state" && g.data.hash !== undefined), "the state event");
   const { body } = await read(member);
   assert.equal(ev.data.hash, body.hash);
   assert.equal(body.state.sessions[0].status, "done");
   // A message in the main workspace's chat (known now), or in a chat of a bot they weren't given, doesn't
-  // wake the member; one the owner keeps between us in Max's chat does.
-  const before = got.filter((g) => g.type === "state").length;
+  // wake the member; one the owner keeps between us in Max's chat does. (Counted by seq: only messages written
+  // from here on, not one announced late from before.)
+  const { seq: since } = (await (await fetch(`${cloud.url}/v1/state/head`, { headers: headers(owner) })).json()) as { seq: number };
+  const woke = () => got.filter((g) => g.type === "state" && typeof g.data.seq === "number" && g.data.seq > since).length;
   await fetch(`${cloud.url}/v1/messages`, { method: "POST", headers: headers(owner), body: JSON.stringify({ upsert: [{ id: "m5", chatId: "bot:boppy", role: "user", text: "x", at: 20 }], remove: [] }) });
   await fetch(`${cloud.url}/v1/messages`, { method: "POST", headers: headers(owner), body: JSON.stringify({ upsert: [{ id: "d2", chatId: "bot:dana", role: "user", text: "z", at: 20 }], remove: [] }) });
   await fetch(`${cloud.url}/v1/messages`, { method: "POST", headers: headers(owner), body: JSON.stringify({ upsert: [{ id: "m6", chatId: "bot:max", role: "user", text: "y", at: 21, secret: true }], remove: [] }) });
-  await until(() => got.filter((g) => g.type === "state").length === before + 1, "Acme's message");
+  await until(() => woke() === 1, "Acme's message");
   await new Promise((r) => setTimeout(r, 100));
-  assert.equal(got.filter((g) => g.type === "state").length, before + 1);
+  assert.equal(woke(), 1);
   ctl.abort();
 });
 

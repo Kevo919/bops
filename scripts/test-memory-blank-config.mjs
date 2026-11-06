@@ -77,10 +77,16 @@ try {
     else s.workspaces.push({ id: MAIN_WORKSPACE, name: "Test", memory: { bank: "", peer: "" } });
   });
   delete process.env.HONCHO_API_KEY;
+  // The route answers a bot's Memory tab {off: true} before memoryFor is reached (8bb46bd, No blank screens:
+  // the tab says memory isn't set up and how, components/app/bot-memory.tsx); memoryFor on its own says why.
   for (const query of ["?bot=boppy", "?bot=boppy&mine=1", "?bot=boppy&q=test"]) {
     const response = await route.GET(new Request(`http://localhost/api/memory${query}`));
     assert.equal(response.status, 200);
     const result = await response.json();
+    assert.deepEqual(result, { off: true, workspace: "", ws: "", card: [], facts: [] });
+  }
+  for (const opts of [{}, { mine: true }, { q: "test" }]) {
+    const result = await M.memoryFor("boppy", opts);
     assert.equal(result.on, false);
     assert.match(result.error, /Memory is not set up/);
     assert.deepEqual(result.facts, []);

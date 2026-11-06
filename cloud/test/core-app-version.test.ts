@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
 import WebSocket from "ws";
-import { forgetNotedVersions, olderThan, refreshAppPolicy, UPDATE_BOPS } from "../app-version.ts";
+import { forgetNotedVersions, noteAppVersion, olderThan, refreshAppPolicy, UPDATE_BOPS, versionWritesDone } from "../app-version.ts";
 import { closeDb, query } from "../db.ts";
 import { call, dropUsers, fakeOrgo, fakeProvider, keyOf, newUserId, prepareDb, seedUser, startCloud, until, type Listening } from "./core-fakes.ts";
 
@@ -83,6 +83,17 @@ test("the version a user's app says is kept with their account, and an app that 
   await as("latest; drop table", "GET", "/v1/state/head");
   await new Promise((r) => setTimeout(r, 200));
   assert.equal((await seen(alice))?.app_version, null);
+});
+
+test("quick changes of version are kept in the order they came: the newest call's is the one left", async () => {
+  // (Each write used to go on its own to the pool, so two close together could land the wrong way round and
+  // keep the older one: the 'old app kept' wait below timed out about once in 30 runs.)
+  for (let round = 0; round < 50; round++) {
+    forgetNotedVersions();
+    for (const v of ["0.0.18", "0.0.100", "0.1.0", "1.0.0", "0.0.17"]) noteAppVersion(bea, v);
+    await versionWritesDone();
+    assert.equal((await seen(bea))?.app_version, "0.0.17", `round ${round}`);
+  }
 });
 
 test("with no oldest version set, every app is served", async () => {
