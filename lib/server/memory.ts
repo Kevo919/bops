@@ -13,6 +13,7 @@ import { chose, decide, yes, type Question } from "./decide";
 import { addMessage, bot, getState, ownerName, sameState, stateArrivals, stateEpoch, update, userDir } from "./store";
 import { memoryDocBlock } from "@/lib/bot-docs";
 import { recordTokens, usageTags } from "./usage";
+import { MEMORY_TIMEOUT } from "./memory-outage";
 
 /**
  * Long-term memory, through Honcho (honcho.dev). Each workspace has a memory bank (a Honcho
@@ -877,7 +878,7 @@ export async function memoryInfo(ws: string) {
   if (on() && (cardDown !== false || lines === null)) {
     // The service's own error goes through as-is (a refused key stays a refused key; the route
     // classifies it). Only a timeout gets the plain words.
-    throw cardDown !== false && cardDown !== true ? (cardDown as Error) : new Error("The memory service didn't answer.");
+    throw cardDown !== false && cardDown !== true ? (cardDown as Error) : new Error(MEMORY_TIMEOUT);
   }
   const ok = new Set(lines ? await shareable(lines) : []);
   return {

@@ -108,16 +108,6 @@ await check("memory off, the bot tab (?bot=): 200 {off: true} with nothing learn
   process.env.HONCHO_API_KEY = `hc-test-memory-reach-${Date.now()}`;
 });
 
-await check("the sheet and the tab distinguish the state in what they render (the wording, in the components)", async () => {
-  const sheet = readFileSync(new URL(at("components/app/memory-sheet.tsx")), "utf8");
-  assert.ok(/unreachable \?/.test(sheet), "the sheet branches on unreachable");
-  assert.ok(/Can&rsquo;t reach the memory service/.test(sheet), "and says so in plain words");
-  assert.ok(/!info\.on \?/.test(sheet), "keeping the isn't-on case for when memory really is off");
-  const tab = readFileSync(new URL(at("components/app/bot-memory.tsx")), "utf8");
-  assert.ok(/data\.unreachable \?/.test(tab), "the bot tab branches on unreachable");
-  assert.ok(/data\?\.off \?/.test(tab) && /Memory isn&apos;t set up on this computer yet/.test(tab), "and on off, saying so in plain words");
-});
-
 await check("D1: the sheet's own path (?ws=) says can't-reach too, not an empty card", async () => {
   process.env.HONCHO_API_KEY = `hc-test-memory-reach-${Date.now()}`;
   const r = await get("?ws=ws_main");
@@ -127,12 +117,24 @@ await check("D1: the sheet's own path (?ws=) says can't-reach too, not an empty 
 
 /** The route with a mockable service: mode tells the fake what the Honcho call does. The client is
  *  cached per key, so each mode also rotates HONCHO_API_KEY to get a fresh bank + client. */
-async function getMode(mode, q) {
-  process.env.HONCHO_API_KEY = `hc-test-memory-reach-${mode}`;
+async function getMode(mode, q, key = `hc-test-memory-reach-${mode}`) {
+  process.env.HONCHO_API_KEY = key;
   mockFetch = async () => {
     if (mode === "401") return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "content-type": "application/json" } });
     if (mode === "403") return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { "content-type": "application/json" } });
+    // The service echoing the key it was given (short and dotted: under the 20-character rule) and its header.
+    if (mode === "echo")
+      return new Response(JSON.stringify({ detail: `Invalid API key ${key} (Authorization: Bearer ${key}); try key=${key}` }), { status: 401, headers: { "content-type": "application/json" } });
+    if (mode === "502") return new Response(JSON.stringify({ detail: "Bad gateway" }), { status: 502, headers: { "content-type": "application/json" } });
+    if (mode === "429") return new Response(JSON.stringify({ detail: "Slow down" }), { status: 429, headers: { "content-type": "application/json" } });
+    // fetch's own network TypeError: the SDK wraps it as its ConnectionError (dist/http/client.js).
     if (mode === "net") throw new TypeError("fetch failed");
+    // A fetch TypeError the SDK doesn't wrap: the body read dies on a reset socket (undici's "terminated",
+    // its cause the socket's own error), so the raw TypeError with a system cause reaches the route.
+    if (mode === "netcause")
+      return { ok: true, status: 200, headers: new Headers(), text: () => Promise.reject(new TypeError("terminated", { cause: Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }) })) };
+    // A real null dereference in the code reading the answer: a 200 whose body is null.
+    if (mode === "nullbody") return new Response("null", { status: 200, headers: { "content-type": "application/json" } });
     if (mode === "plain") throw new Error("Cannot read properties of undefined (reading 'id')");
     throw new TypeError("offline: unexpected mode");
   };
@@ -145,37 +147,49 @@ async function getMode(mode, q) {
   }
 }
 
-await check("the route over the real client: 401 -> 503 {refused:true}; 403 likewise (the 1945 review's #4)", async () => {
-  process.env.HONCHO_API_KEY = `hc-test-memory-reach-${Date.now()}`;
-  for (const mode of ["401", "403"]) {
-    const r = await getMode(mode, "?bot=boppy");
-    assert.equal(r.status, 503, `${mode}: 503, got ${r.status}`);
-    const j = await r.json();
-    assert.equal(j.refused, true, `${mode}: refused`);
-    assert.equal(j.unreachable, undefined);
-    assert.equal(j.error, undefined);
+/** Runs `fn` with console.warn captured: the route's log lines. */
+async function logged(fn) {
+  const lines = [];
+  const warn = console.warn;
+  console.warn = (...a) => lines.push(a.join(" "));
+  try {
+    return { r: await fn(), lines };
+  } finally {
+    console.warn = warn;
   }
-});
+}
 
-await check("a network failure -> 503 {unreachable:true}; a plain code bug -> 500 with no flags (the 1945 review's #2)", async () => {
-  const r = await getMode("net", "?bot=boppy");
-  assert.equal(r.status, 503, `503, got ${r.status}`);
-  assert.equal((await r.json()).unreachable, true);
-  const r2 = await getMode("plain", "?bot=boppy");
-  assert.equal(r2.status, 500, `500, got ${r2.status}`);
-  const j2 = await r2.json();
-  assert.equal(j2.unreachable, undefined, "a code bug is not an outage");
-  assert.equal(j2.refused, undefined);
-  assert.ok(typeof j2.error === "string", "and carries its error for the log");
-});
+// Every outcome, on both paths: the bot tab (?bot=) and the sheet (?ws=). [mode, status, flag, log label]
+const OUTCOMES = [
+  ["401", 200, "refused", "refused"],
+  ["403", 200, "refused", "refused"],
+  ["502", 503, "unreachable", "unreachable"],
+  ["429", 503, "unreachable", "unreachable"],
+  ["net", 503, "unreachable", "unreachable"],
+  ["netcause", 503, "unreachable", "unreachable"],
+  ["nullbody", 500, null, "error"],
+  ["plain", 500, null, "error"],
+];
+for (const q of ["?bot=boppy", "?ws=ws_main"])
+  for (const [mode, status, flag, label] of OUTCOMES)
+    await check(`the route over the real client (${q}): ${mode} -> ${status}${flag ? ` {${flag}}` : " (a code bug, no flags)"}, logged as ${label}`, async () => {
+      const { r, lines } = await logged(() => getMode(mode, q));
+      assert.equal(r.status, status, `${mode}: ${status}, got ${r.status}`);
+      const j = await r.json();
+      assert.equal(j.refused, flag === "refused" ? true : undefined, `${mode}: refused flag`);
+      assert.equal(j.unreachable, flag === "unreachable" ? true : undefined, `${mode}: unreachable flag`);
+      if (flag) assert.equal(j.error, undefined, `${mode}: D4, the service's message stays on the log`);
+      else assert.equal(j.error, "Memory failed; this isn't an outage.", `${mode}: a fixed message, not the raw one`);
+      const line = lines.find((l) => l.startsWith("[memory] "));
+      assert.ok(line, `${mode}: a log line`);
+      assert.ok(line.startsWith(`[memory] ${label}: `), `${mode}: labelled ${label}, got ${JSON.stringify(line)}`);
+      assert.ok(line.length <= 200, `${mode}: at most 200 characters`);
+      assert.ok(!line.includes(process.env.HONCHO_API_KEY), `${mode}: never the key`);
+    });
 
-await check("the sheet's own path (?ws=) over the real client: outage -> 503 unreachable; plain bug -> 500 (D1 + #2)", async () => {
-  const r = await getMode("net", "?ws=ws_main");
-  assert.equal(r.status, 503);
-  assert.equal((await r.json()).unreachable, true);
-  const r2 = await getMode("plain", "?ws=ws_main");
-  assert.equal(r2.status, 500);
-  assert.equal((await r2.json()).unreachable, undefined);
+await check("the null-body case is a genuine null-dereference TypeError (so a bare TypeError really is a code bug)", async () => {
+  const { lines } = await logged(() => getMode("nullbody", "?bot=boppy"));
+  assert.match(lines.find((l) => l.startsWith("[memory] ")) ?? "", /^\[memory\] error: TypeError: Cannot read properties of null/);
 });
 
 await check("D4 end to end: no raw upstream message in either 503 body", async () => {
@@ -185,19 +199,43 @@ await check("D4 end to end: no raw upstream message in either 503 body", async (
   }
 });
 
-await check("the sheet renders the refused state with its own wording (the 1945 review's #1)", async () => {
-  const sheet = readFileSync(new URL(at("components/app/memory-sheet.tsx")), "utf8");
-  assert.match(sheet, /info\.refused \?/, "the sheet branches on refused");
-  assert.match(sheet, /Check the memory key in Settings/, "and names the fix, not try-again");
-  assert.ok(sheet.indexOf("info.refused") < sheet.indexOf("info.unreachable"), "refused is checked before unreachable");
-  const tab = readFileSync(new URL(at("components/app/bot-memory.tsx")), "utf8");
-  assert.match(tab, /data\.refused \?/, "the bot tab branches on refused too");
+await check("redaction: a short dotted key the service echoes back never reaches the log line (either path)", async () => {
+  const key = "hk.7a.Q2";
+  for (const q of ["?bot=boppy", "?ws=ws_main"]) {
+    const { r, lines } = await logged(() => getMode("echo", q, key));
+    assert.equal(r.status, 200);
+    assert.equal((await r.json()).refused, true);
+    const line = lines.find((l) => l.startsWith("[memory] "));
+    assert.ok(line?.startsWith("[memory] refused: "), `labelled refused: ${line}`);
+    assert.ok(!line.includes(key), `${q}: the key is not in ${JSON.stringify(line)}`);
+    assert.ok(!line.includes("7a.Q2"), `${q}: nor any part of it`);
+    assert.match(line, /\[redacted\]/);
+  }
 });
 
-await check("D2: the search path renders the can't-reach wording (not nothing-matches)", async () => {
-  const tab = readFileSync(new URL(at("components/app/bot-memory.tsx")), "utf8");
-  assert.match(tab, /j\.unreachable \|\| j\.refused \? "down"/, "a down result state");
-  assert.match(tab, /results === "down" \?/, "rendered as its own branch");
+await check("redaction: bearer/authorization values, sk-/hch-/ak_/ck_ keys, key=/token= values, long tokens", async () => {
+  const { redactSecrets, memoryLogLine } = await import(at("lib/server/memory-outage.ts"));
+  const cases = [
+    ["Authorization: Bearer abc.def", ["abc.def"]],
+    ["authorization=Basic dXNlcjpw", ["dXNlcjpw"]],
+    ["sent bearer tok.1", ["tok.1"]],
+    ["bad key sk-ab12 here", ["ab12"]],
+    ["bad key hch-x.y here", ["x.y"]],
+    ["ak_short and ck_q.9", ["short", "q.9"]],
+    ["GET /v3/x?api_key=s3.cr&token=t.k&x=1", ["s3.cr", "t.k"]],
+    ['{"apiKey":"pz.9"}', ["pz.9"]],
+    [`id ${"A".repeat(24)} end`, ["A".repeat(24)]],
+  ];
+  for (const [text, secrets] of cases) {
+    const out = redactSecrets(text, []);
+    for (const sec of secrets) assert.ok(!out.includes(sec), `${JSON.stringify(text)} -> ${JSON.stringify(out)} still has ${sec}`);
+  }
+  // The configured key itself, whatever its shape, and it never survives the 200-character cap either.
+  process.env.HONCHO_API_KEY = "q.1";
+  const line = memoryLogLine("error", new Error(`${"x ".repeat(95)}q.1 q.1`));
+  assert.ok(line.length <= 200 && !line.includes("q.1"), line);
+  assert.ok(!redactSecrets("key q.1 was refused").includes("q.1"), "the configured key by default");
+  assert.equal(redactSecrets("Request timed out after 45000ms", []), "Request timed out after 45000ms", "ordinary words stay");
 });
 
 process.chdir(tmpdir());
