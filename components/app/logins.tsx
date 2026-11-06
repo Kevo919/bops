@@ -217,7 +217,7 @@ export function LoginsPage({
               <span className="mt-0.5 text-[13px] leading-[19px] text-[color:var(--ht-6b6b6b)]">
                 {shared
                   ? "Your own apps, keys and site logins. They're yours, not this workspace's bots'."
-                  : computerWords(`Apps, keys and site logins for ${wsName}'s bots. Each bot gets only the access you give it. Passwords stay in your Mac's Keychain, and no AI sees them.`)}
+                  : computerWords`Apps, keys and site logins for ${wsName}'s bots. Each bot gets only the access you give it. Passwords stay in your Mac's Keychain, and no AI sees them.`}
               </span>
             </div>
             <div className="relative mt-[30px] shrink-0">
@@ -940,7 +940,7 @@ function LoginPanel({
         {sure ? (
           <>
             <span className="w-full pb-1 text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">
-              {a ? `Disconnect ${title}? No bot can use it any more, in any workspace.` : l ? computerWords(`Delete the ${l.site} login? It's gone from your Mac's Keychain too.`) : `Remove ${k!.name} from your Orgo vault? Your bots stop using it.`}
+              {a ? `Disconnect ${title}? No bot can use it any more, in any workspace.` : l ? computerWords`Delete the ${l.site} login? It's gone from your Mac's Keychain too.` : `Remove ${k!.name} from your Orgo vault? Your bots stop using it.`}
             </span>
             <button
               disabled={busy}

@@ -8,7 +8,8 @@
 // subscription tasks weren't enabled). The words helpers are checked here first; then, when there's a production build
 // (`npx next build`), the screens those words are on are rendered for real, in the built app as Kevin's Windows PC runs it
 // (self-hosted, the desktop window, /api/config saying win32, the desktop app's bridge), and no text a person can read
-// there may say Mac, Macs, macOS or Keychain, except where a Mac is meant (ALLOWED_MAC, below).
+// there may say Mac, Macs, macOS or Keychain, except where a Mac is meant (ALLOWED_MAC, below). Then the same screens as
+// a Mac shows them: the Mac's own words. On both, names stay as written and no HTML entity or half swap shows (NEVER).
 // Usage: node scripts/test-windows-wording.mjs   (SCREENS=0 to skip the screens; SHOTS=<dir> for their pictures)
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -63,6 +64,11 @@ check("computerWords maps what a Windows user reads", () => {
 assert.equal(computerWords("Stored in your Mac's Keychain", "win32"), "Stored in an encrypted store on your PC");
   assert.equal(computerWords("your Mac's Keychain", "darwin"), "your Mac's Keychain", "the Mac keeps its own words");
   assert.equal(computerWords("⌘", "linux"), "Ctrl", "CommandOrControl is Ctrl off the Mac");
+  // Either apostrophe (channels.tsx's token note has the curly one): never "your PC’s an encrypted store on this PC".
+  assert.equal(computerWords("The token stays in your Mac’s Keychain.", "win32"), "The token stays in an encrypted store on your PC.");
+  assert.equal(computerWords("Kept in this Mac’s Keychain.", "win32"), "Kept in an encrypted store on this PC.");
+  assert.equal(computerWords("The token stays in your Mac’s Keychain.", "linux"), "The token stays in your computer’s key store.");
+  assert.equal(computerWords("The token stays in your Mac’s Keychain.", "darwin"), "The token stays in your Mac’s Keychain.");
 });
 
 check("every raw site is wrapped (no bare ⌘/Keychain/Mac copy left in the UI files)", () => {
@@ -136,8 +142,12 @@ const ALLOWED_MAC = [
   // Handy (This PC, Voice typing): its own installers, one for each kind of computer.
   /on a Mac, the \.dmg/,
   /on a Mac, Accessibility/,
+  // The workspace's own name, as someone gave it (the screens' state names it so on purpose).
+  /\bMac Team\b/,
 ];
 const MAC_WORDS = /\b(Macs?|macOS|Keychain)\b/;
+/** Never on any platform: an HTML entity shown as text (a JS string isn't JSX), or a Keychain swap left half done. */
+const NEVER = [/&apos;|&#x27;|&quot;|&amp;/, /PC['’]s an encrypted store|computer['’]s an encrypted store/, /Windows Team/];
 
 async function screens() {
   if (process.env.SCREENS === "0") return console.log("info screens skipped (SCREENS=0)");
@@ -178,7 +188,8 @@ async function screens() {
       host: "orgo",
       account: { user: { id: "u_pc", email: "kevin@example.test", name: "Kevin Test" } },
       owner: { name: "Kevin Test", timeZone: "America/Chicago" },
-      workspaces: [{ id: "ws_main", name: "Main", createdAt: now - 30 * 24 * H }],
+      // Named with "Mac" in it, as a site below: names someone gave never go through the words.
+      workspaces: [{ id: "ws_main", name: "Mac Team", createdAt: now - 30 * 24 * H }],
       workspace: "ws_main",
       bots: [
         { id: "boppy", name: "Boppy", role: "Chief of staff", color: "#E9FF3B", isMain: true, computerStatus: "none", workspaceId: "ws_main" },
@@ -191,6 +202,7 @@ async function screens() {
       messages: [{ id: "m1", chatId: "bot:boppy", role: "user", text: "Morning! What's on my plate today?", at: now - 5 * H }],
       sessions: [],
       routines: [],
+      vault: [{ id: "vl_mac", site: "mac.example.com", username: "kevin", hasPassword: true, hasTotp: false, bots: "all", auto: false, addedAt: now - 2 * H }],
     }),
   );
   const guard = join(dir, "home", "netguard.cjs");
@@ -264,193 +276,240 @@ net.Socket.prototype.connect = function (...a) {
       if (!found) throw e;
       return chromium.launch({ headless: true, executablePath: found });
     });
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
-    await ctx.addCookies([{ name: "bops_window", value: token, url: BASE }]);
-    // The desktop app's bridge (desktop/preload.cjs), as the Windows app has it: its This PC tab and permissions show.
-    await ctx.addInitScript(() => {
-      const none = () => Promise.resolve(null);
-      window.bopsMac = {
-        screens: () => Promise.resolve({ access: "granted", displays: [], sources: [] }),
-        openScreenSettings: none,
-        popOut: none,
-        closePip: none,
-        showMain: none,
-        permissions: { status: () => Promise.resolve({ screen: "granted", microphone: "granted", notifications: "granted" }), request: () => Promise.resolve("granted"), openSettings: none, automationApps: none },
-        screenNeedsRestart: () => Promise.resolve(false),
-        relaunch: none,
-        copySecret: () => Promise.resolve(true),
-        previewSignIn: () => Promise.resolve(false),
-        pickFolder: none,
-        revealFolder: none,
-        update: { info: none, onChange: () => () => {}, dismiss: none, download: none, install: none, auto: none, setAuto: none },
-      };
-    });
-    await ctx.route("**/*", async (route) => {
-      const u = new URL(route.request().url());
-      if (!(u.hostname === "127.0.0.1" || u.protocol === "data:" || u.protocol === "blob:")) return route.abort("blockedbyclient");
-      // The server runs on Linux here; Kevin's runs on Windows. The window words its places by the server's platform.
-      if (u.pathname === "/api/config") {
-        const r = await route.fetch();
-        return route.fulfill({ response: r, json: { ...(await r.json().catch(() => ({}))), platform: "win32" } });
-      }
-      // Claude Code signed in on this PC and chosen for bot tasks, the ChatGPT one not: what the cards say then.
-      if (u.pathname === "/api/local-subscriptions" && route.request().method() === "GET") {
-        const subs = [
-          { kind: "codex", available: true, connected: false, state: "signed-out", checkedAt: now },
-          { kind: "claude", available: true, connected: true, state: "connected", account: "kevin@example.test", plan: "max", checkedAt: now },
-        ];
-        const kind = u.searchParams.get("kind");
-        return route.fulfill({ json: { subscriptions: kind ? subs.filter((x) => x.kind === kind) : subs } });
-      }
-      if (u.pathname === "/api/pc-task-runner" && route.request().method() === "GET") return route.fulfill({ json: { choice: "claude", runner: "claude", openaiKey: { set: false, masked: "" } } });
-      return route.continue();
-    });
-    const page = await ctx.newPage();
-    const errors = [];
-    page.on("pageerror", (e) => errors.push(String(e).slice(0, 200)));
-    const shots = process.env.SHOTS || join(tmpdir(), "bops-windows-words");
-    mkdirSync(shots, { recursive: true });
+    // Each screen as a Windows PC shows it, then as a Mac does (whose words must stay the Mac's, and whose names too).
+    for (const platform of ["win32", "darwin"]) {
+      const mac = platform === "darwin";
+      const PC = mac ? "Mac" : "PC";
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+      await ctx.addCookies([{ name: "bops_window", value: token, url: BASE }]);
+      // The desktop app's bridge (desktop/preload.cjs), as the Windows app has it: its This PC tab and permissions show.
+      await ctx.addInitScript(() => {
+        const none = () => Promise.resolve(null);
+        window.bopsMac = {
+          screens: () => Promise.resolve({ access: "granted", displays: [], sources: [] }),
+          openScreenSettings: none,
+          popOut: none,
+          closePip: none,
+          showMain: none,
+          permissions: { status: () => Promise.resolve({ screen: "granted", microphone: "granted", notifications: "granted" }), request: () => Promise.resolve("granted"), openSettings: none, automationApps: none },
+          screenNeedsRestart: () => Promise.resolve(false),
+          relaunch: none,
+          copySecret: () => Promise.resolve(true),
+          previewSignIn: () => Promise.resolve(false),
+          pickFolder: none,
+          revealFolder: none,
+          update: { info: none, onChange: () => () => {}, dismiss: none, download: none, install: none, auto: none, setAuto: none },
+        };
+      });
+      await ctx.route("**/*", async (route) => {
+        const u = new URL(route.request().url());
+        if (!(u.hostname === "127.0.0.1" || u.protocol === "data:" || u.protocol === "blob:")) return route.abort("blockedbyclient");
+        // The server runs on Linux here; Kevin's runs on Windows (and the Mac app on a Mac). The window words its places by the server's platform.
+        if (u.pathname === "/api/config") {
+          const r = await route.fetch();
+          return route.fulfill({ response: r, json: { ...(await r.json().catch(() => ({}))), platform } });
+        }
+        // Claude Code signed in on this PC and chosen for bot tasks, the ChatGPT one not: what the cards say then.
+        if (u.pathname === "/api/local-subscriptions" && route.request().method() === "GET") {
+          const subs = [
+            { kind: "codex", available: true, connected: false, state: "signed-out", checkedAt: now },
+            { kind: "claude", available: true, connected: true, state: "connected", account: "kevin@example.test", plan: "max", checkedAt: now },
+          ];
+          const kind = u.searchParams.get("kind");
+          return route.fulfill({ json: { subscriptions: kind ? subs.filter((x) => x.kind === kind) : subs } });
+        }
+        if (u.pathname === "/api/pc-task-runner" && route.request().method() === "GET") return route.fulfill({ json: { choice: "claude", runner: "claude", openaiKey: { set: false, masked: "" } } });
+        return route.continue();
+      });
+      const page = await ctx.newPage();
+      const errors = [];
+      page.on("pageerror", (e) => errors.push(String(e).slice(0, 200)));
+      const shots = join(process.env.SHOTS || join(tmpdir(), "bops-windows-words"), platform);
+      mkdirSync(shots, { recursive: true });
 
-    /** Everything a person can read in `sel`: its text, and each tooltip, label and alt text there. */
-    const readable = (sel) =>
-      page.evaluate((s) => {
-        const el = document.querySelector(s);
-        if (!el) return null;
-        const tips = [...el.querySelectorAll("[title], [aria-label], [data-tip], [alt], [placeholder]")].flatMap((n) => ["title", "aria-label", "data-tip", "alt", "placeholder"].map((a) => n.getAttribute(a)).filter(Boolean));
-        return { text: (el.innerText || "").replace(/\s+/g, " ").trim(), tips };
-      }, sel);
-    /** One screen: it's there, it says something, and nothing it says is a Mac's words. */
-    const looked = [];
-    async function judge(name, sel, more) {
-      await page.waitForTimeout(600);
-      // What's still loading ("Checking", "Loading"), waited out for up to 6 seconds, as a person would.
-      for (let i = 0; i < 12; i++) {
-        const t = (await readable(sel))?.text ?? "";
-        if (!/^\s*(Checking|Loading)\b|Loading…|Checking official CLI/m.test(t)) break;
-        await page.waitForTimeout(500);
+      /** Everything a person can read in `sel`: its text, and each tooltip, label and alt text there. */
+      const readable = (sel) =>
+        page.evaluate((s) => {
+          const el = document.querySelector(s);
+          if (!el) return null;
+          const tips = [...el.querySelectorAll("[title], [aria-label], [data-tip], [alt], [placeholder]")].flatMap((n) => ["title", "aria-label", "data-tip", "alt", "placeholder"].map((a) => n.getAttribute(a)).filter(Boolean));
+          return { text: (el.innerText || "").replace(/\s+/g, " ").trim(), tips };
+        }, sel);
+      /** One screen: it's there, it says something, and nothing it says is a Mac's words. */
+      const looked = [];
+      async function judge(name, sel, more) {
+        await page.waitForTimeout(600);
+        // What's still loading ("Checking", "Loading"), waited out for up to 6 seconds, as a person would.
+        for (let i = 0; i < 12; i++) {
+          const t = (await readable(sel))?.text ?? "";
+          if (!/^\s*(Checking|Loading)\b|Loading…|Checking official CLI/m.test(t)) break;
+          await page.waitForTimeout(500);
+        }
+        await page.screenshot({ path: join(shots, `${name}.png`) });
+        const r = await readable(sel);
+        assert.ok(r, `${name}: ${sel} isn't on the page`);
+        assert.ok(r.text.length > 20, `${name}: blank (${JSON.stringify(r.text)})`);
+        const said = [r.text, ...r.tips];
+        const hits = [];
+        for (const t of said) {
+          // On every platform: no HTML entity shown as text, and no swap that left a half sentence.
+          for (const bad of NEVER) {
+            const m = t.match(bad);
+            if (m) hits.push(JSON.stringify(t.slice(Math.max(0, m.index - 50), m.index + 40)));
+          }
+          if (mac) continue;
+          let left = t;
+          for (const ok of ALLOWED_MAC) left = left.replace(new RegExp(ok.source, "g"), "");
+          const m = left.match(MAC_WORDS);
+          if (m) hits.push(JSON.stringify(left.slice(Math.max(0, m.index - 50), m.index + 40)));
+        }
+        assert.deepEqual(hits, [], `${name} on ${platform} says words it mustn't`);
+        // A name someone gave stays as they wrote it, wherever it shows.
+        assert.ok(!/Windows Team|PC Team|computer Team|pc\.example\.com|computer\.example\.com/.test(r.text), `${name}: a name went through the words`);
+        assert.deepEqual(errors.splice(0), [], `${name}: the page threw`);
+        looked.push(name);
+        await more?.(r.text);
       }
-      await page.screenshot({ path: join(shots, `${name}.png`) });
-      const r = await readable(sel);
-      assert.ok(r, `${name}: ${sel} isn't on the page`);
-      assert.ok(r.text.length > 20, `${name}: blank (${JSON.stringify(r.text)})`);
-      const said = [r.text, ...r.tips];
-      const hits = [];
-      for (const t of said) {
-        let left = t;
-        for (const ok of ALLOWED_MAC) left = left.replace(new RegExp(ok.source, "g"), "");
-        const m = left.match(MAC_WORDS);
-        if (m) hits.push(JSON.stringify(left.slice(Math.max(0, m.index - 50), m.index + 40)));
+      const button = (name, exact = true) => page.getByRole("button", { name, exact }).first();
+      const row = (name) => page.locator("aside button").filter({ hasText: new RegExp(`^\\s*${name}`) }).first();
+      async function fresh() {
+        const state = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/state" && r.request().method() === "GET", { timeout: 30000 }).catch(() => null);
+        // The window's words come from /api/config (components/app/computer-words.ts): answered before anything is judged.
+        const config = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/config", { timeout: 30000 });
+        await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded", timeout: 30000 });
+        await page.locator("aside").first().waitFor({ state: "visible", timeout: 30000 });
+        await state;
+        await config;
+        await button(/team, account and settings/, false).waitFor({ state: "visible", timeout: 15000 });
       }
-      assert.deepEqual(hits, [], `${name} says a Mac's words on a Windows PC`);
-      assert.deepEqual(errors.splice(0), [], `${name}: the page threw`);
-      looked.push(name);
-      await more?.(r.text);
-    }
-    const button = (name, exact = true) => page.getByRole("button", { name, exact }).first();
-    const row = (name) => page.locator("aside button").filter({ hasText: new RegExp(`^\\s*${name}`) }).first();
-    async function fresh() {
-      const state = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/state" && r.request().method() === "GET", { timeout: 30000 }).catch(() => null);
-      // The window's words come from /api/config (components/app/computer-words.ts): answered before anything is judged.
-      const config = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/config", { timeout: 30000 });
-      await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded", timeout: 30000 });
-      await page.locator("aside").first().waitFor({ state: "visible", timeout: 30000 });
-      await state;
-      await config;
-      await button(/team, account and settings/, false).waitFor({ state: "visible", timeout: 15000 });
-    }
-    async function settings(pane) {
-      await fresh();
-      for (let i = 1; ; i++) {
+      async function settings(pane) {
+        await fresh();
+        for (let i = 1; ; i++) {
+          try {
+            await button(/team, account and settings/, false).click({ timeout: 10000 });
+            await page.getByRole("menuitem", { name: "Settings", exact: true }).first().click({ timeout: 5000 });
+            await page.locator('nav[aria-label="Settings"]').waitFor({ state: "visible", timeout: 5000 });
+            break;
+          } catch (e) {
+            if (i >= 3) throw e;
+            await page.keyboard.press("Escape").catch(() => {});
+          }
+        }
+        await page.locator(`[data-settings-nav="${pane}"]`).click({ timeout: 10000 });
+        await page.locator(`main[data-settings-pane="${pane}"]`).waitFor({ state: "visible", timeout: 15000 });
+      }
+      async function screen(name, fn) {
         try {
-          await button(/team, account and settings/, false).click({ timeout: 10000 });
-          await page.getByRole("menuitem", { name: "Settings", exact: true }).first().click({ timeout: 5000 });
-          await page.locator('nav[aria-label="Settings"]').waitFor({ state: "visible", timeout: 5000 });
-          break;
+          await fn();
+          passed++;
+          console.log(`ok   ${name}`);
         } catch (e) {
-          if (i >= 3) throw e;
-          await page.keyboard.press("Escape").catch(() => {});
+          failures++;
+          console.error(`FAIL ${name}\n     ${String(e.message ?? e).split("\n").slice(0, 8).join("\n     ")}`);
         }
       }
-      await page.locator(`[data-settings-nav="${pane}"]`).click({ timeout: 10000 });
-      await page.locator(`main[data-settings-pane="${pane}"]`).waitFor({ state: "visible", timeout: 15000 });
-    }
-    async function screen(name, fn) {
-      try {
-        await fn();
-        passed++;
-        console.log(`ok   ${name}`);
-      } catch (e) {
-        failures++;
-        console.error(`FAIL ${name}\n     ${String(e.message ?? e).split("\n").slice(0, 8).join("\n     ")}`);
-      }
-    }
 
-    await screen("Settings' nav says This PC", async () => {
-      await settings("profile");
-      const nav = await readable('nav[aria-label="Settings"]');
-      assert.match(nav.text, /This PC/);
-      assert.ok(!MAC_WORDS.test(nav.text), nav.text);
-    });
-    // Profile: who you are, then AI subscriptions on This PC: what the Claude sign in does now, and the ChatGPT one.
-    await screen("Settings, Profile (AI subscriptions, This PC)", async () => {
-      await settings("profile");
-      const pane = 'main[data-settings-pane="profile"]';
-      await page.locator(`${pane} [data-local-line="claude"]`).waitFor({ state: "visible", timeout: 15000 });
-      await page.locator(`${pane} [data-local-line="claude"]`).filter({ hasText: /signed in/ }).waitFor({ timeout: 15000 });
-      await judge("settings-profile", pane, (text) => {
-        assert.match(text, /Claude Code is signed in on this PC, and bot tasks on this PC run on your Claude plan\./, "the Claude card says what tasks do now");
-        assert.match(text, /Bops chat and bot tasks don't run on a ChatGPT plan yet/, "the ChatGPT card says it as it is");
-        assert.ok(!/not enabled|enabled yet/i.test(text), "no stale 'not enabled'");
+      await screen(`Settings' nav says This ${PC}`, async () => {
+        await settings("profile");
+        const nav = await readable('nav[aria-label="Settings"]');
+        assert.match(nav.text, new RegExp(`This ${PC}`));
+        if (!mac) assert.ok(!MAC_WORDS.test(ALLOWED_MAC.reduce((t, ok) => t.replace(new RegExp(ok.source, "g"), ""), nav.text)), nav.text);
       });
-    });
-    for (const [pane, label] of [["mac", "This PC"], ["general", "General"], ["team", "Team"], ["bots", "Bots"], ["logins", "Logins"], ["look", "Look"], ["services", "Services"]])
-      await screen(`Settings, ${label}`, async () => {
-        await settings(pane);
-        await judge(`settings-${pane}`, `main[data-settings-pane="${pane}"]`);
-      });
-    // A bot's profile, in the panel: Works on says this PC, for Boppy (Auto) and Rook (always on this PC).
-    for (const [bot, line] of [["Boppy", /Works on\s*Its cloud computer, or your PC when a task needs it/], ["Rook", /Works on\s*Your PC, always/]])
-      await screen(`${bot}'s profile (Works on)`, async () => {
-        await fresh();
-        await row(bot).click();
-        await button(`${bot}'s profile`).click();
-        await page.locator("section[data-panel]").getByText("Works on", { exact: true }).first().waitFor({ state: "visible", timeout: 15000 });
-        await judge(`profile-${bot.toLowerCase()}`, "section[data-panel]", (text) => {
-          assert.match(text, line);
-          assert.match(text, /\bYour PC\b/, "its Works on choice says Your PC");
+      // Profile: who you are, then AI subscriptions on This PC: what the Claude sign in does now, and the ChatGPT one.
+      await screen("Settings, Profile (AI subscriptions, This PC)", async () => {
+        await settings("profile");
+        const pane = 'main[data-settings-pane="profile"]';
+        await page.locator(`${pane} [data-local-line="claude"]`).waitFor({ state: "visible", timeout: 15000 });
+        await page.locator(`${pane} [data-local-line="claude"]`).filter({ hasText: /signed in/ }).waitFor({ timeout: 15000 });
+        await judge("settings-profile", pane, (text) => {
+          assert.match(text, /Claude Code is signed in on this PC, and bot tasks on this PC run on your Claude plan\./, "the Claude card says what tasks do now");
+          assert.match(text, /Bops chat and bot tasks don't run on a ChatGPT plan yet/, "the ChatGPT card says it as it is");
+          assert.ok(!/not enabled|enabled yet/i.test(text), "no stale 'not enabled'");
         });
       });
-    // A bot's settings page, each section opened (AI's Works on, Computer, Skills' Works on your PC...).
-    for (const bot of ["Boppy", "Rook"])
-      await screen(`${bot}'s settings page, every section`, async () => {
+      for (const [pane, label] of [["mac", `This ${PC}`], ["general", "General"], ["team", "Team"], ["bots", "Bots"], ["logins", "Logins"], ["look", "Look"], ["services", "Services"]])
+        await screen(`Settings, ${label}`, async () => {
+          await settings(pane);
+          await judge(`settings-${pane}`, `main[data-settings-pane="${pane}"]`);
+        });
+      // A bot's profile, in the panel: Works on says this PC, for Boppy (Auto) and Rook (always on this PC).
+      for (const [bot, line] of [["Boppy", new RegExp(`Works on\\s*Its cloud computer, or your ${PC} when a task needs it`)], ["Rook", new RegExp(`Works on\\s*Your ${PC}, always`)]])
+        await screen(`${bot}'s profile (Works on)`, async () => {
+          await fresh();
+          await row(bot).click();
+          await button(`${bot}'s profile`).click();
+          await page.locator("section[data-panel]").getByText("Works on", { exact: true }).first().waitFor({ state: "visible", timeout: 15000 });
+          await judge(`profile-${bot.toLowerCase()}`, "section[data-panel]", (text) => {
+            assert.match(text, line);
+            assert.match(text, new RegExp(`\\bYour ${PC}\\b`), `its Works on choice says Your ${PC}`);
+          });
+        });
+      // A bot's settings page, each section opened (AI's Works on, Computer, Skills' Works on your PC...).
+      for (const bot of ["Boppy", "Rook"])
+        await screen(`${bot}'s settings page, every section`, async () => {
+          await settings("bots");
+          await page.locator('main[data-settings-pane="bots"]').getByRole("button", { name: "Open settings" }).nth(bot === "Boppy" ? 0 : 1).click();
+          await page.locator("[data-bot-settings]").waitFor({ state: "visible", timeout: 15000 });
+          const sections = await page.locator("[data-bot-settings] [data-nav]").evaluateAll((els) => els.map((e) => e.getAttribute("data-nav")));
+          for (const sec of sections) {
+            await page.locator(`[data-bot-settings] [data-nav="${sec}"]`).click();
+            await page.waitForTimeout(250);
+          }
+          await judge(`bot-page-${bot.toLowerCase()}`, "[data-bot-settings]", bot === "Rook" ? (text) => assert.match(text, new RegExp(`Your ${PC}, always`)) : undefined);
+        });
+      for (const bot of ["Boppy", "Rook"])
+        await screen(`Chat: ${bot}`, async () => {
+          await fresh();
+          await row(bot).click();
+          await page.locator("#composer").waitFor({ state: "visible", timeout: 15000 });
+          await judge(`chat-${bot.toLowerCase()}`, "main");
+        });
+      for (const [name, go] of [
+        ["Routines", async () => await button("Routines").click()],
+        ["Skills", async () => (await button("Routines").click(), await page.waitForTimeout(300), await button("Skills").click())],
+        ["Knowledge", async () => await button("Knowledge").click()],
+      ])
+        await screen(`Panel: ${name}`, async () => {
+          await fresh();
+          await go();
+          await judge(`panel-${name.toLowerCase()}`, "section[data-panel]");
+        });
+      // Logins: the workspace's and a site's names exactly as written ("Mac Team", mac.example.com), the login's
+      // Delete question, and the website login form, each in this computer's words.
+      const STORE = mac ? "your Mac's Keychain" : "an encrypted store on your PC";
+      await screen("Settings, Logins: names as written, the login's Delete question, and the login form", async () => {
+        await settings("logins");
+        const pane = 'main[data-settings-pane="logins"]';
+        await page.locator(`${pane} [data-logins]`).getByText("mac.example.com").first().waitFor({ state: "visible", timeout: 15000 });
+        await judge("logins", pane, (text) => {
+          assert.match(text, /Workspace · Mac Team/, "the workspace's name, as written");
+          assert.ok(text.includes(`Apps, keys and site logins for Mac Team's bots. Each bot gets only the access you give it. Passwords stay in ${STORE}, and no AI sees them.`), text.slice(0, 400));
+          assert.match(text, /mac\.example\.com/, "the site, as written");
+        });
+        // Its row opens (the list's heading), then the login itself opens its panel.
+        await page.locator(`${pane} [data-list-heading]`).filter({ hasText: "mac.example.com" }).first().click();
+        await page.locator(`${pane} [data-logins]`).getByRole("button", { name: "mac.example.com", exact: true }).first().click();
+        await page.locator("[data-login-panel]").waitFor({ state: "visible", timeout: 10000 });
+        await page.locator("[data-login-panel]").getByRole("button", { name: "Delete", exact: true }).first().click();
+        await judge("login-delete", "[data-login-panel]", (text) => assert.ok(text.includes(`Delete the mac.example.com login? It's gone from ${STORE} too.`), text));
+        await settings("logins");
+        await page.locator(pane).getByRole("button", { name: "Connect", exact: true }).first().click();
+        await page.getByRole("button", { name: /^A website login/ }).first().click();
+        await page.locator(`${pane} form`).first().waitFor({ state: "visible", timeout: 10000 });
+        await judge("login-form", pane, (text) => assert.ok(text.includes(`Stored in ${STORE}`), "the form says where the password goes"));
+      });
+      // Where to find a bot (its settings page): Telegram's token form, with its curly apostrophe.
+      await screen("A bot's settings, Where to find it: Telegram's token form", async () => {
         await settings("bots");
-        await page.locator('main[data-settings-pane="bots"]').getByRole("button", { name: "Open settings" }).nth(bot === "Boppy" ? 0 : 1).click();
+        await page.locator('main[data-settings-pane="bots"]').getByRole("button", { name: "Open settings" }).first().click();
         await page.locator("[data-bot-settings]").waitFor({ state: "visible", timeout: 15000 });
-        const sections = await page.locator("[data-bot-settings] [data-nav]").evaluateAll((els) => els.map((e) => e.getAttribute("data-nav")));
-        for (const sec of sections) {
-          await page.locator(`[data-bot-settings] [data-nav="${sec}"]`).click();
-          await page.waitForTimeout(250);
-        }
-        await judge(`bot-page-${bot.toLowerCase()}`, "[data-bot-settings]", bot === "Rook" ? (text) => assert.match(text, /Your PC, always/) : undefined);
+        await page.locator("[data-bot-settings] button").filter({ hasText: /^\s*Telegram/ }).first().click();
+        await page.locator("[data-bot-settings]").getByText(/The token stays in/).first().waitFor({ state: "visible", timeout: 10000 });
+        await judge("channel-telegram", "[data-bot-settings]", (text) => assert.ok(text.includes(mac ? "The token stays in your Mac’s Keychain." : "The token stays in an encrypted store on your PC."), text.match(/The token stays[^.]*\./)?.[0]));
       });
-    for (const bot of ["Boppy", "Rook"])
-      await screen(`Chat: ${bot}`, async () => {
-        await fresh();
-        await row(bot).click();
-        await page.locator("#composer").waitFor({ state: "visible", timeout: 15000 });
-        await judge(`chat-${bot.toLowerCase()}`, "main");
-      });
-    for (const [name, go] of [
-      ["Routines", async () => await button("Routines").click()],
-      ["Skills", async () => (await button("Routines").click(), await page.waitForTimeout(300), await button("Skills").click())],
-      ["Knowledge", async () => await button("Knowledge").click()],
-    ])
-      await screen(`Panel: ${name}`, async () => {
-        await fresh();
-        await go();
-        await judge(`panel-${name.toLowerCase()}`, "section[data-panel]");
-      });
-    console.log(`info screens looked at on win32: ${looked.length} (pictures in ${shots})`);
+      console.log(`info screens looked at on ${platform}: ${looked.length} (pictures in ${shots})`);
+      await ctx.close();
+    }
   } finally {
     await browser?.close().catch(() => {});
     if (server.exitCode === null) {

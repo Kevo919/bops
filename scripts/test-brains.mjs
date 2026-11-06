@@ -55,6 +55,8 @@ process.chdir(work);
 /* ---------------- Loading the app's modules ---------------- */
 
 const fileUrl = (p) => pathToFileURL(join(rootPath, p)).href;
+// The server's own computer, in its words (lib/computer-words.ts): "PC" on Windows, "Mac" on a Mac, "computer" elsewhere.
+const HERE = { win32: "PC", darwin: "Mac" }[process.platform] ?? "computer";
 // sessions.ts is the app's task runner: here, the takeover and the computer's setup, as calls written down.
 const SESSIONS_OWN = `
 import { update } from ${JSON.stringify(fileUrl("lib/server/store.ts"))};
@@ -618,7 +620,7 @@ await test("a sign-in can be stopped, and tried again on a bot with no free scre
   S.update((s) => (s.watches = []));
   await assert.rejects(B.startSignIn(planId, "boppy"), /Let Boppy use Claude Code first/);
   S.update((s) => (s.host = "mac"));
-  await assert.rejects(B.startSignIn(planId, "rook"), /browsers on this (Mac|PC|computer)/); // (the server's words for its own computer)
+  await assert.rejects(B.startSignIn(planId, "rook"), new RegExp(`browsers on this ${HERE} \\(Settings`));
   S.update((s) => (s.host = "orgo"));
 });
 
