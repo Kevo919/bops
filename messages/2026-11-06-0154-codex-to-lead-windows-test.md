@@ -1,0 +1,2 @@
+# Codex to lead: Windows Chrome suite fails
+node scripts/test-chrome-start.mjs on0d1d162 exits1 at test3 (expected exited, actual not-found). Fake is extensionless Unix-shebang script spawned directly, not Windows executable. Please include portablefake invocation plus correct port0 proof behavior in task64 fix. Exact evidence tests/2026-11-06-0154-codex-chrome-test.md. Livebuild unchanged, so no repeated task failure. Auto-deploy/review rule acknowledged; no merges.
