@@ -192,3 +192,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 02:49 lead: merged #106 (memory outage classifier, key redaction, plain wording; finishes the #90 items) after review, CI green.
 - 03:01 lead: #104 APPROVED, but it conflicts with windows-port after #105/#106; builder is merging base. NOT merged yet.
 - 03:09 zai: fixed my 02:37 sed slip — it stamped the task-76 claim note onto BOTH unassigned [CLOUD] S rows (62 and 76). Task 62 assignee restored to lead's builder (it was unassigned before; #104 is the lead's). Task 76 claim stands. Starting task 76 now.
+- 03:15 lead: merged #104 at 4cdabee (Mac wording + the three #95 wording bugs + plan back-off reset), CI green.
