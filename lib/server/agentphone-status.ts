@@ -174,26 +174,35 @@ export type LinePick = { agent: ApAgent; number: ApNumber | null } | { problem: 
  * The agent and number to use: the only agent (or the only one with a number, else the only one not made by Bops),
  * and the number attached to it (or the only number). Two or more that fit equally: says so, never guesses.
  */
-export function pickLine(agents: ApAgent[], numbers: ApNumber[]): LinePick {
+export function pickLine(agents: ApAgent[], numbers: ApNumber[], from?: string | null): LinePick {
   if (!agents.length) return { problem: "Your AgentPhone account has no agent yet. Make one on agentphone.ai, then try again." };
-  let pool = agents;
-  if (pool.length > 1) {
-    const withNumber = pool.filter((a) => numbers.some((n) => n.agentId === a.id));
-    if (withNumber.length >= 1) pool = withNumber;
+  const digits = (x: string) => x.replace(/\D/g, "").slice(-10);
+  // A number asked for by name: it, and the agent it's attached to.
+  if (from && digits(from).length === 10) {
+    const n = numbers.find((x) => digits(x.phoneNumber) === digits(from));
+    if (!n) return { problem: `${pretty(from)} isn't one of the numbers in your AgentPhone account (${numbers.map((x) => pretty(x.phoneNumber)).slice(0, 4).join(", ") || "none yet"}).` };
+    const agent = agents.find((a) => a.id === n.agentId) ?? (agents.length === 1 ? agents[0] : undefined);
+    return agent ? { agent, number: n } : { problem: `${pretty(n.phoneNumber)} isn't attached to an agent yet. Attach it to one on agentphone.ai, then try again.` };
   }
+  const withNumber = agents.filter((a) => numbers.some((n) => n.agentId === a.id));
+  let pool = agents;
+  if (withNumber.length) pool = withNumber;
+  else if (agents.length > 1)
+    return { problem: `None of your ${agents.length} AgentPhone agents has a number yet. Attach a number to the one Bops should use on agentphone.ai, then try again.` };
   if (pool.length > 1) {
     const notBops = pool.filter((a) => !/^bops-/.test(a.description ?? ""));
     if (notBops.length >= 1) pool = notBops;
   }
-  if (pool.length > 1) return { problem: `Your AgentPhone account has ${pool.length} agents with numbers (${pool.map((a) => a.name ?? a.id).slice(0, 4).join(", ")}), so Bops can't pick one by itself yet. Keep one agent with a number for Bops to use.` };
+  if (pool.length > 1) return { problem: `Your AgentPhone account has ${pool.length} agents with numbers (${pool.map((a) => a.name ?? a.id).slice(0, 4).join(", ")}). Say which number to use: ${numbers.filter((n) => pool.some((a) => a.id === n.agentId)).map((n) => pretty(n.phoneNumber)).slice(0, 6).join(", ")}.` };
   const agent = pool[0];
   const own = numbers.filter((n) => n.agentId === agent.id);
+  if (own.length > 1) return { problem: `Your AgentPhone agent "${agent.name ?? agent.id}" has ${own.length} numbers. Say which one to use: ${own.map((n) => pretty(n.phoneNumber)).slice(0, 6).join(", ")}.` };
   const number = own[0] ?? (numbers.length === 1 ? numbers[0] : null);
   return { agent, number };
 }
 
 /** Read the account (two reads, nothing placed or sent), note how it stands for Settings, and pick the line. */
-export async function probeAccount(key = process.env.AGENTPHONE_API_KEY, fetcher: typeof fetch = fetch): Promise<{ pick: LinePick; probe: AgentPhoneProbe }> {
+export async function probeAccount(key = process.env.AGENTPHONE_API_KEY, fetcher: typeof fetch = fetch, from?: string | null): Promise<{ pick: LinePick; probe: AgentPhoneProbe }> {
   const at = Date.now();
   const fail = (problem: string) => {
     const probe: AgentPhoneProbe = { at, number: null, numbers: 0, agents: 0, agent: null, outboundSms: null, problem };
@@ -210,7 +219,7 @@ export async function probeAccount(key = process.env.AGENTPHONE_API_KEY, fetcher
   if (!nums.ok || !ags.ok) return fail("AgentPhone didn't answer just now. Try Check again later.");
   const numbers = list<ApNumber>(nums.json).filter((n) => n && typeof n.id === "string" && typeof n.phoneNumber === "string");
   const agents = list<ApAgent>(ags.json).filter((a) => a && typeof a.id === "string");
-  const pick = pickLine(agents, numbers);
+  const pick = pickLine(agents, numbers, from);
   const n = "agent" in pick ? pick.number : null;
   const sms = n?.outboundSms;
   const probe: AgentPhoneProbe = {

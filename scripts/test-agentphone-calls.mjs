@@ -274,6 +274,53 @@ await check("the line is picked by itself when there's one; two agents with numb
   assert.equal(bopsToo.agent.id, "a", "a Bops made agent isn't the user's own");
 });
 
+await check("a call claim: phone calls only, never an API, a tool or a function", () => {
+  const backed = { task: true, running: true, send: true, schedule: true, call: false };
+  const claims = ["I called you.", "I've called Dana about it.", "I just called him.", "I phoned her this morning.", "I rang you twice.", "I placed a call to Dana.", "I've placed a call to your number.", "I'm calling you now.", "I called +15550109999.", "I called your phone.", "The call was placed."];
+  for (const t of claims) assert.equal(Chat.unbacked(t, backed), "No call was placed.", t);
+  const not = ["I called the weather API and it's sunny.", "I called get_data for the totals.", "I called the function twice.", "I called Weather API for you.", "I called Stripe's API to check.", "I called it a day.", "Should I call you?", "I can call Dana if you like.", "I called a tool to look it up.", "I called list_repos."];
+  for (const t of not) assert.equal(Chat.unbacked(t, backed), "", t);
+  assert.equal(Chat.unbacked("I called you.", { ...backed, call: true }), "", "a started call backs it");
+});
+
+await check("a bot without AgentPhone set up is never told it placed no call", async () => {
+  const keep = process.env.AGENTPHONE_API_KEY;
+  delete process.env.AGENTPHONE_API_KEY;
+  try {
+    answers.push(reply("I called Dana yesterday, as you asked."));
+    const k = asked.length;
+    await Chat.handleMessage(chatId, "did you reach Dana?");
+    assert.ok(!toolNames(asked[k]).includes("place_call"), "no place_call without the key");
+    assert.equal(lastBot().text, "I called Dana yesterday, as you asked.");
+  } finally {
+    process.env.AGENTPHONE_API_KEY = keep;
+  }
+});
+
+await check("picking: two numbers on one agent ask which; `from` picks one; no agent with a number says so", () => {
+  const agents = [{ id: "a", name: "Front desk" }];
+  const two = [{ id: "n1", phoneNumber: "+15550100000", agentId: "a" }, { id: "n2", phoneNumber: "+15550100001", agentId: "a" }];
+  const asks = St.pickLine(agents, two);
+  assert.match(asks.problem, /has 2 numbers\. Say which one to use: \+1 \(555\) 010-0000, \+1 \(555\) 010-0001/);
+  const chosen = St.pickLine(agents, two, "+1 555 010 0001");
+  assert.equal(chosen.number.id, "n2");
+  assert.match(St.pickLine(agents, two, "+15559990000").problem, /isn't one of the numbers/);
+  const none = St.pickLine([{ id: "a" }, { id: "b" }], [{ id: "n1", phoneNumber: "+15550100000", agentId: null }]);
+  assert.match(none.problem, /^None of your 2 AgentPhone agents has a number yet/);
+  assert.doesNotMatch(none.problem, /agents with numbers/);
+});
+
+await check("a call that ends unanswered, busy or canceled stops being polled, and says so", async () => {
+  for (const [status, words] of [["no_answer", "no answer"], ["no-answer", "no answer"], ["busy", "busy"], ["canceled", "canceled"]]) {
+    ap.call = { id: "call_1", status };
+    ap.seen.length = 0;
+    await Out.followCall("boppy", chatId, "call_1", "+15550109999");
+    const polls = ap.seen.filter((x) => x.path === "/v1/calls/call_1").length;
+    assert.equal(polls, 1, `${status}: one look, then it stops`);
+    assert.equal(messages().at(-1).text, `Call to +1 (555) 010-9999 didn't go through (${words}).`);
+  }
+});
+
 await check("a number that isn't one fails in words before asking", async () => {
   const r = await Out.runOutboundTool("boppy", "send_text", { to: "call me", text: "x" }, { chatId });
   assert.match(r.text, /isn't a full phone number/);

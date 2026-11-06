@@ -63,9 +63,10 @@ export function outboundChatTools() {
         properties: {
           to: { type: ["string", "null"], description: `The number to call, in full (+15550102000). Null for ${owner}'s own mobile number.` },
           purpose: { type: "string", maxLength: MAX_PURPOSE, description: "What the call is for and what to say, in full: the caller follows it. Plain words." },
+          from: { type: ["string", "null"], description: `Which of ${owner}'s AgentPhone numbers to use, in full. Null to let Bops pick (it does when there's one, and says which there are when there are more).` },
           greeting: { type: ["string", "null"], description: `The first words said when they answer, short ("Hi, this is Boppy calling for ${owner}."). Null for a default.` },
         },
-        required: ["to", "purpose", "greeting"],
+        required: ["to", "purpose", "from", "greeting"],
       },
     },
     {
@@ -79,8 +80,9 @@ export function outboundChatTools() {
         properties: {
           to: { type: ["string", "null"], description: `The number to text, in full (+15550102000). Null for ${owner}'s own mobile number.` },
           text: { type: "string", maxLength: MAX_TEXT, description: "The text, short and plain: no markdown." },
+          from: { type: ["string", "null"], description: `Which of ${owner}'s AgentPhone numbers to use, in full. Null to let Bops pick (it does when there's one, and says which there are when there are more).` },
         },
-        required: ["to", "text"],
+        required: ["to", "text", "from"],
       },
     },
   ];
@@ -97,7 +99,7 @@ function systemPromptFor(botName: string, owner: string, purpose: string) {
 
 /** What each tool's yes card shows: exactly what goes. */
 function askOf(kind: "call" | "text", to: string, from: string | null, words: string, greeting?: string): AskSpec {
-  const via = from ? ` from ${from}` : "";
+  const via = from ? ` from ${prettyPhone(from)}` : "";
   return kind === "call"
     ? { action: `Call ${prettyPhone(to)}${via}`, resources: [prettyPhone(to)], preview: `${greeting ? `First words: ${greeting}\n\n` : ""}What the call is for: ${words}`, kind: "app", onceOnly: true }
     : { action: `Text ${prettyPhone(to)}${via}`, resources: [prettyPhone(to)], preview: words, kind: "app", onceOnly: true };
@@ -123,11 +125,12 @@ export async function runOutboundTool(botId: string, name: string, args: Record<
   const owner = ownerName();
   const greeting = kind === "call" ? (typeof args.greeting === "string" && args.greeting.trim() ? args.greeting.trim().slice(0, 300) : `Hi, this is ${b.name}, calling for ${owner}.`) : undefined;
   // Ask before anything else reaches AgentPhone (the read that picks the line comes after the yes).
-  if (!opts.approved) throw new NeedsOk(askOf(kind, who.to, null, words, greeting));
-  const { pick } = await probeAccount();
+  const asked = typeof args.from === "string" && args.from.trim() ? args.from.trim() : null;
+  if (!opts.approved) throw new NeedsOk(askOf(kind, who.to, asked, words, greeting));
+  const { pick } = await probeAccount(undefined, fetch, asked);
   if ("problem" in pick) return { ok: false, text: `Failed: ${pick.problem}` };
   if (!pick.number) return { ok: false, text: "Failed: your AgentPhone agent has no number yet. Add one on agentphone.ai, then try again." };
-  const from = prettyPhone(pick.number.phoneNumber);
+  const fromPretty = prettyPhone(pick.number.phoneNumber);
   let r: Answer<{ id?: string; status?: string }>;
   try {
     r =
@@ -145,7 +148,7 @@ export async function runOutboundTool(botId: string, name: string, args: Record<
   }
   if (kind === "text") {
     noteTexts("working");
-    return { ok: true, said: `Texted ${prettyPhone(who.to)} from ${from}`, text: `Sent the text to ${prettyPhone(who.to)} from ${from}.` };
+    return { ok: true, said: `Texted ${prettyPhone(who.to)} from ${fromPretty}`, text: `Sent the text to ${prettyPhone(who.to)} from ${fromPretty}.` };
   }
   noteCalls("working");
   const callId = typeof r.json.id === "string" ? r.json.id : undefined;
@@ -153,8 +156,8 @@ export async function runOutboundTool(botId: string, name: string, args: Record<
   return {
     ok: true,
     callId,
-    said: `Started a call to ${prettyPhone(who.to)} from ${from}`,
-    text: `The call to ${prettyPhone(who.to)} from ${from} has started (it's ringing now). It hasn't been answered yet: don't say what was said or that it went well. How it ends, with what was said, shows in this chat when it's over.`,
+    said: `Started a call to ${prettyPhone(who.to)} from ${fromPretty}`,
+    text: `The call to ${prettyPhone(who.to)} from ${fromPretty} has started (it's ringing now). It hasn't been answered yet: don't say what was said or that it went well. How it ends, with what was said, shows in this chat when it's over.`,
   };
 }
 
@@ -191,7 +194,8 @@ export async function followCall(botId: string, chatId: string, callId: string, 
       continue;
     }
     if (!r.ok) continue;
-    const status = String(r.json.status ?? "").toLowerCase();
+    // "no_answer", "no-answer" and "No Answer" alike.
+    const status = String(r.json.status ?? "").toLowerCase().replace(/[\s_]+/g, "-");
     if (status === "completed" || status === "ended") {
       let lines = transcriptLines(r.json.transcript, name);
       if (!lines.length) {
@@ -201,8 +205,8 @@ export async function followCall(botId: string, chatId: string, callId: string, 
       addMessage({ chatId, role: "system", text: `Call to ${prettyPhone(to)} completed.${lines.length ? `\n\nWhat was said:\n${lines.join("\n")}` : " No transcript came back."}` });
       return;
     }
-    if (status === "failed" || status === "no-answer" || status === "busy" || status === "canceled" || status === "cancelled") {
-      addMessage({ chatId, role: "system", text: `Call to ${prettyPhone(to)} didn't go through (${status === "failed" ? "it failed" : status.replace("-", " ")}).` });
+    if (["failed", "no-answer", "busy", "canceled", "cancelled", "rejected", "voicemail"].includes(status)) {
+      addMessage({ chatId, role: "system", text: `Call to ${prettyPhone(to)} didn't go through (${status === "failed" ? "it failed" : status.replace(/-/g, " ")}).` });
       return;
     }
   }

@@ -1341,9 +1341,12 @@ const CLAIMS: { kind: "task" | "running" | "send" | "schedule" | "call"; words: 
   },
   {
     kind: "call",
-    // "I called you", "I've phoned Dana", "I'm calling you now", "the call was placed": only once place_call started one.
+    // A phone call said to have happened: "I called you", "I've called Dana", "I phoned her", "I rang you", "I placed a call
+    // to Dana", "I'm calling you now", "the call was placed". Never an API, a tool or a function ("I called the weather
+    // API", "I called get_data"). Case matters here (no /i): a name starts with a capital, so "I called get_data" isn't one.
+    // Checked only on a turn that had place_call (backedBy): a bot without AgentPhone is never told it placed no call.
     words:
-      /\bI(?:'ve| have)? (?:just |now |already )?(?:called|phoned|rang)\b(?! (?:it|this|that) (?:a|an|the)\b)|\bI(?:'m| am) (?:calling|phoning|ringing) (?:you|them|him|her|\+?\d)|\bcall (?:has been|was) (?:placed|made|started)\b|\b(?:we|you) (?:just )?(?:spoke|talked) on the phone\b/i,
+      /\bI(?:'ve| have)? (?:just |now |already )?(?:called|phoned|rang|rung) (?:you|him|her|them|(?:your|his|her|their) (?:phone|number|cell|mobile)|[A-Z][a-z]+\b|\+?\d)(?![^.!?\n]{0,40}\b(?:API|APIs|api|apis|tool|tools|function|functions|endpoint|method|webhook)\b)|\bI(?:'ve| have)? (?:just |now |already )?placed (?:a|the|your|that|this) (?:phone )?call\b|\bI(?:'m| am) (?:now )?(?:calling|phoning|ringing) (?:you|him|her|them|[A-Z][a-z]+\b|\+?\d)(?![^.!?\n]{0,40}\b(?:API|APIs|api|apis|tool|tools|function|functions|endpoint|method|webhook)\b)|\b(?:[Pp]hone )?[Cc]all (?:has been|was) (?:placed|made)\b/,
     note: "No call was placed.",
   },
 ];
@@ -1354,10 +1357,13 @@ type Backed = Record<(typeof CLAIMS)[number]["kind"], boolean>;
  * (a session), a routine or watch that now exists. Kept across a pause for the user's OK (ChatPause.did).
  */
 type Did = { send: boolean; task: boolean; schedule: boolean; call?: boolean };
-/** What backs each kind of claim: what the turn's tools did, the tasks it started (sessionIds), and the tasks running now. */
-function backedBy(botId: string, did: Did, sessionIds: string[]): Backed {
+/**
+ * What backs each kind of claim: what the turn's tools did, the tasks it started (sessionIds), and the tasks running now.
+ * `callOffered`: whether the turn had place_call (AgentPhone set up here); without it a call claim isn't checked at all.
+ */
+function backedBy(botId: string, did: Did, sessionIds: string[], callOffered = false): Backed {
   const task = did.task || sessionIds.length > 0;
-  return { task, running: task || getState().sessions.some((s) => s.botId === botId && live(s)), send: did.send, schedule: did.schedule, call: !!did.call };
+  return { task, running: task || getState().sessions.some((s) => s.botId === botId && live(s)), send: did.send, schedule: did.schedule, call: !callOffered || !!did.call };
 }
 /** The notes for each claim in `text` that no tool backs ("" when none). */
 export function unbacked(text: string, backed: Backed): string {
@@ -3511,7 +3517,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       // Replies it offered are something for the user, even on a quiet run that said NOTHING.
       const made = (isNothing(text) ? null : text || (sessionIds.length && !bg.quiet ? says.join(" ") || "Started on it." : null)) ?? (drafts.length ? readyWords(drafts.length) : null) ?? (proposals.length ? proposedWords(proposals.length) : null);
       // A claim no tool backs is said not to be so (unbacked).
-      const out = made && withoutUnbacked(made, backedBy(botId, doneNow, sessionIds));
+      const out = made && withoutUnbacked(made, backedBy(botId, doneNow, sessionIds, offered.has(CALL_TOOL)));
       // What the run read or left out ("Read …") is said only with a result it posts (a quiet run's words
       // that only start a thread aren't posted: routines.ts chatRun). A quiet run with nothing posts nothing.
       if (out && !bg.sample && !(bg.quiet && sessionIds.length)) for (const n of notes) addMessage({ ...noteLine(n), routine: tag });
@@ -3545,7 +3551,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
     // Only tools' results say what was done (as cards: sessionIds, drafts, notes). A model that couldn't take tools,
     // asked to do something (or saying it did), says plainly it can't, and names one that can; any other claim no
     // tool backs this turn is said not to be so.
-    const backed = backedBy(botId, doneNow, sessionIds);
+    const backed = backedBy(botId, doneNow, sessionIds, offered.has(CALL_TOOL));
     const reply =
       dropped && (asksToAct(answering?.text ?? lastWords(chatId)) || !!unbacked(paged ?? "", backed))
         ? cantActWords(model)

@@ -242,6 +242,8 @@ function viewOf(s: Service, owner: boolean, cloud: boolean): ServiceView {
   let words: string;
   if (current && (current.status === "invalid" || current.status === "no credit")) [status, words] = ["broken", `Key saved but not working. ${current.words}`];
   else if (!missing.length && waiting) [status, words] = ["restart", "Saved. Restart Bops to use it."];
+  // AgentPhone with its key but no public address: calls and texts go out; ones coming in need the address.
+  else if (!missing.length && s.id === "phone" && !saved[1]) [status, words] = ["on", "Set up to place calls and texts. Texts and calls coming in still need the public address they arrive at."];
   else if (!missing.length) [status, words] = ["on", s.summary?.() ? `Set up: ${s.summary()}.` : "Set up."];
   else if (missing.length < s.fields.filter((f) => !f.optional).length) [status, words] = ["off", `Not set up: add the ${missing.map((f) => f.label.toLowerCase()).join(" and ")} too.`];
   else [status, words] = ["off", "Not set up."];
@@ -251,7 +253,8 @@ function viewOf(s: Service, owner: boolean, cloud: boolean): ServiceView {
     words,
     ...(owner ? { fields: s.fields.map((f, i) => ({ name: f.name, label: f.label, secret: f.secret, hint: f.hint, set: !!saved[i], shown: f.secret ? shownSecret(saved[i]) : (saved[i] ?? "") })) } : {}),
     ...(owner && current ? { check: { ok: current.ok, status: current.status, words: current.words } } : {}),
-    ...(s.id === "phone" && saved[0] ? { phone: agentPhoneView(shownSecret(saved[0])) } : {}),
+    // The AgentPhone panel (its number, agent, and what calls and texts need): the owner's view only.
+    ...(owner && s.id === "phone" && saved[0] ? { phone: agentPhoneView(shownSecret(saved[0])) } : {}),
   };
 }
 
@@ -265,7 +268,7 @@ export async function servicesView(request: Request): Promise<ServicesView> {
   // five minutes, so it says what was found without a Check. Nothing is called or sent.
   const key = process.env.AGENTPHONE_API_KEY?.trim();
   const seen = lastProbe();
-  if (!cloud && key && (!seen || Date.now() - seen.at > 5 * 60_000)) await probeAccount(key).catch(() => null);
+  if (owner && key && (!seen || Date.now() - seen.at > 5 * 60_000)) await probeAccount(key).catch(() => null);
   return { mode: cloud ? "cloud" : "self", editable: owner, services: SERVICES.filter((s) => !cloud || !s.selfOnly).map((s) => viewOf(s, owner, cloud)) };
 }
 
