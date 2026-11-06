@@ -312,6 +312,39 @@ test("after a price rise, a dearer sighting at the same count takes only the det
   assert.deepEqual((await usageOf(u, "openai.tokens")).map((r) => [r.units, r.cost]), [[1100, old + dear - cheap]]);
 });
 
+test("after a price rise, growth takes only the new units at today's prices: what was paid isn't priced again; retries and older sightings take nothing", async () => {
+  const u = await newUser();
+  await setCredit(u, { free: 5_000_000 });
+  const ref = `turn_${tag}_grow_rise`;
+  const said = (input: number) => ({ model: "gpt-6.1-sol", source: "agent", input, cached: 0, output: 100 });
+  await recordUsageFor(u, "openai.tokens", ref, 1100, said(1000));
+  const first = costOf("openai.tokens", 1100, { ...said(1000), ref });
+  // As if it was paid when tokens cost half what they do today.
+  const old = Math.floor(first / 2);
+  await query("UPDATE bops.cloud_usage SET cost_micros = $3 WHERE user_id = $1 AND detail->>'ref' = $2", [u, ref, old]);
+  const left = await creditLeft(u);
+  const grown = costOf("openai.tokens", 2100, { ...said(2000), ref });
+  await recordUsageFor(u, "openai.tokens", ref, 2100, said(2000));
+  assert.equal(await creditLeft(u), left - (grown - first), "only the new units, at today's prices");
+  assert.ok(grown - first < grown - old, "not the rise on the whole use");
+  let [row] = await usageOf(u, "openai.tokens");
+  assert.deepEqual([row.units, row.cost], [2100, old + grown - first]);
+  assert.ok(row.cost <= grown, "never past the costliest sighting at today's prices");
+  // A retry, an older sighting, and sightings at once after it: nothing more.
+  await recordUsageFor(u, "openai.tokens", ref, 2100, said(2000));
+  await recordUsageFor(u, "openai.tokens", ref, 1100, said(1000));
+  await Promise.all([2100, 1100, 2100].map((n) => recordUsageFor(u, "openai.tokens", ref, n, said(n - 100))));
+  assert.equal(await creditLeft(u), left - (grown - first));
+  // Grown again, and that sighting retried: its new units, once.
+  const more = said(3000);
+  const third = costOf("openai.tokens", 3100, { ...more, ref });
+  await recordUsageFor(u, "openai.tokens", ref, 3100, more);
+  await recordUsageFor(u, "openai.tokens", ref, 3100, more);
+  [row] = await usageOf(u, "openai.tokens");
+  assert.deepEqual([row.units, row.cost], [3100, old + third - first]);
+  assert.equal(await creditLeft(u), left - (third - first));
+});
+
 test("a sighting without the model, at a larger count, is priced at the row's model, and only with no model known anywhere at the dearest", async () => {
   const u = await newUser();
   await setCredit(u, { free: 5_000_000 });
