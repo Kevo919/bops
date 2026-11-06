@@ -1,22 +1,37 @@
 // Import the user's own Agent Skill folders (the ~/.claude/skills and ~/.agents/skills shape: a folder
-// with SKILL.md, name + description frontmatter, optional files) into a Bops workspace as DRAFT skills
-// labeled "From Claude" - nothing a bot sees until the owner reviews and publishes (SkillRef.status is
-// draft by way of createSkill + a follow-up patchRef; here we mark draft explicitly).
+// with SKILL.md, name + description frontmatter, optional files) into this Bops's workspace as DRAFT
+// skills labeled "From Claude", through the app's own createSkill (lib/server/workspace-skills.ts), so
+// they land where the Skills screen lists them. A draft is inert: no bot sees it until the owner
+// publishes it (skillsFor lists published ones only), and none is given to a bot here.
 //
-//   node scripts/import-agent-skills.mjs [--limit N] [--label L] [--dir PATH]... [--dry]
+//   node scripts/import-agent-skills.mjs [--app PATH] [--user ID] [--limit N] [--label L] [--dir PATH]... [--dry] [--force]
 //
+//   --app PATH  the Bops folder that holds .data (default: the current folder)
+//   --user ID   the Orgo user whose state to add them to (.data/users/<id>/state.json); default the
+//               state the install runs on while nobody is signed in (.data/state.json)
 //   --limit N   import the first N only (default 20: review in batches, not all 700 at once)
 //   --label L   the label to file them under (default "From Claude")
 //   --dir PATH  a skills root to read (repeatable; default ~/.claude/skills then ~/.agents/skills)
 //   --dry       list what would be imported, import nothing
+//   --force     import even though a Bops server answers on this computer (its next save would undo it)
 //
-// Collisions: a slug already in the workspace is skipped (listed); ~/.claude wins over ~/.agents/skills
-// when both hold the same folder name. Skipped-not-failed: the summary says how many and why.
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+// Only for a self-hosted install (BOPS_SELF_HOSTED=1: the state in files under .data). The desktop app
+// signed in with Orgo keeps its state in Bops Cloud: there, use Skills, Import from folder, in the app.
+// Close Bops first: a running server holds the state in memory and its next save would undo the import.
+//
+// What's read, and what never is: a skill folder's own regular files only. Symlinks (to a file or a
+// folder, inside or out) are skipped, and every file's real path is checked to be inside its skill
+// folder. A file that can't be read (a symlink loop, ELOOP; no permission) is skipped, never the run.
+// Secret-looking files (*.env, .env*, *.pem, *.key, id_*, *credentials*, *secret*, *token*, keystores)
+// are skipped by name, and any text file the app's secret scan (gitleaks' rules, skill-bundle.ts
+// scanSecrets) flags is skipped by content. Binary files are skipped. Collisions: a slug already in the
+// workspace is skipped; ~/.claude wins over ~/.agents/skills when both hold the same folder name.
+// Tested by scripts/test-import-agent-skills.mjs.
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
-import { createRequire } from "node:module";
-import { execFileSync } from "node:child_process";
+import { join, resolve, sep } from "node:path";
+import { registerHooks } from "node:module";
+import { parse as parseYaml } from "yaml";
 
 const args = process.argv.slice(2);
 const flag = (name, dflt) => {
@@ -24,23 +39,61 @@ const flag = (name, dflt) => {
   return i >= 0 && i + 1 < args.length ? args[i + 1] : dflt;
 };
 const dry = args.includes("--dry");
+const force = args.includes("--force");
 const LIMIT = Number(flag("limit", "20"));
 const LABEL = flag("label", "From Claude");
+const USER = flag("user", "");
+const APP = resolve(flag("app", process.cwd()));
 const dirs = [];
-for (let i = args.indexOf("--dir"); i >= 0; i = args.indexOf("--dir", i + 1)) if (args[i + 1]) dirs.push(args[i + 1]);
+for (let i = args.indexOf("--dir"); i >= 0; i = args.indexOf("--dir", i + 1)) if (args[i + 1]) dirs.push(resolve(args[i + 1]));
 if (!dirs.length) for (const d of [join(homedir(), ".claude", "skills"), join(homedir(), ".agents", "skills")]) if (existsSync(d)) dirs.push(d);
 
-// Run against the app's own state: a scratch HOME so nothing real is touched, then the server modules.
-const scratch = join(process.env.TEMP ?? "/tmp", `bops-import-skills-${Date.now()}`);
-mkdirSync(join(scratch, ".data"), { recursive: true });
-writeFileSync(join(scratch, ".data", "state.json"), "{}");
-process.env.HOME = scratch;
-process.env.BOPS_SELF_HOSTED = "1";
-process.chdir(scratch);
+const fail = (msg) => {
+  console.error(msg);
+  process.exit(1);
+};
 
+/* ---------------- Which state, and is it safe to write ---------------- */
+
+/** KEY=value lines of the install's .env.local and .env (what Next loads), the first one saying it winning. */
+const envOf = (dir) => {
+  const out = {};
+  for (const f of [".env.local", ".env"]) {
+    let text = "";
+    try {
+      text = readFileSync(join(dir, f), "utf8");
+    } catch {
+      continue;
+    }
+    for (const line of text.split(/\r?\n/)) {
+      const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+      if (m && !(m[1] in out)) out[m[1]] = m[2].replace(/^(["'])(.*)\1$/, "$2");
+    }
+  }
+  return out;
+};
+const appEnv = envOf(APP);
+if ((process.env.BOPS_SELF_HOSTED || appEnv.BOPS_SELF_HOSTED) !== "1")
+  fail(`${APP} isn't a self-hosted Bops (BOPS_SELF_HOSTED=1 in its .env.local): its state is in Bops Cloud, which this script can't write. Import each folder in the app instead: Skills, Import from folder.`);
+const scope = (id) => id.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80) || "_";
+const stateFile = USER ? join(APP, ".data", "users", scope(USER), "state.json") : join(APP, ".data", "state.json");
+if (!existsSync(stateFile)) fail(`No Bops state at ${stateFile}. Run it from the Bops folder (or pass --app), with --user for a signed-in Orgo user's state.`);
+
+const port = process.env.PORT || appEnv.PORT || "3210";
+if (!dry && !force) {
+  const up = await fetch(`http://127.0.0.1:${port}/api/health`, { signal: AbortSignal.timeout(1500) }).then(
+    () => true,
+    () => false,
+  );
+  if (up) fail(`Bops is running on port ${port}: close it first (its next save would undo the import), or pass --force.`);
+}
+
+/* ---------------- The app's own modules, against this install's state (lib/server/persist.ts fileStore) ---------------- */
+
+process.env.BOPS_SELF_HOSTED = "1";
+process.chdir(APP);
 const root = new URL("..", import.meta.url);
 const at = (p) => new URL(p, root).href;
-const { registerHooks } = await import("node:module");
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
@@ -60,92 +113,196 @@ registerHooks({
     return { format: "module", shortCircuit: true, source: names.map((n) => `export const ${n} = function () { return Promise.resolve(); };`).join("\n") };
   },
 });
-
 const S = await import(at("lib/server/store.ts"));
 const WS = await import(at("lib/server/workspace-skills.ts"));
+const B = await import(at("lib/server/skill-bundle.ts"));
 const { MAIN_WORKSPACE } = await import(at("lib/types.ts"));
 clearInterval(globalThis.__bopsRoutines);
+if (USER) await S.bindSignIn(USER);
+const wsId = S.getState().workspaces?.some((w) => w.id === MAIN_WORKSPACE) ? MAIN_WORKSPACE : S.getState().workspaces?.[0]?.id;
+if (!wsId) fail("That state has no workspace to add skills to.");
 
-// A workspace to receive them (the main one; created if this is a fresh state).
-if (!S.getState().workspaces?.length) S.update((s) => void (s.workspaces ??= []).push({ id: MAIN_WORKSPACE, name: "Main", createdAt: Date.now() }));
+/* ---------------- Reading a skill folder, safely ---------------- */
 
-/** One SKILL.md's frontmatter (--- yaml ---), as flat key/value we read name/description from. */
-const frontmatterOf = (text) => {
-  const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  const out = {};
-  if (!m) return out;
-  for (const line of m[1].split(/\r?\n/)) {
-    const kv = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-    if (kv) out[kv[1]] = kv[2].replace(/^["']|["']$/g, "");
-  }
-  return out;
-};
+const MAX_FILES = 40;
+const MAX_FILE = 512 * 1024;
+const MAX_DEPTH = 8;
+const SECRET_NAME = [/\.env$/i, /^\.env/i, /\.pem$/i, /\.key$/i, /^id_/i, /credentials/i, /secret/i, /token/i, /\.(p12|pfx|jks|keystore|kdbx|ppk|gpg)$/i, /^\.?(netrc|pgpass|npmrc|pypirc)$/i];
+const secretName = (name) => SECRET_NAME.some((re) => re.test(name));
+const inside = (top, p) => p === top || p.startsWith(top + sep);
+const why = (e) => e.code ?? e.message;
 
-/** A folder's files besides SKILL.md, capped the way bundles are (relative paths, size limits). */
-const filesOf = (dir) => {
+/** One SKILL.md as YAML frontmatter (the yaml package: folded > and literal | blocks, quoting, all of it) and its body. */
+function splitSkillMd(text) {
+  const t = text.replace(/^﻿/, "");
+  const m = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(t);
+  if (!m) return { frontmatter: {}, body: t };
+  const fm = m[1].trim() ? parseYaml(m[1]) : {};
+  if (fm === null || typeof fm !== "object" || Array.isArray(fm)) throw new Error("its frontmatter isn't a YAML map");
+  return { frontmatter: fm, body: t.slice(m[0].length) };
+}
+
+/** A skill folder's files besides SKILL.md: regular text files inside it, no secrets. What's left out is said, by path and why. */
+function filesOf(dir, skipped) {
+  const top = realpathSync(dir);
   const out = [];
-  const walk = (d, prefix) => {
-    for (const e of readdirSync(d)) {
-      if (e === "SKILL.md" || e.startsWith(".")) continue;
-      const p = join(d, e);
-      const st = statSync(p);
-      if (st.isDirectory()) walk(p, `${prefix}${e}/`);
-      else if (st.size <= 512 * 1024 && out.length < 40) out.push({ path: `${prefix}${e}`, from: p });
+  const walk = (abs, prefix, depth) => {
+    if (depth > MAX_DEPTH) return void skipped.push(`${prefix}: too deep`);
+    let names;
+    try {
+      names = readdirSync(abs).sort();
+    } catch (e) {
+      return void skipped.push(`${prefix || "."}: ${why(e)}`);
+    }
+    for (const name of names) {
+      const rel = `${prefix}${name}`;
+      if (!prefix && name === "SKILL.md") continue;
+      // Dot names (.git, .DS_Store) are junk, left out without a line; a secret-looking one (.env) is said.
+      if (name.startsWith(".") && !secretName(name)) continue;
+      try {
+        const full = join(abs, name);
+        const st = lstatSync(full);
+        if (st.isSymbolicLink()) {
+          skipped.push(`${rel}: a symlink`);
+          continue;
+        }
+        // Never a path out of the folder, however it got there (a link above it, a mount).
+        const real = realpathSync(full);
+        if (!inside(top, real)) {
+          skipped.push(`${rel}: outside the skill folder`);
+          continue;
+        }
+        if (st.isDirectory()) {
+          if (!B.junkReason(`${rel}/x`)) walk(full, `${rel}/`, depth + 1);
+          continue;
+        }
+        if (!st.isFile()) {
+          skipped.push(`${rel}: not a regular file`);
+          continue;
+        }
+        if (secretName(name)) {
+          skipped.push(`${rel}: may hold a secret`);
+          continue;
+        }
+        if (B.junkReason(rel)) continue;
+        if (st.size > MAX_FILE) {
+          skipped.push(`${rel}: over ${MAX_FILE / 1024} KB`);
+          continue;
+        }
+        if (out.length >= MAX_FILES) {
+          skipped.push(`${rel}: over ${MAX_FILES} files`);
+          continue;
+        }
+        const text = B.textOf(rel, readFileSync(real));
+        if (text === null) {
+          skipped.push(`${rel}: binary`);
+          continue;
+        }
+        if (B.scanSecrets(rel, text).length) {
+          skipped.push(`${rel}: holds what looks like a secret`);
+          continue;
+        }
+        out.push({ path: rel, content: text, executable: (st.mode & 0o111) !== 0 });
+      } catch (e) {
+        // ELOOP, EACCES, a file gone mid-read: that file is skipped, never the run.
+        skipped.push(`${rel}: ${why(e)}`);
+      }
     }
   };
-  walk(dir, "");
+  walk(top, "", 0);
   return out;
-};
+}
 
-// Gather candidates: name-labeled folders holding a SKILL.md with a description; first root wins on dupes.
+// Candidates: folders (never a symlinked one) holding a regular SKILL.md with a description; the first root wins on dupes.
 const seen = new Set();
 const candidates = [];
+const notTaken = [];
 for (const root0 of dirs) {
-  for (const e of readdirSync(root0).sort()) {
-    const dir = join(root0, e);
-    if (!statSync(dir).isDirectory() || seen.has(e)) continue;
-    const md = join(dir, "SKILL.md");
-    if (!existsSync(md)) continue;
-    seen.add(e);
-    const fm = frontmatterOf(readFileSync(md, "utf8"));
-    const name = String(fm.name ?? e);
-    const description = String(fm.description ?? "").trim();
-    if (!description) continue; // Bops requires one; listed as skipped below.
-    candidates.push({ dir, name, description, body: readFileSync(md, "utf8"), files: filesOf(dir) });
-  }
-}
-
-const existing = new Set(WS.refsOf(MAIN_WORKSPACE).map((r) => r.slug));
-const take = candidates.filter((c) => {
-  const slug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "skill";
-  return !existing.has(slug);
-});
-
-console.log(`Skills roots: ${dirs.join(", ")}`);
-console.log(`Candidates: ${candidates.length}; already in the workspace: ${candidates.length - take.length}; importing up to ${LIMIT}${dry ? " (dry run)" : ""}.`);
-
-let imported = 0;
-const skipped = [];
-for (const c of take.slice(0, LIMIT)) {
-  if (dry) { console.log(`  would import: ${c.name}`); imported++; continue; }
+  let top;
+  let entries;
   try {
-    const { ref } = WS.createSkill(MAIN_WORKSPACE, {
-      name: c.name,
-      description: c.description.slice(0, 500),
-      body: c.body,
-      label: LABEL,
-      files: c.files.map((f) => ({ path: f.path, content: readFileSync(f.from, "utf8") })),
-    });
-    // createSkill defaults to draft (status: "draft" in its ref), so bots see nothing until the
-    // owner publishes; the label groups them for review. Nothing further to set.
-    imported++;
-    console.log(`  imported (draft): ${c.name}`);
+    top = realpathSync(root0);
+    entries = readdirSync(top).sort();
   } catch (e) {
-    skipped.push(`${c.name}: ${e.message}`);
+    notTaken.push(`${root0}: ${why(e)}`);
+    continue;
+  }
+  for (const e of entries) {
+    if (e.startsWith(".") || seen.has(e)) continue;
+    const dir = join(top, e);
+    try {
+      const st = lstatSync(dir);
+      if (st.isSymbolicLink()) {
+        notTaken.push(`${e}: a symlink`);
+        continue;
+      }
+      if (!st.isDirectory() || !inside(top, realpathSync(dir))) continue;
+      const md = join(dir, "SKILL.md");
+      const mdSt = lstatSync(md, { throwIfNoEntry: false });
+      if (!mdSt) continue;
+      if (mdSt.isSymbolicLink() || !mdSt.isFile() || !inside(realpathSync(dir), realpathSync(md))) {
+        notTaken.push(`${e}: its SKILL.md isn't a regular file in the folder`);
+        continue;
+      }
+      seen.add(e);
+      const { frontmatter, body } = splitSkillMd(readFileSync(md, "utf8"));
+      const name = String(frontmatter.name ?? e).trim() || e;
+      const description = String(frontmatter.description ?? "").replace(/\s+/g, " ").trim();
+      if (!description) {
+        notTaken.push(`${e}: no description`);
+        continue;
+      }
+      candidates.push({ dir, name, description, frontmatter, body });
+    } catch (err) {
+      notTaken.push(`${e}: ${why(err)}`);
+    }
   }
 }
-console.log(`Done: ${imported} imported${skipped.length ? `; skipped ${skipped.length} (${skipped.slice(0, 5).join("; ")})` : ""}.`);
-console.log(`Review them in Bops: Skills -> ${LABEL}; publish the ones you want your bots to see.`);
-// Windows EPERM on a just-used cwd: step out first, retry, tolerate (the task-15 lesson).
-process.chdir(process.env.TEMP ?? "/tmp");
-try { rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 }); } catch {}
+
+const slugOf = (c) => (typeof c.frontmatter.name === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(c.frontmatter.name) ? c.frontmatter.name : B.slugify(c.name));
+const existing = new Set(WS.refsOf(wsId).map((r) => r.slug));
+const take = candidates.filter((c) => !existing.has(slugOf(c)));
+
+console.log(`State: ${stateFile}`);
+console.log(`Skills roots: ${dirs.join(", ") || "(none)"}`);
+console.log(`Candidates: ${candidates.length}; already in the workspace: ${candidates.length - take.length}; importing up to ${LIMIT}${dry ? " (dry run)" : ""}.`);
+for (const n of notTaken) console.log(`  not taken: ${n}`);
+
+// The spec's own fields are kept; Bops' are createSkill's to write, and the label is the one asked for.
+const SPEC_KEYS = ["license", "compatibility", "metadata", "allowed-tools"];
+let imported = 0;
+const failed = [];
+for (const c of take.slice(0, LIMIT)) {
+  const skipped = [];
+  const files = filesOf(c.dir, skipped);
+  const skippedNote = skipped.length ? `; skipped ${skipped.join("; ")}` : "";
+  if (dry) {
+    console.log(`  would import: ${c.name} (${files.length} files${skippedNote})`);
+    imported++;
+    continue;
+  }
+  const extra = Object.fromEntries(SPEC_KEYS.filter((k) => c.frontmatter[k] !== undefined).map((k) => [k, c.frontmatter[k]]));
+  if (slugOf(c) === c.frontmatter.name) extra.name = c.frontmatter.name;
+  // body is SKILL.md without its frontmatter: createSkill writes the one frontmatter block itself.
+  const input = { name: c.name, description: c.description.slice(0, B.BUNDLE_LIMITS.description), body: c.body, label: LABEL, files, source: "import", status: "draft" };
+  try {
+    let made;
+    try {
+      made = WS.createSkill(wsId, { ...input, frontmatter: extra });
+    } catch (e) {
+      // A field the app won't keep in that form (metadata that isn't strings): the skill without it.
+      if (!(e instanceof WS.SkillError) || !/frontmatter/i.test(e.message)) throw e;
+      made = WS.createSkill(wsId, { ...input, frontmatter: extra.name ? { name: extra.name } : {} });
+    }
+    imported++;
+    console.log(`  imported (draft): ${c.name} -> ${made.ref.slug} (${files.length} files${skippedNote})`);
+  } catch (e) {
+    const detail = e.problems?.length ? ` (${e.problems.slice(0, 3).map((p) => `${p.path}${p.line ? `:${p.line}` : ""} ${p.reason}`).join("; ")})` : "";
+    failed.push(`${c.name}: ${e.message}${detail}`);
+  }
+}
+if (!dry && imported && !(await S.flushState(10_000))) failed.push("the state didn't finish saving");
+console.log(`Done: ${imported} ${dry ? "would be imported" : "imported"}${failed.length ? `; not imported ${failed.length} (${failed.slice(0, 5).join("; ")})` : ""}.`);
+if (!dry && imported) console.log(`Start Bops and open Skills: they're drafts under ${LABEL}. Publish the ones you want your bots to see.`);
+// The app's modules start timers of their own; the state is saved, so this run is done.
+process.exit(failed.length ? 2 : 0);
