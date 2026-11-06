@@ -84,10 +84,16 @@ export async function recordUsage(userId: string, kind: string, units: number, d
 
 /**
  * Use that can be seen more than once (an agent turn's tokens come in its event and again when it's
- * looked up; a call's seconds grow while it runs): one row per `ref`, keeping the largest count (and
- * the detail that came with it). Only a larger count is paid, and only up to what it costs less what
- * was paid for the ref already: the same count again (a retry, a replay, the same use with other
- * detail) or a smaller one (an older sighting) changes nothing and charges nothing.
+ * looked up; a call's seconds grow while it runs; a write tried again, or replayed from the spool):
+ * one row per `ref`, keeping the largest count (and the detail that came with it). What's paid for a
+ * ref is never more than its dearest sighting costs: each sighting pays what it costs less what was
+ * paid for the ref already (cost_micros), and only when
+ * - its count is larger, or
+ - its count is the same and its detail is dearer, at today's prices, than the row's (the model
+ *   became known late, fewer tokens were cached than first said), and doesn't leave out the row's
+ *   model: the row takes this sighting's detail. The same detail again (a retry, a replay, even after a price change) is never dearer.
+ * A smaller count (an older sighting), or the same count with detail no dearer, changes nothing and
+ * charges nothing. So sightings A, B, A pay what the dearer of A and B costs, once.
  */
 export async function recordUsageFor(userId: string, kind: string, ref: string, units: number, detail: Record<string, unknown> = {}): Promise<void> {
   let paid = 0;
@@ -110,16 +116,24 @@ export async function recordUsageFor(userId: string, kind: string, ref: string, 
         )
       ).rows[0];
       const was = seen ? Number(seen.units) : 0;
-      // The same count or a smaller one is a sighting already counted (or an older one): nothing is
-      // paid and the row stands as it is, detail and all. Pricing it from its own detail instead lets
-      // sightings that differ only in detail (cached tokens or not) charge again on every swap.
-      if (seen && units <= was) return;
+      // A smaller count is an older sighting: nothing is paid and the row stands as it is.
+      if (seen && units < was) return;
       const keep = { ...detail, ref };
       const before = seen ? Number(seen.cost_micros) : 0;
-      // A larger count: paid up to what it costs, less what was paid for this ref already, so what's
-      // paid for a ref never comes to more than its largest sighting costs (and a price change never
-      // charges what was counted before).
-      paid = Math.max(0, costOf(kind, units, keep) - before);
+      const costs = costOf(kind, units, keep);
+      if (seen && units === was) {
+        // The same count: paid only when this detail is dearer than what was paid, and dearer than the
+        // row's own detail at today's prices (so a retry of the same detail after a price rise pays
+        // nothing). Never pricing past what was paid keeps swaps (A, B, A) from paying again. A
+        // sighting that doesn't know the model the row has isn't dearer either: a model not known is
+        // priced as the dearest (pricing.ts), and that's not news about this use.
+        const stood = costOf(kind, was, { ...(seen.detail ?? {}), ref });
+        if (costs <= before || costs <= stood) return;
+        if (typeof seen.detail?.model === "string" && typeof detail.model !== "string") return;
+      }
+      // Paid up to what it costs, less what was paid for this ref already, so what's paid for a ref
+      // never comes to more than its dearest sighting costs.
+      paid = Math.max(0, costs - before);
       const cost = before + paid;
       if (seen)
         await c.query("UPDATE bops.cloud_usage SET units = $2, detail = $3::jsonb, cost_micros = $4 WHERE id = $1", [seen.id, units, JSON.stringify(keep), cost]);
@@ -151,41 +165,62 @@ export type UsageFor = { botId?: string | null; [key: string]: unknown };
 const kept = (detail: UsageFor) => Object.fromEntries(Object.entries(detail).filter(([, v]) => v !== undefined && v !== null && v !== ""));
 
 /**
- * An OpenAI answer's token use (a response's `usage`, an agent turn's), once per response or turn, priced
- * at its model and at the service tier it ran on (`tier`: the response's own `service_tier`, which says
- * the tier OpenAI used, not the one asked for).
+ * One use, as it's counted (kind, units, detail), before it's written: the proxy hands it to
+ * usage-queue.ts keepUse, which gives it a ref (or keeps the one it has) and writes it with
+ * recordUsageFor until it's in.
  */
-export async function recordTokens(userId: string, ref: string, usage: unknown, detail: UsageFor & { model?: unknown; source: string; tier?: unknown }): Promise<void> {
+export type Use = { kind: string; units: number; detail: Record<string, unknown> };
+
+/**
+ * An OpenAI answer's token use (a response's `usage`, an agent turn's), priced at its model and at the
+ * service tier it ran on (`tier`: the response's own `service_tier`, which says the tier OpenAI used,
+ * not the one asked for). Null when it used nothing.
+ */
+export function tokensUse(usage: unknown, detail: UsageFor & { model?: unknown; source: string; tier?: unknown }): Use | null {
   const u = (usage ?? {}) as TokenUsage;
   const input = Number(u.input_tokens) || 0;
   const output = Number(u.output_tokens) || 0;
-  if (!input && !output) return;
+  if (!input && !output) return null;
   const { model, ...rest } = detail;
-  await recordUsageFor(userId, "openai.tokens", ref, input + output, {
-    ...kept(rest),
-    ...(typeof model === "string" ? { model } : {}),
-    input,
-    output,
-    cached: Number(u.input_tokens_details?.cached_tokens) || 0,
-    cacheWrite: Number(u.input_tokens_details?.cache_write_tokens) || 0,
-    reasoning: Number(u.output_tokens_details?.reasoning_tokens) || 0,
-  });
+  return {
+    kind: "openai.tokens",
+    units: input + output,
+    detail: {
+      ...kept(rest),
+      ...(typeof model === "string" ? { model } : {}),
+      input,
+      output,
+      cached: Number(u.input_tokens_details?.cached_tokens) || 0,
+      cacheWrite: Number(u.input_tokens_details?.cache_write_tokens) || 0,
+      reasoning: Number(u.output_tokens_details?.reasoning_tokens) || 0,
+    },
+  };
+}
+
+/** An OpenAI answer's token use (tokensUse), written now, once per response or turn (its id is the ref). */
+export async function recordTokens(userId: string, ref: string, usage: unknown, detail: UsageFor & { model?: unknown; source: string; tier?: unknown }): Promise<void> {
+  const use = tokensUse(usage, detail);
+  if (use) await recordUsageFor(userId, use.kind, ref, use.units, use.detail);
 }
 
 /** One Jev answer (Typesafe's POST /v1/systemone): its input tokens at its model's price. */
-export async function recordJev(userId: string, answer: { model?: unknown; usage?: unknown }, requestBytes: number, detail: UsageFor = {}): Promise<void> {
+export function jevUse(answer: { model?: unknown; usage?: unknown }, requestBytes: number, detail: UsageFor = {}): Use {
   const u = (answer.usage ?? null) as { input_tokens?: unknown; output_tokens?: unknown } | null;
   const said = typeof u?.input_tokens === "number" && Number.isFinite(u.input_tokens) && u.input_tokens >= 0 ? u.input_tokens : undefined;
   // Typesafe didn't say: about 4 bytes a token, as orgo-web's Jev client estimates it.
   const input = said ?? Math.ceil(requestBytes / 4);
   const output = Number(u?.output_tokens) || 0;
-  await recordUsage(userId, "typesafe.tokens", input, {
-    ...kept(detail),
-    model: typeof answer.model === "string" ? answer.model : "jev-latest",
-    input,
-    output,
-    ...(said === undefined ? { estimated: true } : {}),
-  });
+  return {
+    kind: "typesafe.tokens",
+    units: input,
+    detail: {
+      ...kept(detail),
+      model: typeof answer.model === "string" ? answer.model : "jev-latest",
+      input,
+      output,
+      ...(said === undefined ? { estimated: true } : {}),
+    },
+  };
 }
 
 type ImageUsage = {
@@ -194,8 +229,8 @@ type ImageUsage = {
   input_tokens_details?: { text_tokens?: number; image_tokens?: number; cached_tokens?: number; cached_tokens_details?: { text_tokens?: number; image_tokens?: number } } | null;
 };
 
-/** One image answer: its tokens at its model's price, or, when it didn't say, how many images it made. */
-export async function recordImages(userId: string, answer: { usage?: unknown; data?: unknown }, detail: UsageFor & { model?: unknown }): Promise<void> {
+/** One image answer: its tokens at its model's price, or, when it didn't say, how many images it made. Null when it made none. */
+export function imagesUse(answer: { usage?: unknown; data?: unknown }, detail: UsageFor & { model?: unknown }): Use | null {
   const u = (answer.usage ?? null) as ImageUsage | null;
   const { model, ...rest } = detail;
   const base = { ...kept(rest), ...(typeof model === "string" ? { model } : {}) };
@@ -203,37 +238,40 @@ export async function recordImages(userId: string, answer: { usage?: unknown; da
   const output = Number(u?.output_tokens) || 0;
   if (!input && !output) {
     const made = Array.isArray(answer.data) ? answer.data.length : 0;
-    if (made) await recordUsage(userId, "openai.images", 0, { ...base, unreported: made });
-    return;
+    return made ? { kind: "openai.images", units: 0, detail: { ...base, unreported: made } } : null;
   }
   const d = u?.input_tokens_details ?? {};
   const image = Number(d.image_tokens) || 0;
-  await recordUsage(userId, "openai.images", input + output, {
-    ...base,
-    text: Number(d.text_tokens) || Math.max(0, input - image),
-    textCached: Number(d.cached_tokens_details?.text_tokens) || 0,
-    image,
-    imageCached: Number(d.cached_tokens_details?.image_tokens) || 0,
-    output,
-  });
+  return {
+    kind: "openai.images",
+    units: input + output,
+    detail: {
+      ...base,
+      text: Number(d.text_tokens) || Math.max(0, input - image),
+      textCached: Number(d.cached_tokens_details?.text_tokens) || 0,
+      image,
+      imageCached: Number(d.cached_tokens_details?.image_tokens) || 0,
+      output,
+    },
+  };
 }
+
+/** A transcription OpenAI didn't say the length of: the mic's longest recording (components/app/mic-button.tsx). */
+const UNREPORTED_SECONDS = 300;
 
 /**
  * One transcription: seconds of audio, as the answer says (`usage` of type "duration"). A model billed
  * by tokens instead is counted as tokens (priced at its model, or the dearest when it has none listed).
  */
-/** A transcription OpenAI didn't say the length of: the mic's longest recording (components/app/mic-button.tsx). */
-const UNREPORTED_SECONDS = 300;
-
-export async function recordTranscription(userId: string, answer: { usage?: unknown }, detail: UsageFor & { model?: unknown }): Promise<void> {
+export function transcriptionUse(answer: { usage?: unknown }, detail: UsageFor & { model?: unknown }): Use | null {
   const u = (answer.usage ?? null) as { type?: unknown; seconds?: unknown } | null;
-  if (u?.type === "tokens") return recordTokens(userId, `transcribe_${Date.now()}_${Math.random().toString(36).slice(2)}`, u, { ...detail, source: "chat" });
+  if (u?.type === "tokens") return tokensUse(u, { ...detail, source: "chat" });
   // OpenAI always says (gpt-transcribe answers in seconds); if it ever didn't, it's priced as the longest recording the app makes, never free.
   const said = Number(u?.seconds) || 0;
   if (!(said > 0)) console.warn(`[usage] a transcription without its seconds: priced as ${UNREPORTED_SECONDS}`);
   const seconds = said > 0 ? said : UNREPORTED_SECONDS;
   const { model, ...rest } = detail;
-  await recordUsage(userId, "openai.transcribe_seconds", seconds, { ...kept(rest), ...(typeof model === "string" ? { model } : {}) });
+  return { kind: "openai.transcribe_seconds", units: seconds, detail: { ...kept(rest), ...(typeof model === "string" ? { model } : {}) } };
 }
 
 /**

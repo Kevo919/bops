@@ -19,8 +19,8 @@ import { accountFor, composioUserId, honchoPrefix, ownsWorkspace, podKeyOf } fro
 import { loadState } from "./state.ts";
 import { DELETED_CLOSE } from "./tunnel.ts";
 import { admitTurn, follow, userStopped, verdict, watchSession, type Start } from "./turn-guard.ts";
-import { isWebSearch, liveSecondsOf, recordImages, recordJev, recordTokens, recordTranscription, recordTreg, recordUsageFor, recordWebSearch } from "./usage.ts";
-import { keepUsage, track } from "./usage-queue.ts";
+import { imagesUse, isWebSearch, jevUse, liveSecondsOf, recordTreg, recordUsageFor, recordWebSearch, tokensUse, transcriptionUse } from "./usage.ts";
+import { keepUsage, keepUse, track } from "./usage-queue.ts";
 
 /**
  * /proxy/<provider>/*: the Mac's calls to OpenAI, AgentPhone, Honcho, Composio, Typesafe and treg, sent on
@@ -433,7 +433,8 @@ async function recordResponse(call: Call, r: ResponseObject | undefined, done: b
   if (r?.object !== "response" || typeof r.id !== "string") return;
   await own(call, "openai", "response", r.id);
   if (!done) return;
-  counted(recordTokens(call.user.id, r.id, r.usage, { model: r.model, source: call.source ?? "responses", botId: call.bot, tier: r.service_tier }));
+  // Kept (retried, spooled) under the response's id: once per response, however often it's seen or tried.
+  keepUse(call.user.id, tokensUse(r.usage, { model: r.model, source: call.source ?? "responses", botId: call.bot, tier: r.service_tier }), r.id);
   for (const item of Array.isArray(r.output) ? r.output : []) if (isWebSearch(item)) counted(recordWebSearch(call.user.id, item, call.bot));
 }
 
@@ -468,9 +469,13 @@ async function turnInfo(call: Call, session: string | undefined): Promise<{ mode
   return { model: call.model ?? undefined, botId: call.sessionBot ?? undefined };
 }
 
-/** A finished agent turn's tokens, at its session's model, for its session's bot. */
+/**
+ * A finished agent turn's tokens, at its session's model, for its session's bot: kept (retried,
+ * spooled) under the turn's id once the session is looked up. A lookup that fails drops this sighting
+ * only: reconcile.ts reads the turn back.
+ */
 const turnTokens = (call: Call, session: string | undefined, turn: string, usage: unknown) =>
-  counted(turnInfo(call, session).then(({ model, botId }) => recordTokens(call.user.id, turn, usage, { model, source: "agent", botId })));
+  counted(turnInfo(call, session).then(({ model, botId }) => keepUse(call.user.id, tokensUse(usage, { model, source: "agent", botId }), turn)));
 
 /** A web search the agent ran (a web_search_call item, seen in a session's stream or a list of its items), for the session's bot (usage.ts recordWebSearch). */
 async function countWebSearch(call: Call, session: string | undefined, item: unknown) {
@@ -553,7 +558,8 @@ const openai: Spec = {
         if (!["json", undefined].includes(formField(call, "response_format"))) throw new HttpError(400, "Ask for a JSON answer.");
         if (!["false", undefined].includes(formField(call, "stream"))) throw new HttpError(400, "Bops Cloud doesn't stream transcriptions.");
       },
-      json: (call, data) => counted(recordTranscription(call.user.id, isObject(data) ? data : {}, { model: "gpt-transcribe", botId: call.bot })),
+      // Kept (retried, spooled) under a ref of its own, made once before its first write.
+      json: (call, data) => void keepUse(call.user.id, transcriptionUse(isObject(data) ? data : {}, { model: "gpt-transcribe", botId: call.bot })),
     }),
     // A bot's picture, made or edited (an edit sends the pictures it starts from as a file upload). Only image models whose price is known; never streamed.
     rule("POST v1/images/generations", {
@@ -565,7 +571,7 @@ const openai: Spec = {
         if (body.stream) throw new HttpError(400, "Bops Cloud doesn't stream images.");
         imageAsk(body.n, body.size, body.quality);
       },
-      json: (call, data) => counted(recordImages(call.user.id, isObject(data) ? data : {}, { model: isObject(call.json) ? call.json.model : undefined, botId: call.bot })),
+      json: (call, data) => void keepUse(call.user.id, imagesUse(isObject(data) ? data : {}, { model: isObject(call.json) ? call.json.model : undefined, botId: call.bot })),
     }),
     rule("POST v1/images/edits", {
       upload: true,
@@ -577,7 +583,7 @@ const openai: Spec = {
         if (!["false", undefined].includes(formField(call, "stream"))) throw new HttpError(400, "Bops Cloud doesn't stream images.");
         imageAsk(formField(call, "n"), formField(call, "size"), formField(call, "quality"));
       },
-      json: (call, data) => counted(recordImages(call.user.id, isObject(data) ? data : {}, { model: formField(call, "model"), botId: call.bot })),
+      json: (call, data) => void keepUse(call.user.id, imagesUse(isObject(data) ? data : {}, { model: formField(call, "model"), botId: call.bot })),
     }),
     // A call in the app: the live session it makes is the user's (a phone call's is recorded by /hooks/openai).
     // Its audio goes from the browser to OpenAI, so the cloud listens on the session's sideband for its seconds (watchLive).
@@ -1411,7 +1417,7 @@ const typesafe: Spec = {
       readToEnd: true,
       json: (call, data) => {
         const bytes = call.json === undefined ? 0 : Buffer.byteLength(JSON.stringify(call.json));
-        counted(recordJev(call.user.id, isObject(data) ? data : {}, bytes, { botId: call.bot }));
+        keepUse(call.user.id, jevUse(isObject(data) ? data : {}, bytes, { botId: call.bot }));
       },
     }),
   ],
