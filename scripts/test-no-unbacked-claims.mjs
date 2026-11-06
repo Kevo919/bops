@@ -11,7 +11,14 @@
 //   went on) backs "I've sent it", a send refused or failed doesn't, nor a tell_task to no task or a hand_off refused;
 // - no note on words that claim nothing ("I started thinking", "I sent you a summary above"), and a question ("how's my
 //   task?") is never read as a request to act;
-// - This PC only when the bot's Works on is This PC and the PC is ready: otherwise the old routing, said plainly.
+// - This PC only when the bot's Works on is This PC and the PC is ready: otherwise the old routing, said plainly; the
+//   bot is told exactly when a task goes there (the owner's own turn, auto, not part of a group), never "every task";
+// - only this turn's own sends back its claim (turn-deeds.ts): two bots in the same moment, A sends and B says it sent,
+//   B gets the note and A doesn't;
+// - an app's read (Zapier gmail_find_email) or a write that only marks (mark as read) never backs "I sent the email";
+//   any other write that ran does (backsSend): Zapier's execute_zapier_write_action always, its read action never, and a
+//   slug Composio's COMPOSIO_MULTI_EXECUTE_TOOL runs unless it's a read, a mark or a draft;
+// - notes that only say what didn't happen never become "Done.".
 //
 // OpenAI and OpenRouter are fakes (fetch), sessions.ts is a stand-in that records the tasks started and runs nothing,
 // and the state lives in a throwaway folder: nothing reaches a real service, and no real task runs.
@@ -28,6 +35,9 @@ process.env.TZ = "America/New_York";
 process.env.BOPS_SELF_HOSTED = "1";
 // Fake keys, made up here: never a real one, and never written as a name and its value.
 const fakeKey = (...parts) => ["fake", ...parts].join("-");
+for (const k of Object.keys(process.env)) if (k.startsWith("ZAPIER_")) delete process.env[k];
+delete process.env.COMPOSIO_MCP_URL;
+delete process.env.COMPOSIO_MCP_KEY;
 process.env.OPENAI_API_KEY = fakeKey("openai");
 process.env.OPENROUTER_API_KEY = fakeKey("or", "default");
 process.env.OPENROUTER_API_KEY__WORK = fakeKey("or", "work");
@@ -80,6 +90,24 @@ registerHooks({
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
 const asked = [];
 const answers = [];
+/** Otto's own answers (a second bot's turn running in the same moment as Boppy's): by whose instructions they are. */
+const ottoAnswers = [];
+/** Otto's inbox read (check_email) waits here until it's let go: Boppy's send lands while Otto's tool is running. */
+let ottoReading = null;
+let ottoGate = null;
+/** A fake Zapier MCP server (Streamable HTTP, JSON answers): its actions, and the calls it got. */
+const ZAP_TOOLS = [
+  { name: "gmail_find_email", title: "Gmail: Find Email", description: "Finds an email.", inputSchema: { type: "object", properties: { instructions: { type: "string" } } }, annotations: { readOnlyHint: true } },
+  { name: "gmail_mark_email_as_read", title: "Gmail: Mark Email as Read", description: "Marks an email read.", inputSchema: { type: "object", properties: { instructions: { type: "string" } } } },
+  { name: "gmail_send_email", title: "Gmail: Send Email", description: "Sends an email.", inputSchema: { type: "object", properties: { instructions: { type: "string" }, to: { type: "string" } } } },
+  { name: "execute_zapier_read_action", title: "Run a Zapier read action", description: "Runs a read by its key.", inputSchema: { type: "object", properties: { selected_api: { type: "string" }, action: { type: "string" }, params: { type: "object" } } }, annotations: { readOnlyHint: true } },
+  { name: "execute_zapier_write_action", title: "Run a Zapier write action", description: "Runs an action by its key.", inputSchema: { type: "object", properties: { selected_api: { type: "string" }, action: { type: "string" }, params: { type: "object" } } } },
+];
+/** Composio's For You MCP server: its meta tool runs actions by slug. */
+const COMPOSIO_TOOLS = [
+  { name: "COMPOSIO_MULTI_EXECUTE_TOOL", description: "Runs tools by slug.", inputSchema: { type: "object", properties: { tools: { type: "array", items: { type: "object", properties: { tool_slug: { type: "string" }, arguments: { type: "object" } } } } } } },
+];
+const zapCalls = [];
 const response = (id, output) => ({ id, object: "response", model: "gpt-test", status: "completed", output, usage: { input_tokens: 100, output_tokens: 10, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } });
 const said = (text) => ({ id: `msg_${asked.length}`, type: "message", role: "assistant", content: [{ type: "output_text", text, annotations: [] }] });
 let calls = 0;
@@ -98,7 +126,7 @@ globalThis.fetch = async (input, init) => {
     const b = JSON.parse(await req.text());
     if (String(b.instructions ?? "").startsWith("You keep the running summary")) return json(response("resp_summary", [said("They talked.")]));
     asked.push(b);
-    const next = answers.shift();
+    const next = (String(b.instructions ?? "").includes("You are Otto,") ? ottoAnswers : answers).shift();
     return json(next ? await next(b) : response(`resp_${asked.length}`, [said("Done.")]));
   }
   if (url.origin === "https://openrouter.ai" && url.pathname === "/api/v1/chat/completions") {
@@ -107,6 +135,21 @@ globalThis.fetch = async (input, init) => {
     routed.push({ key, model: b.model, tools: !!b.tools?.length, messages: b.messages });
     if (b.tools?.length && refuses.has(`${key} ${b.model}`)) return json({ error: { message: "No endpoints found that support tool use.", code: 404 } }, 404);
     return json({ choices: [{ message: { content: routerSays } }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
+  }
+  // Otto's inbox (check_email): held open until the test lets it go.
+  if (url.origin === "https://api.agentmail.to" && req.method === "GET" && /\/inboxes\/in_otto\/messages/.test(url.pathname)) {
+    ottoReading?.();
+    await ottoGate;
+    return json({ count: 0, limit: 10, messages: [] });
+  }
+  if (url.host === "mcp.zapier.com" || url.host === "connect.composio.dev") {
+    const msg = JSON.parse((await req.text()) || "{}");
+    zapCalls.push({ host: url.host, ...msg });
+    if (msg.method === "initialize") return new Response(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "zapier", version: "1" } } }), { status: 200, headers: { "content-type": "application/json", "mcp-session-id": "zs1" } });
+    if (msg.method === "notifications/initialized") return new Response(null, { status: 202 });
+    if (msg.method === "tools/list") return json({ jsonrpc: "2.0", id: msg.id, result: { tools: url.host === "mcp.zapier.com" ? ZAP_TOOLS : COMPOSIO_TOOLS } });
+    if (msg.method === "tools/call") return json({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: msg.params?.name === "gmail_find_email" ? "Found 1 email from Dana: the quote." : "Done in Gmail." }] } });
+    return json({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "no such method" } });
   }
   // AgentMail (mail.ts): an email sent goes in `mailed`, and gets an id back.
   if (url.origin === "https://api.agentmail.to" && /\/messages\/send$/.test(url.pathname)) {
@@ -240,7 +283,7 @@ await check("Works on This PC, but the PC isn't ready: the old routing (auto), s
   answers.push(calling(toolCall("start_task", { title: "Sort photos", goal: "Sort the photos folder", say: "Sorting them.", where: "auto", then_on_mac: null, part_of: null, skill: null })));
   const k = asked.length;
   await Chat.handleMessage(chatId, "Start a task to sort my photos folder");
-  assert.doesNotMatch(asked[k].instructions, /every task you start \(start_task\) runs there/);
+  assert.doesNotMatch(asked[k].instructions, /every task you start|a task you start \(start_task\) on Alex's own turn runs there/);
   assert.match(asked[k].instructions, /isn't ready right now: a task you start goes where Bops can run it/);
   assert.equal(started.length, n + 1);
   assert.equal(started.at(-1).where, "auto", "not forced onto a PC that can't take it");
@@ -255,7 +298,9 @@ await check("a real start_task, single-agent bot whose Works on is This PC and t
   answers.push(calling(toolCall("start_task", { title: "Tidy downloads", goal: "Tidy the downloads folder on this PC", say: "On it: tidying your downloads.", where: "auto", then_on_mac: null, part_of: null, skill: null })));
   const k = asked.length;
   await Chat.handleMessage(chatId, "Start a task on this PC to tidy my downloads folder");
-  assert.match(asked[k].instructions, /You work on Alex's own (PC|computer|Mac): every task you start \(start_task\) runs there\./);
+  // Said as start_task places it: the owner's own turn, left to auto, not part of a group; never "every task".
+  assert.match(asked[k].instructions, /You work on Alex's own (PC|computer|Mac): a task you start \(start_task\) on Alex's own turn runs there, unless its where is cloud, it's one part of a group \(part_of\) or its goal asks for the cloud\. A task from anyone else's turn goes where Bops can run it\./);
+  assert.doesNotMatch(asked[k].instructions, /every task you start/);
   const tool = asked[k].tools.find((t) => t.name === "start_task");
   assert.ok(tool, "start_task offered");
   assert.ok(!("agent" in tool.parameters.properties), "a single-agent bot: no agent to pick");
@@ -334,6 +379,120 @@ await check("a task tool that didn't start one backs nothing: tell_task to no ta
   await Chat.handleMessage(chatId, "Hand the research to someone");
   assert.equal(lastBot().text, "I've started a task for Max on it.\n\nNo task was started.");
   assert.equal(started.length, n, "nothing started");
+});
+
+await check("two bots in the same moment: Boppy sends, Otto says 'I sent it' without sending; Otto gets the note, Boppy doesn't", async () => {
+  const ottoChat = botChatId("otto");
+  S.update((s) => {
+    if (!s.bots.some((x) => x.id === "otto")) s.bots.push({ id: "otto", name: "Otto", role: "Outbound", color: "#E9FF3B", isMain: false, computerStatus: "none" });
+    if (!s.chats.some((c) => c.id === ottoChat)) s.chats.push({ id: ottoChat, kind: "bot", botIds: ["otto"], createdAt: Date.now(), typing: [] });
+    Object.assign(s.bots.find((x) => x.id === "otto"), { email: "otto@bops.bot", mail: { inboxId: "in_otto", podId: "pod_1" } });
+  });
+  let letGo;
+  ottoGate = new Promise((r) => (letGo = r));
+  const reading = new Promise((r) => (ottoReading = r));
+  const m = mailed.length;
+  // Otto's turn: reads its inbox (held open), then says it sent the email. It sent nothing.
+  ottoAnswers.push(calling(toolCall("check_email", { query: null })), reply("I've sent the email to Dana."));
+  const ottoTurn = Chat.handleMessage(ottoChat, "Did Dana write back?");
+  await Promise.race([reading, new Promise((_, no) => setTimeout(() => no(new Error("Otto never read its inbox")), 5000))]);
+  // Meanwhile Boppy's turn really sends one (the user approved it), while Otto's read is still running.
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith(SEND, "once");
+  assert.equal(mailed.length, m + 1, "Boppy's email went");
+  letGo();
+  await ottoTurn;
+  ottoReading = ottoGate = null;
+  const otto = S.getState().messages.filter((x) => x.chatId === ottoChat && x.role === "bot").at(-1);
+  console.log(`     Otto: ${JSON.stringify(otto.text)}  Boppy: ${JSON.stringify(lastBot().text)}`);
+  assert.equal(otto.text, "I've sent the email to Dana.\n\nNothing was sent.", "Boppy's send never backs Otto's claim");
+  assert.equal(lastBot().text, "I've sent the email to Dana.", "Boppy's own send backs its claim");
+  assert.equal(mailed.length, m + 1, "Otto sent nothing");
+});
+
+await check("an app read (Zapier gmail_find_email) or a mark-as-read, then 'I sent the email': the note; a real Zapier send: none", async () => {
+  process.env.ZAPIER_MCP_URL = `https://mcp.zapier.com/api/v1/connect?token=${fakeKey("zap")}`; // gitleaks:allow (made up for this test)
+  // In a turn: the model reads Dana's email, then says it sent one.
+  answers.push(calling(toolCall("zapier_gmail_find_email", { instructions: "Dana's newest email" })), reply("I've sent the email to Dana."));
+  const k = asked.length;
+  await Chat.handleMessage(chatId, "Find Dana's email and send her the quote");
+  assert.ok(asked[k].tools.some((t) => t.name === "zapier_gmail_find_email"), "Zapier's actions offered");
+  assert.ok(zapCalls.some((c) => c.method === "tools/call" && c.params?.name === "gmail_find_email"), "the read ran");
+  assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
+  // The same read in a paused round the user said yes to (approved): still a read, never a send.
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith({ name: "zapier_gmail_find_email", arguments: JSON.stringify({ instructions: "Dana's newest email" }) }, "once");
+  assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
+  // A write that only marks an email read, approved and done: not a send.
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith({ name: "zapier_gmail_mark_email_as_read", arguments: JSON.stringify({ instructions: "mark Dana's email read" }) }, "once");
+  assert.ok(zapCalls.some((c) => c.method === "tools/call" && c.params?.name === "gmail_mark_email_as_read"), "the mark-as-read ran");
+  assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
+  // A real send, approved and done: backed, no note.
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith({ name: "zapier_gmail_send_email", arguments: JSON.stringify({ instructions: "send Dana the quote", to: "dana@acme.example" }) }, "once");
+  assert.ok(zapCalls.some((c) => c.method === "tools/call" && c.params?.name === "gmail_send_email"), "the send ran");
+  assert.equal(lastBot().text, "I've sent the email to Dana.");
+  // Zapier's execute_zapier_write_action always backs it (Gmail's action key is just "message"); its read action never does.
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith({ name: "zapier_execute_zapier_write_action", arguments: JSON.stringify({ selected_api: "GoogleMailV2CLIAPI", action: "message", params: { to: "dana@acme.example" } }) }, "once");
+  assert.ok(zapCalls.some((c) => c.method === "tools/call" && c.params?.name === "execute_zapier_write_action" && c.params?.arguments?.action === "message"), "the write action ran");
+  assert.equal(lastBot().text, "I've sent the email to Dana.");
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith({ name: "zapier_execute_zapier_read_action", arguments: JSON.stringify({ selected_api: "GoogleMailV2CLIAPI", action: "message", params: {} }) }, "once");
+  assert.ok(zapCalls.some((c) => c.method === "tools/call" && c.params?.name === "execute_zapier_read_action"), "the read action ran");
+  assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
+  delete process.env.ZAPIER_MCP_URL;
+});
+
+await check("Composio For You's multi-execute meta tool: a real GMAIL_SEND_EMAIL in it backs 'sent'; a read in it, then the claim, gets the note", async () => {
+  process.env.COMPOSIO_MCP_URL = "https://connect.composio.dev/mcp";
+  const META = "mycomposio_COMPOSIO_MULTI_EXECUTE_TOOL";
+  // A read through the meta tool runs at once (a fetch), and the model then says it sent the email.
+  answers.push(calling(toolCall(META, { tools: [{ tool_slug: "GMAIL_FETCH_EMAILS", arguments: { max_results: 1 } }] })), reply("I've sent the email to Dana."));
+  const k = asked.length;
+  await Chat.handleMessage(chatId, "Read Dana's email and send her the quote");
+  assert.ok(asked[k].tools.some((t) => t.name === META), "Composio's meta tool offered");
+  assert.ok(zapCalls.some((c) => c.host === "connect.composio.dev" && c.method === "tools/call" && c.params?.arguments?.tools?.[0]?.tool_slug === "GMAIL_FETCH_EMAILS"), "the read ran");
+  assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
+  // The same read approved in a paused round: still a read.
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith({ name: META, arguments: JSON.stringify({ tools: [{ tool_slug: "GMAIL_FETCH_EMAILS", arguments: {} }] }) }, "once");
+  assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
+  // A real send through the meta tool, approved and done: backed, no note. Whatever the slug's wording.
+  for (const slug of ["GMAIL_SEND_EMAIL", "GMAIL_REPLY_TO_THREAD", "SLACK_SENDS_A_MESSAGE_TO_A_SLACK_CHANNEL", "TWITTER_CREATION_OF_A_POST", "MICROSOFT_TEAMS_CHATS_POST_MESSAGE", "LINKEDIN_CREATE_LINKED_IN_POST", "DISCORD_POST_MESSAGE"]) {
+    answers.push(reply("I've sent the email to Dana."));
+    await resumeWith({ name: META, arguments: JSON.stringify({ tools: [{ tool_slug: slug, arguments: { text: "Here's the quote." } }] }) }, "once");
+    assert.ok(zapCalls.some((c) => c.host === "connect.composio.dev" && c.method === "tools/call" && c.params?.arguments?.tools?.[0]?.tool_slug === slug), `${slug} ran`);
+    assert.equal(lastBot().text, "I've sent the email to Dana.", slug);
+  }
+  // Not sends, approved and done: a list, a draft, a mark-read. Each gets the note.
+  for (const slug of ["GMAIL_LIST_THREADS", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_MARK_AS_READ"]) {
+    answers.push(reply("I've sent the email to Dana."));
+    await resumeWith({ name: META, arguments: JSON.stringify({ tools: [{ tool_slug: slug, arguments: {} }] }) }, "once");
+    assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.", slug);
+  }
+  delete process.env.COMPOSIO_MCP_URL;
+});
+
+await check("backsSend(): any write that ran backs 'sent', unless it's clearly a read, a mark or a draft", () => {
+  for (const a of ["GMAIL_SEND_EMAIL", "GMAIL_SEND_DRAFT", "GMAIL_REPLY_TO_THREAD", "SLACK_SENDS_A_MESSAGE_TO_A_SLACK_CHANNEL", "TWITTER_CREATION_OF_A_POST", "MICROSOFT_TEAMS_CHATS_POST_MESSAGE", "LINKEDIN_CREATE_LINKED_IN_POST", "DISCORD_POST_MESSAGE", "message", "channel_message", "slack_send_channel_message", "sendMessage", "send_status"])
+    assert.equal(Chat.backsSend(a), true, a);
+  for (const a of ["GMAIL_FETCH_EMAILS", "GMAIL_LIST_THREADS", "gmail_find_email", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_MARK_AS_READ", "gmail_mark_email_as_read", "GMAIL_ADD_LABEL_TO_EMAIL", "GMAIL_MODIFY_THREAD_LABELS", "SLACK_LIST_MESSAGES", "read_messages", ""])
+    assert.equal(Chat.backsSend(a), false, a);
+});
+
+await check("a turn whose only notes say what didn't happen: never 'Done.'", async () => {
+  // The user said no to the send, and the model wrote nothing: the note says Boppy didn't do it, so the reply isn't "Done.".
+  answers.push(reply(""));
+  await resumeWith(SEND, "reject");
+  const reply_ = lastBot().text;
+  console.log(`     reply: ${JSON.stringify(reply_)}`);
+  assert.notEqual(reply_, "Done.");
+  assert.equal(reply_, "That didn't go through.");
+  // Only the failure notes' own format counts: a success note that quotes "can't" or "couldn't" is still a success.
+  for (const n of ["Couldn't find that task", "Didn't start \"x\": it would open an address on evil.example that the message didn't give", "Not handed off: Max isn't under Boppy on the org chart.", "Boppy didn't do it: send the email"]) assert.equal(Chat.saysNotDone(n), true, n);
+  for (const n of ["Sent to Research: “they couldn't come, so book Friday”", "Read https://example.com/why-you-can't-sleep", "Remembered: Dana can't do mornings", "Deleted routine \"Can't miss\"", "Moved Tidy to your Mac: “if you can't, skip it”"]) assert.equal(Chat.saysNotDone(n), false, n);
 });
 
 await check("unbacked(): each kind of claim, and what backs it", () => {
