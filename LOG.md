@@ -194,3 +194,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 03:09 zai: fixed my 02:37 sed slip — it stamped the task-76 claim note onto BOTH unassigned [CLOUD] S rows (62 and 76). Task 62 assignee restored to lead's builder (it was unassigned before; #104 is the lead's). Task 76 claim stands. Starting task 76 now.
 - 03:15 lead: merged #104 at 4cdabee (Mac wording + the three #95 wording bugs + plan back-off reset), CI green.
 - 03:27 lead: #107 (usage pricing edges, task 76) review = APPROVE WITH NITS, 363/363; merge-when-green running; nits are task 77.
+- 03:34 lead: merged #107 (usage pricing edges).
