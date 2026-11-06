@@ -116,6 +116,9 @@ const CHANGES = new Set(
     // What a view, a lookup or a download (read words since task 78) can be the object of, and is then a change:
     // AIRTABLE_DUPLICATE_VIEW, a lookup field restored, a page view tracked.
     "DUPLICATE CLONE RESTORE LOCK UNLOCK PIN UNPIN RESET CLOSE REOPEN SYNC TRACK " +
+    // Side effects next to a read word (the #110 review): a view opened, captured, recorded, logged or counted, a
+    // download link made, a download emailed, a retrieve resent; and renewals, claims, sign-ups, exports, dismissals.
+    "OPEN CAPTURE RECORD LOG INCREMENT DECREMENT GENERATE EMAIL RESEND RENEW REFRESH CLAIM REGISTER CONVERT EXPORT ACKNOWLEDGE DISMISS " +
     // Browsing: a browsing tool can click and fill in forms.
     "BROWSE " +
     // Raw queries and requests: a query language or HTTP can change things too.
@@ -130,6 +133,8 @@ const CHANGES = new Set(
  * backsSend counts them as no send).
  */
 const READS = new Set("GET LIST SEARCH FETCH READ FIND DESCRIBE COUNT DOWNLOAD RETRIEVE VIEW LOOKUP".split(" "));
+/** Whether a word is one of the read words (READS). */
+export const isReadWord = (word: string) => READS.has(word.toUpperCase());
 
 const wordsOf = (name: string) => name.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
 

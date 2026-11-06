@@ -8,7 +8,7 @@ import { isSecret, learn, memoryBlock, memoryOn, recall, rememberMessage, saveTo
 import { APP_TOOLS, findAppActions, runAppAction } from "./composio";
 import { isZapierTool, runZapierTool, zapierChatTools, zapierForTurn } from "./zapier-chat";
 import { composioMcpChatTools, composioMcpForTurn, isComposioMcpTool, runComposioMcpTool } from "./composio-mcp-chat";
-import { COMPOSIO_MCP_PREFIX, META, runEntries, slugReads } from "./composio-mcp";
+import { COMPOSIO_MCP_PREFIX, isReadWord, META, runEntries, slugReads } from "./composio-mcp";
 import { agentChatTools, agentsForTurn, isAgentTool, runAgentTool } from "./agent-instances-chat";
 import { CALL_TOOL, isOutboundTool, outboundChatTools, outboundForTurn, outboundOn, runOutboundTool } from "./agentphone-outbound";
 import { callApi, callApiTool, usableKeys } from "./keys";
@@ -1423,8 +1423,9 @@ export function backsSend(action: string): boolean {
     .toUpperCase()
     .split(/[^A-Z0-9]+/)
     .filter(Boolean);
-  // Read as a slug (lookupContact as LOOKUP_CONTACT), by the same classifier the asks use.
-  if (!words.length || slugReads(words.join("_"))) return false;
+  // Read as a slug (lookupContact as LOOKUP_CONTACT), by the same classifier the asks use. EMAIL is a change word
+  // there (DOWNLOAD_AND_EMAIL sends one), but right after a read word it's what's read (gmail_find_email), not a send.
+  if (!words.length || slugReads(words.filter((w, i) => !(w === "EMAIL" && i > 0 && isReadWord(words[i - 1]))).join("_"))) return false;
   const has = (...w: string[]) => w.some((x) => words.includes(x));
   const sends = has("SEND", "SENDS", "REPLY", "FORWARD", "POST", "PUBLISH", "SCHEDULE", "COMMENT");
   if (has("MARK") && has("READ", "UNREAD", "SEEN", "UNSEEN")) return false;

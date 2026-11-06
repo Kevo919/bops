@@ -519,7 +519,7 @@ await check("backsSend(): any write that ran backs 'sent', unless it's clearly a
   for (const a of ["GMAIL_SEND_EMAIL", "GMAIL_SEND_DRAFT", "GMAIL_REPLY_TO_THREAD", "SLACK_SENDS_A_MESSAGE_TO_A_SLACK_CHANNEL", "TWITTER_CREATION_OF_A_POST", "MICROSOFT_TEAMS_CHATS_POST_MESSAGE", "LINKEDIN_CREATE_LINKED_IN_POST", "DISCORD_POST_MESSAGE", "message", "channel_message", "slack_send_channel_message", "sendMessage"])
     assert.equal(Chat.backsSend(a), true, a);
   // Task 78: drafts sent, published, posted or scheduled; queries, GraphQL and browsing that say they send; a status sent.
-  for (const a of ["WORDPRESS_PUBLISH_DRAFT", "BUFFER_SCHEDULE_DRAFT", "LINKEDIN_POST_DRAFT", "GITHUB_GRAPHQL_POST_COMMENT", "SLACK_QUERY_AND_REPLY", "browse_and_send", "GMAIL_SEND_EMAIL_STATUS_UPDATE", "AIRTABLE_DUPLICATE_VIEW", "SEGMENT_TRACK_PAGE_VIEW"])
+  for (const a of ["WORDPRESS_PUBLISH_DRAFT", "BUFFER_SCHEDULE_DRAFT", "LINKEDIN_POST_DRAFT", "GITHUB_GRAPHQL_POST_COMMENT", "SLACK_QUERY_AND_REPLY", "browse_and_send", "GMAIL_SEND_EMAIL_STATUS_UPDATE", "AIRTABLE_DUPLICATE_VIEW", "SEGMENT_TRACK_PAGE_VIEW", "DOWNLOAD_AND_EMAIL", "GET_REPORT_AND_EMAIL", "RETRIEVE_AND_RESEND"])
     assert.equal(Chat.backsSend(a), true, a);
   for (const a of ["GMAIL_FETCH_EMAILS", "GMAIL_LIST_THREADS", "gmail_find_email", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_MARK_AS_READ", "gmail_mark_email_as_read", "GMAIL_ADD_LABEL_TO_EMAIL", "GMAIL_MODIFY_THREAD_LABELS", "SLACK_LIST_MESSAGES", "read_messages", ""])
     assert.equal(Chat.backsSend(a), false, a);
@@ -529,6 +529,7 @@ await check("backsSend(): any write that ran backs 'sent', unless it's clearly a
     "NOTION_QUERY_DATABASE", "SUPABASE_QUERY_TABLE", "GITHUB_GRAPHQL", "SHOPIFY_GRAPHQL_QUERY", "browse", "BROWSERBASE_BROWSE_PAGE",
     "OUTLOOK_DRAFT_REPLY", "OUTLOOK_UPDATE_DRAFT", "GMAIL_DELETE_DRAFT", "zapier_gmail_create_draft",
     "GMAIL_MOVE_TO_TRASH", "OUTLOOK_TRASH_MESSAGE", "GMAIL_UNTRASH_MESSAGE", "COMPOSIO_MANAGE_CONNECTIONS", "send_status", "GET_SEND_STATUS",
+    "gmail_find_email", "outlook_get_email", "SEARCH_EMAIL_THREADS",
   ])
     assert.equal(Chat.backsSend(a), false, a);
 });
