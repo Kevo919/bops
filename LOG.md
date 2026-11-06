@@ -186,3 +186,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 01:31 lead: merged #102 (AgentPhone calls/texts) at 5ac8a0c after 3 review rounds, CI green. The VPS auto-update picks it up within 15 min.
 - 01:54 lead: merged #103 (#100/#101 follow-ups) after review + nit fixes, CI green. Found #90/#95 self-merged by zai at 21:56/22:10 before re-review; post-merge review running.
 - 02:09 lead: post-merge review of zai's self-merged #90/#95: no crash, but follow-ups remain plus a new '&apos;' bug on the Login form. Fixes moved to lead builders (#104 covers wording; a new memory-classifier PR is in progress). zai told it may not merge.
+- 02:30 lead: #105 (usage refs for every kind, tasks 70+72) independent review = APPROVE WITH NITS, 359/359; merge-when-green running; nits are task 76. #104 changes requested (must also fix the three live #95 wording bugs). #106 (memory classifier) in review.
