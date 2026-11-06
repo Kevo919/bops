@@ -16,8 +16,8 @@
 // - only this turn's own sends back its claim (turn-deeds.ts): two bots in the same moment, A sends and B says it sent,
 //   B gets the note and A doesn't;
 // - an app's read (Zapier gmail_find_email) or a write that only marks (mark as read) never backs "I sent the email";
-//   only an action that sends does (sendsOut), including one Zapier's execute_zapier_write_action names and a slug
-//   Composio's COMPOSIO_MULTI_EXECUTE_TOOL runs;
+//   any other write that ran does (backsSend): Zapier's execute_zapier_write_action always, its read action never, and a
+//   slug Composio's COMPOSIO_MULTI_EXECUTE_TOOL runs unless it's a read, a mark or a draft;
 // - notes that only say what didn't happen never become "Done.".
 //
 // OpenAI and OpenRouter are fakes (fetch), sessions.ts is a stand-in that records the tasks started and runs nothing,
@@ -100,6 +100,7 @@ const ZAP_TOOLS = [
   { name: "gmail_find_email", title: "Gmail: Find Email", description: "Finds an email.", inputSchema: { type: "object", properties: { instructions: { type: "string" } } }, annotations: { readOnlyHint: true } },
   { name: "gmail_mark_email_as_read", title: "Gmail: Mark Email as Read", description: "Marks an email read.", inputSchema: { type: "object", properties: { instructions: { type: "string" } } } },
   { name: "gmail_send_email", title: "Gmail: Send Email", description: "Sends an email.", inputSchema: { type: "object", properties: { instructions: { type: "string" }, to: { type: "string" } } } },
+  { name: "execute_zapier_read_action", title: "Run a Zapier read action", description: "Runs a read by its key.", inputSchema: { type: "object", properties: { selected_api: { type: "string" }, action: { type: "string" }, params: { type: "object" } } }, annotations: { readOnlyHint: true } },
   { name: "execute_zapier_write_action", title: "Run a Zapier write action", description: "Runs an action by its key.", inputSchema: { type: "object", properties: { selected_api: { type: "string" }, action: { type: "string" }, params: { type: "object" } } } },
 ];
 /** Composio's For You MCP server: its meta tool runs actions by slug. */
@@ -432,13 +433,14 @@ await check("an app read (Zapier gmail_find_email) or a mark-as-read, then 'I se
   await resumeWith({ name: "zapier_gmail_send_email", arguments: JSON.stringify({ instructions: "send Dana the quote", to: "dana@acme.example" }) }, "once");
   assert.ok(zapCalls.some((c) => c.method === "tools/call" && c.params?.name === "gmail_send_email"), "the send ran");
   assert.equal(lastBot().text, "I've sent the email to Dana.");
-  // Zapier's execute_zapier_write_action: by the action key it names. A send backs the claim; a label doesn't.
+  // Zapier's execute_zapier_write_action always backs it (Gmail's action key is just "message"); its read action never does.
   answers.push(reply("I've sent the email to Dana."));
-  await resumeWith({ name: "zapier_execute_zapier_write_action", arguments: JSON.stringify({ selected_api: "GoogleMailV2CLIAPI", action: "send_email", params: { to: "dana@acme.example" } }) }, "once");
-  assert.ok(zapCalls.some((c) => c.method === "tools/call" && c.params?.name === "execute_zapier_write_action" && c.params?.arguments?.action === "send_email"), "the write action ran");
+  await resumeWith({ name: "zapier_execute_zapier_write_action", arguments: JSON.stringify({ selected_api: "GoogleMailV2CLIAPI", action: "message", params: { to: "dana@acme.example" } }) }, "once");
+  assert.ok(zapCalls.some((c) => c.method === "tools/call" && c.params?.name === "execute_zapier_write_action" && c.params?.arguments?.action === "message"), "the write action ran");
   assert.equal(lastBot().text, "I've sent the email to Dana.");
   answers.push(reply("I've sent the email to Dana."));
-  await resumeWith({ name: "zapier_execute_zapier_write_action", arguments: JSON.stringify({ selected_api: "GoogleMailV2CLIAPI", action: "add_label_to_email", params: {} }) }, "once");
+  await resumeWith({ name: "zapier_execute_zapier_read_action", arguments: JSON.stringify({ selected_api: "GoogleMailV2CLIAPI", action: "message", params: {} }) }, "once");
+  assert.ok(zapCalls.some((c) => c.method === "tools/call" && c.params?.name === "execute_zapier_read_action"), "the read action ran");
   assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
   delete process.env.ZAPIER_MCP_URL;
 });
@@ -457,17 +459,27 @@ await check("Composio For You's multi-execute meta tool: a real GMAIL_SEND_EMAIL
   answers.push(reply("I've sent the email to Dana."));
   await resumeWith({ name: META, arguments: JSON.stringify({ tools: [{ tool_slug: "GMAIL_FETCH_EMAILS", arguments: {} }] }) }, "once");
   assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
-  // A real send through the meta tool, approved and done: backed, no note.
-  answers.push(reply("I've sent the email to Dana."));
-  await resumeWith({ name: META, arguments: JSON.stringify({ tools: [{ tool_slug: "GMAIL_SEND_EMAIL", arguments: { recipient_email: "dana@acme.example", subject: "Quote", body: "Here's the quote." } }] }) }, "once");
-  assert.ok(zapCalls.some((c) => c.host === "connect.composio.dev" && c.method === "tools/call" && c.params?.arguments?.tools?.[0]?.tool_slug === "GMAIL_SEND_EMAIL"), "the send ran");
-  assert.equal(lastBot().text, "I've sent the email to Dana.");
+  // A real send through the meta tool, approved and done: backed, no note. Whatever the slug's wording.
+  for (const slug of ["GMAIL_SEND_EMAIL", "GMAIL_REPLY_TO_THREAD", "SLACK_SENDS_A_MESSAGE_TO_A_SLACK_CHANNEL", "TWITTER_CREATION_OF_A_POST", "MICROSOFT_TEAMS_CHATS_POST_MESSAGE", "LINKEDIN_CREATE_LINKED_IN_POST", "DISCORD_POST_MESSAGE"]) {
+    answers.push(reply("I've sent the email to Dana."));
+    await resumeWith({ name: META, arguments: JSON.stringify({ tools: [{ tool_slug: slug, arguments: { text: "Here's the quote." } }] }) }, "once");
+    assert.ok(zapCalls.some((c) => c.host === "connect.composio.dev" && c.method === "tools/call" && c.params?.arguments?.tools?.[0]?.tool_slug === slug), `${slug} ran`);
+    assert.equal(lastBot().text, "I've sent the email to Dana.", slug);
+  }
+  // Not sends, approved and done: a list, a draft, a mark-read. Each gets the note.
+  for (const slug of ["GMAIL_LIST_THREADS", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_MARK_AS_READ"]) {
+    answers.push(reply("I've sent the email to Dana."));
+    await resumeWith({ name: META, arguments: JSON.stringify({ tools: [{ tool_slug: slug, arguments: {} }] }) }, "once");
+    assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.", slug);
+  }
   delete process.env.COMPOSIO_MCP_URL;
 });
 
-await check("sendsOut(): only an action that sends backs 'sent', never a read, a mark or a draft", () => {
-  for (const a of ["GMAIL_SEND_EMAIL", "GMAIL_SEND_DRAFT", "GMAIL_REPLY_TO_THREAD", "zapier_slack_send_channel_message", "SLACK_CHAT_POST_MESSAGE", "OUTLOOK_FORWARD_MESSAGE", "TWILIO_CREATE_MESSAGE", "mycomposio_GMAIL_SEND_EMAIL", "sendMessage", "slack.chat.postMessage", "SLACK_SENDS_A_MESSAGE_TO_A_SLACK_CHANNEL"]) assert.equal(Chat.sendsOut(a), true, a);
-  for (const a of ["GMAIL_FETCH_EMAILS", "GMAIL_LIST_THREADS", "zapier_gmail_find_email", "GMAIL_MARK_AS_READ", "zapier_gmail_mark_email_as_read", "GMAIL_ADD_LABEL_TO_EMAIL", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_GET_SEND_AS", "SLACK_LIST_MESSAGES", "read_messages", "send_status", "postStatus", "GMAIL_SEND_AS_SETTINGS", "execute_zapier_write_action", "TWILIO_MESSAGE_SEND_HISTORY_EXPORT", ""]) assert.equal(Chat.sendsOut(a), false, a);
+await check("backsSend(): any write that ran backs 'sent', unless it's clearly a read, a mark or a draft", () => {
+  for (const a of ["GMAIL_SEND_EMAIL", "GMAIL_SEND_DRAFT", "GMAIL_REPLY_TO_THREAD", "SLACK_SENDS_A_MESSAGE_TO_A_SLACK_CHANNEL", "TWITTER_CREATION_OF_A_POST", "MICROSOFT_TEAMS_CHATS_POST_MESSAGE", "LINKEDIN_CREATE_LINKED_IN_POST", "DISCORD_POST_MESSAGE", "message", "channel_message", "slack_send_channel_message", "sendMessage", "send_status"])
+    assert.equal(Chat.backsSend(a), true, a);
+  for (const a of ["GMAIL_FETCH_EMAILS", "GMAIL_LIST_THREADS", "gmail_find_email", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_MARK_AS_READ", "gmail_mark_email_as_read", "GMAIL_ADD_LABEL_TO_EMAIL", "GMAIL_MODIFY_THREAD_LABELS", "SLACK_LIST_MESSAGES", "read_messages", ""])
+    assert.equal(Chat.backsSend(a), false, a);
 });
 
 await check("a turn whose only notes say what didn't happen: never 'Done.'", async () => {
