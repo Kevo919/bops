@@ -197,3 +197,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 03:34 lead: merged #107 (usage pricing edges).
 - 04:06 lead: #108 (claims per turn, task 66) re-review = APPROVE WITH NITS (inverted to a read allowlist); merge-when-green running; nits are task 78. #109 (red tests, task 65): reviewer found the code sound but a plan.ts conflict with #104; builder resolving.
 - 04:12 lead: merged #108 (claims per turn, task 66) at d1e15b6, CI green.
+- 04:26 lead: merged #109 (pre-existing red tests and their product races, task 65) at fe4ee61, CI green. Cloud work left: tasks 77/78 (builder). PC work queued: task 60, PC rebuild, Codex live queue.
