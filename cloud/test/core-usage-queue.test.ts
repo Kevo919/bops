@@ -147,8 +147,9 @@ test("a use whose write fails is tried again, and is in once the database takes 
     "still waiting to be written, not dropped",
   );
   await failWrites(false);
+  // The row can be seen (another connection) a moment before its writer takes it off the queue.
   await until(
-    async () => (await rowsOf(ref)).length > 0,
+    async () => (await rowsOf(ref)).length > 0 && usageQueueState().pending === 0,
     "the retry to write it",
   );
   assert.equal((await rowsOf(ref)).length, 1);
@@ -615,11 +616,13 @@ test("an image, a transcription and a Jev answer each get a ref before their fir
     "waiting to be written, not dropped",
   );
   await failWrites(false);
+  // The rows can be seen (another connection) a moment before their writers take them off the queue.
   await until(
-    async () => (await Promise.all(refs.map(rowsOf))).every((r) => r.length),
+    async () =>
+      (await Promise.all(refs.map(rowsOf))).every((r) => r.length) &&
+      usageQueueState().pending === 0,
     "the retries to write them",
   );
-  assert.equal(usageQueueState().pending, 0);
   for (const [i, ref] of refs.entries()) {
     const cost = await priced(uses[i], ref);
     assert.ok(cost > 0, `${uses[i].kind} costs something`);
@@ -852,6 +855,43 @@ test("an object whose wait on a delete runs past the lock wait is tried once mor
   }
 });
 
+test("a lookup that fails is tried again with the write, then spooled with the use: never dropped", async () => {
+  const { tokensUse } = await import("../usage.ts");
+  process.env.BOPS_USAGE_SPOOL = spoolPath();
+  Object.assign(usageQueueTiming, { tries: 2, firstRetryMs: 20, maxRetryMs: 50 });
+  const session = `sess_uq_fail_${Date.now()}`;
+  const turn = `turn_uq_fail_${Date.now()}`;
+  await ownObject(alice, "openai", "agent_session", session, "gpt-6.1-sol", "sam");
+  let asked = 0;
+  const said = tokensUse({ input_tokens: 1_000, output_tokens: 100 }, { source: "agent" });
+  keepUse(alice, said, turn, {
+    of: { provider: "openai", objectId: session },
+    run: async () => {
+      asked++;
+      throw new Error("test: lookup refused");
+    },
+  });
+  await until(async () => (await spooled()).some((u) => u.ref === turn), "it to be spooled");
+  assert.equal(asked, 2, "tried with each of its tries");
+  assert.deepEqual(await rowsOf(turn), []);
+  // The replay in this process uses the same lookup: refused again, back on the spool.
+  assert.equal(await replayUsage(), 0);
+  assert.ok((await spooled()).some((u) => u.ref === turn && u.lookup?.objectId === session));
+  assert.equal(asked, 3);
+  // Read back from the spool by another process (no lookup of its own): its session's model and bot.
+  const text = await readFile(spoolPath(), "utf8");
+  await writeFile(spoolPath(), text.replaceAll(/"id":"use_[0-9a-f-]+"/g, (m) => m.replace("use_", "use_other_")));
+  assert.ok((await replayUsage()) >= 1);
+  const [row] = (
+    await query<{ model: string; bot: string }>(
+      "SELECT detail->>'model' AS model, detail->>'botId' AS bot FROM bops.cloud_usage WHERE user_id = $1 AND detail->>'ref' = $2",
+      [alice, turn],
+    )
+  ).rows;
+  assert.deepEqual(row, { model: "gpt-6.1-sol", bot: "sam" });
+  assert.equal((await rowsOf(turn)).length, 1);
+});
+
 // Last: a stop is for good (no use is retried after it).
 test("a stop waits for writes under way, and spools what isn't in, or logs it whole: none is only lost", async () => {
   process.env.BOPS_USAGE_SPOOL = spoolPath();
@@ -935,3 +975,60 @@ test("a use parked in memory stays parked while a replay is still writing it, so
   );
   assert.equal(usageQueueState().parked, 0);
 });
+
+test("a turn whose session lookup is still under way at a stop is spooled with its session, and a replay looks it up: written once, at the session's model", async () => {
+  const { tokensUse } = await import("../usage.ts");
+  const { costOf } = await import("../pricing.ts");
+  process.env.BOPS_USAGE_SPOOL = spoolPath();
+  Object.assign(usageQueueTiming, { tries: 3, firstRetryMs: 20, maxRetryMs: 50 });
+  const session = `sess_uq_late_${Date.now()}`;
+  const turn = `turn_uq_late_${Date.now()}`;
+  await ownObject(alice, "openai", "agent_session", session, "gpt-6-luna", "sam");
+  // The proxy's own lookup (turnInfo), here one that answers only after the stop.
+  let answer!: (v: { model?: string; botId?: string }) => void;
+  const late = new Promise<{ model?: string; botId?: string }>((r) => (answer = r));
+  const said = tokensUse(
+    { input_tokens: 1_000, output_tokens: 100, input_tokens_details: { cached_tokens: 0 } },
+    { source: "agent" },
+  );
+  assert.equal(
+    keepUse(alice, said, turn, {
+      of: { provider: "openai", objectId: session },
+      run: () => late,
+    }),
+    turn,
+  );
+  assert.equal(usageQueueState().pending, 1, "queued before the lookup answers");
+  const t0 = Date.now();
+  assert.ok((await drainUsage(200)) >= 1);
+  assert.ok(Date.now() - t0 < 1_500, `bounded by the drain's wait: ${Date.now() - t0} ms`);
+  const [line] = (await spooled()).filter((u) => u.ref === turn);
+  assert.ok(line, "on the spool");
+  assert.deepEqual(line.lookup, { provider: "openai", objectId: session }, "with its session, still to look up");
+  assert.equal(line.detail.model, undefined);
+  // The lookup answers after the stop: that writer leaves it to the spool.
+  answer({ model: "gpt-6-luna", botId: "sam" });
+  await new Promise((r) => setTimeout(r, 200));
+  assert.deepEqual(await rowsOf(turn), [], "not written by the late lookup: the spool has it");
+  // The replay (as the next start's) looks the session up itself.
+  const text = await readFile(spoolPath(), "utf8");
+  assert.ok((await replayUsage()) >= 1);
+  const dear = costOf("openai.tokens", 1_100, { ...tokens(0), model: "gpt-6-luna", ref: turn });
+  assert.ok(dear < costOf("openai.tokens", 1_100, { source: "agent", input: 1_000, cached: 0, output: 100, ref: turn }), "cheaper than the dearest");
+  const detail = async () =>
+    (
+      await query<{ model: string; bot: string; cost: number }>(
+        "SELECT detail->>'model' AS model, detail->>'botId' AS bot, cost_micros::float8 AS cost FROM bops.cloud_usage WHERE user_id = $1 AND detail->>'ref' = $2",
+        [alice, turn],
+      )
+    ).rows;
+  assert.deepEqual(await detail(), [{ model: "gpt-6-luna", bot: "sam", cost: dear }]);
+  // Replayed again (a replay cut off before it deleted the spool), and seen again by reconcile: paid once.
+  await writeFile(spoolPath(), text);
+  assert.ok((await replayUsage()) >= 1);
+  const { recordUsageFor } = await import("../usage.ts");
+  await recordUsageFor(alice, "openai.tokens", turn, said!.units, { ...said!.detail, model: "gpt-6-luna", botId: "sam" });
+  assert.deepEqual(await detail(), [{ model: "gpt-6-luna", bot: "sam", cost: dear }]);
+  assert.deepEqual(await spooled(), []);
+});
+

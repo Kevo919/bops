@@ -10,6 +10,7 @@ import {
 } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { config } from "./config.ts";
+import { objectInfo } from "./db.ts";
 import { recordUsageFor, type Use } from "./usage.ts";
 
 /**
@@ -32,9 +33,14 @@ import { recordUsageFor, type Use } from "./usage.ts";
  *   replays, and one still not written when the cloud stops is logged whole ("[usage] NOT RECORDED"),
  *   so it can be written by hand. It is never only a warning.
  *
- * Other writes the proxy doesn't wait for (counted in proxy.ts: web searches, a call's seconds, the
- * lookup of a turn's session before its tokens are kept) are tracked here too, so a stop waits for
- * them (drainUsage), though they aren't retried: an agent turn's are read back by reconcile.ts anyway.
+ * - A use whose model and bot are still to be looked up (an agent turn's, from its session: `lookup`)
+ *   is queued before the lookup, and the lookup is the first step of its write: tried again with it,
+ *   and kept with it on the spool, so a replay (in this process or the next) looks it up itself
+ *   (db.ts objectInfo). A stop while the lookup is under way spools the use as it is: never lost.
+ *
+ * Other writes the proxy doesn't wait for (counted in proxy.ts: web searches, a call's seconds) are
+ * tracked here too, so a stop waits for them (drainUsage), though they aren't retried: an agent's web
+ * searches are read back by reconcile.ts anyway.
  */
 
 export type QueuedUse = {
@@ -47,7 +53,22 @@ export type QueuedUse = {
   units: number;
   detail: Record<string, unknown>;
   at: number;
+  /** The object whose model and bot (db.ts objectInfo) go in the detail before it's written; gone once looked up. */
+  lookup?: UseLookup;
 };
+
+/** An object the cloud keeps (bops.cloud_objects): an agent turn's session. */
+export type UseLookup = { provider: string; objectId: string };
+
+/** What a lookup found: the model when the detail has none, and the bot when one is known. */
+type LookedUp = { model?: string | null; botId?: string | null };
+
+/**
+ * This process's own way to look a use up (proxy.ts turnInfo, which knows what the call asked for), by
+ * the use's id. A use without one here (replayed from the spool by another process, or after a restart)
+ * is looked up with objectInfo.
+ */
+const lookups = new Map<string, () => Promise<LookedUp>>();
 
 /** Tests shorten them. */
 export const usageQueueTiming = {
@@ -87,6 +108,7 @@ export function keepUsage(
   units: number,
   detail: Record<string, unknown> = {},
   ref?: string,
+  lookup?: { of: UseLookup; run?: () => Promise<LookedUp> },
 ): string {
   const id = `use_${randomUUID()}`;
   const use: QueuedUse = {
@@ -97,7 +119,9 @@ export function keepUsage(
     units,
     detail,
     at: Date.now(),
+    ...(lookup ? { lookup: lookup.of } : {}),
   };
+  if (lookup?.run) lookups.set(id, lookup.run);
   pending.set(use.id, use);
   void track(writeWithRetries(use));
   return use.ref;
@@ -108,19 +132,45 @@ export function keepUse(
   userId: string,
   use: Use | null,
   ref?: string,
+  lookup?: { of: UseLookup; run?: () => Promise<LookedUp> },
 ): string | undefined {
   return use
-    ? keepUsage(userId, use.kind, use.units, use.detail, ref)
+    ? keepUsage(userId, use.kind, use.units, use.detail, ref, lookup)
     : undefined;
 }
 
-const write = (u: QueuedUse) =>
-  recordUsageFor(u.userId, u.kind, u.ref, u.units, u.detail);
+/**
+ * Fill in a use's model and bot from its lookup, if it has one still to do: the model only when the
+ * detail has none, the bot when the lookup knows it. Done in place, all at once, so the use is either
+ * still to look up or looked up, wherever it's spooled from.
+ */
+async function lookUp(u: QueuedUse) {
+  const of = u.lookup;
+  if (!of) return;
+  const run = lookups.get(u.id) ?? (() => objectInfo(of.provider, of.objectId));
+  const found = await run();
+  if (!u.lookup) return; // looked up meanwhile (a replay of the same use)
+  const detail = { ...u.detail };
+  if (typeof detail.model !== "string" && typeof found.model === "string")
+    detail.model = found.model;
+  if (typeof found.botId === "string" && found.botId) detail.botId = found.botId;
+  u.detail = detail;
+  delete u.lookup;
+  lookups.delete(u.id);
+}
+
+/** Look the use up (if it's to be), then write it, unless `still` says it's no longer this writer's (spooled by a stop meanwhile). Whether it was written. */
+async function write(u: QueuedUse, still: () => boolean = () => true) {
+  await lookUp(u);
+  if (!still()) return false;
+  await recordUsageFor(u.userId, u.kind, u.ref, u.units, u.detail);
+  return true;
+}
 
 async function writeWithRetries(use: QueuedUse) {
   for (let i = 1; ; i++) {
     try {
-      await write(use);
+      if (!(await write(use, () => pending.has(use.id)))) return;
       pending.delete(use.id);
       return;
     } catch (e) {
@@ -243,7 +293,11 @@ const isUse = (x: unknown): x is QueuedUse => {
     (u.id === undefined || typeof u.id === "string") &&
     typeof u.userId === "string" &&
     typeof u.kind === "string" &&
-    typeof u.units === "number"
+    typeof u.units === "number" &&
+    (u.lookup === undefined ||
+      (!!u.lookup &&
+        typeof u.lookup.provider === "string" &&
+        typeof u.lookup.objectId === "string"))
   );
 };
 

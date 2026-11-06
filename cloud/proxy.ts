@@ -471,11 +471,27 @@ async function turnInfo(call: Call, session: string | undefined): Promise<{ mode
 
 /**
  * A finished agent turn's tokens, at its session's model, for its session's bot: kept (retried,
- * spooled) under the turn's id once the session is looked up. A lookup that fails drops this sighting
- * only: reconcile.ts reads the turn back.
+ * spooled) under the turn's id at once, before the session is looked up. When the call doesn't know
+ * the session's model and bot yet, the lookup (turnInfo) is the first step of the use's write
+ * (usage-queue.ts), so a lookup that fails is tried again with it, and a stop while it's under way
+ * spools the use with its session, for the replay to look up: never lost.
  */
-const turnTokens = (call: Call, session: string | undefined, turn: string, usage: unknown) =>
-  counted(turnInfo(call, session).then(({ model, botId }) => keepUse(call.user.id, tokensUse(usage, { model, source: "agent", botId }), turn)));
+function turnTokens(call: Call, session: string | undefined, turn: string, usage: unknown) {
+  const asked = modelAsked(call);
+  if ((call.model !== undefined && call.sessionBot !== undefined) || !session) {
+    // Known already, or no session to look up: what turnInfo answers then, without a read.
+    const model = call.model !== undefined ? call.model : (asked ?? null);
+    const botId = call.sessionBot !== undefined ? call.sessionBot : asked ? (call.bot ?? null) : null;
+    keepUse(call.user.id, tokensUse(usage, { model: model ?? undefined, source: "agent", botId: botId ?? undefined }), turn);
+    return;
+  }
+  // Until it's looked up, what turnInfo falls back to when the session's row says nothing: the model
+  // asked for, and with it the call's bot (the lookup's model fills in only when there's none; its bot wins).
+  keepUse(call.user.id, tokensUse(usage, { model: asked, source: "agent", botId: asked ? call.bot : undefined }), turn, {
+    of: { provider: "openai", objectId: session },
+    run: () => turnInfo(call, session),
+  });
+}
 
 /** A web search the agent ran (a web_search_call item, seen in a session's stream or a list of its items), for the session's bot (usage.ts recordWebSearch). */
 async function countWebSearch(call: Call, session: string | undefined, item: unknown) {
