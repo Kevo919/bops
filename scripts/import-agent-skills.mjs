@@ -4,7 +4,7 @@
 // they land where the Skills screen lists them. A draft is inert: no bot sees it until the owner
 // publishes it (skillsFor lists published ones only), and none is given to a bot here.
 //
-//   node scripts/import-agent-skills.mjs [--app PATH] [--user ID] [--limit N] [--label L] [--dir PATH]... [--dry] [--force]
+//   node scripts/import-agent-skills.mjs [--app PATH] [--user ID] [--limit N] [--label L] [--dir PATH]... [--dry]
 //
 //   --app PATH  the Bops folder that holds .data (default: the current folder)
 //   --user ID   the Orgo user whose state to add them to (.data/users/<id>/state.json); default the
@@ -13,11 +13,15 @@
 //   --label L   the label to file them under (default "From Claude")
 //   --dir PATH  a skills root to read (repeatable; default ~/.claude/skills then ~/.agents/skills)
 //   --dry       list what would be imported, import nothing
-//   --force     import even though a Bops server answers on this computer (its next save would undo it)
 //
 // Only for a self-hosted install (BOPS_SELF_HOSTED=1: the state in files under .data). The desktop app
 // signed in with Orgo keeps its state in Bops Cloud: there, use Skills, Import from folder, in the app.
 // Close Bops first: a running server holds the state in memory and its next save would undo the import.
+// So the run is refused while Bops answers (its port, from PORT or .env.local, on 127.0.0.1, ::1,
+// localhost and the HOST/HOSTNAME it's set to listen on), and checked again right before the state is
+// saved: if Bops started meanwhile, nothing is saved and the folders this run wrote are taken away again.
+// A skill folder already on disk is never written over (createSkill's writeTree replaces the folder at
+// its slug): one whose slug folder is there, listed or not, is imported under the next free slug.
 //
 // What's read, and what never is: a skill folder's own regular files only. Symlinks (to a file or a
 // folder, inside or out) are skipped, and every file's real path is checked to be inside its skill
@@ -27,7 +31,8 @@
 // scanSecrets) flags is skipped by content. Binary files are skipped. Collisions: a slug already in the
 // workspace is skipped; ~/.claude wins over ~/.agents/skills when both hold the same folder name.
 // Tested by scripts/test-import-agent-skills.mjs.
-import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { registerHooks } from "node:module";
@@ -39,7 +44,6 @@ const flag = (name, dflt) => {
   return i >= 0 && i + 1 < args.length ? args[i + 1] : dflt;
 };
 const dry = args.includes("--dry");
-const force = args.includes("--force");
 const LIMIT = Number(flag("limit", "20"));
 const LABEL = flag("label", "From Claude");
 const USER = flag("user", "");
@@ -79,13 +83,21 @@ const scope = (id) => id.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80) || "_";
 const stateFile = USER ? join(APP, ".data", "users", scope(USER), "state.json") : join(APP, ".data", "state.json");
 if (!existsSync(stateFile)) fail(`No Bops state at ${stateFile}. Run it from the Bops folder (or pass --app), with --user for a signed-in Orgo user's state.`);
 
-const port = process.env.PORT || appEnv.PORT || "3210";
-if (!dry && !force) {
-  const up = await fetch(`http://127.0.0.1:${port}/api/health`, { signal: AbortSignal.timeout(1500) }).then(
-    () => true,
-    () => false,
-  );
-  if (up) fail(`Bops is running on port ${port}: close it first (its next save would undo the import), or pass --force.`);
+const port = Number(process.env.PORT || appEnv.PORT || "3210");
+// Every address the server could be reached at here: loopback both ways, and the host it's told to listen on.
+const hosts = [...new Set(["127.0.0.1", "::1", "localhost", ...[process.env.HOST, appEnv.HOST, appEnv.HOSTNAME].filter((h) => h && h !== "0.0.0.0" && h !== "::")])];
+/**
+ * Whether a Bops server is listening here: a TCP connect to each host at its port. Synchronous (a child
+ * process), so no background save of this run's state can slip in while it's asked.
+ */
+function bopsRunning() {
+  const probe = `const net=require("node:net");const [port,...hosts]=JSON.parse(process.argv[1]);let left=hosts.length;const done=(w)=>{if(w){process.stdout.write(w);process.exit(0)}if(--left===0)process.exit(0)};for(const h of hosts){const s=net.connect({host:h,port});s.setTimeout(800);s.on("connect",()=>done(h+":"+port));s.on("timeout",()=>{s.destroy();done()});s.on("error",()=>done())}`;
+  const r = spawnSync(process.execPath, ["-e", probe, JSON.stringify([port, ...hosts])], { encoding: "utf8", timeout: 5000, windowsHide: true });
+  return r.stdout.trim() || null;
+}
+if (!dry) {
+  const up = bopsRunning();
+  if (up) fail(`Bops is running (it answers at ${up}): close it first, then import. Its next save would undo the import.`);
 }
 
 /* ---------------- The app's own modules, against this install's state (lib/server/persist.ts fileStore) ---------------- */
@@ -272,6 +284,16 @@ for (const n of notTaken) console.log(`  not taken: ${n}`);
 const SPEC_KEYS = ["license", "compatibility", "metadata", "allowed-tools"];
 let imported = 0;
 const failed = [];
+/** The folders this run wrote, with the SKILL.md it wrote there: taken away again if the state can't be saved. */
+const made = [];
+/** A slug free in the list and on disk: a folder already there (another skill's, or one left behind) is never written over. */
+const onDisk = (slug) => !!lstatSync(WS.skillDir(wsId, "skill", slug), { throwIfNoEntry: false });
+const listed = new Set(WS.refsOf(wsId).map((r) => r.slug));
+const freeSlugFor = (base) => {
+  let slug = base;
+  for (let n = 2; listed.has(slug) || onDisk(slug); n++) slug = `${base.slice(0, B.BUNDLE_LIMITS.slug - String(n).length - 1)}-${n}`;
+  return slug;
+};
 for (const c of take.slice(0, LIMIT)) {
   const skipped = [];
   const files = filesOf(c.dir, skipped);
@@ -282,26 +304,53 @@ for (const c of take.slice(0, LIMIT)) {
     continue;
   }
   const extra = Object.fromEntries(SPEC_KEYS.filter((k) => c.frontmatter[k] !== undefined).map((k) => [k, c.frontmatter[k]]));
-  if (slugOf(c) === c.frontmatter.name) extra.name = c.frontmatter.name;
+  // The slug, chosen here and given as the frontmatter's name (createSkill keeps a valid one): free in the list and on disk.
+  const slug = freeSlugFor(slugOf(c));
+  if (slug !== slugOf(c)) console.log(`  ${c.name}: a folder for ${slugOf(c)} is already there; importing it as ${slug} instead`);
+  extra.name = slug;
   // body is SKILL.md without its frontmatter: createSkill writes the one frontmatter block itself.
   const input = { name: c.name, description: c.description.slice(0, B.BUNDLE_LIMITS.description), body: c.body, label: LABEL, files, source: "import", status: "draft" };
   try {
-    let made;
+    let result;
     try {
-      made = WS.createSkill(wsId, { ...input, frontmatter: extra });
+      if (onDisk(slug)) throw new Error(`a folder for ${slug} appeared meanwhile; not written over`);
+      result = WS.createSkill(wsId, { ...input, frontmatter: extra });
     } catch (e) {
       // A field the app won't keep in that form (metadata that isn't strings): the skill without it.
       if (!(e instanceof WS.SkillError) || !/frontmatter/i.test(e.message)) throw e;
-      made = WS.createSkill(wsId, { ...input, frontmatter: extra.name ? { name: extra.name } : {} });
+      result = WS.createSkill(wsId, { ...input, frontmatter: { name: slug } });
     }
+    const dir = WS.skillDir(wsId, "skill", result.ref.slug);
+    made.push({ dir, skillMd: readFileSync(join(dir, "SKILL.md"), "utf8") });
+    listed.add(result.ref.slug);
     imported++;
-    console.log(`  imported (draft): ${c.name} -> ${made.ref.slug} (${files.length} files${skippedNote})`);
+    console.log(`  imported (draft): ${c.name} -> ${result.ref.slug} (${files.length} files${skippedNote})`);
   } catch (e) {
     const detail = e.problems?.length ? ` (${e.problems.slice(0, 3).map((p) => `${p.path}${p.line ? `:${p.line}` : ""} ${p.reason}`).join("; ")})` : "";
     failed.push(`${c.name}: ${e.message}${detail}`);
   }
 }
-if (!dry && imported && !(await S.flushState(10_000))) failed.push("the state didn't finish saving");
+if (!dry && imported) {
+  // Test-only: hold here (synchronously, so no background save runs) for a test to start a server.
+  const hold = Number(process.env.BOPS_IMPORT_TEST_HOLD_MS || 0);
+  if (hold > 0) {
+    console.log("holding before the save");
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, hold);
+  }
+  // Bops started while this ran: it loaded the state from before, and its next save would drop these drafts and
+  // leave their folders behind. Nothing is saved, and the folders this run wrote (still as it wrote them) go.
+  const up = bopsRunning();
+  if (up) {
+    for (const m of made)
+      try {
+        if (readFileSync(join(m.dir, "SKILL.md"), "utf8") === m.skillMd) rmSync(m.dir, { recursive: true, force: true });
+      } catch {}
+    console.error(`Bops started while importing (it answers at ${up}): nothing was saved, and the ${made.length} folders this run wrote were taken away. Close Bops and run it again.`);
+    // Out now, before the store's background save can run.
+    process.exit(3);
+  }
+  if (!(await S.flushState(10_000))) failed.push("the state didn't finish saving");
+}
 console.log(`Done: ${imported} ${dry ? "would be imported" : "imported"}${failed.length ? `; not imported ${failed.length} (${failed.slice(0, 5).join("; ")})` : ""}.`);
 if (!dry && imported) console.log(`Start Bops and open Skills: they're drafts under ${LABEL}. Publish the ones you want your bots to see.`);
 // The app's modules start timers of their own; the state is saved, so this run is done.

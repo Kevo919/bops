@@ -155,19 +155,51 @@ try {
     assert.match(r.stdout, /Done: 0 imported\./);
   });
 
-  await test("refused while Bops is running (its save would undo the import), and for a Bops Cloud install", async () => {
-    const server = createServer((_, res) => res.end("{}"));
-    await new Promise((r) => server.listen(0, "127.0.0.1", r));
-    const port = String(server.address().port);
-    const r = await new Promise((resolve) => {
-      const child = spawn(process.execPath, [script, "--app", app, "--dir", skills], { env: { ...process.env, PORT: port, BOPS_SELF_HOSTED: "" } });
+  // A run that keeps going while the test does (spawnSync would hold this process's servers too).
+  const runAsync = (appDir, env = {}, onOut = () => {}) =>
+    new Promise((resolve) => {
+      const { PORT: _p, ...rest } = process.env;
+      void _p;
+      const child = spawn(process.execPath, [script, "--app", appDir, "--dir", skills], { env: { ...rest, BOPS_SELF_HOSTED: "", ...env } });
+      let out = "";
       let err = "";
+      child.stdout.on("data", (d) => {
+        out += d;
+        onOut(out);
+      });
       child.stderr.on("data", (d) => (err += d));
-      child.on("close", (status) => resolve({ status, err }));
+      child.on("close", (status) => resolve({ status, out, err }));
     });
-    server.close();
-    assert.equal(r.status, 1);
-    assert.match(r.err, /Bops is running on port/);
+  const freshApp = (name, envLocal = "BOPS_SELF_HOSTED=1\n") => {
+    const dir = join(base, name);
+    mkdirSync(join(dir, ".data"), { recursive: true });
+    writeFileSync(join(dir, ".env.local"), envLocal);
+    writeFileSync(join(dir, ".data", "state.json"), "{}");
+    return dir;
+  };
+  const listen = (host, port = 0) =>
+    new Promise((resolve, reject) => {
+      const server = createServer((_, res) => res.end("{}"));
+      server.once("error", reject);
+      server.listen(port, host, () => resolve(server));
+    });
+
+  await test("refused while Bops is running: its port from PORT on 127.0.0.1, from .env.local on ::1, and for a Bops Cloud install", async () => {
+    const v4 = await listen("127.0.0.1");
+    const r = await runAsync(app, { PORT: String(v4.address().port) });
+    v4.close();
+    assert.equal(r.status, 1, r.out + r.err);
+    assert.match(r.err, /Bops is running \(it answers at 127\.0\.0\.1:\d+\)/);
+    // The port from .env.local (no PORT in the environment), on ::1 where this machine has it, else 127.0.0.1.
+    const v6 = await listen("::1").catch(() => null);
+    const there = v6 ?? (await listen("127.0.0.1"));
+    const six = freshApp("six", `BOPS_SELF_HOSTED=1\nPORT=${there.address().port}\n`);
+    const r6 = await runAsync(six);
+    there.close();
+    assert.equal(r6.status, 1, r6.out + r6.err);
+    assert.match(r6.err, v6 ? /answers at ::1:\d+/ : /answers at 127\.0\.0\.1:\d+/);
+    assert.deepEqual(JSON.parse(readFileSync(join(six, ".data", "state.json"), "utf8")), {});
+    if (!v6) console.log("  (no IPv6 loopback here: .env.local's port checked on 127.0.0.1)");
     const cloud = join(base, "cloud");
     mkdirSync(join(cloud, ".data"), { recursive: true });
     writeFileSync(join(cloud, ".data", "state.json"), "{}");
@@ -175,6 +207,43 @@ try {
     assert.equal(c.status, 1);
     assert.match(c.stderr, /isn't a self-hosted Bops/);
     assert.ok(!existsSync(join(cloud, ".data", "workspaces")));
+  });
+
+  await test("a slug folder already on disk (another skill's, or left behind) is never written over: the next free slug", async () => {
+    const two = freshApp("two");
+    const theirs = join(two, ".data", "workspaces", "ws_main", "skills", "normal");
+    mkdirSync(theirs, { recursive: true });
+    writeFileSync(join(theirs, "SKILL.md"), "SERVER MADE THIS\n");
+    const r = await runAsync(two, { PORT: "1" });
+    assert.equal(r.status, 0, r.out + r.err);
+    assert.match(r.out, /a folder for normal is already there; importing it as normal-2 instead/);
+    assert.equal(readFileSync(join(theirs, "SKILL.md"), "utf8"), "SERVER MADE THIS\n", "the folder there is untouched");
+    const md = readFileSync(join(two, ".data", "workspaces", "ws_main", "skills", "normal-2", "SKILL.md"), "utf8");
+    assert.match(md, /^---\nname: normal-2\n/);
+    assert.match(md, /# Normal/);
+    const refs = JSON.parse(readFileSync(join(two, ".data", "state.json"), "utf8")).workspaces[0].skills;
+    assert.deepEqual(refs.map((x) => x.slug).sort(), ["literal", "normal-2"]);
+  });
+
+  await test("Bops started mid-run: nothing saved, and only the folders this run wrote are taken away", async () => {
+    const three = freshApp("three");
+    const keep = join(three, ".data", "workspaces", "ws_main", "skills", "keep");
+    mkdirSync(keep, { recursive: true });
+    writeFileSync(join(keep, "SKILL.md"), "KEEP\n");
+    const probe = await listen("127.0.0.1");
+    const port = probe.address().port;
+    await new Promise((r) => probe.close(r));
+    let server = null;
+    const r = await runAsync(three, { PORT: String(port), BOPS_IMPORT_TEST_HOLD_MS: "8000" }, (out) => {
+      if (!server && out.includes("holding before the save")) server = listen("127.0.0.1", port);
+    });
+    assert.ok(server, "the run reached the save");
+    (await server).close();
+    assert.equal(r.status, 3, r.out + r.err);
+    assert.match(r.err, /Bops started while importing .*nothing was saved, and the 2 folders this run wrote were taken away/);
+    assert.deepEqual(JSON.parse(readFileSync(join(three, ".data", "state.json"), "utf8")), {}, "the state is as it was");
+    assert.deepEqual(readdirSync(join(three, ".data", "workspaces", "ws_main", "skills")), ["keep"], "no orphan folders");
+    assert.equal(readFileSync(join(keep, "SKILL.md"), "utf8"), "KEEP\n");
   });
 
   await test("the Skills screen's route lists them under From Claude, and no bot sees a draft", async () => {
