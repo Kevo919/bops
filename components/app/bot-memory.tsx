@@ -212,7 +212,8 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
       ) : data.unreachable ? (
         <Quiet>Can&rsquo;t reach the memory service right now. It&rsquo;s set up, but it didn&rsquo;t answer &mdash; try again in a moment.</Quiet>
       ) : data.error ? (
-        <Quiet>{data.error}</Quiet>
+        // The route's 500 (a code bug, not an outage): plain words, never its raw message.
+        <Quiet>Memory couldn&rsquo;t load. Try again, and if it keeps happening tell us.</Quiet>
       ) : (
         <>
           <Section title="About you">{data.card.length ? <ContactCard ws={data.ws} lines={data.card} onChange={reload} /> : <Quiet>Nothing yet. Tell {b.name} about yourself, or pin what it learns.</Quiet>}</Section>

@@ -67,6 +67,10 @@ jobs:
         run: node scripts/test-executor-lifecycle.mjs
       - name: Agents API Windows path serialization tests
         run: node scripts/test-agent-api-path.mjs
+      - name: Phone pairing (Your phone) tests
+        run: node scripts/test-easy-pairing.mjs
+      - name: Agent Skill folder import tests
+        run: node scripts/test-import-agent-skills.mjs
       - name: Host computer identity tests
         run: |
           node scripts/test-computer-identity.mjs win32
@@ -82,6 +86,8 @@ jobs:
         run: node --conditions=react-server scripts/test-composio-for-you.mjs
       - name: Services screen tests (service keys pasted in Settings)
         run: node --conditions=react-server scripts/test-service-keys.mjs
+      - name: AgentPhone calls and texts tests (place_call, send_text, a stub AgentPhone)
+        run: node --conditions=react-server scripts/test-agentphone-calls.mjs
       - name: Chat provider tests
         run: node --conditions=react-server scripts/test-chat-providers.mjs
       - name: Key check tests
@@ -142,6 +148,8 @@ jobs:
         run: node scripts/test-mobile-layout.mjs
       - name: Windows wording on the screens (no Mac words on a PC, scripts/test-windows-wording.mjs)
         run: node scripts/test-windows-wording.mjs
+      - name: AgentPhone panel in Settings, Services (light and dark)
+        run: node scripts/test-agentphone-services-ui.mjs
 
   android:
     if: github.repository != 'OrgoAI/bops'

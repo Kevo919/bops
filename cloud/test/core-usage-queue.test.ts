@@ -26,6 +26,7 @@ import {
 import {
   drainUsage,
   keepUsage,
+  keepUse,
   readSpool,
   spoolHooks,
   spoolTiming,
@@ -555,6 +556,256 @@ test("a retry after the price changed charges nothing; growth then pays only wha
   // Grown to 3 segments: paid up to what 3 cost today, less what was paid.
   await recordUsageFor(alice, "agentphone.sms", ref, 3, { direction: "out" });
   assert.deepEqual(await rowsOf(ref), [{ units: 3, cost: (cost / 2) * 3 }]);
+});
+
+/* Tokens, images, transcriptions and Jev answers through the queue (proxy.ts keepUse): each with its ref before its first write. */
+
+/** The uses the proxy keeps for an image, a transcription and a Jev answer (usage.ts imagesUse, transcriptionUse, jevUse). */
+async function otherUses() {
+  const { imagesUse, jevUse, transcriptionUse } = await import("../usage.ts");
+  return [
+    imagesUse(
+      {
+        usage: {
+          input_tokens: 300,
+          output_tokens: 1_000,
+          input_tokens_details: { text_tokens: 50, image_tokens: 250 },
+        },
+      },
+      { model: "gpt-image-2.5-flare", botId: "sam" },
+    )!,
+    transcriptionUse(
+      { usage: { type: "duration", seconds: 12 } },
+      { model: "gpt-transcribe", botId: "sam" },
+    )!,
+    jevUse(
+      { model: "jev-1.13.0", usage: { input_tokens: 1_200, output_tokens: 3 } },
+      0,
+      { botId: "sam" },
+    ),
+  ];
+}
+
+/** What a use costs, priced as recordUsageFor prices it (with its ref in its detail). */
+const priced = async (
+  u: { kind: string; units: number; detail: Record<string, unknown> },
+  ref: string,
+) => {
+  const { costOf } = await import("../pricing.ts");
+  return costOf(u.kind, u.units, { ...u.detail, ref });
+};
+
+test("an image, a transcription and a Jev answer each get a ref before their first write; a refused write is tried again and lands once", async () => {
+  delete process.env.BOPS_USAGE_SPOOL;
+  Object.assign(usageQueueTiming, {
+    tries: 50,
+    firstRetryMs: 50,
+    maxRetryMs: 100,
+  });
+  const uses = await otherUses();
+  await failWrites(true);
+  const refs = uses.map((u) => keepUse(alice, u)!);
+  assert.equal(new Set(refs).size, 3, "a ref of each one's own");
+  for (const ref of refs) assert.match(ref, /^use_[0-9a-f-]{36}$/);
+  await new Promise((r) => setTimeout(r, 300));
+  for (const ref of refs) assert.deepEqual(await rowsOf(ref), []);
+  assert.equal(
+    usageQueueState().pending,
+    3,
+    "waiting to be written, not dropped",
+  );
+  await failWrites(false);
+  await until(
+    async () => (await Promise.all(refs.map(rowsOf))).every((r) => r.length),
+    "the retries to write them",
+  );
+  assert.equal(usageQueueState().pending, 0);
+  for (const [i, ref] of refs.entries()) {
+    const cost = await priced(uses[i], ref);
+    assert.ok(cost > 0, `${uses[i].kind} costs something`);
+    assert.deepEqual(await rowsOf(ref), [{ units: uses[i].units, cost }]);
+  }
+});
+
+test("an image, a transcription and a Jev answer survive the spool, and replayed twice are paid once", async () => {
+  process.env.BOPS_USAGE_SPOOL = spoolPath();
+  Object.assign(usageQueueTiming, {
+    tries: 2,
+    firstRetryMs: 20,
+    maxRetryMs: 50,
+  });
+  const uses = await otherUses();
+  await failWrites(true);
+  const refs = uses.map((u) => keepUse(alice, u)!);
+  await until(async () => {
+    const on = (await spooled()).map((u) => u.ref);
+    return refs.every((r) => on.includes(r));
+  }, "them to be spooled");
+  assert.equal(usageQueueState().pending, 0);
+  // What's on the spool, as it was: written again after the replay below, as a replay cut off after
+  // its writes (before it deleted the file) would leave it for the next start.
+  const text = await readFile(spoolPath(), "utf8");
+  const lines = readSpool(text).uses.filter((u) => refs.includes(u.ref));
+  const byRef = (a: unknown[], b: unknown[]) =>
+    String(a[0]).localeCompare(String(b[0]));
+  assert.deepEqual(
+    lines.map((u) => [u.ref, u.kind, u.units]).sort(byRef),
+    refs.map((r, i) => [r, uses[i].kind, uses[i].units]).sort(byRef),
+    "each with its ref, made before its first write",
+  );
+  await failWrites(false);
+  // At least these three (another test's use still on the spool is written too).
+  assert.ok((await replayUsage()) >= 3);
+  assert.deepEqual(await spooled(), []);
+  await writeFile(spoolPath(), text);
+  assert.ok((await replayUsage()) >= 3, "written again…");
+  assert.deepEqual(await spooled(), []);
+  for (const [i, ref] of refs.entries())
+    assert.deepEqual(
+      await rowsOf(ref),
+      [{ units: uses[i].units, cost: await priced(uses[i], ref) }],
+      "…and still one row, paid once",
+    );
+});
+
+test("a turn's tokens are kept under the turn's id: sightings refused, then spooled and replayed, pay the dearest once", async () => {
+  const { tokensUse } = await import("../usage.ts");
+  const { costOf } = await import("../pricing.ts");
+  process.env.BOPS_USAGE_SPOOL = spoolPath();
+  Object.assign(usageQueueTiming, {
+    tries: 2,
+    firstRetryMs: 20,
+    maxRetryMs: 50,
+  });
+  const turn = `turn_uq_${Date.now()}`;
+  const said = (cached: number) =>
+    tokensUse(
+      {
+        input_tokens: 1_000,
+        output_tokens: 100,
+        input_tokens_details: { cached_tokens: cached },
+      },
+      { model: "gpt-6.1-sol", source: "agent" },
+    );
+  await failWrites(true);
+  // The event first said 900 cached; the turn's read says none (dearer), at the same count.
+  assert.equal(keepUse(alice, said(900), turn), turn);
+  assert.equal(keepUse(alice, said(0), turn), turn);
+  assert.equal(
+    keepUse(alice, tokensUse({}, { source: "agent" }), turn),
+    undefined,
+    "nothing used, nothing kept",
+  );
+  await until(
+    async () => (await spooled()).filter((u) => u.ref === turn).length === 2,
+    "both to be spooled",
+  );
+  await failWrites(false);
+  assert.ok((await replayUsage()) >= 2);
+  assert.ok(!(await spooled()).some((u) => u.ref === turn));
+  await replayUsage();
+  const dear = costOf("openai.tokens", 1_100, { ...tokens(0), ref: turn });
+  assert.deepEqual(await costRow(turn, "openai.tokens"), [
+    { units: 1_100, cost: dear, cached: "0" },
+  ]);
+});
+
+/* Task 72: the same count with dearer detail pays what it costs beyond what was paid. */
+
+test("the same count seen later with dearer detail (B, A, B) pays the difference once: never past the dearest", async () => {
+  const { recordUsageFor } = await import("../usage.ts");
+  const { costOf } = await import("../pricing.ts");
+  const ref = `turn_bab_${Date.now()}`;
+  const a = costOf("openai.tokens", 1_100, { ...tokens(0), ref });
+  const b = costOf("openai.tokens", 1_100, { ...tokens(900), ref });
+  assert.ok(a > b);
+  await recordUsageFor(alice, "openai.tokens", ref, 1_100, tokens(900)); // B
+  assert.deepEqual(await costRow(ref, "openai.tokens"), [
+    { units: 1_100, cost: b, cached: "900" },
+  ]);
+  await recordUsageFor(alice, "openai.tokens", ref, 1_100, tokens(0)); // A: dearer, a − b more
+  assert.deepEqual(await costRow(ref, "openai.tokens"), [
+    { units: 1_100, cost: a, cached: "0" },
+  ]);
+  for (const cached of [900, 0, 900, 0])
+    await recordUsageFor(alice, "openai.tokens", ref, 1_100, tokens(cached));
+  assert.deepEqual(
+    await costRow(ref, "openai.tokens"),
+    [{ units: 1_100, cost: a, cached: "0" }],
+    "swaps after it pay nothing more",
+  );
+  // At once: they take turns, and the dearest is paid once.
+  const t = `turn_bab_once_${Date.now()}`;
+  await Promise.all(
+    [900, 0, 900, 0, 900].map((c) =>
+      recordUsageFor(alice, "openai.tokens", t, 1_100, tokens(c)),
+    ),
+  );
+  assert.deepEqual(
+    (await costRow(t, "openai.tokens")).map((r) => [r.units, r.cost]),
+    [[1_100, costOf("openai.tokens", 1_100, { ...tokens(0), ref: t })]],
+  );
+});
+
+test("dearer detail at a smaller count never pays, and cheaper detail at the same count changes nothing", async () => {
+  const { recordUsageFor } = await import("../usage.ts");
+  const { costOf } = await import("../pricing.ts");
+  const ref = `turn_down_${Date.now()}`;
+  const big = { ...tokens(900), input: 2_000 };
+  await recordUsageFor(alice, "openai.tokens", ref, 2_100, big);
+  const paid = costOf("openai.tokens", 2_100, { ...big, ref });
+  // A smaller count, though its detail costs more than what was paid (all uncached, a dearer model).
+  const dearSmall = { ...tokens(0), model: "gpt-6-astra", input: 2_000 };
+  assert.ok(costOf("openai.tokens", 2_050, { ...dearSmall, ref }) > paid);
+  await recordUsageFor(alice, "openai.tokens", ref, 2_050, dearSmall);
+  assert.deepEqual(await costRow(ref, "openai.tokens"), [
+    { units: 2_100, cost: paid, cached: "900" },
+  ]);
+  // The same count, cheaper (more cached): nothing back, nothing more, the row as it was.
+  await recordUsageFor(alice, "openai.tokens", ref, 2_100, {
+    ...big,
+    cached: 1_900,
+  });
+  assert.deepEqual(await costRow(ref, "openai.tokens"), [
+    { units: 2_100, cost: paid, cached: "900" },
+  ]);
+});
+
+test("the same count whose model became known late pays the dearer model's price, less what was paid", async () => {
+  const { recordUsageFor } = await import("../usage.ts");
+  const { costOf } = await import("../pricing.ts");
+  const ref = `turn_model_${Date.now()}`;
+  const luna = { ...tokens(0), model: "gpt-6-luna" };
+  const astra = { ...tokens(0), model: "gpt-6-astra" };
+  const cheap = costOf("openai.tokens", 1_100, { ...luna, ref });
+  const dear = costOf("openai.tokens", 1_100, { ...astra, ref });
+  assert.ok(dear > cheap);
+  await recordUsageFor(alice, "openai.tokens", ref, 1_100, luna);
+  await recordUsageFor(alice, "openai.tokens", ref, 1_100, astra);
+  const [row] = (
+    await query<{ cost: number; model: string }>(
+      "SELECT cost_micros::float8 AS cost, detail->>'model' AS model FROM bops.cloud_usage WHERE user_id = $1 AND detail->>'ref' = $2",
+      [alice, ref],
+    )
+  ).rows;
+  assert.deepEqual([row.cost, row.model], [dear, "gpt-6-astra"]);
+  // Seen again as first said: nothing back, nothing more.
+  await recordUsageFor(alice, "openai.tokens", ref, 1_100, luna);
+  assert.equal((await rowsOf(ref))[0].cost, dear);
+});
+
+test("the same count seen later without the model the row has (priced as the dearest) pays nothing more", async () => {
+  const { recordUsageFor } = await import("../usage.ts");
+  const { costOf } = await import("../pricing.ts");
+  const ref = `turn_unknown_${Date.now()}`;
+  const sol = tokens(0);
+  const { model: _known, ...unknown } = sol;
+  void _known;
+  const paid = costOf("openai.tokens", 1_100, { ...sol, ref });
+  assert.ok(costOf("openai.tokens", 1_100, { ...unknown, ref }) > paid);
+  await recordUsageFor(alice, "openai.tokens", ref, 1_100, sol);
+  await recordUsageFor(alice, "openai.tokens", ref, 1_100, unknown);
+  assert.deepEqual(await rowsOf(ref), [{ units: 1_100, cost: paid }]);
 });
 
 test("an object whose wait on a delete runs past the lock wait is tried once more, then logged whole for cleanup", async () => {

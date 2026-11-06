@@ -264,6 +264,25 @@ test("use seen more than once is paid once: only what it costs beyond what was p
   assert.equal(await creditLeft(u), 1_000_000 - 50_000);
 });
 
+test("the same count seen later with dearer detail takes only the difference from the credit, once; swaps and smaller counts take nothing", async () => {
+  const u = await newUser();
+  await setCredit(u, { free: 1_000_000 });
+  const ref = `turn_${tag}_dearer`;
+  const said = (cached: number) => ({ model: "gpt-6.1-sol", source: "agent", input: 1000, cached, output: 100 });
+  const cheap = costOf("openai.tokens", 1100, { ...said(900), ref });
+  const dear = costOf("openai.tokens", 1100, { ...said(0), ref });
+  assert.ok(dear > cheap);
+  await recordUsageFor(u, "openai.tokens", ref, 1100, said(900));
+  assert.equal(await creditLeft(u), 1_000_000 - cheap);
+  await recordUsageFor(u, "openai.tokens", ref, 1100, said(0));
+  assert.equal(await creditLeft(u), 1_000_000 - dear, "the difference, so the dearest once in all");
+  for (const cached of [900, 0, 900]) await recordUsageFor(u, "openai.tokens", ref, 1100, said(cached));
+  await recordUsageFor(u, "openai.tokens", ref, 1000, { ...said(0), model: "gpt-6-astra", input: 900 });
+  assert.equal(await creditLeft(u), 1_000_000 - dear);
+  const rows = await usageOf(u, "openai.tokens");
+  assert.deepEqual(rows.map((r) => [r.units, r.cost, r.detail.cached]), [[1100, dear, 0]]);
+});
+
 /* ---------------- Through the proxies ---------------- */
 
 test("an agent turn is priced at its session's model, from the turn's own read or its session's stream", async () => {

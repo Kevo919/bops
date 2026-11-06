@@ -10,16 +10,19 @@ import {
 } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { config } from "./config.ts";
-import { recordUsageFor } from "./usage.ts";
+import { recordUsageFor, type Use } from "./usage.ts";
 
 /**
  * Billable use the proxy counts after it has answered (a text sent, a number bought, a Composio or
- * Honcho call): written in the background, so the Mac's call is never held up by it (usage.ts), but
- * never dropped either.
+ * Honcho call, a response's or agent turn's tokens, an image, a transcription, a Jev answer): written
+ * in the background, so the Mac's call is never held up by it (usage.ts), but never dropped either.
  *
- * - Each use gets its own ref when it's counted and is written with recordUsageFor, one row per ref:
- *   a retry, or a replay after a restart, of a write that did go in (its answer lost on the way back)
- *   finds the row and pays nothing more. So it's written once, however many times it's tried.
+ * - Each use has a ref before its first write: its own (a response's or turn's id, for tokens), or
+ *   one made for it when it's counted. It's written with recordUsageFor, one row per ref: a retry, or a
+ *   replay after a restart, of a write that did go in (its answer lost on the way back) finds the row
+ *   and pays nothing more. So it's written once, however many times it's tried. Two sightings of one
+ *   ref (a turn's tokens from its event and its read) are two uses with the same ref: each is written,
+ *   and recordUsageFor pays the ref what its dearest sighting costs, once.
  * - A write that fails is tried again a few times, waiting longer each time (usageQueueTiming).
  * - One that still fails, or is still waiting when the cloud stops, goes on the spool: one JSON line
  *   per use, each appended in one write and fsynced, in a file that outlives the process
@@ -29,13 +32,16 @@ import { recordUsageFor } from "./usage.ts";
  *   replays, and one still not written when the cloud stops is logged whole ("[usage] NOT RECORDED"),
  *   so it can be written by hand. It is never only a warning.
  *
- * Other writes the proxy doesn't wait for (counted in proxy.ts: tokens, web searches, images…) are
- * tracked here too, so a stop waits for them (drainUsage), though they aren't retried: an agent turn's
- * are read back by reconcile.ts anyway.
+ * Other writes the proxy doesn't wait for (counted in proxy.ts: web searches, a call's seconds, the
+ * lookup of a turn's session before its tokens are kept) are tracked here too, so a stop waits for
+ * them (drainUsage), though they aren't retried: an agent turn's are read back by reconcile.ts anyway.
  */
 
 export type QueuedUse = {
+  /** The row it's written to (recordUsageFor): one made for this use, or a response's or turn's id. */
   ref: string;
+  /** This use itself (two sightings of one ref are two uses). A spool line from before ids: its ref. */
+  id: string;
   userId: string;
   kind: string;
   units: number;
@@ -52,9 +58,9 @@ export const usageQueueTiming = {
   replayEveryMs: 60_000,
 };
 
-/** Uses counted and not yet written (or spooled). */
+/** Uses counted and not yet written (or spooled), by id. */
 const pending = new Map<string, QueuedUse>();
-/** Uses that couldn't be written or spooled (no spool set, or it couldn't be written): tried again with each replay. */
+/** Uses that couldn't be written or spooled (no spool set, or it couldn't be written), by id: tried again with each replay. */
 const parked = new Map<string, QueuedUse>();
 /** Every background write under way, this queue's and the proxy's others. */
 const underWay = new Set<Promise<unknown>>();
@@ -70,24 +76,42 @@ export function track<T>(p: Promise<T>): Promise<T> {
   return p;
 }
 
-/** Count one use of `kind` by the user, written in the background until it's in (or on the spool). Its ref. */
+/**
+ * Count one use of `kind` by the user, written in the background until it's in (or on the spool). Its
+ * ref is `ref` when given (a use with its own id, maybe seen more than once), else one made for it now,
+ * before its first write, and kept through every retry and replay. Its ref.
+ */
 export function keepUsage(
   userId: string,
   kind: string,
   units: number,
   detail: Record<string, unknown> = {},
+  ref?: string,
 ): string {
+  const id = `use_${randomUUID()}`;
   const use: QueuedUse = {
-    ref: `use_${randomUUID()}`,
+    ref: ref ?? id,
+    id,
     userId,
     kind,
     units,
     detail,
     at: Date.now(),
   };
-  pending.set(use.ref, use);
+  pending.set(use.id, use);
   void track(writeWithRetries(use));
   return use.ref;
+}
+
+/** keepUsage for a use usage.ts worked out (tokensUse, imagesUse…), nothing when there's none. Its ref. */
+export function keepUse(
+  userId: string,
+  use: Use | null,
+  ref?: string,
+): string | undefined {
+  return use
+    ? keepUsage(userId, use.kind, use.units, use.detail, ref)
+    : undefined;
 }
 
 const write = (u: QueuedUse) =>
@@ -97,15 +121,15 @@ async function writeWithRetries(use: QueuedUse) {
   for (let i = 1; ; i++) {
     try {
       await write(use);
-      pending.delete(use.ref);
+      pending.delete(use.id);
       return;
     } catch (e) {
-      if (!pending.has(use.ref)) return; // spooled meanwhile by a stop
+      if (!pending.has(use.id)) return; // spooled meanwhile by a stop
       if (stopping || i >= usageQueueTiming.tries) {
         console.warn(
           `[usage] ${use.kind} for ${use.userId} (${use.ref}) failed ${i} times, put on the spool: ${(e as Error).message}`,
         );
-        pending.delete(use.ref);
+        pending.delete(use.id);
         await spool([use]);
         return;
       }
@@ -193,18 +217,18 @@ async function spool(uses: QueuedUse[]): Promise<boolean> {
   let all = true;
   for (const u of uses) {
     if (!path) {
-      parked.set(u.ref, u);
+      parked.set(u.id, u);
       all = false;
       continue;
     }
     try {
       await inSpoolTurn(() => appendUse(path, u));
-      parked.delete(u.ref);
+      parked.delete(u.id);
     } catch (e) {
       console.error(
         `[usage] the spool (${path}) couldn't take ${u.ref}, kept in memory: ${(e as Error).message}`,
       );
-      parked.set(u.ref, u);
+      parked.set(u.id, u);
       all = false;
     }
   }
@@ -216,6 +240,7 @@ const isUse = (x: unknown): x is QueuedUse => {
   return (
     !!u &&
     typeof u.ref === "string" &&
+    (u.id === undefined || typeof u.id === "string") &&
     typeof u.userId === "string" &&
     typeof u.kind === "string" &&
     typeof u.units === "number"
@@ -241,7 +266,9 @@ export function readSpool(text: string): {
   const parse = (t: string): QueuedUse | null => {
     try {
       const u: unknown = JSON.parse(t);
-      return isUse(u) ? { ...u, detail: u.detail ?? {} } : null;
+      return isUse(u)
+        ? { ...u, id: u.id ?? u.ref, detail: u.detail ?? {} }
+        : null;
     } catch {
       return null;
     }
@@ -284,7 +311,7 @@ async function keepBad(path: string, from: string, fragments: string[]) {
       seenAt: new Date().toISOString(),
       file: basename(from),
       bytes: f.length,
-      ref: /"ref":"(use_[A-Za-z0-9_-]+)"/.exec(f)?.[1] ?? null,
+      ref: /"ref":"([A-Za-z0-9_.:-]{1,200})"/.exec(f)?.[1] ?? null,
       kind: /"kind":"([a-z._]+)"/.exec(f)?.[1] ?? null,
     }),
   );
@@ -374,7 +401,7 @@ async function replayOnce(): Promise<number> {
             continue;
           }
           const { uses: found, bad, torn } = readSpool(text);
-          for (const u of found) if (!uses.has(u.ref)) uses.set(u.ref, u);
+          for (const u of found) if (!uses.has(u.id)) uses.set(u.id, u);
           if (torn && Date.now() - mtime < spoolTiming.tornGraceMs)
             keep.add(file);
           else if (torn) bad.push(torn);
@@ -392,7 +419,7 @@ async function replayOnce(): Promise<number> {
   for (const u of uses.values()) {
     try {
       await write(u);
-      parked.delete(u.ref);
+      parked.delete(u.id);
       wrote++;
     } catch (e) {
       console.warn(

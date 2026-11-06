@@ -3,7 +3,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { dirname, join } from "node:path";
-import { execFile, execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { dataRoot } from "./user-paths";
 
 /**
@@ -84,27 +85,39 @@ const cli = () => {
 };
 
 let tailscaleCache: { at: number; state: TailscaleState } | null = null;
+let tailscaleAsking: Promise<TailscaleState> | null = null;
 const TAILSCALE_CACHE_MS = 10_000;
+const TAILSCALE_TIMEOUT_MS = 4000;
+const run = promisify(execFile);
+
+const cached = (state: TailscaleState) => (tailscaleCache = { at: Date.now(), state }).state;
 
 /** What this computer's Tailscale is doing, for the Phone card's step 2 to speak plainly: installed
  *  but signed out is the state users hit and the old copy got wrong (it said "install it"). Cached ten
- *  seconds: the card polls, and status is not free. */
-export function tailscaleState(): TailscaleState {
-  if (tailscaleCache && Date.now() - tailscaleCache.at < TAILSCALE_CACHE_MS) return tailscaleCache.state;
+ *  seconds: the card polls, and status is not free. Asked without blocking the server (the CLI can take
+ *  seconds when its daemon is slow), with no console window on Windows, and once at a time: polls that
+ *  come while it's being asked wait for the same answer. */
+export function tailscaleState(): Promise<TailscaleState> {
+  if (tailscaleCache && Date.now() - tailscaleCache.at < TAILSCALE_CACHE_MS) return Promise.resolve(tailscaleCache.state);
+  if (tailscaleAsking) return tailscaleAsking;
   const bin = cli();
-  if (!bin) return (tailscaleCache = { at: Date.now(), state: { installed: false, connected: false, needsLogin: false } }).state;
+  if (!bin) return Promise.resolve(cached({ installed: false, connected: false, needsLogin: false }));
   // An interface check first: a 100.64/10 address means connected, whatever the CLI says after.
-  if (addresses().tailnet.length) return (tailscaleCache = { at: Date.now(), state: { installed: true, connected: true, needsLogin: false, backend: "Running" } }).state;
-  const state: TailscaleState = { installed: true, connected: false, needsLogin: false };
-  try {
-    const out = execFileSync(bin, ["status", "--json"], { timeout: 4000, encoding: "utf8" });
-    const j = JSON.parse(out) as { BackendState?: string };
-    state.backend = j.BackendState;
-    state.needsLogin = j.BackendState === "NeedsLogin";
-  } catch {
-    // The daemon may not be running at all; installed is still true and the wording covers it.
-    state.backend = "unreachable";
-  }
-  return (tailscaleCache = { at: Date.now(), state }).state;
+  if (addresses().tailnet.length) return Promise.resolve(cached({ installed: true, connected: true, needsLogin: false, backend: "Running" }));
+  tailscaleAsking = (async () => {
+    const state: TailscaleState = { installed: true, connected: false, needsLogin: false };
+    try {
+      const { stdout } = await run(bin, ["status", "--json"], { timeout: TAILSCALE_TIMEOUT_MS, encoding: "utf8", windowsHide: true });
+      const j = JSON.parse(stdout) as { BackendState?: string };
+      state.backend = j.BackendState;
+      state.needsLogin = j.BackendState === "NeedsLogin";
+    } catch {
+      // The daemon may not be running at all; installed is still true and the wording covers it.
+      state.backend = "unreachable";
+    }
+    return cached(state);
+  })().finally(() => {
+    tailscaleAsking = null;
+  });
+  return tailscaleAsking;
 }
-
