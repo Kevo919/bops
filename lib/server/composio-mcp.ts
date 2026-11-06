@@ -113,12 +113,28 @@ const CHANGES = new Set(
     "DELETE REMOVE TRASH UNTRASH DESTROY CLEAR PURGE ARCHIVE UNARCHIVE UPLOAD SHARE UNSHARE INVITE PAY PAYMENT CHARGE REFUND TRANSFER PURCHASE BUY ORDER " +
     "SUBSCRIBE UNSUBSCRIBE CANCEL APPROVE REJECT PUBLISH SCHEDULE DRAFT MARK STAR UNSTAR LABEL TAG ASSIGN EXECUTE RUN TRIGGER START STOP ENABLE DISABLE " +
     "ACCEPT DECLINE BATCH IMPORT MERGE " +
+    // What a view, a lookup or a download (read words since task 78) can be the object of, and is then a change:
+    // AIRTABLE_DUPLICATE_VIEW, a lookup field restored, a page view tracked.
+    "DUPLICATE CLONE RESTORE LOCK UNLOCK PIN UNPIN RESET CLOSE REOPEN SYNC TRACK " +
+    // Side effects next to a read word (the #110 review): a view opened, captured, recorded, logged or counted, a
+    // download link made, a download emailed, a retrieve resent; and renewals, claims, sign-ups, exports, dismissals.
+    "OPEN CAPTURE RECORD LOG INCREMENT DECREMENT GENERATE EMAIL RESEND RENEW REFRESH CLAIM REGISTER CONVERT EXPORT ACKNOWLEDGE DISMISS " +
+    // Browsing: a browsing tool can click and fill in forms.
+    "BROWSE " +
     // Raw queries and requests: a query language or HTTP can change things too.
     "QUERY SQL RAW PROXY GRAPHQL GQL SOQL COMMAND SCRIPT CODE REQUEST HTTP API EXEC CALL INVOKE"
   ).split(" "),
 );
-/** The only words that make a slug a read; a slug without one asks. */
-const READS = new Set("GET LIST SEARCH FETCH READ FIND DESCRIBE COUNT".split(" "));
+/**
+ * The only words that make a slug a read; a slug without one asks. Each only reads what's there (task 78 added
+ * DOWNLOAD, RETRIEVE, VIEW and LOOKUP: GOOGLEDRIVE_DOWNLOAD_FILE, STRIPE_RETRIEVE_CUSTOMER, NOTION_VIEW_PAGE,
+ * DRIVE_LOOKUP_FILE). Not QUERY or GRAPHQL (a query language can change things: a GraphQL mutation, SQL), nor
+ * BROWSE (a browsing tool can click and fill in forms, so it's a change word above): those still ask (chat.ts
+ * backsSend counts them as no send).
+ */
+const READS = new Set("GET LIST SEARCH FETCH READ FIND DESCRIBE COUNT DOWNLOAD RETRIEVE VIEW LOOKUP".split(" "));
+/** Whether a word is one of the read words (READS). */
+export const isReadWord = (word: string) => READS.has(word.toUpperCase());
 
 const wordsOf = (name: string) => name.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
 

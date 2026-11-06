@@ -283,7 +283,7 @@ await check("clear errors: key turned down, key missing, address unknown, nothin
 
 await check("judging a call: reads run, anything that sends, changes, deletes or pays asks", async () => {
   for (const s of ["GMAIL_FETCH_EMAILS", "GMAIL_LIST_THREADS", "GOOGLEDRIVE_FIND_FILE", "GMAIL_GET_PROFILE", "GMAIL_LIST_DRAFTS"]) assert.equal(C.slugReads(s), true, s);
-  for (const s of ["GMAIL_SEND_EMAIL", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_REPLY_TO_THREAD", "GOOGLEDRIVE_DELETE_FILE", "GMAIL_MOVE_TO_TRASH", "STRIPE_CREATE_PAYMENT_INTENT", "GOOGLEDRIVE_UPDATE_FILE_PUT", "GMAIL_BATCH_MODIFY_MESSAGES", "GOOGLEDRIVE_SHARE_FILE", "SOMETHING_ELSE", "GET_AND_DELETE", "GOOGLEDRIVE_DOWNLOAD_FILE"]) assert.equal(C.slugReads(s), false, s);
+  for (const s of ["GMAIL_SEND_EMAIL", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_REPLY_TO_THREAD", "GOOGLEDRIVE_DELETE_FILE", "GMAIL_MOVE_TO_TRASH", "STRIPE_CREATE_PAYMENT_INTENT", "GOOGLEDRIVE_UPDATE_FILE_PUT", "GMAIL_BATCH_MODIFY_MESSAGES", "GOOGLEDRIVE_SHARE_FILE", "SOMETHING_ELSE", "GET_AND_DELETE"]) assert.equal(C.slugReads(s), false, s);
   const t = (name, annotations) => ({ name, annotations });
   assert.equal(C.judgeCall(t("COMPOSIO_SEARCH_TOOLS"), {}).reads, true);
   assert.equal(C.judgeCall(t("COMPOSIO_MULTI_EXECUTE_TOOL"), { tools: [{ tool_slug: "GMAIL_FETCH_EMAILS" }, { tool_slug: "GOOGLEDRIVE_FIND_FILE" }] }).reads, true);
@@ -321,8 +321,59 @@ await check("review 3: only clear read verbs read; the added write verbs, raw qu
     assert.equal(C.judgeCall({ name: `APP_LIST_${w}`, annotations: { readOnlyHint: true } }, {}).reads, false, w);
   }
   for (const s of ["POSTGRES_RUN_QUERY", "SUPABASE_QUERY_TABLE", "GOOGLESHEETS_QUERY", "SNOWFLAKE_EXECUTE_SQL", "BIGQUERY_GET_QUERY_RESULTS", "SALESFORCE_SOQL_SEARCH", "GITHUB_GRAPHQL_FETCH", "HUBSPOT_RAW_GET"]) assert.equal(C.slugReads(s), false, s);
-  for (const s of ["GMAIL_SUMMARIZE_THREAD", "DRIVE_LOOKUP_FILE", "NOTION_VIEW_PAGE", "GMAIL"]) assert.equal(C.slugReads(s), false, `${s}: not clearly a read`);
+  for (const s of ["GMAIL_SUMMARIZE_THREAD", "GMAIL"]) assert.equal(C.slugReads(s), false, `${s}: not clearly a read`);
   for (const s of ["GMAIL_GET_PROFILE", "GMAIL_LIST_LABELS", "GOOGLEDRIVE_SEARCH_FILES", "GMAIL_FETCH_EMAILS", "NOTION_READ_PAGE", "GOOGLEDRIVE_FIND_FOLDER", "SLACK_DESCRIBE_CHANNEL", "GMAIL_COUNT_UNREAD"]) assert.equal(C.slugReads(s), true, s);
+});
+
+await check("task 78: DOWNLOAD, RETRIEVE, VIEW and LOOKUP read and run unasked; QUERY, GRAPHQL and BROWSE, and anything a view or lookup is changed by, still ask", async () => {
+  const t = (name, annotations) => ({ name, annotations });
+  const run = (...slugs) => C.judgeCall(t("COMPOSIO_MULTI_EXECUTE_TOOL"), { tools: slugs.map((tool_slug) => ({ tool_slug, arguments: {} })) });
+  const reads = ["GOOGLEDRIVE_DOWNLOAD_FILE", "GMAIL_DOWNLOAD_ATTACHMENT", "STRIPE_RETRIEVE_CUSTOMER", "STRIPE_RETRIEVE_BALANCE", "NOTION_VIEW_PAGE", "AIRTABLE_LIST_VIEWS", "DRIVE_LOOKUP_FILE", "HUBSPOT_LOOKUP_CONTACT"];
+  for (const s of reads) {
+    assert.equal(C.slugReads(s), true, s);
+    assert.deepEqual(C.judgeCall(t(s), {}), { reads: true, slugs: [], onceOnly: false }, s);
+  }
+  assert.equal(run(...reads).reads, true, "a run of only reads runs unasked");
+  // Ambiguous: a query language, GraphQL (a mutation changes things), a browsing tool (it can click and fill in forms).
+  const ambiguous = ["NOTION_QUERY_DATABASE", "SUPABASE_QUERY_TABLE", "GOOGLESHEETS_QUERY", "GITHUB_GRAPHQL", "GITHUB_GRAPHQL_FETCH", "SHOPIFY_GRAPHQL_QUERY", "GITHUB_GET_GRAPHQL", "browse", "BROWSERBASE_BROWSE_PAGE", "GET_AND_BROWSE"];
+  for (const s of ambiguous) {
+    assert.equal(C.slugReads(s), false, s);
+    assert.equal(C.judgeCall(t(s), {}).reads, false, s);
+    assert.equal(run("GOOGLEDRIVE_DOWNLOAD_FILE", s).reads, false, `${s} in a run`);
+  }
+  // A GraphQL mutation by any name asks, even marked read only.
+  assert.equal(C.judgeCall(t("GITHUB_GRAPHQL", { readOnlyHint: true }), { query: "mutation { addComment(input: {}) { clientMutationId } }" }).reads, false);
+  // The new read words next to a change: a view duplicated, updated or tracked, a lookup field made, a download imported.
+  for (const s of ["AIRTABLE_DUPLICATE_VIEW", "AIRTABLE_UPDATE_VIEW", "AIRTABLE_CREATE_VIEW", "SEGMENT_TRACK_PAGE_VIEW", "AIRTABLE_CREATE_LOOKUP_FIELD", "GOOGLEDRIVE_DOWNLOAD_AND_IMPORT", "NOTION_RESTORE_VIEW", "SLACK_PIN_VIEW", "DRIVE_CLONE_LOOKUP", "GOOGLEDRIVE_DOWNLOAD_AND_SHARE", "STRIPE_RETRIEVE_AND_REFUND", "GMAIL_VIEW_AND_SEND"]) {
+    assert.equal(C.slugReads(s), false, s);
+    assert.equal(C.judgeCall(t(s, { readOnlyHint: true }), {}).reads, false, `${s}, even marked read only`);
+  }
+  // Drafts without CREATE, the trash, connections and a send's status: not sends (chat.ts backsSend), but they still ask.
+  for (const s of ["OUTLOOK_DRAFT_REPLY", "OUTLOOK_UPDATE_DRAFT", "GMAIL_MOVE_TO_TRASH", "OUTLOOK_TRASH_MESSAGE", "COMPOSIO_MANAGE_CONNECTIONS", "send_status"]) {
+    assert.equal(C.slugReads(s), false, s);
+    assert.equal(C.judgeCall(t(s), {}).reads, false, s);
+  }
+});
+
+await check("#110 review: a read word next to a side effect asks; change words always win, and plain reads still run unasked", async () => {
+  const t = (name, annotations) => ({ name, annotations });
+  const run = (...slugs) => C.judgeCall(t("COMPOSIO_MULTI_EXECUTE_TOOL"), { tools: slugs.map((tool_slug) => ({ tool_slug, arguments: {} })) });
+  const asks = ["OPEN_A_VIEW", "CAPTURE_PAGE_VIEW", "RECORD_PAGE_VIEW", "LOG_PAGE_VIEW", "INCREMENT_VIEW_COUNT", "DECREMENT_VIEW_COUNT", "GENERATE_DOWNLOAD_LINK", "DOWNLOAD_AND_EMAIL", "RETRIEVE_AND_RESEND"];
+  // The verbs alone, after a read word.
+  for (const w of "RENEW REFRESH CLAIM REGISTER CONVERT EXPORT ACKNOWLEDGE DISMISS SHARE INVITE PUBLISH SUBMIT APPROVE REJECT ASSIGN START STOP RUN TRIGGER EXECUTE PURCHASE PAY CHARGE REFUND ORDER".split(" "))
+    asks.push(w, `APP_GET_${w}`, `APP_RETRIEVE_${w}_ITEM`);
+  for (const s of asks) {
+    assert.equal(C.slugReads(s), false, s);
+    assert.equal(C.judgeCall(t(s), {}).reads, false, s);
+    assert.equal(C.judgeCall(t(s, { readOnlyHint: true }), {}).reads, false, `${s}, even marked read only`);
+    assert.equal(run("GMAIL_FETCH_EMAILS", s).reads, false, `${s} in a run with a read`);
+  }
+  const reads = ["GMAIL_FETCH_EMAILS", "GMAIL_GET_PROFILE", "GITHUB_GET_A_REPOSITORY", "SLACK_LIST_CHANNELS", "GMAIL_LIST_THREADS", "GOOGLEDRIVE_DOWNLOAD_FILE", "DROPBOX_DOWNLOAD_FILE", "STRIPE_RETRIEVE_CUSTOMER", "STRIPE_RETRIEVE_BALANCE", "SLACK_RETRIEVE_CONVERSATION_INFO"];
+  for (const s of reads) {
+    assert.equal(C.slugReads(s), true, s);
+    assert.deepEqual(C.judgeCall(t(s), {}), { reads: true, slugs: [], onceOnly: false }, s);
+  }
+  assert.equal(run(...reads).reads, true, "a run of plain reads runs unasked");
 });
 
 await check("review 5: the validation is exported for the Services screen's paste box", async () => {
