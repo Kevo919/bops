@@ -106,6 +106,7 @@ const ZAP_TOOLS = [
 /** Composio's For You MCP server: its meta tool runs actions by slug. */
 const COMPOSIO_TOOLS = [
   { name: "COMPOSIO_MULTI_EXECUTE_TOOL", description: "Runs tools by slug.", inputSchema: { type: "object", properties: { tools: { type: "array", items: { type: "object", properties: { tool_slug: { type: "string" }, arguments: { type: "object" } } } } } } },
+  { name: "COMPOSIO_MANAGE_CONNECTIONS", description: "Connects an app.", inputSchema: { type: "object", properties: { toolkits: { type: "array", items: { type: "string" } } } } },
 ];
 const zapCalls = [];
 const response = (id, output) => ({ id, object: "response", model: "gpt-test", status: "completed", output, usage: { input_tokens: 100, output_tokens: 10, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } });
@@ -475,10 +476,60 @@ await check("Composio For You's multi-execute meta tool: a real GMAIL_SEND_EMAIL
   delete process.env.COMPOSIO_MCP_URL;
 });
 
+await check("task 78: approved reads slugReads now knows, drafts without CREATE, the trash and MANAGE_CONNECTIONS never back 'sent'; queries and GraphQL run only once approved, and back nothing", async () => {
+  process.env.COMPOSIO_MCP_URL = "https://connect.composio.dev/mcp";
+  const META = "mycomposio_COMPOSIO_MULTI_EXECUTE_TOOL";
+  const notSends = ["GOOGLEDRIVE_DOWNLOAD_FILE", "STRIPE_RETRIEVE_CUSTOMER", "NOTION_VIEW_PAGE", "DRIVE_LOOKUP_FILE", "NOTION_QUERY_DATABASE", "GITHUB_GRAPHQL_FETCH", "OUTLOOK_DRAFT_REPLY", "OUTLOOK_UPDATE_DRAFT", "GMAIL_MOVE_TO_TRASH", "OUTLOOK_TRASH_MESSAGE"];
+  for (const slug of notSends) {
+    answers.push(reply("I've sent the email to Dana."));
+    await resumeWith({ name: META, arguments: JSON.stringify({ tools: [{ tool_slug: slug, arguments: {} }] }) }, "once");
+    assert.ok(zapCalls.some((c) => c.host === "connect.composio.dev" && c.method === "tools/call" && c.params?.arguments?.tools?.[0]?.tool_slug === slug), `${slug} ran`);
+    assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.", slug);
+  }
+  // Changing the connections, approved and done: no send.
+  answers.push(reply("I've sent the email to Dana."));
+  await resumeWith({ name: "mycomposio_COMPOSIO_MANAGE_CONNECTIONS", arguments: JSON.stringify({ toolkits: ["gmail"] }) }, "once");
+  assert.ok(zapCalls.some((c) => c.host === "connect.composio.dev" && c.method === "tools/call" && c.params?.name === "COMPOSIO_MANAGE_CONNECTIONS"), "MANAGE_CONNECTIONS ran");
+  assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.");
+  // Still sends: a draft sent or published, a GraphQL call that posts, a send whose status isn't all it says.
+  for (const slug of ["GMAIL_SEND_DRAFT", "WORDPRESS_PUBLISH_DRAFT", "GITHUB_GRAPHQL_POST_COMMENT", "GMAIL_SEND_EMAIL_STATUS_UPDATE"]) {
+    answers.push(reply("I've sent the email to Dana."));
+    await resumeWith({ name: META, arguments: JSON.stringify({ tools: [{ tool_slug: slug, arguments: {} }] }) }, "once");
+    assert.equal(lastBot().text, "I've sent the email to Dana.", slug);
+  }
+  // Unapproved, the new reads run at once (no ask) and back nothing; a query, a GraphQL call, a draft, the trash ask first.
+  for (const slug of ["GOOGLEDRIVE_DOWNLOAD_FILE", "STRIPE_RETRIEVE_CUSTOMER", "NOTION_VIEW_PAGE", "DRIVE_LOOKUP_FILE"]) {
+    const n = zapCalls.length;
+    answers.push(calling(toolCall(META, { tools: [{ tool_slug: slug, arguments: {} }] })), reply("I've sent the email to Dana."));
+    await Chat.handleMessage(chatId, `Look at it with ${slug} and send Dana the quote`);
+    assert.ok(zapCalls.slice(n).some((c) => c.method === "tools/call" && c.params?.arguments?.tools?.[0]?.tool_slug === slug), `${slug} ran without an ask`);
+    assert.equal(lastBot().text, "I've sent the email to Dana.\n\nNothing was sent.", slug);
+  }
+  for (const slug of ["NOTION_QUERY_DATABASE", "GITHUB_GRAPHQL", "OUTLOOK_DRAFT_REPLY", "GMAIL_MOVE_TO_TRASH"]) {
+    const n = zapCalls.length;
+    // It pauses for the user's yes, so the model isn't asked again.
+    answers.push(calling(toolCall(META, { tools: [{ tool_slug: slug, arguments: { query: "mutation { addComment }" } }] })));
+    await Chat.handleMessage(chatId, `Use ${slug}`);
+    assert.ok(!zapCalls.slice(n).some((c) => c.method === "tools/call"), `${slug} waits for the user's yes`);
+  }
+  delete process.env.COMPOSIO_MCP_URL;
+});
+
 await check("backsSend(): any write that ran backs 'sent', unless it's clearly a read, a mark or a draft", () => {
-  for (const a of ["GMAIL_SEND_EMAIL", "GMAIL_SEND_DRAFT", "GMAIL_REPLY_TO_THREAD", "SLACK_SENDS_A_MESSAGE_TO_A_SLACK_CHANNEL", "TWITTER_CREATION_OF_A_POST", "MICROSOFT_TEAMS_CHATS_POST_MESSAGE", "LINKEDIN_CREATE_LINKED_IN_POST", "DISCORD_POST_MESSAGE", "message", "channel_message", "slack_send_channel_message", "sendMessage", "send_status"])
+  for (const a of ["GMAIL_SEND_EMAIL", "GMAIL_SEND_DRAFT", "GMAIL_REPLY_TO_THREAD", "SLACK_SENDS_A_MESSAGE_TO_A_SLACK_CHANNEL", "TWITTER_CREATION_OF_A_POST", "MICROSOFT_TEAMS_CHATS_POST_MESSAGE", "LINKEDIN_CREATE_LINKED_IN_POST", "DISCORD_POST_MESSAGE", "message", "channel_message", "slack_send_channel_message", "sendMessage"])
+    assert.equal(Chat.backsSend(a), true, a);
+  // Task 78: drafts sent, published, posted or scheduled; queries, GraphQL and browsing that say they send; a status sent.
+  for (const a of ["WORDPRESS_PUBLISH_DRAFT", "BUFFER_SCHEDULE_DRAFT", "LINKEDIN_POST_DRAFT", "GITHUB_GRAPHQL_POST_COMMENT", "SLACK_QUERY_AND_REPLY", "browse_and_send", "GMAIL_SEND_EMAIL_STATUS_UPDATE", "AIRTABLE_DUPLICATE_VIEW", "SEGMENT_TRACK_PAGE_VIEW"])
     assert.equal(Chat.backsSend(a), true, a);
   for (const a of ["GMAIL_FETCH_EMAILS", "GMAIL_LIST_THREADS", "gmail_find_email", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_MARK_AS_READ", "gmail_mark_email_as_read", "GMAIL_ADD_LABEL_TO_EMAIL", "GMAIL_MODIFY_THREAD_LABELS", "SLACK_LIST_MESSAGES", "read_messages", ""])
+    assert.equal(Chat.backsSend(a), false, a);
+  // Task 78: the new reads, queries, GraphQL and browsing, drafts without CREATE, the trash, MANAGE_CONNECTIONS, send_status.
+  for (const a of [
+    "GOOGLEDRIVE_DOWNLOAD_FILE", "GMAIL_DOWNLOAD_ATTACHMENT", "STRIPE_RETRIEVE_CUSTOMER", "NOTION_VIEW_PAGE", "DRIVE_LOOKUP_FILE", "lookupContact",
+    "NOTION_QUERY_DATABASE", "SUPABASE_QUERY_TABLE", "GITHUB_GRAPHQL", "SHOPIFY_GRAPHQL_QUERY", "browse", "BROWSERBASE_BROWSE_PAGE",
+    "OUTLOOK_DRAFT_REPLY", "OUTLOOK_UPDATE_DRAFT", "GMAIL_DELETE_DRAFT", "zapier_gmail_create_draft",
+    "GMAIL_MOVE_TO_TRASH", "OUTLOOK_TRASH_MESSAGE", "GMAIL_UNTRASH_MESSAGE", "COMPOSIO_MANAGE_CONNECTIONS", "send_status", "GET_SEND_STATUS",
+  ])
     assert.equal(Chat.backsSend(a), false, a);
 });
 

@@ -1397,21 +1397,43 @@ const pcReady = () => getState().host === "mac" || !!getState().mac?.ready;
  * Whether an app action that ran backs "I sent it". A false "Nothing was sent." on a real send is worse than missing a
  * claim now and then, so any write does, unless the action is clearly no send:
  * - a read, by For You's own classifier (composio-mcp.ts slugReads: GET, LIST, SEARCH, FETCH, READ, FIND, DESCRIBE,
- *   COUNT, and nothing that changes things), so the two never drift apart: GMAIL_FETCH_EMAILS, zapier_gmail_find_email;
+ *   COUNT, DOWNLOAD, RETRIEVE, VIEW, LOOKUP, and nothing that changes things), so the two never drift apart:
+ *   GMAIL_FETCH_EMAILS, zapier_gmail_find_email, STRIPE_RETRIEVE_CUSTOMER;
+ * - a query, a GraphQL call or browsing, with no send word (SUPABASE_QUERY_TABLE, GITHUB_GRAPHQL_FETCH, browse):
+ *   these still ask before they run (they can change things), but they send nothing;
  * - marking read or filing with a label (GMAIL_MARK_AS_READ, GMAIL_ADD_LABEL_TO_EMAIL, GMAIL_MODIFY_THREAD_LABELS);
- * - a draft made, not sent (GMAIL_CREATE_EMAIL_DRAFT; GMAIL_SEND_DRAFT does send).
+ * - a draft made or changed, not sent (GMAIL_CREATE_EMAIL_DRAFT, OUTLOOK_DRAFT_REPLY, OUTLOOK_UPDATE_DRAFT; GMAIL_SEND_DRAFT
+ *   and a draft published, posted or scheduled do send);
+ * - moving to the trash or out of it (GMAIL_MOVE_TO_TRASH, OUTLOOK_TRASH_MESSAGE, GMAIL_UNTRASH_MESSAGE);
+ * - changing which accounts are connected (COMPOSIO_MANAGE_CONNECTIONS);
+ * - asking how a send went (send_status, GET_SEND_STATUS).
+ * Known gaps, each a claim that gets no note or one that gets a wrong one:
+ * - any other write that sends nothing (updating a record, a calendar event, a file) backs "sent";
+ * - a Zapier write (execute_zapier_write_action) always backs "sent", though its action may only make a draft: its
+ *   action key (gmail "draft", "message") doesn't say which reliably;
+ * - a GraphQL mutation, a query (SQL) or a browsing tool that does send something (a comment posted through GitHub's
+ *   GraphQL, a form a browser submitted) backs nothing, so a true "I sent it" after one gets "Nothing was sent.";
+ * - a name ending in SEND_STATUS is taken for a send's status: an app whose SEND_STATUS posts one (a WhatsApp Status)
+ *   backs nothing;
+ * - a non-GET call_api always backs "sent".
  */
 export function backsSend(action: string): boolean {
-  if (!action.trim() || slugReads(action)) return false;
   const words = action
     .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
     .toUpperCase()
     .split(/[^A-Z0-9]+/)
     .filter(Boolean);
+  // Read as a slug (lookupContact as LOOKUP_CONTACT), by the same classifier the asks use.
+  if (!words.length || slugReads(words.join("_"))) return false;
   const has = (...w: string[]) => w.some((x) => words.includes(x));
+  const sends = has("SEND", "SENDS", "REPLY", "FORWARD", "POST", "PUBLISH", "SCHEDULE", "COMMENT");
   if (has("MARK") && has("READ", "UNREAD", "SEEN", "UNSEEN")) return false;
   if (has("LABEL", "LABELS")) return false;
-  if (has("CREATE") && has("DRAFT", "DRAFTS")) return false;
+  if (has("DRAFT", "DRAFTS") && !has("SEND", "SENDS", "PUBLISH", "POST", "SCHEDULE")) return false;
+  if (has("TRASH", "UNTRASH")) return false;
+  if (has("MANAGE") && has("CONNECTION", "CONNECTIONS")) return false;
+  if (words.at(-2) === "SEND" && words.at(-1) === "STATUS") return false;
+  if (has("QUERY", "GRAPHQL", "GQL", "BROWSE") && !sends) return false;
   return true;
 }
 /** A Zapier tool that ran: its write meta tool always backs "sent", its read one never; any other by its name (backsSend). */
