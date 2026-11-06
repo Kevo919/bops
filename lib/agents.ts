@@ -427,14 +427,21 @@ export type AgentState = {
  * The Default is said by its tile, whatever its state. `keys`: the names of the keys the Vault has (both
  * scopes), when the window has read them: an agent on a key with none there isn't ready.
  */
-export function agentState(x: BotAgent, b: Bot, state: Pick<AppState, "bots" | "brains" | "host">, keys?: ReadonlySet<string>): AgentState {
+export function agentState(
+  x: BotAgent,
+  b: Bot,
+  state: Pick<AppState, "bots" | "brains" | "host">,
+  keys?: ReadonlySet<string>,
+  /** This computer's words (components/app/computer-words.ts useComputerWords), for the fixed words: names stay exact. */
+  words: (text: TemplateStringsArray, ...values: unknown[]) => string = (text, ...values) => text.map((part, i) => part + (i < values.length ? String(values[i]) : "")).join(""),
+): AgentState {
   const soon = AGENTS[x.kind].soon;
   if (soon) return { ready: false, line: AGENTS[x.kind].maker, soon };
   if (x.kind === "bops") return { ready: true, line: `${x.model ? modelShort("bops", x.model) : "OpenAI"} · Credit` };
   if (!BRAINS_ON) return { ready: false, line: "Not in this version of Bops" };
   const name = AGENTS[x.kind].name;
-  if (state.host === "mac") return { ready: false, line: `${name} runs on a cloud computer. Your bots work on this Mac.` };
-  if (b.runsOn === "mac") return { ready: false, line: `${b.name} works on your Mac, so its threads use Bops agent.` };
+  if (state.host === "mac") return { ready: false, line: words`${name} runs on a cloud computer. Your bots work on this Mac.` };
+  if (b.runsOn === "mac") return { ready: false, line: words`${b.name} works on your Mac, so its threads use Bops agent.` };
   if (x.pays === "key") {
     const want = anyModel(x.kind) ? agentKeyName(x) : (accountOf(x, state)?.keyName ?? agentKeyName(x));
     if (keys && want && !keys.has(want)) return { ready: false, line: `No ${keyVendor(x)} key in your Vault yet.`, button: "add_key" };

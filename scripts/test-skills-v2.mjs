@@ -182,6 +182,8 @@ const hear = (x) => (heard.push(typeof x === "string" ? x : JSON.stringify(x)), 
 const S = await import(`${rootUrl}/lib/server/store.ts`);
 const W = await import(`${rootUrl}/lib/server/workspace-skills.ts`);
 const B = await import(`${rootUrl}/lib/server/skill-bundle.ts`);
+// This computer's words, as the server says them (process.platform: "this PC" on Windows, "this computer" on Linux).
+const { computerWords } = await import(`${rootUrl}/lib/computer-words.ts`);
 const L = await import(`${rootUrl}/lib/skill-labels.ts`);
 const PL = await import(`${rootUrl}/lib/skill-proposals.ts`);
 const P = await import(`${rootUrl}/lib/server/skill-proposals.ts`);
@@ -690,7 +692,7 @@ await check("On a computer's runner: a proposal for a skill whose files aren't t
   assert.equal(CS.computersMessage(m, new Set(["boppy"]), new Set([chatId])), true);
   assert.equal(CS.computersMessage({ ...m, botId: "max" }, new Set(["boppy"]), new Set([chatId])), false, "never another bot's");
   S.update((s) => s.messages.push(m));
-  assert.equal((await route({ action: "proposal", do: "accept", messageId: m.id, proposalId: got.proposal.id })).body.error, "Its folder is gone from this Mac.");
+  assert.equal((await route({ action: "proposal", do: "accept", messageId: m.id, proposalId: got.proposal.id })).body.error, computerWords("Its folder is gone from this Mac.", process.platform));
   S.update((s) => (s.workspaces[0].skills = s.workspaces[0].skills.filter((x) => x.slug !== "cloud-only")));
 });
 
@@ -713,7 +715,7 @@ await check("Accept takes a proposal only as its message's own, and one without 
   // Its mark copied onto another, or a field changed since: not this Mac's own, so the view first.
   const forged = await accept("msg_p_forged", "prop_forged");
   assert.equal(forged.status, 409);
-  assert.equal(forged.body.stale.why, "It wasn't made on this Mac, so here's the change on what it is now.");
+  assert.equal(forged.body.stale.why, computerWords("It wasn't made on this Mac, so here's the change on what it is now.", process.platform));
   assert.notEqual(P.proposalDiff("msg_p_sealed", sealed.id).why, forged.body.stale.why, "this Mac's own is shown as it is");
   setLabels("boppy", []);
   assert.equal((await accept("msg_p_sealed", sealed.id)).body.error, "Its bot doesn't have that skill anymore.");

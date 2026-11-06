@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useComputerWords } from "./computer-words";
 import { CodeInput, ErrorLine, postJson, ResendButton, RetryLabel, useInfo, type CodeAnswer } from "./code-entry";
 
 /** Where one of the user's addresses comes from (ownerEmailSources in lib/server/mail.ts). */
@@ -34,6 +35,7 @@ const countingSources = (e: OwnerAddress) => e.sources.filter((s) => s !== "sign
  * server can't add any yet, or show them (`add`).
  */
 export function OwnerEmail({ info, onInfo }: { info: OwnerEmailInfo; onInfo: (i: OwnerEmailInfo) => void }) {
+  const computerWords = useComputerWords();
   const [address, setAddress] = useState("");
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -133,7 +135,7 @@ export function OwnerEmail({ info, onInfo }: { info: OwnerEmailInfo; onInfo: (i:
     return (
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] font-medium leading-4">Your email</span>
-        <span className={note}>Adding an email only works in the app on your Mac for now.</span>
+        <span className={note}>{computerWords("Adding an email only works in the app on your Mac for now.")}</span>
       </div>
     );
 

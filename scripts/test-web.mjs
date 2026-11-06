@@ -282,7 +282,7 @@ await part("Addresses refused before any lookup", async () => {
     "http://router.home.arpa/",
     "http://intranet/",
   ])
-    await check(`${url} is private`, () => refused(() => checkUrl(url), /this Mac or a private network/));
+    await check(`${url} is private`, () => refused(() => checkUrl(url), /this (Mac|PC|computer) or a private network/));
   for (const [url, re] of [
     ["https://example.com:8080/", /usual ports \(80 and 443\), not 8080/],
     ["http://example.com:22/", /not 22/],
@@ -342,7 +342,7 @@ await part("The fixture is refused unless BOPS_FETCH_ALLOW names it", async () =
 await part("Lookups: every address checked, the connection pinned", async () => {
   await check("a name that points to this Mac is refused", async () => {
     dns.table.set("rebind.test", [{ address: "127.0.0.1", family: 4 }]);
-    await refused(() => safeFetch("http://rebind.test/"), /rebind\.test points to this Mac or a private network/);
+    await refused(() => safeFetch("http://rebind.test/"), /rebind\.test points to this (Mac|PC|computer) or a private network/);
   });
   await check("one private address among public ones refuses the name", async () => {
     dns.table.set("mixed.test", [
@@ -411,12 +411,12 @@ await part("This Mac's own networks, and redirects to a bare address", async () 
   };
   globalThis.__webTestInterfaces = () => home;
   try {
-    await check("an address on the home's IPv6 network is refused before any lookup", () => refused(() => checkUrl("http://[2600:1700:abcd:1234::1]/"), /this Mac or a private network/));
+    await check("an address on the home's IPv6 network is refused before any lookup", () => refused(() => checkUrl("http://[2600:1700:abcd:1234::1]/"), /this (Mac|PC|computer) or a private network/));
     await check("this Mac's own public address too", () => refused(() => checkUrl("http://[2600:1700:abcd:1234::5]/")));
     await check("another network's address passes", () => assert.ok(checkUrl("http://[2600:1700:abcd:9999::1]/") instanceof URL));
     await check("a name that points into the home network is refused", async () => {
       dns.table.set("nas.test", [{ address: "2600:1700:abcd:1234::77", family: 6 }]);
-      await refused(() => safeFetch("http://nas.test/"), /nas\.test points to this Mac or a private network/);
+      await refused(() => safeFetch("http://nas.test/"), /nas\.test points to this (Mac|PC|computer) or a private network/);
     });
     await check("a redirect into the home network is refused", async () => {
       allow();

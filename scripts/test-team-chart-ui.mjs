@@ -490,7 +490,7 @@ await test("bots that can't ask each other on one computer: a note under the cha
 await test("an older Bops on the account (Bops says so: GET /api/workspaces?olderBops=1): said once, under the chart", async () => {
   bops.older = true;
   const { box, done } = await mount(chartOf());
-  assert.match(box.querySelector("[data-older-bops]").textContent, /One of your Macs runs an older Bops\. These rules hold there once it updates\./);
+  assert.match(box.querySelector("[data-older-bops]").textContent, /One of your computers runs an older Bops\. These rules hold there once it updates\./); // (Rendered before /api/config says which computer this is: the neutral words. On a PC: "PC".)
   await done();
   bops.older = false;
   const now = await mount(chartOf());

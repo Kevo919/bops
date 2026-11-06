@@ -867,8 +867,8 @@ await test("every state of a tile says what it is, with its one button", () => {
   assert.equal(tile(rookPlan, bot("rook"), going), "Claude Code Sign in is open on its screen. · your Claude plan");
   const failed = { ...st, brains: st.brains.map((x) => (x.id === "brain_plan" ? { ...x, signingIn: { botId: "rook", computerId: "pc-rook", display: 2, at: now, failed: "it took too long" } } : x)) };
   assert.equal(tile(rookPlan, bot("rook"), failed), "Claude Code Sign in didn't finish: it took too long. · your Claude plan");
-  assert.equal(tile(rookPlan, bot("rook"), { ...st, host: "mac" }), "Claude Code Claude Code runs on a cloud computer. Your bots work on this Mac. · your Claude plan");
-  assert.equal(tile(rookPlan, { ...bot("rook"), runsOn: "mac" }), "Claude Code Rook works on your Mac, so its threads use Bops agent. · your Claude plan");
+  assert.equal(tile(rookPlan, bot("rook"), { ...st, host: "mac" }), "Claude Code Claude Code runs on a cloud computer. Your bots work on this computer. · your Claude plan"); // (Rendered before /api/config says which computer this is: the neutral words. On a PC: "PC".)
+  assert.equal(tile(rookPlan, { ...bot("rook"), runsOn: "mac" }), "Claude Code Rook works on your computer, so its threads use Bops agent. · your Claude plan");
   assert.equal(tile({ id: "ag_oc00000001", kind: "opencode", pays: "key", model: "anthropic/claude-sonnet-5-5" }), "OpenCode Sonnet 5.5 · your Anthropic key");
   assert.equal(tile({ id: "bops", kind: "bops", pays: "credit", model: "gpt-6-astra" }), "Bops agent GPT 6 Astra · Credit");
   // A bot that shares a computer and keeps a login there is told its logins aren't walled off.

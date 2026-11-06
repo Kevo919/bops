@@ -28,6 +28,7 @@ import {
 import { BRAINS_ON, brainRuns, live, threadRunner, waitsForOk, workBot, type AgentKind, type AgentPays, type AppState, type Bot, type BotAgent, type Session } from "@/lib/types";
 import { AgentMark, OpenAiMark, type MarkState } from "./agent-marks";
 import { brainSignIn } from "./brains";
+import { useOwnComputerWords } from "./computer-words";
 import { Fold } from "./fold";
 import { DefaultPill, NewThread, useBotKeys, useDismiss } from "./new-thread";
 import { undash } from "./side-group";
@@ -114,7 +115,8 @@ function threadsNow(state: AppState, b: Bot) {
 
 /** One agent of the profile as a tile: its mark, name and how it is, the Default marked whatever its state. `on`: its editor is open. */
 export function AgentTile({ agent: x, bot: b, state, isDefault, on, keys, onClick }: { agent: BotAgent; bot: Bot; state: AppState; isDefault: boolean; on?: boolean; keys?: ReadonlySet<string>; onClick?: () => void }) {
-  const st = agentState(x, b, state, keys);
+  const ownWords = useOwnComputerWords(state);
+  const st = agentState(x, b, state, keys, ownWords);
   const soon = !!st.soon;
   const at = { bot: b, state };
   return (
@@ -258,7 +260,8 @@ function AgentEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ask, setAsk] = useState<{ body: Record<string, unknown>; words: string } | null>(null);
-  const st = agentState(x, b, state, keys);
+  const ownWords = useOwnComputerWords(state);
+  const st = agentState(x, b, state, keys, ownWords);
   const acct = accountOf(x, state);
   const at = { bot: b, state };
   const accounts = (state.brains ?? []).filter((y) => y.kind === x.kind && y.auth === x.pays && y.workspaceId === (b.workspaceId ?? acct?.workspaceId));
@@ -589,6 +592,7 @@ export function BotAiSection({
   const [error, setError] = useState<string | null>(null);
   const [termBusy, setTermBusy] = useState(false);
   const keys = useBotKeys(state, b);
+  const ownWords = useOwnComputerWords(state);
   const ai = aiOf(b, state);
   const ro = !!state.shared;
   const def = ai.agents.find((x) => x.id === ai.default) ?? ai.agents[0];
@@ -700,7 +704,7 @@ export function BotAiSection({
           {shared && <SharedWarning bot={b} words={shared} ro={ro || workBot(b, state.bots).id === b.id} />}
           <span className={quiet}>
             {BRAINS_ON ? `Each thread runs on the agent you pick, with ${b.name}'s own accounts. Chat, memory and calls stay on credit.` : "Chat, threads, memory and calls run on credit."}
-            {BRAINS_ON && where === "some" ? " Threads on your Mac use Bops agent." : ""}
+            {BRAINS_ON && where === "some" ? ownWords(" Threads on your Mac use Bops agent.") : ""}
           </span>
           {ro && (
             <span className={quiet}>

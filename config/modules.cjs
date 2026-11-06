@@ -58,7 +58,7 @@ const MODULES = [
   {
     id: "thisComputer",
     name: "This computer",
-    help: "Bots doing tasks on this PC (or Mac), in a Chrome of their own. Full access is its own switch in Settings.",
+    help: "Bots doing tasks on this computer, in a Chrome of their own. Full access is its own switch in Settings.",
     keys: [],
     settings: [
       { key: "enabled", env: "BOPS_THIS_COMPUTER", label: "Bots can work on this computer", type: "toggle", default: true },

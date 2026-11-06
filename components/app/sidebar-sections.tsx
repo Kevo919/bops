@@ -17,6 +17,7 @@ import { KeyIcon } from "./screen-cards";
 import { SETUP_NEEDS, type SetupItem } from "./setup";
 import { arrived, Chevron, Count, DeleteX, readSectionOpen, undash, usePop, useRise, writeSectionOpen } from "./side-group";
 import { SkillsIcon } from "./skills";
+import { useComputerWords } from "./computer-words";
 import { ago, currentWorkspace, needsYou, NeedsYouDot, post, quietNothing, StatusIcon } from "./ui";
 
 /*
@@ -277,7 +278,7 @@ function AskCard({ ask: a, botName, where, shared, onOpen }: { ask: AppApproval;
 export type NeedActs = { onOpenIssue: (issue: Issue) => void; onOpenWatch: (w: Watch) => void; onSetup: () => void; onOpenAsk?: (a: AppApproval) => void };
 
 /** A bot's cards (needsByBot): what it asked your OK for, its urgent alerts, the issues waiting on us, then what Setup still needs. */
-function needCards(n: BotNeeds, acts: NeedActs) {
+function needCards(n: BotNeeds, acts: NeedActs, words: (text: string) => string) {
   return [
     ...n.asks.map((x) => <AskCard key={`ask:${x.ask.id}`} ask={x.ask} botName={x.botName} where={x.where} shared={x.shared} onOpen={() => acts.onOpenAsk?.(x.ask)} />),
     ...n.alerts.map((w) => (
@@ -312,7 +313,7 @@ function needCards(n: BotNeeds, acts: NeedActs) {
             <KeyIcon size={12} />
           </span>
         }
-        title={SETUP_NEEDS[item]}
+        title={words(SETUP_NEEDS[item])}
         meta="Setup"
         onClick={acts.onSetup}
       />
@@ -363,7 +364,8 @@ export function WithThreads({
     // Only when asked again: the user folding it afterwards keeps it folded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openAt]);
-  const cards = needs ? needCards(needs, acts) : [];
+  const computerWords = useComputerWords();
+  const cards = needs ? needCards(needs, acts, computerWords) : [];
   const count = cards.length + threads.length;
   const any = count > 0;
   const mark = cards.length || threads.some((s) => okWaits?.has(s.id)) ? "you" : chipMark(threads, readOnly);
