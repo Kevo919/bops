@@ -7,6 +7,7 @@ import { mailOn } from "./mail";
 import { memoryOn } from "./memory";
 import { fromThisMac } from "./owner-email";
 import { phoneOn } from "./phone";
+import { agentPhoneBase, agentPhoneView, lastProbe, probeAccount, type AgentPhoneView } from "./agentphone-status";
 import { getState } from "./store";
 import { fromBopsWindow } from "./ui-token";
 import { checkZapier, zapierOn } from "./zapier";
@@ -78,11 +79,20 @@ export const SERVICES: Service[] = [
     what: "Lets you text and call your bots from your own phone.",
     fields: [
       key("AGENTPHONE_API_KEY", "AgentPhone"),
-      { name: "BOPS_AGENTPHONE_HOOK_URL", label: "Public address texts arrive at", secret: false, hint: "https://your-address/hooks/agentphone", valid: looksLikeHttpsUrl },
+      // Only for texts and calls coming in: placing calls and texts from your own number needs the key alone.
+      { name: "BOPS_AGENTPHONE_HOOK_URL", label: "Public address texts arrive at", secret: false, hint: "https://your-address/hooks/agentphone", valid: looksLikeHttpsUrl, optional: true },
     ],
     getKey: { href: "https://agentphone.ai/dashboard", label: "Where to get this key (AgentPhone, Settings, API Keys)" },
     // Bops' own numbers list (phone.ts lists them the same way): a read, nothing is bought or sent.
-    probe: { url: "https://api.agentphone.ai/v1/numbers?limit=1", method: "GET", auth: "bearer" },
+    // (At AgentPhone's own address, or BOPS_AGENTPHONE_BASE: a stub on this computer, for tests.) After it, Check also
+    // reads the numbers and agents (agentphone-status.ts probeAccount) for the AgentPhone panel: still only reads.
+    probe: {
+      get url() {
+        return `${agentPhoneBase()}/v1/numbers?limit=1`;
+      },
+      method: "GET",
+      auth: "bearer",
+    },
     on: phoneOn,
   },
   {
@@ -196,6 +206,8 @@ export type ServiceView = {
   check?: CheckWords;
   /** Whether a Check exists for it (a safe read at the provider). */
   canCheck: boolean;
+  /** AgentPhone only, once its key is saved on a self-hosted Bops: the number and agent found, and whether calls and texts are ready. */
+  phone?: AgentPhoneView;
 };
 export type ServicesView = { mode: "self" | "cloud"; editable: boolean; services: ServiceView[] };
 
@@ -239,6 +251,7 @@ function viewOf(s: Service, owner: boolean, cloud: boolean): ServiceView {
     words,
     ...(owner ? { fields: s.fields.map((f, i) => ({ name: f.name, label: f.label, secret: f.secret, hint: f.hint, set: !!saved[i], shown: f.secret ? shownSecret(saved[i]) : (saved[i] ?? "") })) } : {}),
     ...(owner && current ? { check: { ok: current.ok, status: current.status, words: current.words } } : {}),
+    ...(s.id === "phone" && saved[0] ? { phone: agentPhoneView(shownSecret(saved[0])) } : {}),
   };
 }
 
@@ -248,6 +261,11 @@ export async function servicesView(request: Request): Promise<ServicesView> {
   // Signed in with Orgo, whether each is on is the cloud session's: read it first, or a fresh start says "off".
   if (cloud) await cloudSession().catch(() => null);
   const owner = !cloud && ownerHere(request);
+  // AgentPhone's panel: one read-only look (GET /v1/numbers and /v1/agents) with the key Bops runs with, at most every
+  // five minutes, so it says what was found without a Check. Nothing is called or sent.
+  const key = process.env.AGENTPHONE_API_KEY?.trim();
+  const seen = lastProbe();
+  if (!cloud && key && (!seen || Date.now() - seen.at > 5 * 60_000)) await probeAccount(key).catch(() => null);
   return { mode: cloud ? "cloud" : "self", editable: owner, services: SERVICES.filter((s) => !cloud || !s.selfOnly).map((s) => viewOf(s, owner, cloud)) };
 }
 
@@ -295,7 +313,11 @@ export async function checkService(id: unknown, fetcher: typeof fetch = fetch): 
     if (probe.body) headers["Content-Type"] = "application/json";
     const response = await fetcher(probe.url, { method: probe.method, headers, body: probe.body, redirect: "error", cache: "no-store", signal: controller.signal });
     await drain(response);
-    if (response.ok) return done({ ok: true, status: "works", words: `${s.provider} accepted this key.` });
+    if (response.ok) {
+      // AgentPhone: also what the account has (its number, agent and texting), for its panel. Reads only.
+      if (s.id === "phone") await probeAccount(value, fetcher).catch(() => null);
+      return done({ ok: true, status: "works", words: `${s.provider} accepted this key.` });
+    }
     if (response.status === 401 || response.status === 403) return done({ ok: false, status: "invalid", words: `${s.provider} turned this key down. Copy it again from ${s.provider} and save it here.` });
     if (response.status === 402) return done({ ok: false, status: "no credit", words: `${s.provider} says the account has no credit left.` });
     if (response.status === 429) return done({ ok: false, status: "busy", words: `${s.provider} is busy right now. Try Check again in a minute.` });

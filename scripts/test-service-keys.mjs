@@ -232,7 +232,9 @@ await test("masked display: a key shows as 'ends in' its last four, an address w
   assert.equal((await save("phone", "BOPS_AGENTPHONE_HOOK_URL", "https://hooks.example.com/hooks/agentphone")).status, 200);
   const phone = (await call(route.GET)).json.services.find((s) => s.id === "phone");
   assert.equal(phone.fields[1].shown, "https://hooks.example.com/hooks/agentphone");
-  assert.match(phone.words, /add the agentphone key too/, "texting needs both");
+  // The key is what sets it up (placing calls and texts needs only the key; the address is for ones coming in).
+  assert.equal(phone.status, "off", "the address alone isn't set up");
+  assert.ok(!phone.phone, "no AgentPhone panel before a key is saved");
 });
 
 await test("the atomic write: other lines kept, the setting replaced not doubled, owner-only, no .tmp left, even on failure", async () => {
