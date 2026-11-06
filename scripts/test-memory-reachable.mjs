@@ -117,11 +117,14 @@ await check("D1: the sheet's own path (?ws=) says can't-reach too, not an empty 
 
 /** The route with a mockable service: mode tells the fake what the Honcho call does. The client is
  *  cached per key, so each mode also rotates HONCHO_API_KEY to get a fresh bank + client. */
-async function getMode(mode, q) {
-  process.env.HONCHO_API_KEY = `hc-test-memory-reach-${mode}`;
+async function getMode(mode, q, key = `hc-test-memory-reach-${mode}`) {
+  process.env.HONCHO_API_KEY = key;
   mockFetch = async () => {
     if (mode === "401") return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "content-type": "application/json" } });
     if (mode === "403") return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { "content-type": "application/json" } });
+    // The service echoing the key it was given (short and dotted: under the 20-character rule) and its header.
+    if (mode === "echo")
+      return new Response(JSON.stringify({ detail: `Invalid API key ${key} (Authorization: Bearer ${key}); try key=${key}` }), { status: 401, headers: { "content-type": "application/json" } });
     if (mode === "502") return new Response(JSON.stringify({ detail: "Bad gateway" }), { status: 502, headers: { "content-type": "application/json" } });
     if (mode === "429") return new Response(JSON.stringify({ detail: "Slow down" }), { status: 429, headers: { "content-type": "application/json" } });
     // fetch's own network TypeError: the SDK wraps it as its ConnectionError (dist/http/client.js).
@@ -196,10 +199,43 @@ await check("D4 end to end: no raw upstream message in either 503 body", async (
   }
 });
 
-await check("D2: the search path renders the can't-reach wording (not nothing-matches)", async () => {
-  const tab = readFileSync(new URL(at("components/app/bot-memory.tsx")), "utf8");
-  assert.match(tab, /j\.unreachable \|\| j\.refused \? "down"/, "a down result state");
-  assert.match(tab, /results === "down" \?/, "rendered as its own branch");
+await check("redaction: a short dotted key the service echoes back never reaches the log line (either path)", async () => {
+  const key = "hk.7a.Q2";
+  for (const q of ["?bot=boppy", "?ws=ws_main"]) {
+    const { r, lines } = await logged(() => getMode("echo", q, key));
+    assert.equal(r.status, 200);
+    assert.equal((await r.json()).refused, true);
+    const line = lines.find((l) => l.startsWith("[memory] "));
+    assert.ok(line?.startsWith("[memory] refused: "), `labelled refused: ${line}`);
+    assert.ok(!line.includes(key), `${q}: the key is not in ${JSON.stringify(line)}`);
+    assert.ok(!line.includes("7a.Q2"), `${q}: nor any part of it`);
+    assert.match(line, /\[redacted\]/);
+  }
+});
+
+await check("redaction: bearer/authorization values, sk-/hch-/ak_/ck_ keys, key=/token= values, long tokens", async () => {
+  const { redactSecrets, memoryLogLine } = await import(at("lib/server/memory-outage.ts"));
+  const cases = [
+    ["Authorization: Bearer abc.def", ["abc.def"]],
+    ["authorization=Basic dXNlcjpw", ["dXNlcjpw"]],
+    ["sent bearer tok.1", ["tok.1"]],
+    ["bad key sk-ab12 here", ["ab12"]],
+    ["bad key hch-x.y here", ["x.y"]],
+    ["ak_short and ck_q.9", ["short", "q.9"]],
+    ["GET /v3/x?api_key=s3.cr&token=t.k&x=1", ["s3.cr", "t.k"]],
+    ['{"apiKey":"pz.9"}', ["pz.9"]],
+    [`id ${"A".repeat(24)} end`, ["A".repeat(24)]],
+  ];
+  for (const [text, secrets] of cases) {
+    const out = redactSecrets(text, []);
+    for (const sec of secrets) assert.ok(!out.includes(sec), `${JSON.stringify(text)} -> ${JSON.stringify(out)} still has ${sec}`);
+  }
+  // The configured key itself, whatever its shape, and it never survives the 200-character cap either.
+  process.env.HONCHO_API_KEY = "q.1";
+  const line = memoryLogLine("error", new Error(`${"x ".repeat(95)}q.1 q.1`));
+  assert.ok(line.length <= 200 && !line.includes("q.1"), line);
+  assert.ok(!redactSecrets("key q.1 was refused").includes("q.1"), "the configured key by default");
+  assert.equal(redactSecrets("Request timed out after 45000ms", []), "Request timed out after 45000ms", "ordinary words stay");
 });
 
 process.chdir(tmpdir());

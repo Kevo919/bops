@@ -1,6 +1,7 @@
 import "server-only";
 import { AuthenticationError, ConnectionError, PermissionDeniedError, RateLimitError, ServerError, TimeoutError } from "@honcho-ai/sdk";
 import { APIConnectionError } from "openai";
+import { cloudProxy } from "./cloud";
 
 /**
  * What a failed memory read was, for /api/memory (the Memory sheet and a bot's Memory tab):
@@ -46,10 +47,38 @@ export function classifyMemoryError(e: unknown): MemoryFailure {
   return "error";
 }
 
-/** The server log's line for a failed memory read: labelled by outcome, long tokens redacted, at most 200 characters. */
-export function memoryLogLine(kind: MemoryFailure, e: unknown): string {
+/** The memory keys in use: this computer's Honcho key and, signed in with Orgo, the cloud proxy's. */
+function configuredKeys(): string[] {
+  let cloud: string | undefined;
+  try {
+    cloud = cloudProxy("honcho")?.key;
+  } catch {}
+  return [process.env.HONCHO_API_KEY, cloud].filter((k): k is string => typeof k === "string" && k.length > 0);
+}
+
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Masks what could be a secret in text bound for the log: the configured keys themselves (whatever their
+ * length or shape: a short or dotted key is still a key), bearer/authorization values, sk-/hch-/ak_/ck_
+ * style keys, key=/token= values, and any run of 20+ token characters.
+ */
+export function redactSecrets(text: string, secrets: string[] = configuredKeys()): string {
+  let out = text;
+  // Longest first, so a key that contains another is masked whole.
+  for (const k of [...new Set(secrets)].filter(Boolean).sort((a, b) => b.length - a.length)) out = out.replace(new RegExp(escape(k), "g"), "[redacted]");
+  return out
+    .replace(/\b(bearer|basic)\s+[^\s"',;]+/gi, "$1 [redacted]")
+    .replace(/\b(authorization|x-api-key|api[-_]?key)(["']?\s*[:=]\s*["']?)(?:(?:bearer|basic)\s+)?[^\s"',;&]+/gi, "$1$2[redacted]")
+    .replace(/\b(sk|hch|ak|ck)([-_])[A-Za-z0-9._-]+/g, "$1$2[redacted]")
+    .replace(/\b([A-Za-z_]*(?:key|token|secret|password))=[^\s&"',;]+/gi, "$1=[redacted]")
+    .replace(/[A-Za-z0-9_-]{20,}/g, "[redacted]");
+}
+
+/** The server log's line for a failed memory read: labelled by outcome, secrets redacted, at most 200 characters. */
+export function memoryLogLine(kind: MemoryFailure, e: unknown, secrets?: string[]): string {
   const err = (e ?? {}) as Err;
   const cause = networkCause(err.cause) ? ` (${String((err.cause as Err).code)})` : "";
   const what = `${typeof err.name === "string" ? err.name : "Error"}: ${String(err.message ?? "")}${cause}`;
-  return `[memory] ${kind}: ${what.replace(/[A-Za-z0-9_-]{20,}/g, "[redacted]")}`.slice(0, 200);
+  return `[memory] ${kind}: ${redactSecrets(what, secrets)}`.slice(0, 200);
 }

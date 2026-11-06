@@ -88,7 +88,7 @@ export function MemorySheet({ state, onClose }: { state: AppState; onClose: () =
             <div className="py-6 text-center text-[13px] text-[color:var(--ht-9a9a98)]">Can&rsquo;t reach the memory service right now. It&rsquo;s set up, but it didn&rsquo;t answer &mdash; try again in a moment.</div>
           ) : info.error ? (
             // A code bug (the route's 500): not an outage, and not off - without this it read as "isn't on yet".
-            <div className="py-6 text-center text-[13px] text-[color:var(--ht-b42318)]">Memory couldn&rsquo;t load. Something went wrong in Bops, not the memory service.</div>
+            <div className="py-6 text-center text-[13px] text-[color:var(--ht-b42318)]">Memory couldn&rsquo;t load. Try again, and if it keeps happening tell us.</div>
           ) : !info.on ? (
             <div className="py-6 text-center text-[13px] text-[color:var(--ht-9a9a98)]">Memory isn&rsquo;t on yet.</div>
           ) : (

@@ -41,6 +41,15 @@ const { parseHTML } = await import("linkedom");
 const { window: win } = parseHTML("<!doctype html><html><body></body></html>");
 globalThis.window = globalThis;
 globalThis.document = win.document;
+// So react-dom listens for input events (it checks `"oninput" in document` when it loads; linkedom has no on* props).
+if (!("oninput" in win.document)) win.document.oninput = null;
+// And knows a plain <input> for a text box: a browser's input.type is "text" when no type is set; linkedom's is empty.
+{
+  const P = Object.getPrototypeOf(win.document.createElement("input"));
+  const type = Object.getOwnPropertyDescriptor(P, "type");
+  if (!win.document.createElement("input").type)
+    Object.defineProperty(P, "type", { configurable: true, get() { return this.getAttribute("type") || "text"; }, set(v) { if (type?.set) type.set.call(this, v); else this.setAttribute("type", v); } });
+}
 globalThis.addEventListener = () => {};
 globalThis.removeEventListener = () => {};
 Object.defineProperty(globalThis, "navigator", { configurable: true, value: { userAgent: "test" } });
@@ -54,6 +63,10 @@ const ANSWERS = {
   // Memory off: the sheet's path (?ws=) is memoryInfo with on: false; the bot tab's (?bot=) is {off: true}.
   off: (url) => (url.includes("bot=") ? json({ off: true, workspace: "", ws: "", card: [], facts: [] }) : json({ on: false, bank: "b", own: true, sharedWith: [], card: [], review: null })),
   error: () => json({ error: "Memory failed; this isn't an outage." }, 500),
+  // A search (D2): the page loads normally, then the search's own call can't reach the service, or is refused.
+  "search-unreachable": (url) => (url.includes("q=") ? json({ unreachable: true }, 503) : json({ workspace: "Home", ws: "ws_main", card: [], facts: [] })),
+  "search-refused": (url) => (url.includes("q=") ? json({ refused: true }) : json({ workspace: "Home", ws: "ws_main", card: [], facts: [] })),
+  "search-ok": (url) => (url.includes("q=") ? json({ workspace: "Home", ws: "ws_main", card: [], facts: [] }) : json({ workspace: "Home", ws: "ws_main", card: [], facts: [] })),
 };
 let mode = "refused";
 const asked = [];
@@ -84,7 +97,7 @@ const bot = { id: "boppy", name: "Boppy", workspaceId: "ws_main" };
 const state = { workspace: "ws_main", workspaces: [{ id: "ws_main", name: "Home" }], bots: [bot], chats: [], messages: [], sessions: [], routines: [] };
 
 /** Mounts `el` with /api/memory answering as `m`, and gives its visible text (whitespace collapsed). */
-async function rendered(m, el) {
+async function rendered(m, el, search) {
   mode = m;
   asked.length = 0;
   const box = document.createElement("div");
@@ -94,6 +107,15 @@ async function rendered(m, el) {
     r.render(el);
     await settle();
   });
+  if (search)
+    await act(async () => {
+      // Typed as a person would: the native value setter (React's change tracking), then an input event.
+      const input = box.querySelector("input");
+      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value").set.call(input, search);
+      input.dispatchEvent(new win.Event("input", { bubbles: true }));
+      await new Promise((res) => setTimeout(res, 400)); // the search waits 300 ms for typing to stop
+      await settle();
+    });
   const text = box.textContent.replace(/\s+/g, " ").trim();
   await act(async () => r.unmount());
   box.remove();
@@ -105,7 +127,7 @@ const SHEET = {
   refused: "Memory’s service refused this key. Check the memory key in Settings → Services — trying again won’t fix a refused key.",
   unreachable: "Can’t reach the memory service right now. It’s set up, but it didn’t answer — try again in a moment.",
   off: "Memory isn’t on yet.",
-  error: "Memory couldn’t load. Something went wrong in Bops, not the memory service.",
+  error: "Memory couldn’t load. Try again, and if it keeps happening tell us.",
 };
 for (const m of Object.keys(SHEET))
   await test(`the Memory sheet, ${m}: says "${SHEET[m].slice(0, 40)}…" and nothing of the other states`, async () => {
@@ -121,7 +143,7 @@ const TAB = {
   refused: "Memory’s service refused this key. Check the memory key in Settings — trying again won’t fix a refused key.",
   unreachable: "Can’t reach the memory service right now. It’s set up, but it didn’t answer — try again in a moment.",
   off: "Memory isn't set up on this computer yet.",
-  error: "Memory failed; this isn't an outage.",
+  error: "Memory couldn’t load. Try again, and if it keeps happening tell us.",
 };
 for (const m of Object.keys(TAB))
   await test(`a bot's Memory tab, ${m}: says "${TAB[m].slice(0, 40)}…" and nothing of the other states`, async () => {
@@ -129,6 +151,19 @@ for (const m of Object.keys(TAB))
     assert.ok(asked.some((u) => u.startsWith("/api/memory?bot=boppy")), "it asked the tab's path");
     assert.ok(text.includes(TAB[m]), `${m}: expected ${JSON.stringify(TAB[m])} in ${JSON.stringify(text)}`);
     for (const other of Object.keys(TAB)) if (other !== m) assert.ok(!text.includes(TAB[other]), `${m}: not the ${other} wording`);
+    assert.doesNotMatch(text, /this isn't an outage|undefined|\[object Object\]|\{"/, "no raw body");
+  });
+
+// D2: a search whose call can't reach the service (or is refused) says so, not "nothing matches" (a real search
+// through the box, replacing test-memory-reachable.mjs's source-text match).
+const DOWN = "Can’t reach the memory service right now — try again in a moment.";
+const NONE = "Nothing learned matches.";
+for (const [m, want] of [["search-unreachable", DOWN], ["search-refused", DOWN], ["search-ok", NONE]])
+  await test(`a bot's Memory tab, ${m}: a search says "${want.slice(0, 40)}…"`, async () => {
+    const text = await rendered(m, h(BotMemory, { state, bot, onOpenThread: () => {} }), "coffee");
+    assert.ok(asked.some((u) => u.startsWith("/api/memory?") && u.includes("bot=boppy") && u.includes("q=coffee")), `the search asked the route (asked: ${asked.join(", ")})`);
+    assert.ok(text.includes(want), `${m}: expected ${JSON.stringify(want)} in ${JSON.stringify(text)}`);
+    for (const other of [DOWN, NONE]) if (other !== want) assert.ok(!text.includes(other), `${m}: not ${JSON.stringify(other)}`);
   });
 
 console.log(`memory sheet ui: ${passed} passed`);
