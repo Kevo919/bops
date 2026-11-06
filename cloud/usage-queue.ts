@@ -66,7 +66,9 @@ type LookedUp = { model?: string | null; botId?: string | null };
 /**
  * This process's own way to look a use up (proxy.ts turnInfo, which knows what the call asked for), by
  * the use's id. A use without one here (replayed from the spool by another process, or after a restart)
- * is looked up with objectInfo.
+ * is looked up with objectInfo. Gone once the use is looked up, or once a replay here finds the use is
+ * no longer this process's (not queued, parked or being spooled here, and on no spool file: another
+ * process replayed it).
  */
 const lookups = new Map<string, () => Promise<LookedUp>>();
 
@@ -83,8 +85,12 @@ export const usageQueueTiming = {
 const pending = new Map<string, QueuedUse>();
 /** Uses that couldn't be written or spooled (no spool set, or it couldn't be written), by id: tried again with each replay. */
 const parked = new Map<string, QueuedUse>();
+/** Uses on their way to the spool (spool, before their line is on it), by id. */
+const spooling = new Set<string>();
 /** Every background write under way, this queue's and the proxy's others. */
 const underWay = new Set<Promise<unknown>>();
+/** This queue's writes under way (writeWithRetries: until the use is in or on the spool), by use id, with their ref. */
+const writes = new Map<string, { ref: string; done: Promise<void> }>();
 /** Retries waiting their turn: woken at once when the cloud stops. */
 const sleepers = new Set<() => void>();
 let stopping = false;
@@ -123,8 +129,23 @@ export function keepUsage(
   };
   if (lookup?.run) lookups.set(id, lookup.run);
   pending.set(use.id, use);
-  void track(writeWithRetries(use));
+  const done = track(writeWithRetries(use));
+  writes.set(id, { ref: use.ref, done });
+  const gone = () => void writes.delete(id);
+  done.then(gone, gone);
   return use.ref;
+}
+
+/**
+ * For tests: wait for the queue's writes of `ref`'s uses (every use's, with none) to end: each use in,
+ * on the spool, parked, or left to the spool by a stop.
+ */
+export async function usageWritten(ref?: string): Promise<void> {
+  await Promise.allSettled(
+    [...writes.values()]
+      .filter((w) => ref === undefined || w.ref === ref)
+      .map((w) => w.done),
+  );
 }
 
 /** keepUsage for a use usage.ts worked out (tokensUse, imagesUse…), nothing when there's none. Its ref. */
@@ -265,21 +286,27 @@ async function appendUse(path: string, u: QueuedUse) {
 async function spool(uses: QueuedUse[]): Promise<boolean> {
   const path = config.usageSpool();
   let all = true;
+  // At once, before any wait: a replay's sweep of `lookups` never takes one of these for gone.
+  for (const u of uses) spooling.add(u.id);
   for (const u of uses) {
-    if (!path) {
-      parked.set(u.id, u);
-      all = false;
-      continue;
-    }
     try {
-      await inSpoolTurn(() => appendUse(path, u));
-      parked.delete(u.id);
-    } catch (e) {
-      console.error(
-        `[usage] the spool (${path}) couldn't take ${u.ref}, kept in memory: ${(e as Error).message}`,
-      );
-      parked.set(u.id, u);
-      all = false;
+      if (!path) {
+        parked.set(u.id, u);
+        all = false;
+        continue;
+      }
+      try {
+        await inSpoolTurn(() => appendUse(path, u));
+        parked.delete(u.id);
+      } catch (e) {
+        console.error(
+          `[usage] the spool (${path}) couldn't take ${u.ref}, kept in memory: ${(e as Error).message}`,
+        );
+        parked.set(u.id, u);
+        all = false;
+      }
+    } finally {
+      spooling.delete(u.id);
     }
   }
   return all;
@@ -435,6 +462,8 @@ async function replayOnce(): Promise<number> {
   const path = config.usageSpool();
   /** Claimed files not to delete: unread, or with a last line that may still be being written. */
   const keep = new Set<string>();
+  /** Whether every claimed file was read whole (then any use not in them, nor here, isn't on the spool). */
+  let readAll = true;
   const claimed = !path
     ? []
     : await inSpoolTurn(async () => {
@@ -452,6 +481,7 @@ async function replayOnce(): Promise<number> {
               `[usage] ${file} couldn't be read, kept: ${(e as Error).message}`,
             );
             keep.add(file);
+            readAll = false;
             continue;
           }
           const { uses: found, bad, torn } = readSpool(text);
@@ -466,6 +496,13 @@ async function replayOnce(): Promise<number> {
             await keepBad(path, file, bad);
           }
         }
+        // A lookup kept for a use this process spooled, that another process has replayed since: the
+        // use is on no spool file now (every file was just claimed and read, and this process appends
+        // only in its spool turn), and isn't queued, parked or being spooled here. It won't be asked for.
+        if (readAll)
+          for (const id of [...lookups.keys()])
+            if (!uses.has(id) && !pending.has(id) && !parked.has(id) && !spooling.has(id))
+              lookups.delete(id);
         return files;
       });
   let wrote = 0;
@@ -543,4 +580,5 @@ export const usageQueueState = () => ({
   pending: pending.size,
   parked: parked.size,
   underWay: underWay.size,
+  lookups: lookups.size,
 });

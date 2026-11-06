@@ -33,6 +33,7 @@ import {
   replayUsage,
   usageQueueState,
   usageQueueTiming,
+  usageWritten,
 } from "../usage-queue.ts";
 import {
   dropUsers,
@@ -40,7 +41,6 @@ import {
   prepareDb,
   seedUser,
   TEST_DATABASE_URL,
-  until,
 } from "./core-fakes.ts";
 
 /**
@@ -147,11 +147,8 @@ test("a use whose write fails is tried again, and is in once the database takes 
     "still waiting to be written, not dropped",
   );
   await failWrites(false);
-  // The row can be seen (another connection) a moment before its writer takes it off the queue.
-  await until(
-    async () => (await rowsOf(ref)).length > 0 && usageQueueState().pending === 0,
-    "the retry to write it",
-  );
+  // The retry's write, awaited: in, and off the queue.
+  await usageWritten(ref);
   assert.equal((await rowsOf(ref)).length, 1);
   assert.equal((await rowsOf(ref))[0].units, 2);
   assert.equal(usageQueueState().pending, 0);
@@ -166,9 +163,10 @@ test("a use that keeps failing goes on the spool, and is written from it once (a
   });
   await failWrites(true);
   const ref = keepUsage(alice, "honcho.calls", 1, { route: "chat" });
-  await until(
-    async () => (await spooled()).some((u) => u.ref === ref),
-    "it to be spooled",
+  await usageWritten(ref);
+  assert.ok(
+    (await spooled()).some((u) => u.ref === ref),
+    "on the spool",
   );
   assert.deepEqual(await rowsOf(ref), []);
   assert.equal(usageQueueState().pending, 0);
@@ -194,10 +192,9 @@ test("with no spool, a use that can't be written stays in memory, and a later re
   delete process.env.BOPS_USAGE_SPOOL;
   await failWrites(true);
   const ref = keepUsage(alice, "composio.calls", 1, { tool: "NOTION_SEARCH" });
-  await until(
-    () => usageQueueState().parked === 1 && usageQueueState().pending === 0,
-    "it to be parked",
-  );
+  await usageWritten(ref);
+  assert.equal(usageQueueState().parked, 1, "parked");
+  assert.equal(usageQueueState().pending, 0);
   await failWrites(false);
   assert.equal(await replayUsage(), 1);
   assert.equal((await rowsOf(ref)).length, 1);
@@ -241,16 +238,15 @@ test("a spool line a crash cut short costs only itself: the line after it is rep
   Object.assign(usageQueueTiming, { tries: 1 });
   await failWrites(true);
   const cut = keepUsage(alice, "honcho.calls", 1, { route: "chat" });
-  await until(
-    async () => (await spooled()).some((u) => u.ref === cut),
-    "it to be spooled",
-  );
+  await usageWritten(cut);
+  assert.ok((await spooled()).some((u) => u.ref === cut), "spooled");
   const size = (await readFile(spoolPath())).length;
   await truncate(spoolPath(), size - 20);
   const next = keepUsage(alice, "honcho.calls", 1, { route: "search" });
-  await until(
-    async () => (await readFile(spoolPath(), "utf8")).includes(next),
-    "the next one to be spooled",
+  await usageWritten(next);
+  assert.ok(
+    (await readFile(spoolPath(), "utf8")).includes(next),
+    "the next one spooled",
   );
   await appendFile(spoolPath(), `\n${JSON.stringify(use(after))}\n`);
   await failWrites(false);
@@ -373,10 +369,9 @@ test("an append that lands in a spool another process claimed and read meanwhile
   try {
     await failWrites(true);
     const ref = keepUsage(alice, "agentphone.sms", 1, { direction: "out" });
-    await until(
-      () => usageQueueState().pending === 0 && opens >= 2,
-      "it to be spooled",
-    );
+    await usageWritten(ref);
+    assert.equal(usageQueueState().pending, 0, "spooled");
+    assert.ok(opens >= 2, "appended again");
     // The write + fsync went to their file, after their read: then they delete it.
     assert.ok(!readThere.includes(ref), "their read was before the line");
     assert.ok(
@@ -415,10 +410,9 @@ test("in this process, a replay waits for an append under way: it never claims t
   try {
     await failWrites(true);
     const ref = keepUsage(alice, "agentphone.sms", 1, { direction: "out" });
-    await until(
-      () => replayed !== undefined && usageQueueState().pending === 0,
-      "it to be spooled",
-    );
+    await usageWritten(ref);
+    assert.equal(usageQueueState().pending, 0, "spooled");
+    assert.ok(replayed !== undefined, "a replay started mid-append");
     // The replay ran once the append was done, and found the line.
     assert.equal(await replayed, 1);
     assert.equal(opens, 1, "one open: the file was never moved under it");
@@ -537,7 +531,7 @@ test("a lower sighting replayed later (a spooled one after reconcile) charges no
   ]);
 });
 
-test("a retry after the price changed charges nothing; growth then pays only what's not paid yet", async () => {
+test("a retry after the price changed charges nothing; growth then pays only the new units, at today's price", async () => {
   const { recordUsageFor } = await import("../usage.ts");
   const ref = `use_price_${Date.now()}`;
   await recordUsageFor(alice, "agentphone.sms", ref, 2, { direction: "out" });
@@ -554,9 +548,34 @@ test("a retry after the price changed charges nothing; growth then pays only wha
     [{ units: 2, cost: cost / 2 }],
     "nothing more charged for the price change",
   );
-  // Grown to 3 segments: paid up to what 3 cost today, less what was paid.
+  // Grown to 3 segments: the third at today's price; the two paid at the old price aren't priced again.
   await recordUsageFor(alice, "agentphone.sms", ref, 3, { direction: "out" });
-  assert.deepEqual(await rowsOf(ref), [{ units: 3, cost: (cost / 2) * 3 }]);
+  assert.deepEqual(await rowsOf(ref), [{ units: 3, cost: cost / 2 + cost / 2 }]);
+  assert.ok(cost < (cost / 2) * 3, "less than today's price on the whole use");
+  // Retried, and seen again at 2 (older): nothing more.
+  await recordUsageFor(alice, "agentphone.sms", ref, 3, { direction: "out" });
+  await recordUsageFor(alice, "agentphone.sms", ref, 2, { direction: "out" });
+  assert.deepEqual(await rowsOf(ref), [{ units: 3, cost }]);
+});
+
+test("after a price drop, growth pays at most what the whole use costs today, less what was paid", async () => {
+  const { recordUsageFor } = await import("../usage.ts");
+  const { costOf } = await import("../pricing.ts");
+  const ref = `use_drop_${Date.now()}`;
+  await recordUsageFor(alice, "agentphone.sms", ref, 2, { direction: "out" });
+  const [{ cost }] = await rowsOf(ref);
+  // As if it was paid when texts cost twice what they do today.
+  await query(
+    "UPDATE bops.cloud_usage SET cost_micros = cost_micros * 2 WHERE user_id = $1 AND detail->>'ref' = $2",
+    [alice, ref],
+  );
+  await recordUsageFor(alice, "agentphone.sms", ref, 3, { direction: "out" });
+  const today = costOf("agentphone.sms", 3, { direction: "out", ref });
+  assert.deepEqual(
+    await rowsOf(ref),
+    [{ units: 3, cost: Math.max(cost * 2, today) }],
+    "never past the whole use at today's price (or what was paid already)",
+  );
 });
 
 /* Tokens, images, transcriptions and Jev answers through the queue (proxy.ts keepUse): each with its ref before its first write. */
@@ -616,13 +635,9 @@ test("an image, a transcription and a Jev answer each get a ref before their fir
     "waiting to be written, not dropped",
   );
   await failWrites(false);
-  // The rows can be seen (another connection) a moment before their writers take them off the queue.
-  await until(
-    async () =>
-      (await Promise.all(refs.map(rowsOf))).every((r) => r.length) &&
-      usageQueueState().pending === 0,
-    "the retries to write them",
-  );
+  // The retries' writes, awaited: in, and off the queue.
+  await Promise.all(refs.map((r) => usageWritten(r)));
+  assert.equal(usageQueueState().pending, 0);
   for (const [i, ref] of refs.entries()) {
     const cost = await priced(uses[i], ref);
     assert.ok(cost > 0, `${uses[i].kind} costs something`);
@@ -640,10 +655,12 @@ test("an image, a transcription and a Jev answer survive the spool, and replayed
   const uses = await otherUses();
   await failWrites(true);
   const refs = uses.map((u) => keepUse(alice, u)!);
-  await until(async () => {
-    const on = (await spooled()).map((u) => u.ref);
-    return refs.every((r) => on.includes(r));
-  }, "them to be spooled");
+  await Promise.all(refs.map((r) => usageWritten(r)));
+  const on = (await spooled()).map((u) => u.ref);
+  assert.ok(
+    refs.every((r) => on.includes(r)),
+    "them spooled",
+  );
   assert.equal(usageQueueState().pending, 0);
   // What's on the spool, as it was: written again after the replay below, as a replay cut off after
   // its writes (before it deleted the file) would leave it for the next start.
@@ -699,9 +716,11 @@ test("a turn's tokens are kept under the turn's id: sightings refused, then spoo
     undefined,
     "nothing used, nothing kept",
   );
-  await until(
-    async () => (await spooled()).filter((u) => u.ref === turn).length === 2,
-    "both to be spooled",
+  await usageWritten(turn);
+  assert.equal(
+    (await spooled()).filter((u) => u.ref === turn).length,
+    2,
+    "both spooled",
   );
   await failWrites(false);
   assert.ok((await replayUsage()) >= 2);
@@ -871,7 +890,8 @@ test("a lookup that fails is tried again with the write, then spooled with the u
       throw new Error("test: lookup refused");
     },
   });
-  await until(async () => (await spooled()).some((u) => u.ref === turn), "it to be spooled");
+  await usageWritten(turn);
+  assert.ok((await spooled()).some((u) => u.ref === turn), "spooled");
   assert.equal(asked, 2, "tried with each of its tries");
   assert.deepEqual(await rowsOf(turn), []);
   // The replay in this process uses the same lookup: refused again, back on the spool.
@@ -890,6 +910,47 @@ test("a lookup that fails is tried again with the write, then spooled with the u
   ).rows;
   assert.deepEqual(row, { model: "gpt-6.1-sol", bot: "sam" });
   assert.equal((await rowsOf(turn)).length, 1);
+  // The lookup this process kept for its own line (now on no spool file) is let go.
+  assert.equal(usageQueueState().lookups, 0);
+});
+
+test("a spooled use another process replays has its lookup here let go at the next replay; one still queued keeps its own", async () => {
+  const { tokensUse } = await import("../usage.ts");
+  process.env.BOPS_USAGE_SPOOL = spoolPath();
+  Object.assign(usageQueueTiming, { tries: 1, firstRetryMs: 20, maxRetryMs: 50 });
+  const session = `sess_uq_gone_${Date.now()}`;
+  const turn = `turn_uq_gone_${Date.now()}`;
+  await ownObject(alice, "openai", "agent_session", session, "gpt-6.1-sol", "sam");
+  const said = tokensUse({ input_tokens: 1_000, output_tokens: 100 }, { source: "agent" });
+  keepUse(alice, said, turn, {
+    of: { provider: "openai", objectId: session },
+    run: async () => {
+      throw new Error("test: lookup refused");
+    },
+  });
+  await usageWritten(turn);
+  assert.ok((await spooled()).some((u) => u.ref === turn), "spooled with its lookup");
+  assert.equal(usageQueueState().lookups, 1, "kept for a replay here");
+  // Another process claims the spool, writes the use (looked up with objectInfo) and deletes its file.
+  const other = `${spoolPath()}.replaying.9999.g0neby0u`;
+  await rename(spoolPath(), other);
+  const { recordUsageFor } = await import("../usage.ts");
+  await recordUsageFor(alice, "openai.tokens", turn, said!.units, { ...said!.detail, model: "gpt-6.1-sol", botId: "sam" });
+  await unlink(other);
+  assert.equal(usageQueueState().lookups, 1, "nothing here knows yet");
+  // Meanwhile a use of this process's own is still being looked up: its lookup stays.
+  let answer!: (v: { model?: string; botId?: string }) => void;
+  const late = new Promise<{ model?: string; botId?: string }>((r) => (answer = r));
+  const mine = `turn_uq_mine_${Date.now()}`;
+  keepUse(alice, said, mine, { of: { provider: "openai", objectId: session }, run: () => late });
+  assert.equal(usageQueueState().lookups, 2);
+  assert.equal(await replayUsage(), 0, "nothing on the spool");
+  assert.equal(usageQueueState().lookups, 1, "the replayed one's let go, the queued one's kept");
+  answer({ model: "gpt-6.1-sol", botId: "sam" });
+  await usageWritten(mine);
+  assert.equal(usageQueueState().lookups, 0, "and gone once looked up");
+  assert.equal((await rowsOf(turn)).length, 1);
+  assert.equal((await rowsOf(mine)).length, 1);
 });
 
 // Last: a stop is for good (no use is retried after it).
@@ -938,10 +999,9 @@ test("a use parked in memory stays parked while a replay is still writing it, so
   delete process.env.BOPS_USAGE_SPOOL;
   await failWrites(true);
   const ref = keepUsage(alice, "composio.calls", 1, { tool: "SLACK_SEND" });
-  await until(
-    () => usageQueueState().parked >= 1 && usageQueueState().pending === 0,
-    "it to be parked",
-  );
+  await usageWritten(ref);
+  assert.ok(usageQueueState().parked >= 1, "parked");
+  assert.equal(usageQueueState().pending, 0);
   await failWrites(false);
   // The replay's write waits on the use's own lock (usage.ts recordUsageFor), held by another session.
   const blocker = new pg.Client({ connectionString: TEST_DATABASE_URL });
@@ -1008,7 +1068,7 @@ test("a turn whose session lookup is still under way at a stop is spooled with i
   assert.equal(line.detail.model, undefined);
   // The lookup answers after the stop: that writer leaves it to the spool.
   answer({ model: "gpt-6-luna", botId: "sam" });
-  await new Promise((r) => setTimeout(r, 200));
+  await usageWritten(turn);
   assert.deepEqual(await rowsOf(turn), [], "not written by the late lookup: the spool has it");
   // The replay (as the next start's) looks the session up itself.
   const text = await readFile(spoolPath(), "utf8");

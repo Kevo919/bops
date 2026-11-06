@@ -87,11 +87,14 @@ export async function recordUsage(userId: string, kind: string, units: number, d
  * looked up; a call's seconds grow while it runs; a write tried again, or replayed from the spool):
  * one row per `ref`, keeping the largest count (and the detail that came with it). What's paid for a
  * ref (cost_micros) is never more than its dearest sighting costs at today's prices. A sighting that
- * doesn't say the model is priced at the row's model, when the row has one. A sighting pays
- * - when its count is larger (or it's the first): what it costs, less what was paid for the ref;
- * - when its count is the same and its detail is dearer than the row's, both priced at today's
- *   prices (the model became known late, fewer tokens were cached than first said): only that
- *   difference, and never past what it costs less what was paid. The row takes this sighting's detail.
+ * doesn't say the model is priced at the row's model, when the row has one. A sighting is priced
+ * against the row, both at today's prices (the row's detail with the sighting's model when the row
+ * had none), and pays only what it costs beyond the row, and never past what it costs less what was
+ * paid:
+ * - a larger count (or the first): only the new units (and any dearer detail) at today's prices, so
+ *   the part already paid is never priced again after a price rise;
+ * - the same count with dearer detail (the model became known late, fewer tokens were cached than
+ *   first said): only that difference. The row takes this sighting's detail.
  * A smaller count (an older sighting), or the same count with detail no dearer (a retry, a replay,
  * even after a price change), changes nothing and charges nothing. So sightings A, B, A pay what the
  * dearer of A and B costs, once.
@@ -125,21 +128,22 @@ export async function recordUsageFor(userId: string, kind: string, ref: string, 
       const keep = { ...detail, ...(typeof detail.model !== "string" && typeof rowModel === "string" ? { model: rowModel } : {}), ref };
       const before = seen ? Number(seen.cost_micros) : 0;
       const costs = costOf(kind, units, keep);
-      if (seen && units === was) {
-        // The same count: both details priced at today's prices, and only what this one costs beyond
-        // the row's is paid, and never past what this one costs in all (less what was paid). So a
-        // price rise is never paid on the whole use again (a dearer sighting after it pays only the
-        // detail's difference), a retry or replay of the same detail is never dearer, and swaps
-        // (A, B, A) pay once. A detail dearer than the row's is kept even when nothing is left to pay
-        // (it was paid at a price since lowered), so the row is always the dearest sighting.
-        const stood = costOf(kind, was, { ...(seen.detail ?? {}), ref });
-        if (costs <= stood) return;
-        paid = Math.max(0, Math.min(costs - stood, costs - before));
-      } else {
-        // A larger count (or the first): paid up to what it costs, less what was paid for this ref
-        // already, so what's paid for a ref never comes to more than its dearest sighting costs.
-        paid = Math.max(0, costs - before);
-      }
+      // What the row stands at today: its own detail at today's prices, at the model now known when
+      // it had none (it was priced as the dearest, and the model is news about it, not new use).
+      const stood = seen
+        ? costOf(kind, was, { ...(seen.detail ?? {}), ...(typeof rowModel !== "string" && typeof keep.model === "string" ? { model: keep.model } : {}), ref })
+        : 0;
+      // The same count, no dearer than the row: a retry or a replay (even after a price change), or a
+      // swap back (A, B, A). Nothing changes and nothing is paid.
+      if (seen && units === was && costs <= stood) return;
+      // Only what this sighting costs beyond the row, both at today's prices: so after a price rise,
+      // growth pays the new units at the new price, and dearer detail at the same count its
+      // difference, never the rise on what was already paid. And never past what it costs in all,
+      // less what was paid: what's paid for a ref never comes to more than its dearest sighting
+      // costs at today's prices (after a price drop, less than the new units' price may be left).
+      // A detail dearer than the row's is kept even when nothing is left to pay (it was paid at a
+      // price since lowered), so the row is always the dearest sighting.
+      paid = Math.max(0, Math.min(costs - stood, costs - before));
       const cost = before + paid;
       if (seen)
         await c.query("UPDATE bops.cloud_usage SET units = $2, detail = $3::jsonb, cost_micros = $4 WHERE id = $1", [seen.id, units, JSON.stringify(keep), cost]);
