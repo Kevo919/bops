@@ -28,9 +28,22 @@ const STUBS = {
       "export const tailscaleState = () => globalThis.__remote.tailscale ?? { installed: false, connected: false, needsLogin: false };",
   ),
 };
+// The real lib/server/remote.ts (for tailscaleState): a Tailscale CLI that's there and answers slowly, through a stand-in
+// execFile that records how it was called, and no network interfaces (so the CLI is asked).
+const REMOTE_STUBS = {
+  "node:child_process": stub(
+    "import { promisify } from 'node:util';" +
+      "export function execFile(bin, args, opts, cb) { const t = globalThis.__tailscale; t.calls.push({ bin, args, opts }); setTimeout(() => cb(null, t.stdout, ''), t.delay); }" +
+      "execFile[promisify.custom] = (bin, args, opts) => new Promise((res, rej) => execFile(bin, args, opts, (e, stdout, stderr) => (e ? rej(e) : res({ stdout, stderr }))));" +
+      "export function execFileSync() { throw new Error('execFileSync blocks the server'); }",
+  ),
+  "node:fs": stub("import * as fs from 'node:fs'; export * from 'node:fs'; export const existsSync = (p) => /tailscale/i.test(String(p)) || fs.existsSync(p);"),
+  "node:os": stub("export * from 'node:os'; export const networkInterfaces = () => ({});"),
+};
 registerHooks({
   resolve(specifier, context, next) {
     if (STUBS[specifier]) return { url: STUBS[specifier], shortCircuit: true };
+    if (REMOTE_STUBS[specifier] && context.parentURL?.endsWith("/lib/server/remote.ts")) return { url: REMOTE_STUBS[specifier], shortCircuit: true };
     if (specifier.startsWith("@/")) specifier = pathToFileURL(`${root}/${specifier.slice(2)}`).href;
     try {
       return next(specifier, context);
@@ -310,6 +323,30 @@ await test("plain words: no dashes in anything shown, in every state", async () 
     assert.doesNotMatch(words(m.box), DASHES);
     await m.done();
   }
+});
+
+await test("tailscaleState asks the CLI without blocking the server, with no console window, a timeout, and a cache", async () => {
+  const real = await import(pathToFileURL(`${root}/lib/server/remote.ts`).href);
+  globalThis.__tailscale = { calls: [], delay: 200, stdout: JSON.stringify({ BackendState: "NeedsLogin" }) };
+  let ticked = false;
+  setTimeout(() => (ticked = true), 5);
+  const started = Date.now();
+  const asking = real.tailscaleState();
+  assert.ok(asking instanceof Promise, "answers with a promise");
+  assert.ok(Date.now() - started < 50, "returns at once, before the CLI answers");
+  const again = real.tailscaleState();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(ticked, "timers run while the CLI is being asked: the event loop isn't held");
+  const state = await asking;
+  assert.deepEqual(state, { installed: true, connected: false, needsLogin: true, backend: "NeedsLogin" });
+  assert.equal(await again, state, "a poll while it's asked waits for the same answer");
+  assert.equal(globalThis.__tailscale.calls.length, 1, "the CLI is asked once");
+  const { args, opts } = globalThis.__tailscale.calls[0];
+  assert.deepEqual(args, ["status", "--json"]);
+  assert.equal(opts.windowsHide, true, "no console window flashes on Windows");
+  assert.ok(opts.timeout > 0 && opts.timeout <= 4000, `a timeout (${opts.timeout} ms)`);
+  assert.deepEqual(await real.tailscaleState(), state, "cached");
+  assert.equal(globalThis.__tailscale.calls.length, 1, "cached: not asked again within ten seconds");
 });
 
 /* ---------------- Settings, Your phone ---------------- */

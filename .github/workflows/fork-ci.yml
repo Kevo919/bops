@@ -67,6 +67,10 @@ jobs:
         run: node scripts/test-executor-lifecycle.mjs
       - name: Agents API Windows path serialization tests
         run: node scripts/test-agent-api-path.mjs
+      - name: Phone pairing (Your phone) tests
+        run: node scripts/test-easy-pairing.mjs
+      - name: Agent Skill folder import tests
+        run: node scripts/test-import-agent-skills.mjs
       - name: Host computer identity tests
         run: |
           node scripts/test-computer-identity.mjs win32
