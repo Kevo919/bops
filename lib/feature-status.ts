@@ -45,6 +45,7 @@ const LIST: FeatureInProgress[] = [
   { id: "agents-you-run", name: "Agents you run", percent: 70, left: "Review, then a live check: Hermes on your server and dsh on your PC", state: "testing", where: "feature/agent-instances" },
   { id: "agents-dsh-remote", name: "DeepSeek Harness on another computer", percent: 10, left: "dsh documents no task address for other apps yet: its web page needs a sign in token", where: "feature/agent-instances" },
   { id: "agents-dsh-desktop", name: "Drive the DeepSeek Harness app", percent: 5, left: "The app's window takes no outside tasks. Add its dsh.cmd as a program on this PC for now", where: "feature/agent-instances" },
+  { id: "agentphone-calls-texts", name: "Calls and texts from your AgentPhone number", percent: 80, left: "A live call and a live text on your PC, once AgentPhone has funds and the 10DLC registration is done", state: "testing", where: "feature/agentphone-calls-texts" },
   { id: "phone-pairing", name: "Your phone pairing", percent: 75, left: "Finish the review, then pair your phone with a QR code on your PC", where: "feature/easy-phone-pairing (PR #77)" },
 ];
 
