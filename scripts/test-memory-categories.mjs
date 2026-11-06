@@ -232,6 +232,15 @@ const unknownCall = (call) => (honcho.unknown.push(`${call.method} ${call.path}`
 /** What the model says each fact is about, by the fact's text: its answer is a function of what it was asked. */
 const SORTS = new Map();
 /** One item as the model gives it (every field is required by the schema). */
+/**
+ * The invoice's due date, a few days from the real today: Orbit leaves out a to-do two weeks past due
+ * (settled() in lib/memory-categories.ts), and the clock isn't frozen here, so a fixed date (it was
+ * 2026-10-16) dropped it from orbit_read once that was two weeks gone.
+ */
+const INVOICE_DUE = (() => {
+  const d = new Date(Date.now() + 3 * 86_400_000);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+})();
 const item = (category, title, more = {}) => ({ category, title, detail: "", key: "", when: "", who: "", done: false, ...more });
 // Each call (its body, its input parsed, the fact texts, the SDK's timeout and retry headers); `fail(call)`
 // answers instead, `hold(call)` waits for releaseOpenai().
@@ -575,7 +584,7 @@ await section("A first look at memory: the card first, then the newest facts, so
         "f5",
         50,
         "Tiger needs to send the invoice to Acme by Friday.",
-        [item("todos", "Send the invoice to Acme", { key: "send invoice acme", when: "2026-10-16", who: "Acme" }), item("companies", "Acme Inc", { key: "Acme Inc", detail: "Gets your invoice" })],
+        [item("todos", "Send the invoice to Acme", { key: "send invoice acme", when: INVOICE_DUE, who: "Acme" }), item("companies", "Acme Inc", { key: "Acme Inc", detail: "Gets your invoice" })],
       ],
       ["f6", 60, "Dana promised to send Tiger the signed contract by Monday.", [item("promises", "Dana sends the signed contract", { key: "dana signed contract", who: "Dana Reyes", when: "next Monday" })]],
       ["f7", 70, "Tiger is building Bops, an app for teams of AI assistants.", [item("projects", "Bops", { key: "Project Bops", detail: "An app for teams of AI assistants." })]],
@@ -691,7 +700,7 @@ await section("A first look at memory: the card first, then the newest facts, so
   assert.deepEqual([leo.private, leo.sources[0].private, leo.sources[0].from, leo.sources[0].how], [true, true, "Your other agents", "saved"]);
   for (const i of items.filter((x) => x !== leo)) assert.equal(i.private, undefined, `${i.title} isn't private`);
   // To-dos and promises: when they're due (a date the app can read, or none), who for.
-  assert.deepEqual(pick(one(items, "todos", "Send the invoice to Acme"), ["when", "who", "done"]), { when: "2026-10-16", who: "Acme", done: undefined });
+  assert.deepEqual(pick(one(items, "todos", "Send the invoice to Acme"), ["when", "who", "done"]), { when: INVOICE_DUE, who: "Acme", done: undefined });
   assert.deepEqual(pick(one(items, "promises", "Dana sends the signed contract"), ["when", "who"]), { when: undefined, who: "Dana Reyes" }, "\"next Monday\" isn't a date");
   assert.deepEqual(pick(one(items, "projects", "Bops"), ["key", "detail"]), { key: "projects:bops", detail: "An app for teams of AI assistants" }, "\"Project Bops\" is Bops; no full stop");
   noDashes(one(items, "decisions", "Pro plan at 40 dollars a month").detail);

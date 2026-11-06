@@ -505,13 +505,31 @@ function reposAtHand(wsId: string): IngotRepo[] | undefined {
 
 /**
  * As a bot's turn starts (chat.ts), the workspace's repos are read again from Ingot in the background when the list
- * kept is older than a few seconds, so the turn's note (hostedAppsLine) has them by the time it's written. Never
- * waited on: Ingot slow or down only means the note says nothing of them. Nothing for a workspace not on Orgo yet.
+ * kept is older than a few seconds, so the turn's note (hostedAppsLine) has them by the time it's written. The read
+ * goes on alongside the turn's other work; the note waits for what's left of it at most REPOS_AHEAD_WAIT_MS
+ * (reposReadBy): Ingot slow or down only means the note says nothing of them. (Not waited on at all, a quick turn
+ * wrote its note a moment before a quick answer came, and a repo just put in Ingot went unsaid.) Nothing for a
+ * workspace not on Orgo yet. Never rejects.
  */
-export function readReposAhead(botId: string) {
+export function readReposAhead(botId: string): Promise<void> {
   const b = bot(botId);
   const wsId = b ? workspaceOf(b) : undefined;
-  if (wsId && workspace(wsId)?.orgoProjectId) void reposOf(wsId);
+  if (!wsId || !workspace(wsId)?.orgoProjectId) return Promise.resolve();
+  return reposOf(wsId).then(
+    () => {},
+    () => {},
+  );
+}
+
+/** The longest a turn's note waits for the repos read as it started (readReposAhead). */
+const REPOS_AHEAD_WAIT_MS = 1000;
+
+/** Once `read` (readReposAhead's) is done, or REPOS_AHEAD_WAIT_MS on, whichever comes first. */
+export async function reposReadBy(read: Promise<void> | undefined): Promise<void> {
+  if (!read) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([read, new Promise<void>((resolve) => (timer = setTimeout(resolve, REPOS_AHEAD_WAIT_MS)))]);
+  clearTimeout(timer);
 }
 
 /* ---------------- Whether deploying can work ---------------- */

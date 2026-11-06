@@ -445,6 +445,9 @@ const renderedLines = (r: Rendered) =>
     .map((line) => squash(line.trim().replace(/\t+/g, CELL_GAP)))
     .filter(Boolean);
 
+/** A turn for the rest of the server: through the event loop's timers (setImmediate would run before them). */
+const letBreathe = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
 /**
  * A page for a bot to read (web_fetch): its title and text, at most 12,000 characters (`truncated`
  * when there was more, or the page was over 2 MB), and its links, at most 100, the ones to read first
@@ -469,12 +472,16 @@ export async function readPage(url: string, opts: { sayNoBrowser?: boolean } = {
   let text: string;
   let links: PageLink[] = [];
   if (kind === "html") {
+    // A big page is a few hundred milliseconds of parsing and walking: the server gets a turn between
+    // the steps (letBreathe), so one bot's read doesn't hold up every other request for all of it.
     const document = parse(got.body);
+    await letBreathe();
     title = titleOf(document);
     // The visible text, links and <base href> first: Readability takes the document apart as it reads.
     const onPage: FoundLink[] = [];
     const visible = blocks(document, false, onPage).join("\n");
     const base = baseOf(document, got.url);
+    await letBreathe();
     const art = article(document);
     title = art?.title || title;
     text = art?.text ?? visible;

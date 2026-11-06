@@ -120,6 +120,18 @@ jobs:
         run: node --conditions=react-server scripts/test-schedules.mjs
       - name: Voice typing card UI tests
         run: node scripts/test-handy-card-ui.mjs
+      - name: Memory with blank IDs or off tests
+        run: node --conditions=react-server scripts/test-memory-blank-config.mjs
+      - name: Memory categories (Knowledge, Orbit) tests
+        run: node --conditions=react-server scripts/test-memory-categories.mjs
+      - name: Orgo plan and computers tests
+        run: node --conditions=react-server scripts/test-plan.mjs
+      - name: Reading web pages (safe fetch, web_fetch, monitors) tests
+        run: node --conditions=react-server scripts/test-web.mjs
+      - name: Apps on the web (Ingot, deploys, Locals) tests
+        run: node --conditions=react-server scripts/test-hosted-apps.mjs
+      - name: Runner mode (what a computer's runner runs) tests
+        run: node --conditions=react-server scripts/test-runner-mode.mjs
 
   # The web UI in a phone-sized window (scripts/test-mobile-layout.mjs): a production build served on loopback, a made-up
   # Orgo, Playwright's Chromium. Its own job, so the build doesn't hold up the web job's tests.

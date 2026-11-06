@@ -35,7 +35,7 @@ import { plainLinks } from "@/cloud/style";
 import { soulBlock } from "@/lib/bot-docs";
 import { whenText } from "@/cloud/schedule";
 import { buildApp, madeApp } from "./made-apps";
-import { appWork, askDeploy, botSite, deployForBot, hostedAppsLine, localForBot, readReposAhead } from "./hosted-apps";
+import { appWork, askDeploy, botSite, deployForBot, hostedAppsLine, localForBot, readReposAhead, reposReadBy } from "./hosted-apps";
 import { savePage } from "./pages";
 import { saveDoc } from "./docs";
 import { onRunner } from "./persist";
@@ -2104,9 +2104,9 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
     // now (lib/apps-access.ts): on a member's turn, only with Your Apps at Write there.
     const member = opts.member;
     const apps = appsOpen(getState()) && (!member || memberAppsWrite(member, botId));
-    // Its workspace's repos in Ingot, read again meanwhile (never waited on), so its note can name the ones that
-    // aren't apps yet (hostedAppsLine), on the turns that note is on.
-    if (apps && !bg && !opts.outside) readReposAhead(botId);
+    // Its workspace's repos in Ingot, read again meanwhile, so its note can name the ones that aren't apps yet
+    // (hostedAppsLine), on the turns that note is on: the note waits a moment at most for what's left of it (reposReadBy).
+    const reposRead = apps && !bg && !opts.outside ? readReposAhead(botId) : undefined;
     // The user's API keys it may call (keys.ts): only ones set in their Orgo vault. None on a turn someone
     // outside Bops started: a GET runs at once, and would read the user's Stripe or bank on a stranger's say. On a
     // member's, the ones this bot has: they reach the owner's keys only through the bots they may tell, and anything
@@ -2730,6 +2730,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       .join("\n");
     // What memory is searched for: the user's latest words, or a routine's job.
     const about = bg ? bg.goal : lastWords(chatId);
+    await reposReadBy(reposRead);
     const now = [
       ...nowLines(b),
       // (On a member's turn, another bot's work on a shared screen is named only when they see that bot.)

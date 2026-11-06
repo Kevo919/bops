@@ -325,7 +325,10 @@ export async function orgoPlan({ fresh = false } = {}): Promise<OrgoPlan | null>
   // A miss doubles this read's keep, up to the cap; a plan resets it. (forgetPlan, a new key and changed
   // computers read again at once, as before.)
   void read.plan.then((p) => {
-    if (g.bopsOrgoPlan === read && !p) read.keep = Math.min(read.keep * 2, FAIL_KEEP_MAX_MS);
+    if (g.bopsOrgoPlan !== read) return;
+    // (A plan after misses used to keep the misses' doubled keep, and pass it on to every read after.)
+    if (p) read.keep = KEEP_MS;
+    else read.keep = Math.min(read.keep * 2, FAIL_KEEP_MAX_MS);
   });
   return read.plan;
 }
