@@ -176,11 +176,15 @@ export type LinePick = { agent: ApAgent; number: ApNumber | null } | { problem: 
  */
 export function pickLine(agents: ApAgent[], numbers: ApNumber[], from?: string | null): LinePick {
   if (!agents.length) return { problem: "Your AgentPhone account has no agent yet. Make one on agentphone.ai, then try again." };
-  const digits = (x: string) => x.replace(/\D/g, "").slice(-10);
   // A number asked for by name: it, and the agent it's attached to.
-  if (from && digits(from).length === 10) {
-    const n = numbers.find((x) => digits(x.phoneNumber) === digits(from));
-    if (!n) return { problem: `${pretty(from)} isn't one of the numbers in your AgentPhone account (${numbers.map((x) => pretty(x.phoneNumber)).slice(0, 4).join(", ") || "none yet"}).` };
+  // Exactly one of theirs, whole (country code optional for a US number): never a partial match, never ignored.
+  if (from != null && from.trim()) {
+    const full = (x: string) => {
+      const d = x.replace(/\D/g, "");
+      return d.length === 10 ? `1${d}` : d;
+    };
+    const n = full(from).length >= 11 ? numbers.find((x) => full(x.phoneNumber) === full(from)) : undefined;
+    if (!n) return { problem: `"${from.trim().slice(0, 30)}" isn't one of your AgentPhone numbers. Use one of these, in full: ${numbers.map((x) => pretty(x.phoneNumber)).slice(0, 6).join(", ") || "none yet"}.` };
     const agent = agents.find((a) => a.id === n.agentId) ?? (agents.length === 1 ? agents[0] : undefined);
     return agent ? { agent, number: n } : { problem: `${pretty(n.phoneNumber)} isn't attached to an agent yet. Attach it to one on agentphone.ai, then try again.` };
   }

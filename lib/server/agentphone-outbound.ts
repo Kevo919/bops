@@ -126,7 +126,17 @@ export async function runOutboundTool(botId: string, name: string, args: Record<
   const greeting = kind === "call" ? (typeof args.greeting === "string" && args.greeting.trim() ? args.greeting.trim().slice(0, 300) : `Hi, this is ${b.name}, calling for ${owner}.`) : undefined;
   // Ask before anything else reaches AgentPhone (the read that picks the line comes after the yes).
   const asked = typeof args.from === "string" && args.from.trim() ? args.from.trim() : null;
-  if (!opts.approved) throw new NeedsOk(askOf(kind, who.to, asked, words, greeting));
+  // A number to send from, named: checked against the account first (a read; nothing is placed or sent), so the yes
+  // card shows exactly the number used, and one that isn't theirs, or isn't whole, is refused with their numbers.
+  if (!opts.approved) {
+    let shown: string | null = null;
+    if (asked) {
+      const { pick } = await probeAccount(undefined, fetch, asked);
+      if ("problem" in pick) return { ok: false, text: `Failed: ${pick.problem}` };
+      shown = pick.number?.phoneNumber ?? null;
+    }
+    throw new NeedsOk(askOf(kind, who.to, shown, words, greeting));
+  }
   const { pick } = await probeAccount(undefined, fetch, asked);
   if ("problem" in pick) return { ok: false, text: `Failed: ${pick.problem}` };
   if (!pick.number) return { ok: false, text: "Failed: your AgentPhone agent has no number yet. Add one on agentphone.ai, then try again." };

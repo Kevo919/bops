@@ -304,10 +304,28 @@ await check("picking: two numbers on one agent ask which; `from` picks one; no a
   assert.match(asks.problem, /has 2 numbers\. Say which one to use: \+1 \(555\) 010-0000, \+1 \(555\) 010-0001/);
   const chosen = St.pickLine(agents, two, "+1 555 010 0001");
   assert.equal(chosen.number.id, "n2");
-  assert.match(St.pickLine(agents, two, "+15559990000").problem, /isn't one of the numbers/);
+  assert.match(St.pickLine(agents, two, "+15559990000").problem, /isn't one of your AgentPhone numbers\. Use one of these, in full: \+1 \(555\) 010-0000, \+1 \(555\) 010-0001/);
+  assert.match(St.pickLine(agents, two, "555-0100").problem, /isn't one of your AgentPhone numbers/, "too few digits is refused, never ignored");
+  assert.equal(St.pickLine(agents, two, "(555) 010-0001").number.id, "n2", "a whole US number without +1");
   const none = St.pickLine([{ id: "a" }, { id: "b" }], [{ id: "n1", phoneNumber: "+15550100000", agentId: null }]);
   assert.match(none.problem, /^None of your 2 AgentPhone agents has a number yet/);
   assert.doesNotMatch(none.problem, /agents with numbers/);
+});
+
+await check("a `from` that isn't exactly one of theirs is refused before the yes card, with their numbers; a whole one shows on the card", async () => {
+  ap.numbers = [{ id: "num_1", phoneNumber: "+15550102000", agentId: "agt_1", outboundSms: "enabled" }];
+  ap.seen.length = 0;
+  const before = asks().length;
+  for (const from of ["555-0102", "+15559990000"]) {
+    const r = await Out.runOutboundTool("boppy", "send_text", { to: "+15550109999", text: "Hi", from }, { chatId });
+    assert.equal(r.ok, false);
+    assert.match(r.text, /^Failed: ".+" isn't one of your AgentPhone numbers\. Use one of these, in full: \+1 \(555\) 010-2000\.$/, r.text);
+  }
+  assert.equal(asks().length, before, "no yes card");
+  assert.ok(ap.seen.every((x) => x.method === "GET"), "only reads, nothing sent");
+  // The same tool with a whole number of theirs: the card names exactly it.
+  await assert.rejects(Out.runOutboundTool("boppy", "send_text", { to: "+15550109999", text: "Hi", from: "555 010 2000" }, { chatId }), (e) => /^Text \+1 \(555\) 010-9999 from \+1 \(555\) 010-2000$/.test(e.ask.action));
+  assert.equal(posts("/v1/messages").length, 0);
 });
 
 await check("a call that ends unanswered, busy or canceled stops being polled, and says so", async () => {
