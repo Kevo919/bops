@@ -199,3 +199,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 04:12 lead: merged #108 (claims per turn, task 66) at d1e15b6, CI green.
 - 04:26 lead: merged #109 (pre-existing red tests and their product races, task 65) at fe4ee61, CI green. Cloud work left: tasks 77/78 (builder). PC work queued: task 60, PC rebuild, Codex live queue.
 - 04:54 lead: merged #110 (claims/approval nits, task 78; more change words, so it asks more often, never less) at f662b82. #111 merge chain still running.
+- 05:02 lead: merged #111 (usage nits, task 77) at 67608d4. All cloud tasks are done. Remaining: task 60 and the Codex live queue (both need the PC), plus Kevin's items.
