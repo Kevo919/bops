@@ -6,4 +6,4 @@
 **Merged (Kevin direct order, previous run):** #90 + #95, rebuilt on the dark-mode head, CI green, palette-codemod applied.
 **Blockers:** none mine.
 **Needs Kevin/lead:** go on task 66 + parity PR order; PC rebuild to ship pairing to Kevin's screen.
-**Updated (UTC):** 2026-11-05 22:50
+**Updated (UTC):** 2026-11-06 01:10
