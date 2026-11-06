@@ -1,4 +1,5 @@
 import "server-only";
+import { noteSentOut } from "./turn-deeds";
 import { stamp } from "./turn-context";
 import { randomBytes } from "node:crypto";
 import { cleanAi, isCli, legacyAi } from "@/lib/agents";
@@ -542,6 +543,8 @@ export const session = (sessionId: string) => box.state.sessions.find((s) => s.i
 export function addMessage(m: Omit<Message, "id" | "at">) {
   // On a runner's chat turn, its bot's rows carry the turn and Bops Cloud's clock (turn-context.ts).
   const message: Message = stamp({ id: id("msg"), at: Date.now(), ...m });
+  // An email or a text going out: the turn whose tool sent it is told (turn-deeds.ts), never anyone else's.
+  if (message.email?.dir === "out" || message.sms?.dir === "out") noteSentOut();
   update((s) => {
     // About a thread started for something the user kept between us (its result, chips or notes): kept between us too.
     const about = [m.resultOf, ...(m.sessionIds ?? [])];
