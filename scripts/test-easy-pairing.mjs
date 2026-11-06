@@ -24,7 +24,8 @@ const STUBS = {
     "export const pair = () => (globalThis.__remote.paired = true, 'x'.repeat(43));" +
       "export const unpair = () => { globalThis.__remote.paired = false; };" +
       "export const pairing = () => (globalThis.__remote.paired ? { hash: 'h', created: 1 } : null);" +
-      "export const addresses = () => globalThis.__remote.addresses;",
+      "export const addresses = () => globalThis.__remote.addresses;" +
+      "export const tailscaleState = () => globalThis.__remote.tailscale ?? { installed: false, connected: false, needsLogin: false };",
   ),
 };
 registerHooks({
@@ -181,7 +182,7 @@ await test("no Tailscale address: says exactly what to do, with Google Play QR, 
   assert.match(missing.textContent, /home wifi address is not used/);
   assert.ok([...s2.querySelectorAll("button")].some((b) => b.textContent === "Check again"));
   assert.doesNotMatch(m.box.textContent, /192\.168\.1\.20/, "never offers the home address");
-  assert.match(step(m.box, 3).textContent, /Finish step 2 first/);
+  assert.match(step(m.box, 3).textContent, /No QR yet: step 2/);
   assert.doesNotMatch(m.box.textContent, /none yet\b(?! \(see step 2\))/);
   // Nothing to pair with: Pair a phone is off, and pressing it anyway sends nothing.
   const pairButton = [...m.box.querySelectorAll("button")].find((b) => b.textContent.trim() === "Pair a phone");
@@ -191,6 +192,22 @@ await test("no Tailscale address: says exactly what to do, with Google Play QR, 
   assert.deepEqual(calls.filter((c) => c.startsWith("POST")), [], "nothing sent");
   assert.equal(globalThis.__remote.paired, false, "not paired");
   assert.equal(qr(step(m.box, 3), "Pairing QR code"), null);
+  await m.done();
+});
+
+await test("Tailscale installed but signed out: says so plainly (not install it), and step 3 says why there is no QR", async () => {
+  globalThis.__remote = { paired: false, addresses: NONE, tailscale: { installed: true, connected: false, needsLogin: true, backend: "NeedsLogin" } };
+  const m = await mount();
+  const s2 = step(m.box, 2);
+  const signedOut = s2.querySelector('[data-tailscale="signed-out"]');
+  assert.ok(signedOut, "its own state, not the missing one");
+  assert.match(signedOut.textContent, /installed on this computer but not signed in/);
+  assert.match(signedOut.textContent, /system tray/);
+  assert.match(signedOut.textContent, /same account as your phone/);
+  assert.ok([...signedOut.querySelectorAll("button")].some((b) => b.textContent === "Check again"));
+  assert.match(step(m.box, 3).textContent, /Tailscale on this computer is not signed in \(step 2\)/);
+  const pairButton = [...m.box.querySelectorAll("button")].find((b) => b.textContent.trim() === "Pair a phone");
+  assert.ok(pairButton?.disabled, "still off until signed in");
   await m.done();
 });
 
@@ -244,7 +261,7 @@ await test("paired but the address went away: the Tailscale step shows, and Pair
   const m = await mount();
   assert.ok(step(m.box, 2)?.querySelector('[data-tailscale="missing"]'), "step 2 says what to do");
   assert.ok([...m.box.querySelectorAll("button")].find((b) => b.textContent.trim() === "Pair again").disabled);
-  assert.match(step(m.box, 3).textContent, /Finish step 2 first/);
+  assert.match(step(m.box, 3).textContent, /No QR yet: step 2/);
   await m.done();
 });
 
