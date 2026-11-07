@@ -1,24 +1,17 @@
 # Codex status
-Updated 2026-11-07T09:52Z. IN PROGRESS.
+Updated 2026-11-07T10:54Z. IN PROGRESS.
 
-## Current coordination
-Read team 3be267d (no new codex/all instructions) and lead 0610: Codex live queue is on HOLD while the lead tester drives the Bops window. No UI actions taken. Native desktop and Node REPL tools are now available; previous tool-availability blocker is superseded. Await lead release before using them.
+## Coordination
+Fetched team f0e82f8. No new codex/all messages or explicit release of lead's 0610 live-window hold. No UI actions. Native desktop/Node REPL are available when released.
 
-## Findings / ownership
-Live findings 79-87 are assigned to builders A/B/C; no duplicate code work. Zai owns PR113 review fixes. Lead tester's recipes will be in agent-desktop-hub/recipes/bops/. Actual Windows task completion remains unverified by Codex. Last independent health/build evidence from 05:49: 67608d4, nhyaYdanjjku_eugiIErl, HTTP200; not rerun this hour.
+## Ownership and evidence
+Task90 is now zai's DOING scope; previous Codex offer is withdrawn to avoid duplication. Zai reports PR113 fake-executable escaping fix fa23036; CI success is not independently verified by Codex. PR118/task89 remains partial; shared tests overlap builder C/task85. No source changes or tests run this hour.
+
+## Remaining acceptance
+Actual Windows task completion, Memory, note persistence and full visual matrix remain unverified by Codex. Last independently verified running build: 67608d4 / nhyaYdanjjku_eugiIErl at 05:49 HTTP200; historical evidence only. Resume lead's live queue using tester recipes after explicit release. Runner Chrome follow-up remains with its owner.
 
 ## Needs Kevin
-Board task88 records OpenAI credit issue; no new account action or repeated sign-in request from Codex.
+No new request. Board task88 retains credit issue; no fresh account check or repeated sign-in request.
 
-## Handoff
-Resume lead's six-step live queue after explicit release; use reusable tester recipes and record exact results. Preserve user configuration and existing ownership. Chrome startup follow-up remains with runner owner.
-
-## Coordination log
-Hourly automation bops-hourly-build-check; run codex-1107-0949. Canonical lists read including closed items and updated. Board/code-only run: no source edits, merges, heavy jobs or restarts. Own hourly lock released on exit.
-
-Latest: PR114 merged remotely at af176d8; PR115-117 owned by builders. No explicit live-hold release. Offered task90 audit to lead; confirmed old procedure error-message assertion by source read only, preserving zero-request guard. No tests rerun or deployment claim.
-
-
-
-Board-only update: zai reports partial task89 in PR118; task row still names PR117. Shared suite has 15 remaining failures and overlaps builder C/task85. Evidence is zai-reported, not rerun by Codex. Live hold unchanged; task90 assignment request remains pending.
-
+## Run
+Hourly bops-hourly-build-check, codex-1107-1051. Canonical lists read including closed. No heavy jobs, restarts, merges or changes to user configuration. Own hourly lock released on exit.
