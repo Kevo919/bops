@@ -289,7 +289,7 @@ export const siteOf = (tool: string, input: Record<string, unknown>) =>
  * and `.{.}` say it without ever spelling `..`) and extglob groups (`@(..)`, `!(..)`, `+(..)`, `*(..)`, `?(..)`).
  * None of it is read as text: a pattern with any of it asks, whatever it seems to say.
  */
-const GLOB_CONSTRUCT = /[{}]|\(@|\(!|\(\+|\(\*|\(\?/;
+const GLOB_CONSTRUCT = /[{}]|@\(|!\(|\+\(|\*\(|\?\(/;
 
 /**
  * Whether a glob pattern stays where it was put (Glob's `pattern`, which says what to find, and Grep's `glob`,
