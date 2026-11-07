@@ -5,7 +5,7 @@ Every feature, how it was tested, when, by whom, and the result. **Kevin: read t
 Legend: ✅ passed · ⚠️ passed with a known limit · ❌ failed · ⏳ not yet tested this way.
 Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an independent agent read the code for bugs and security), **Live PC** (on Kevin's PC, real app), **Live server** (on the Hostinger server), **Live phone**, **Real account** (with Kevin's real provider account).
 
-**Tested: 65%** (120.5 of 185 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
+**Tested: 65%** (121 of 185 checks that apply have passed; a pass with a known limit counts as half). Updated by the lead each check-in.
 
 **Visual features (Kevin, Nov 5):** a screen or visual change is only ✅ when (1) its tests pass, (2) a screenshot check passes (dark mode, no blank screens), (3) an independent review passes, and (4) it's tried in the real app on the PC.
 
@@ -50,7 +50,7 @@ Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an indepen
 | Bad cron can't be saved; phone Logins refusal says why (#73, #74, from the crawl) | ✅ Nov 5 zai + lead: crawl-low-1 2 | ✅ Nov 5 reviewer (#74; #73 typing bug found and fixed) | ⏳ | ✅ Nov 5 lead: crawl-low-1 2 on the server (c313758) | n/a |  |
 | Crawl LOW part 2: own schedule chip picked, skills 503, name limits, avatar label (#75) | ✅ Nov 5 zai + lead: crawl-low-2 4 | ✅ Nov 5 lead (post-merge; nit: the 503 is chosen by matching the error text) | ⏳ | ⏳ | n/a |  |
 | No blank screens: every page explains itself (#82) | ✅ Nov 5 lead builder: no-blank-screens 39/39, mobile-layout 28 | ✅ Nov 5 reviewer (nits: cloud wording, link target) | ⏳ | ⏳ | n/a | 4 screens fixed: How bots reach you, Email and phone, Memory, Logins |
-| Bot tasks on this PC with your Claude plan (#80) | ✅ Nov 5 builder: pc-task-runner 14, cli-agents 43, local-subscriptions 15, executor-lifecycle 7 | ✅ Nov 5 security re-review + codex Windows review (nits in task 60) | ⏳ | n/a | ⏳ a real task on Kevin's Max plan |  |
+| Bot tasks on this PC with your Claude plan (#80) | ✅ Nov 5 builder: pc-task-runner 14, cli-agents 43, local-subscriptions 15, executor-lifecycle 7 | ✅ Nov 5 security re-review + codex Windows review (nits in task 60) | ⚠️ Nov 7 lead: Job Object proven live on the PC with packaged Bops.exe (#122: forks die with Bops, fail-closed, missing CLI); an in-app task still waits on chat + Kevin's OK | n/a | ⏳ a real task on Kevin's Max plan |  |
 | Easy phone pairing: Your phone in Settings, QR codes, Scan button (#77) | ✅ Nov 5 builder: easy-pairing 15, phone-card-ui 5, PairLink unit 15, gradle build | ✅ Nov 5 reviewer (fixes done; QR decoded to bops://pair) | ⏳ | n/a | ⏳ Kevin's phone |  |
 | In-progress badges: grayed out, red label, percent; Being tested state (#84) | ✅ Nov 5 builder: in-progress 11, in-progress-ui 20 (light, dark, desktop, phone), mobile-layout 28 | ✅ Nov 5 reviewer (blocker fixed) | ⏳ | n/a | n/a |  |
 | Agents you run: several DeepSeek Harness and Hermes instances (#91) | ✅ Nov 5 builder: agent-instances 12, UI 9 | ✅ Nov 5 security review (8 fixes done) | ⏳ | n/a | ⏳ Hermes on the server with its key | Hermes API reachable on the tailnet (health 200, 401 without key) |
