@@ -4,7 +4,9 @@ import type { Response, ResponseCreateParamsNonStreaming } from "openai/resource
 import type { AgentRoute } from "@/lib/agents";
 import { chatKeyName, chatModels, providerOf } from "@/lib/chat-models";
 import { llms } from "@/lib/agents";
-import { accountKeyName, accountWord } from "@/lib/accounts";
+import { ownPlatform } from "./owner-platform";
+import { modelsSettingsPath, providerSetupGuide } from "@/lib/setup-words";
+import { accountWord } from "@/lib/accounts";
 import { accountKey } from "./provider-accounts";
 
 /** The provider's name, with the account when it isn't the default: "OpenRouter (work)". */
@@ -357,7 +359,7 @@ async function send(provider: AgentRoute, url: string, headers: Record<string, s
       timedOut
         ? `${whoOf(provider, acct)} took too long to answer (over ${Math.round(TIMEOUT_MS / 1000)} seconds). Try again, or pick another model.`
         : provider === "ollama"
-          ? `Couldn't reach Ollama at ${ollamaBase()}: check that Ollama is running there, and OLLAMA_BASE_URL in .env.local, then try again.`
+          ? `Couldn't reach Ollama at ${ollamaBase()}: check that Ollama is running and its saved address is correct. ${providerSetupGuide(ownPlatform())}`
           : `Couldn't reach ${whoOf(provider, acct)}: check this server's internet connection, then try again.`,
       provider,
     );
@@ -387,18 +389,17 @@ function said(raw: string, key: string): string {
 export function refusal(provider: AgentRoute, status: number, raw: string, key: string, model: string, acct?: string): ChatProviderError {
   // Another account's: named, with its own key name ("OpenRouter (work)", OPENROUTER_API_KEY__WORK).
   const who = whoOf(provider, acct);
-  const keyName = accountKeyName(chatKeyName(provider), acct);
   const words = said(raw, key);
   const balance = status === 402 || /insufficient[ _]balance|credit balance|no (resource package|balance)|no credits?( remaining| left)?|out of credit|insufficient[ _]quota|quota exceeded|exceeded your current quota|billing|1113|top ?up|payment required/i.test(words);
   const err = (m: string) => new ChatProviderError(m, provider, status, words);
   if (provider === "ollama") {
-    if (status === 401 || status === 403) return err(`Ollama turned this down: it wants a key. Set OLLAMA_API_KEY in .env.local to the one its proxy expects, then restart Bops.`);
+    if (status === 401 || status === 403) return err(`Ollama needs a valid access key. ${providerSetupGuide(ownPlatform())} Or choose another model.`);
     if (status === 404 || /not found|try pulling/i.test(words)) return err(`Ollama doesn't have the model "${model}". Pull it on the server (ollama pull ${model}), or pick another model.`);
     if (status >= 500) return err(`Ollama had a problem running "${model}" (HTTP ${status})${words ? `: ${words}` : ""}. The server may be short of memory for it: try a smaller model.`);
     return err(`Ollama turned this down (HTTP ${status})${words ? `: ${words}` : ""}.`);
   }
   if (status === 401 || (status === 403 && /key|auth|token|credential/i.test(words) && !balance))
-    return err(`${who} turned this down: your ${ACCOUNTS[provider]} key${acct ? ` (${accountWord(acct)})` : ""} isn't valid. Check ${keyName} in .env.local, then restart Bops.`);
+    return err(`${who} turned this down: your ${ACCOUNTS[provider]} key${acct ? ` (${accountWord(acct)})` : ""} isn't valid. ${providerSetupGuide(ownPlatform())} Or choose another model.`);
   if (balance)
     return err(
       provider === "zai" || provider === "zai-coding" || provider === "zai-coding-cn"
@@ -434,12 +435,12 @@ export async function createOnProvider(params: Params, opts: { timeoutMs?: numbe
   const name = model.slice(provider.length + 1);
   // The account its LLM names (config/llms.yaml account: BASE__LABEL in .env.local), else the default key.
   const acct = provider === "ollama" ? undefined : llms().find((l) => `${l.provider}/${l.model}` === model)?.account;
-  const { keyName, key } = provider === "ollama" ? accountKey("OLLAMA_API_KEY") : accountKey(chatKeyName(provider), acct);
+  const { key } = provider === "ollama" ? accountKey("OLLAMA_API_KEY") : accountKey(chatKeyName(provider), acct);
   if (!key && provider !== "ollama")
     throw new ChatProviderError(
       acct
-        ? `The ${whoOf(provider, acct)} account isn't set on this server: add ${keyName} to .env.local, then restart Bops. Or pick another account for this model in Settings, Models.`
-        : `No ${ACCOUNTS[provider]} key is set on this server: add ${keyName} to .env.local, then restart Bops. Or pick another model.`,
+        ? `The ${whoOf(provider, acct)} account is not connected. Choose another account for this model in ${modelsSettingsPath(ownPlatform())}. ${providerSetupGuide(ownPlatform())}`
+        : `${ACCOUNTS[provider]} is not connected. ${providerSetupGuide(ownPlatform())} Or pick another model.`,
       provider,
     );
 
@@ -511,7 +512,7 @@ export function respond(client: OpenAI, params: Params, options?: Parameters<Ope
     const { keyName, key } = accountKey(chatKeyName("openai"), acct);
     if (!key)
       return Promise.reject(
-        new ChatProviderError(`The ${whoOf("openai", acct)} account isn't set on this server: add ${keyName} to .env.local, then restart Bops. Or pick another account for this model in Settings, Models.`, "openai"),
+        new ChatProviderError(`The ${whoOf("openai", acct)} account is not connected. Choose another account for this model in ${modelsSettingsPath(ownPlatform())}. ${providerSetupGuide(ownPlatform())}`, "openai"),
       );
     return accountClient(client, keyName, key).responses.create({ ...params, model }, options) as Promise<Response>;
   }

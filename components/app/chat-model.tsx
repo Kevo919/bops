@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import type { AppState, Chat } from "@/lib/types";
-import { chatKeyName, chatKeySet, chatModelLabel, chatModels, chatModelShown, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
-import { accountKeyName, accountWord } from "@/lib/accounts";
+import { chatKeySet, chatModelLabel, chatModels, chatModelShown, providerName, providerOf, type ChatModel } from "@/lib/chat-models";
+import { accountWord } from "@/lib/accounts";
 import type { AgentRoute } from "@/lib/agents";
+import { modelsSettingsPath, providerSetupGuide } from "@/lib/setup-words";
 import { post } from "./ui";
 // The default for new chats (Settings, Models), named in the box's hint.
 import { chatDefault } from "@/lib/chat-models";
@@ -78,11 +79,11 @@ export function ChatModelOptions({ keys, value, auto }: { keys: Partial<Record<s
 }
 
 /** The line under the box when the chat's model has no key on this server: which key to add, and where. Null when it has one, or it's Auto. */
-export function chatModelHint(state: Pick<AppState, "chatKeys" | "shared">, c: Pick<Chat, "model">): string | null {
+export function chatModelHint(state: Pick<AppState, "chatKeys" | "shared">, c: Pick<Chat, "model">, platform = "unknown"): string | null {
   const p = providerOf(c.model);
   const account = chatModels().find((m) => m.id === c.model)?.account;
   if (!p || state.shared || chatKeySet({ provider: p, account }, state.chatKeys ?? {})) return null;
-  if (account) return `${providerName(p)} (${accountWord(account)}) has no key on this server yet: add ${accountKeyName(chatKeyName(p), account)} to .env.local, then restart Bops.`;
-  if (p === "ollama") return `Ollama isn't set up on this server: add OLLAMA_BASE_URL (its address, like http://127.0.0.1:11434/v1) to .env.local, then restart Bops.`;
-  return `${providerName(p)} has no key on this server yet: add ${chatKeyName(p)} to .env.local, then restart Bops.`;
+  if (account) return `${providerName(p)} (${accountWord(account)}) is not connected yet. Choose another account in ${modelsSettingsPath(platform)}, or connect it using the setup guide. ${providerSetupGuide(platform)}`;
+  if (p === "ollama") return `Ollama is not connected yet. ${providerSetupGuide(platform)} Or choose another model.`;
+  return `${providerName(p)} is not connected yet. ${providerSetupGuide(platform)} Or choose another model.`;
 }

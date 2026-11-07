@@ -64,14 +64,15 @@ globalThis.fetch = async () => {
 const { openaiClient } = await import(at("lib/server/openai-client.ts"));
 const client = openaiClient();
 
-await check("no key, self-hosted: the error names the environment, the Windows .env.local, and the vault's limits", async () => {
+await check("no key, self-hosted: the error gives plain setup guidance and preserves the vault distinction", async () => {
   delete process.env.OPENAI_API_KEY;
   await assert.rejects(
     () => client.chat.completions.create({ model: "gpt-test", messages: [{ role: "user", content: "hi" }] }),
     (e) => {
       const m = String(e.message);
-      assert.match(m, /OPENAI_API_KEY/, "the env var");
-      assert.match(m, /\.env\.local/, "the file, with its Windows place");
+      assert.match(m, /OpenAI is not connected for chat/);
+      assert.doesNotMatch(m, /\.env\.local|OPENAI_API_KEY/);
+      assert.match(m, /Settings → This (PC|Mac|computer) → Keys/);
       assert.match(m, /Logins is the vault/, "a key in Logins is said to be the vault's");
       assert.match(m, /doesn.t power the chat/, "and not to power the chat");
       return true;

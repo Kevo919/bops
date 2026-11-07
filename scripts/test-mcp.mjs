@@ -347,6 +347,16 @@ await check("a bare command resolves along PATH with PATHEXT (.exe first, no she
   assert.match(await M.callMcp(bot(), { server: "native", tool: "ping" }, true), /pong/);
 });
 
+await check("a missing custom connection key gives administrator guidance without exposing variable names", async () => {
+  delete process.env.BOPS_TEST_MISSING_MCP_KEY;
+  await assert.rejects(() => M.listTools("missing-key", { ...M.mcpServers().fake, env: ["BOPS_TEST_MISSING_MCP_KEY"] }), e => {
+    assert.match(e.message, /connection "missing-key" needs an access key/);
+    assert.match(e.message, /Settings → This (PC|Mac|computer) → Keys/);
+    assert.doesNotMatch(e.message, /\.env\.local|BOPS_TEST_MISSING_MCP_KEY/);
+    return true;
+  });
+});
+
 await check("a server that dies at once fails plainly and is not left running", async () => {
   give(["dies"]);
   await assert.rejects(() => M.listTools("dies", M.mcpServers().dies), /stopped|didn't answer|couldn't start/, "a clear why");

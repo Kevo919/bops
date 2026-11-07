@@ -1,4 +1,6 @@
 "use client";
+import { providerSetupGuide } from "@/lib/setup-words";
+import { useComputerPlatform } from "./computer-words";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { post } from "./ui";
@@ -270,7 +272,7 @@ function KeyDot({ provider }: { provider?: Provider }) {
     <span
       data-key="set"
       className="flex items-center gap-1 text-[12px] text-[color:var(--ht-3a3a38)]"
-      title={`${provider.keyName} is set on this server`}
+      title={`${provider.name} is connected on this server`}
     >
       <span className="size-[7px] rounded-full bg-[color:var(--hb-2bb673)]" />
       Key set
@@ -285,7 +287,7 @@ function KeyDot({ provider }: { provider?: Provider }) {
         ? "No key yet:"
         : "Not set up yet:"}{" "}
       <a href="#settings-keys" className="underline">
-        add {provider.keyName}
+        Open setup guide in Keys
       </a>
     </span>
   );
@@ -353,6 +355,7 @@ function AccountSelect({
   disabled?: boolean;
   onChange: (label: string) => void;
 }) {
+  const platform = useComputerPlatform();
   const labels = provider?.accounts ?? [];
   if (!provider?.keyName || (!labels.length && !value)) return null;
   return (
@@ -368,10 +371,10 @@ function AccountSelect({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
       >
-        <option value="">Default ({provider.keyName})</option>
+        <option value="">Default account</option>
         {labels.map((a) => (
           <option key={a} value={a}>
-            {a.toLowerCase()} ({provider.keyName}__{a})
+            {a.toLowerCase()}
           </option>
         ))}
         {value && !labels.includes(value) && (
@@ -382,8 +385,7 @@ function AccountSelect({
       </select>
       {missing && (
         <span data-account-missing className="text-[color:var(--ht-9a5b00)]">
-          Account not found: add {provider.keyName}__{value} to .env.local, then
-          restart Bops.
+          Account not connected. Choose an available account. {providerSetupGuide(platform)}
         </span>
       )}
     </label>
@@ -975,7 +977,7 @@ function AddModel({
               )}
               {presets?.noKey && (
                 <span data-presets-nokey className="text-pencil">
-                  Add OPENROUTER_API_KEY in Keys to see your presets here, or
+                  Follow the setup guide linked in Keys to connect OpenRouter and see your presets here, or
                   type a preset&apos;s slug below.
                 </span>
               )}

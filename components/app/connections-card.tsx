@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useComputerPlatform } from "./computer-words";
+import { providerSetupGuide } from "@/lib/setup-words";
 import { OpenSettings } from "./open-settings";
 import type { AppState } from "@/lib/types";
 import type { KeyCheckResult } from "@/lib/server/key-check";
@@ -31,14 +33,14 @@ export const CONNECTIONS: Row[] = [
     name: "Composio (connected apps)",
     what: "Lets your bots use Gmail, Slack, Notion, Google Sheets and about 1,000 more apps. You sign in to each app on its own page; Composio keeps the login, Bops never sees your password.",
     getKey: { label: "Get a key at composio.dev", href: "https://composio.dev" },
-    paste: "Sign in at composio.dev, open Settings, Project Settings, and copy the project key under API Keys (it starts with ak_). Put it in .env.local as COMPOSIO_API_KEY=your_key, then restart Bops.",
+    paste: "Sign in at composio.dev, open Settings, Project Settings, and copy the project key under API Keys. Paste it in Settings, Services, Connected apps.",
   },
   {
     key: "COMPOSIO_MCP_URL",
     name: "Composio (your account)",
     what: "Lets your bots use the apps you already connected yourself in Composio's For You area (like Gmail and Google Drive), in your own chats in Bops. Reading runs right away; anything that sends, changes, deletes or pays asks you first.",
     getKey: { label: "Open Composio", href: "https://composio.dev" },
-    paste: "In Composio, open For You, then Connect my agent, copy the address, paste it here: in .env.local, add a line COMPOSIO_MCP_URL= followed by the address. If that page shows a key too (it starts with ck_), add a line COMPOSIO_MCP_KEY= followed by the key. Then restart Bops and press Check.",
+    paste: "In Composio, open For You, then Connect my agent. Copy its address and any key it provides into Settings, Services, Composio (your account).",
     more: "Only in your own chats in the Bops app: not for team members, Telegram, Discord, Slack, texts, emails, routines, or the bots' cloud computers.",
   },
   {
@@ -46,7 +48,7 @@ export const CONNECTIONS: Row[] = [
     name: "Zapier",
     what: "Lets your bots run the Zapier actions you pick, in your own chats in Bops. Anything that could change something asks you first.",
     getKey: { label: "Make a server at mcp.zapier.com", href: "https://mcp.zapier.com" },
-    paste: "At mcp.zapier.com make a server for \"Other\" MCP clients, add the actions you want, then copy its server URL (it has your token in it, so keep it private). Put it in .env.local as ZAPIER_MCP_URL=that_url, then restart Bops.",
+    paste: "At mcp.zapier.com make a server for Other MCP clients, add the actions you want, then copy its private server address into Settings, Services, Zapier.",
     more: "Only in your own chats in the Bops app: not for team members, Telegram, Discord, Slack, texts, emails, routines, or the bots' cloud computers.",
   },
   {
@@ -54,7 +56,7 @@ export const CONNECTIONS: Row[] = [
     name: "OpenRouter",
     what: "Hundreds of AI models for chats and bots, some of them free (their ids end in :free). Pick one in Models below, or in a chat's model box.",
     getKey: { label: "Get a key at openrouter.ai/keys", href: "https://openrouter.ai/keys" },
-    paste: "Create a key at openrouter.ai/keys (give it a credit limit). Put it in .env.local as OPENROUTER_API_KEY=your_key, then restart Bops.",
+    paste: "Create a key at openrouter.ai/keys with a credit limit. Use the setup guide linked in the Keys card to connect it; this card does not save provider keys.",
   },
 ];
 
@@ -80,6 +82,7 @@ const openLogins = () => document.querySelector<HTMLButtonElement>('[data-settin
 
 export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> }) {
   const openSettings = useContext(OpenSettings);
+  const platform = useComputerPlatform();
   const [rows, setRows] = useState<KeyCheckResult[] | null>(null);
   const [busy, setBusy] = useState<string | null>("refresh");
   const [error, setError] = useState<string | null>(null);
@@ -140,7 +143,7 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
       <div className="flex items-center gap-3">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-[13.5px] font-semibold leading-[18px]">Connections</span>
-          <span className="text-[12px] leading-4 text-pencil">Outside accounts your bots can use. Keys go in .env.local on the computer running Bops, like the ones on the Keys card; they are never shown here.</span>
+          <span className="text-[12px] leading-4 text-pencil">Outside accounts your bots can use. Use Settings, Services for connected apps and Zapier. For other provider accounts, follow the setup guide linked in Keys. Saved keys are never shown here.</span>
           <span className="pt-0.5 text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">{busy === "refresh" ? "Reading…" : rows ? `${on} of ${CONNECTIONS.length} set up` : "Status unavailable"}</span>
         </div>
         <button className={light} disabled={busy !== null} onClick={() => { setBusy("refresh"); setError(null); void load(); }}>Refresh</button>
@@ -162,7 +165,7 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
               {checked && r.message && <div data-message className="text-[12px] text-pencil">{r.message}</div>}
               {r?.shown && <div data-shown className="text-[12px] text-pencil">Saved: {r.shown}</div>}
               <p className="text-[12px] text-pencil">{c.what}</p>
-              <p className="text-[12px] text-pencil">{c.paste}</p>
+              <p className="text-[12px] text-pencil">{c.key === "OPENROUTER_API_KEY" ? providerSetupGuide(platform) : c.paste}</p>
               {c.more && <p className="text-[12px] text-pencil">{c.more}</p>}
               <div className="flex flex-wrap items-center gap-3 text-[12px]">
                 <a className="underline" href={c.getKey.href} target="_blank" rel="noopener noreferrer">{c.getKey.label}</a>

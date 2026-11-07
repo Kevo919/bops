@@ -172,7 +172,8 @@ await check("a task starts on the bot's agent for the model, when it's one of Yo
   assert.deepEqual(R.taskAgentFor({ ...qwen, fromOutside: "x" }, b, [dsh, open]), {});
   assert.deepEqual(R.taskAgentFor({}, b, [dsh, open]), {});
   assert.deepEqual(R.taskAgentFor(qwen, b), {}, "this bot's own: no computer, so none ready");
-  const src = readFileSync(new URL("lib/server/routines.ts", rootUrl), "utf8");
+  // The source-shape assertion uses LF; Windows Git checkouts may use CRLF.
+  const src = readFileSync(new URL("lib/server/routines.ts", rootUrl), "utf8").replace(/\r\n/g, "\n");
   assert.match(src, /\.\.\.taskAgentFor\(r, b\),\n {4}\}\);/, "taskRun starts the thread with it");
 });
 

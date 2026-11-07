@@ -123,8 +123,8 @@ export async function checkKey(key: string): Promise<KeyCheckResult | null> {
     const data = await payload(response);
     const error = data?.error && typeof data.error === "object" ? data.error as Record<string, unknown> : null;
     if (kind === "ollama") {
-      if (response.status === 401 || response.status === 403) return result("invalid", "Ollama's address answered but wants a key: set OLLAMA_API_KEY to the one its proxy expects.");
-      if (!response.ok || !data || !Array.isArray(data.data)) return result("unavailable", "Something answered at OLLAMA_BASE_URL, but not as Ollama's model list. Check the address ends in /v1.");
+      if (response.status === 401 || response.status === 403) return result("invalid", "Ollama answered but needs an access key. Follow the setup guide linked in the Keys card to connect it.");
+      if (!response.ok || !data || !Array.isArray(data.data)) return result("unavailable", "Something answered at the saved Ollama address, but not with a model list. Check that its address ends in /v1 using the setup guide linked in the Keys card.");
       const n = data.data.length;
       return result("works", n ? `Ollama answered with ${n} model${n === 1 ? "" : "s"}. It's free: no key or credit needed.` : "Ollama answered, but has no models yet: pull one on the server (ollama pull qwen2.5:3b).");
     }
@@ -148,7 +148,7 @@ export async function checkKey(key: string): Promise<KeyCheckResult | null> {
     } else if (kind !== "orgo" && !Array.isArray(data.data)) return result("unavailable", "The provider returned an unexpected response.");
     return result("works", "The authenticated check succeeded. Generation credit and access to individual models were not tested.");
   } catch {
-    if (kind === "ollama") return result("unavailable", "Nothing answered at OLLAMA_BASE_URL, or it timed out. Check that Ollama is running and the address is right.");
+    if (kind === "ollama") return result("unavailable", "Nothing answered at the saved Ollama address, or it timed out. Check that Ollama is running and its address is right.");
     return result("unavailable", "The provider could not be reached or the check timed out. This does not mean the key is invalid.");
   } finally { clearTimeout(timer); }
 }

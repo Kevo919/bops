@@ -196,6 +196,11 @@ const callTool = (id, name, args) => chatSays(null, [{ id, type: "function", fun
 const Z = await import(`${rootUrl}/lib/server/zapier.ts`);
 const ZC = await import(`${rootUrl}/lib/server/zapier-chat.ts`);
 const K = await import(`${rootUrl}/lib/server/key-check.ts`);
+const checkedKey = async (...args) => {
+  const result = await K.checkKey(...args);
+  assert.doesNotMatch(result.message ?? "", /[A-Z_]{4,}_(KEY|URL)|\.env/);
+  return result;
+};
 const P = await import(`${rootUrl}/lib/server/chat-providers.ts`);
 const S = await import(`${rootUrl}/lib/server/store.ts`);
 const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
@@ -213,6 +218,18 @@ const secretFree = (where, text) => {
 
 /* ---------------- The address ---------------- */
 
+await check("Zapier missing and invalid address Check messages name the real setup page", async () => {
+  const saved = process.env.ZAPIER_MCP_URL;
+  try {
+    for (const address of [undefined, "https://wrong.example/mcp"]) {
+      if (address === undefined) delete process.env.ZAPIER_MCP_URL; else process.env.ZAPIER_MCP_URL = address;
+      const result = await Z.checkZapier();
+      assert.doesNotMatch(result.message, /[A-Z_]{4,}_(KEY|URL)|\.env/);
+      assert.match(result.message, /Settings, Services, Zapier/);
+    }
+  } finally { if (saved === undefined) delete process.env.ZAPIER_MCP_URL; else process.env.ZAPIER_MCP_URL = saved; }
+});
+
 await check("only an https address on zapier.com is used; anything else is refused before a request", async () => {
   for (const ok of [ZAPIER, "https://mcp.zapier.com/api/mcp/s/abcdefghijklmnop/mcp", "https://zapier.com/x", "https://MCP.Zapier.com./api"]) assert.ok(Z.zapierUrl(ok), ok);
   for (const bad of ["http://mcp.zapier.com/api/v1/connect?token=x", /* gitleaks:allow */ "https://mcp.zapier.com.evil.example/x", "https://evilzapier.com/x", "https://user:pw@mcp.zapier.com/x", "https://mcp.zapier.com:8443/x", "ftp://mcp.zapier.com/x", "not a url", "", "https://127.0.0.1/x"]) assert.equal(Z.zapierUrl(bad), null, bad);
@@ -220,15 +237,15 @@ await check("only an https address on zapier.com is used; anything else is refus
   process.env.ZAPIER_MCP_URL = `http://mcp.zapier.com/api/v1/connect?token=${TOKEN}`; // gitleaks:allow (made up for this test)
   assert.equal(Z.zapierOn(), false);
   assert.equal(Z.zapierSet(), true);
-  const r = await K.checkKey("ZAPIER_MCP_URL");
+  const r = await checkedKey("ZAPIER_MCP_URL");
   assert.equal(r.status, "invalid");
-  assert.match(r.message, /must be an https address on zapier\.com/);
+  assert.match(r.message, /must start with https:\/\/ and be on zapier\.com/);
   assert.deepEqual(await ZC.zapierChatTools(), []);
   assert.equal(z.got.length, 0, "nothing was sent");
   assert.equal(elsewhere.length, 0);
   secretFree("the check", JSON.stringify(r));
   delete process.env.ZAPIER_MCP_URL;
-  assert.equal((await K.checkKey("ZAPIER_MCP_URL")).status, "not set");
+  assert.equal((await checkedKey("ZAPIER_MCP_URL")).status, "not set");
 });
 
 /* ---------------- The connection ---------------- */
@@ -280,7 +297,7 @@ await check("errors in plain words: a turned-down address, a JSON-RPC error, a t
   reset();
   z.on.initialize = () => ({ status: 401 });
   await assert.rejects(Z.zapierActions(), (e) => e.kind === "invalid" && /turned down this server address/.test(e.message));
-  const r = await K.checkKey("ZAPIER_MCP_URL");
+  const r = await checkedKey("ZAPIER_MCP_URL");
   assert.equal(r.status, "invalid");
   reset();
   z.on.initialize = () => ({ status: 405 });
@@ -311,7 +328,7 @@ await check("each request has its own timeout: a call that never answers ends in
   reset();
   Z.zapierTiming.initMs = 300;
   z.on.initialize = () => ({ hang: true });
-  const c = await K.checkKey("ZAPIER_MCP_URL");
+  const c = await checkedKey("ZAPIER_MCP_URL");
   assert.equal(c.status, "unavailable");
   assert.match(c.message, /took too long/);
   Z.zapierTiming.initMs = 15_000;
@@ -343,25 +360,25 @@ await check("the window's Check: works with the number of actions, and only safe
 
 await check("Composio's Check: x-api-key to Composio's own address; works, invalid, unavailable", async () => {
   delete process.env.COMPOSIO_API_KEY;
-  assert.equal((await K.checkKey("COMPOSIO_API_KEY")).status, "not set");
+  assert.equal((await checkedKey("COMPOSIO_API_KEY")).status, "not set");
   assert.equal(composio.calls.length, 0);
   const ak = ["ak", "SYNTHETIC", "SECRET", "composio"].join("_"); // gitleaks:allow (made up for this test)
   process.env.COMPOSIO_API_KEY = ak;
   composio.reply = json({ items: [{ id: "ac_1" }], next_cursor: null });
-  let r = await K.checkKey("COMPOSIO_API_KEY");
+  let r = await checkedKey("COMPOSIO_API_KEY");
   assert.equal(r.status, "works");
   assert.equal(composio.calls[0].url, "https://backend.composio.dev/api/v3.1/auth_configs?limit=1");
   assert.equal(composio.calls[0].headers["x-api-key"], ak);
   assert.equal(composio.calls[0].headers.authorization, undefined);
   composio.reply = json({ error: { message: `Invalid API key ${ak}` } }, 401);
-  r = await K.checkKey("COMPOSIO_API_KEY");
+  r = await checkedKey("COMPOSIO_API_KEY");
   assert.equal(r.status, "invalid");
   composio.reply = json({ error: "forbidden" }, 403);
-  assert.equal((await K.checkKey("COMPOSIO_API_KEY")).status, "invalid");
+  assert.equal((await checkedKey("COMPOSIO_API_KEY")).status, "invalid");
   composio.reply = json({ something: "else" });
-  assert.equal((await K.checkKey("COMPOSIO_API_KEY")).status, "unavailable");
+  assert.equal((await checkedKey("COMPOSIO_API_KEY")).status, "unavailable");
   composio.reply = "offline";
-  r = await K.checkKey("COMPOSIO_API_KEY");
+  r = await checkedKey("COMPOSIO_API_KEY");
   assert.equal(r.status, "unavailable");
   assert.ok(!JSON.stringify(r).includes("SYNTHETIC_SECRET"));
   assert.ok(K.keyCheckList().some((k) => k.key === "COMPOSIO_API_KEY" && k.status === "set"));

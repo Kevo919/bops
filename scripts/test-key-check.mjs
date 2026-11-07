@@ -31,7 +31,12 @@ registerHooks({
 let calls = [];
 let reply = () => Response.json({ data: [] });
 globalThis.fetch = async (url, options) => { calls.push({ url, options }); return reply(url, options); };
-const { keyCheckList, checkKey } = await import("../lib/server/key-check.ts");
+const { keyCheckList, checkKey: rawCheckKey } = await import("../lib/server/key-check.ts");
+const checkKey = async (...args) => {
+  const result = await rawCheckKey(...args);
+  assert.doesNotMatch(result?.message ?? "", /[A-Z_]{4,}_(KEY|URL)|\.env/);
+  return result;
+};
 const route = await import("../app/api/key-check/route.ts");
 const { ROUTE_KEYS } = await import("../lib/agents.ts");
 let passed = 0;
@@ -241,7 +246,7 @@ try {
       await new Promise(r => server.close(r));
       const off = await checkKey("OLLAMA_BASE_URL");
       assert.equal(off.status, "unavailable");
-      assert.match(off.message, /Nothing answered at OLLAMA_BASE_URL/);
+      assert.match(off.message, /Nothing answered at the saved Ollama address/);
     } finally {
       server.close();
       globalThis.fetch = async (url, options) => { calls.push({ url, options }); return reply(url, options); };

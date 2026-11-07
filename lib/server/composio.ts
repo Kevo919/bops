@@ -231,7 +231,7 @@ async function authConfigFor(app: string) {
  * the same app is fine. `replaces` signs an expired account back in: the bots keep their access.
  */
 export async function connectApp(app: string, label?: string, replaces?: string, picked?: AppConnecting["grant"]) {
-  if (!composioOn()) throw new Error(cloudOn() ? "Connected apps aren't available right now." : "Add COMPOSIO_API_KEY to .env.local first");
+  if (!composioOn()) throw new Error(cloudOn() ? "Connected apps aren't available right now." : "Connected apps are not set up yet. Open Settings, Services, Connected apps to add your Composio key.");
   // Connected in the workspace open now (ui.tsx currentWorkspace): its bots have it by default, and the
   // bots were picked from its team, so its other bots get no access.
   const state = getState();

@@ -1,9 +1,10 @@
 "use client";
 
 import { useComputerWords } from "./computer-words";
+import { OpenSettings } from "./open-settings";
 import { InProgress } from "./in-progress";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { BRAINS_ON, signInOn, workBot, workspaceOf, type AppState, type Bot, type BotAi } from "@/lib/types";
 import { aiOf, accountOf, paysLabel } from "@/lib/agents";
 import { brainSignIn } from "./brains";
@@ -124,7 +125,7 @@ export function PcTaskRunnerCard({ onView }: { /** Each answer, for the Claude c
     <div role="group" aria-label="Bot tasks on this PC" className="rounded-xl bg-white p-3 text-[12px] shadow-[0_0_0_1px_var(--h-e6e6e3)]">
       <h3 className="font-semibold">Bot tasks on this PC</h3>
       <p className="my-2 text-[color:var(--ht-6b6b6b)]">Who does the work when a bot runs a task here. Your Claude plan uses the Claude Code sign in above and the bot&apos;s own Chrome; it asks you before running commands, opening a new website, clicking or typing in the browser, or reading files outside the task&apos;s folder, and it can&apos;t change files outside that folder. It can&apos;t control your other apps yet. We recommend it.</p>
-      <p className="mb-2 text-[color:var(--ht-6b6b6b)]">OpenAI key: tasks run on OpenAI instead, which needs an OpenAI <strong>environment key</strong>, not an ordinary API key. Make one in OpenAI Platform under Agents, Environments, Keys, and select Create. Use the same project as your OPENAI_API_KEY, and make sure that project has credit.</p>
+      <p className="mb-2 text-[color:var(--ht-6b6b6b)]">OpenAI key: tasks run on OpenAI instead, which needs an OpenAI <strong>environment key</strong>, not an ordinary API key. Make one in OpenAI Platform under Agents, Environments, Keys, and select Create. Use the same project as your OpenAI chat account, and make sure that project has credit.</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={busy || !view} aria-pressed={picked === "claude"} onClick={() => void send({ choice: "claude" })} className={picked === "claude" ? dark : light}>Your Claude plan (signed in)</button>
         <button type="button" disabled={busy || !view} aria-pressed={picked === "openai"} onClick={() => void send({ choice: "openai" })} className={picked === "openai" ? dark : light}>OpenAI key</button>
@@ -290,7 +291,7 @@ export function SubscriptionRow({ kind, state, bot: b, keys, selfHosted, onShowS
     <h3 className="text-[13px] font-semibold">{name}</h3>
     {candidates.length > 1 && <label>Account <select aria-label={`${name} account`} value={agent?.id} disabled={busy} onChange={(e) => { setChosen(e.target.value); setError(null); }}>{candidates.map((a) => <option key={a.id} value={a.id}>{accountOf(a, state)?.name ?? a.model}</option>)}</select></label>}
     {kind === "zai" ? <>
-      <p>The Coding Plan uses a key from your z.ai plan account, saved in Keys as ZAI_API_KEY. This is not a browser sign-in.</p>
+      <p>The Coding Plan uses a key from your z.ai plan account, connected using the setup guide linked in the Keys card. This is not a browser sign-in.</p>
       <p role="status">{agent ? keys === undefined ? "Coding Plan route configured; key status unavailable." : keys.has("ZAI_API_KEY") ? "Coding Plan route configured; key saved. Subscription entitlement is not verified." : "Coding Plan route configured; add your plan account's key." : "Not configured. A regular Z.ai API key alone does not confirm a Coding Plan subscription."}</p>
     </> : <>
       <p role="status">{pending ? "Signing in on this computer…" : signing?.failed ? `Sign-in failed: ${signing.failed}` : connected ? `Connected: ${connected}` : "Not signed in on this computer."}</p>
@@ -1115,15 +1116,14 @@ export function KeysCard() {
             <div key={row.key} className="flex items-center gap-2 rounded-md px-2 py-1.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
               <div className="min-w-0 flex-1 text-[12px]">
                 <div className="font-medium">{row.label}: {busy === row.key ? "Checking…" : row.status}</div>
-                <div className="break-all font-mono text-[11px] text-pencil">{row.key}</div>
                 {row.message && <p className="text-pencil">{row.message}</p>}
               </div>
               <button className={light} disabled={busy !== null || row.status === "not set"} aria-label={`Check ${row.label}`} onClick={() => void check(row.key)}>Check</button>
             </div>
           ))}
           <a className="text-[12px] underline" href="https://github.com/Kevo919/bops/blob/windows-port/docs/keys.md" target="_blank" rel="noopener noreferrer">How to get keys and set spending limits</a>
-          <p className="text-[12px] text-pencil">A successful authentication check does not guarantee credits or access to every model. After changing .env.local, restart Bops and refresh this list.</p>
-          <p data-accounts-help className="text-[12px] text-pencil">More than one account for a provider (a work and a personal key): to add another account, put a line like <span className="font-mono">OPENROUTER_API_KEY__WORK=...</span> in .env.local (the provider&apos;s key name, two underscores, then a label of A to Z, 0 to 9 and _), and restart Bops. Each account gets its own row and Check here, and you pick it for a model in Models. Bots&apos; tasks on their computers still use the default account.</p>
+          <p className="text-[12px] text-pencil">A successful authentication check does not guarantee credits or access to every model. After following the setup guide to change an account, restart Bops and refresh this list.</p>
+          <p data-accounts-help className="text-[12px] text-pencil">More than one account for a provider: follow the “How to get keys and set spending limits” guide linked above to connect your extra account. This screen checks saved accounts; it does not add or edit them. Once connected, each account gets its own row and Check here, and you pick it for a model in Models. Bots&apos; tasks on their computers still use the default account.</p>
         </div>
       }
     >
@@ -1140,7 +1140,9 @@ type ModuleInfo = { id: string; name: string; help: string; required: boolean; e
  * Harness's plugins: the AI provider and models, the bots' computers, memory, apps, email, phone and
  * the rest. Saved to config/bops.yaml; Bops restarts to use them. Keys stay in .env.local.
  */
-function ModulesCard() {
+export function ModulesCard() {
+  const openSettings = useContext(OpenSettings);
+  const serviceRows = { email: "mail", phone: "phone", memory: "memory", apps: "apps" } as const;
   const [mods, setMods] = useState<ModuleInfo[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, Record<string, unknown>>>({});
@@ -1165,20 +1167,22 @@ function ModulesCard() {
     <Card
       icon={ICONS.modules}
       title="Modules"
-      line="Every part of Bops you can swap or switch off: the AI provider and models, computers, memory, apps, email, phone and more. Saved in config/bops.yaml; keys stay in .env.local."
+      line="Every part of Bops you can swap or switch off: the AI provider and models, computers, memory, apps, email, phone and more. Your choices are saved on the computer running Bops."
       tone="ok"
       status={`${on} of ${mods.length} on and set up`}
       below={
         <div className="flex flex-col gap-1.5">
           {mods.map((m) => {
             const enabled = Boolean(value(m, "enabled", m.enabled));
+            const service = serviceRows[m.id as keyof typeof serviceRows];
             return (
               <div key={m.id} className="rounded-md px-2 py-1.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
                 <div className="flex items-center gap-2">
                   <button onClick={() => setOpen(open === m.id ? null : m.id)} className="flex min-w-0 flex-1 flex-col text-left">
                     <span className="text-[12.5px] font-medium leading-4">{m.name}</span>
-                    <span className="truncate text-[12px] leading-4 text-pencil">{!enabled ? "Off" : m.keysSet ? m.help : `Needs ${m.keys.join(", ")} in .env.local`}</span>
+                    <span className="truncate text-[12px] leading-4 text-pencil">{!enabled ? "Off" : m.keysSet ? m.help : "Not set up yet"}</span>
                   </button>
+                  {enabled && !m.keysSet && service && openSettings && <button data-module-service={service} onClick={() => openSettings("services", { service })} className={light}>Set up in Services</button>}
                   {!m.required && (
                     <label className="flex items-center gap-1 text-[12px]">
                       <input type="checkbox" checked={enabled} onChange={(e) => change(m.id, "enabled", e.target.checked)} />

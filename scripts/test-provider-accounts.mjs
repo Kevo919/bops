@@ -193,7 +193,7 @@ try {
     assert.equal(other.output_text, "answered on OPENROUTER_API_KEY", "a model not in Your LLMs: the default");
   });
 
-  await test("an OpenAI LLM with an account chats on that account's key, never the default client; one not set says which line to add", async () => {
+  await test("an OpenAI LLM with an account chats on that account's key, never the default client; one not set asks for setup", async () => {
     const extra = L.clean({ llms: [{ name: "GPT side", provider: "openai", model: "gpt-5-side", account: "side" }, { name: "GPT gone", provider: "openai", model: "gpt-5-gone", account: "nope" }, { name: "GPT plain", provider: "openai", model: "gpt-5-plain" }] }, []);
     assert.equal(extra[0].account, "SIDE", "openai accounts are kept by llms.cjs");
     A.setLlms([...L.read(temp, () => {}), ...extra]);
@@ -205,21 +205,21 @@ try {
     assert.equal(asked.at(-1).url, "https://api.openai.com/v1/responses");
     assert.equal(asked.at(-1).auth, `Bearer ${SECRETS.OPENAI_API_KEY__SIDE}`);
     assert.deepEqual(used, [], "the default client (OPENAI_API_KEY or Orgo) isn't used");
-    await assert.rejects(P.respond(def, { model: "openai/gpt-5-gone", input: "hi" }), /The OpenAI \(nope\) account isn't set on this server: add OPENAI_API_KEY__NOPE to \.env\.local/);
+    await assert.rejects(P.respond(def, { model: "openai/gpt-5-gone", input: "hi" }), /The OpenAI \(nope\) account is not connected\. Choose another account for this model in Settings → This (PC|Mac|computer) → Models/);
     assert.deepEqual(used, []);
     await P.respond(def, { model: "openai/gpt-5-plain", input: "hi" });
     assert.deepEqual(used, ["gpt-5-plain"], "no account: the default client, as before");
     A.setLlms(L.read(temp, () => {}));
   });
 
-  await test("a no names the account (\"OpenRouter (personal 2)\"), and an account that isn't set says which line to add; never a key", async () => {
+  await test("a no names the account (\"OpenRouter (personal 2)\"), and an unconnected account asks for setup; never a key", async () => {
     await assert.rejects(P.createOnProvider({ model: "openrouter/meta-llama/llama-5", input: "hi" }), (e) => {
       assert.match(e.message, /^OpenRouter \(personal 2\) says your OpenRouter account has no credit left/);
       noSecret(e.message, "the error");
       return true;
     });
-    await assert.rejects(P.createOnProvider({ model: "openrouter/x/gone", input: "hi" }), /The OpenRouter \(nope\) account isn't set on this server: add OPENROUTER_API_KEY__NOPE to \.env\.local/);
-    assert.match(P.refusal("openrouter", 401, "{}", SECRETS.OPENROUTER_API_KEY__WORK, "m", "WORK").message, /OpenRouter \(work\) turned this down: your OpenRouter key \(work\) isn't valid\. Check OPENROUTER_API_KEY__WORK/);
+    await assert.rejects(P.createOnProvider({ model: "openrouter/x/gone", input: "hi" }), /The OpenRouter \(nope\) account is not connected\. Choose another account for this model in Settings → This (PC|Mac|computer) → Models/);
+    assert.match(P.refusal("openrouter", 401, "{}", SECRETS.OPENROUTER_API_KEY__WORK, "m", "WORK").message, /OpenRouter \(work\) turned this down: your OpenRouter key \(work\) isn't valid\. Settings → This (PC|Mac|computer) → Keys/);
   });
 
   await test("Keys: each account its own row, checked on its own key at the provider's address; a name that isn't one is refused", async () => {
@@ -257,9 +257,11 @@ try {
     assert.match(src, /\{chatKeySet\(m, keys\) \? "" : " \(no key\)"\}/);
   });
 
-  await test("the Keys card says how to add another account (a line in .env.local, then restart), and that bots use the default", () => {
+  await test("the Keys card honestly explains extra accounts need administrator setup, and bots use the default", () => {
     const src = readFileSync(join(root, "components/app/setup.tsx"), "utf8");
-    assert.match(src, /data-accounts-help[^>]*>More than one account for a provider[^<]*<span className="font-mono">OPENROUTER_API_KEY__WORK=\.\.\.<\/span> in \.env\.local[^<]*restart Bops\.[^<]*Bots&apos; tasks on their computers still use the default account\./);
+    assert.match(src, /data-accounts-help[^>]*>More than one account for a provider: follow the/);
+    assert.match(src, /This screen checks saved accounts; it does not add or edit them/);
+    assert.match(src, /Bots&apos; tasks on their computers still use the default account/);
   });
 
   await test("nothing secret in the log", () => noSecret(logs.join("\n"), "the log"));

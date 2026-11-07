@@ -68,8 +68,8 @@ export function composioMcpUrl(raw: string | undefined = process.env.COMPOSIO_MC
 export function composioMcpKeyProblem(raw: string | undefined = process.env.COMPOSIO_MCP_KEY): string | null {
   const k = raw?.trim();
   if (!k) return null;
-  if (/^ak_/i.test(k)) return "COMPOSIO_MCP_KEY is a Platform project key (it starts with ak_). For You uses its own key: in Composio, open For You, then Settings, Sessions & API Key, and copy the key that starts with ck_.";
-  if (k.length > 512 || !/^[\x21-\x7e]+$/.test(k)) return "COMPOSIO_MCP_KEY doesn't look like a key: copy it again from For You, Connect my agent, as one line with no spaces.";
+  if (/^ak_/i.test(k)) return "This is a Platform project key (it starts with ak_). For You uses its own key: in Composio, open For You, then Settings, Sessions & API Key, and copy the key that starts with ck_.";
+  if (k.length > 512 || !/^[\x21-\x7e]+$/.test(k)) return "This does not look like a key: copy it again from For You, Connect my agent, as one line with no spaces.";
   return null;
 }
 
@@ -189,8 +189,8 @@ export function judgeCall(tool: McpTool, args: Record<string, unknown>): { reads
 
 const turnedDown = () =>
   key()
-    ? "Composio turned down the key in COMPOSIO_MCP_KEY. It may have been made new: in Composio, open For You, then Settings, Sessions & API Key, copy the key again into .env.local, then restart Bops."
-    : "Composio wants your key for this address: in Composio, open For You, then Connect my agent, copy the key (it starts with ck_) and put it in .env.local as COMPOSIO_MCP_KEY=the_key, then restart Bops.";
+    ? "Composio turned down your saved key. In Composio, open For You, then Settings, Sessions & API Key. Copy the current key into Settings, Services, Composio (your account) in Bops, then restart Bops."
+    : "Composio wants your key for this address: in Composio, open For You, then Connect my agent. Copy the key (it starts with ck_) into Settings, Services, Composio (your account) in Bops, then restart Bops.";
 
 const client = remoteMcp("composio-mcp", {
   name: "Composio",
@@ -204,14 +204,14 @@ const client = remoteMcp("composio-mcp", {
   secrets,
   readOnly: (tool) => judgeCall(tool, {}).reads,
   words: {
-    notSet: "Composio (your account) isn't connected: put COMPOSIO_MCP_URL in .env.local, then restart Bops.",
+    notSet: "Composio (your account) is not connected. Open Settings, Services, Composio (your account) to add its address, then restart Bops.",
     badAddress: () =>
       composioMcpKeyProblem() ??
       (process.env.COMPOSIO_MCP_URL?.trim()
-        ? "COMPOSIO_MCP_URL in .env.local isn't Composio's For You address: it must start with https:// and be on connect.composio.dev. In Composio, open For You, then Connect my agent, and copy the address again."
-        : "COMPOSIO_MCP_KEY is set but COMPOSIO_MCP_URL isn't: in Composio, open For You, then Connect my agent, copy the address and put it in .env.local as COMPOSIO_MCP_URL=the_address."),
+        ? "The saved Composio address is not a For You address: it must start with https:// and be on connect.composio.dev. In Composio, open For You, then Connect my agent. Copy the address into Settings, Services, Composio (your account) in Bops."
+        : "Your Composio key is saved but its address is missing. In Composio, open For You, then Connect my agent. Copy the address into Settings, Services, Composio (your account) in Bops."),
     turnedDown,
-    unknown: "Composio doesn't know this address. In Composio, open For You, then Connect my agent, and copy the address again into COMPOSIO_MCP_URL.",
+    unknown: "Composio doesn't know this address. In Composio, open For You, then Connect my agent, and copy the address again into Settings, Services, Composio (your account) in Bops.",
     busy: "Composio is getting too many requests right now (or your plan's limit was reached). Wait a bit and try again.",
     notMcp: "This address doesn't answer as an MCP server. In Composio, open For You, then Connect my agent, and copy the address it gives for other MCP clients (it starts with https://connect.composio.dev/).",
   },
@@ -238,10 +238,10 @@ export function plainName(name: string) {
 
 /** Settings' Check: a fresh session and the tool list, in plain words. Never the address, the key or what Composio said. */
 export async function checkComposioMcp(): Promise<{ status: "not set" | "works" | "invalid" | "unavailable" | "rate limited"; message: string }> {
-  if (!composioMcpSet()) return { status: "not set", message: "COMPOSIO_MCP_URL isn't set in the running server's environment." };
+  if (!composioMcpSet()) return { status: "not set", message: "Composio (your account) is not connected. Add its address in Settings, Services, Composio (your account), then restart Bops." };
   const bad = composioMcpKeyProblem();
   if (bad) return { status: "invalid", message: bad };
-  if (!composioMcpUrl()) return { status: "invalid", message: process.env.COMPOSIO_MCP_URL?.trim() ? "COMPOSIO_MCP_URL must be an https address on connect.composio.dev. In Composio, open For You, then Connect my agent, and copy the address." : "COMPOSIO_MCP_URL isn't set: in Composio, open For You, then Connect my agent, and copy the address." };
+  if (!composioMcpUrl()) return { status: "invalid", message: process.env.COMPOSIO_MCP_URL?.trim() ? "The Composio address must start with https:// and be on connect.composio.dev. Copy it from For You, Connect my agent into Settings, Services, Composio (your account)." : "The Composio address is missing. Copy it from For You, Connect my agent into Settings, Services, Composio (your account)." };
   try {
     const list = await client.freshList();
     if (!list.length) return { status: "works", message: "Composio answered, but nothing is connected yet. In Composio, open For You, then Connect Apps, and connect Gmail or another app." };

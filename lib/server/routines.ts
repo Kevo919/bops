@@ -1,4 +1,6 @@
 import "server-only";
+import { modelsSettingsPath } from "@/lib/setup-words";
+import { ownPlatform } from "./owner-platform";
 import { readlinkSync } from "node:fs";
 import { trackServerEvent } from "./analytics";
 import { botChatId, lastWorkOf, levelIn, live, pausedForOk, workspaceOf, type Bot, type BotAgent, type Delivery, type Message, type ReplyDraft, type Routine, type SkillProposal, type RoutineRun, type RoutineSource, type Schedule, type Session } from "@/lib/types";
@@ -212,7 +214,7 @@ type RoutineOpts = {
 export function modelProblem(model: unknown): string | undefined {
   if (chatModelOk(model)) return undefined;
   const ids = chatModels().map((m) => m.id);
-  return `"${String(model).slice(0, 130)}" isn't a model Bops has. Pick one of Your LLMs (Settings, Models) or a built in one: ${ids.slice(0, 30).join(", ")}${ids.length > 30 ? ", …" : ""}.`;
+  return `"${String(model).slice(0, 130)}" isn't a model Bops has. Pick one of Your LLMs (${modelsSettingsPath(ownPlatform())}) or a built in one: ${ids.slice(0, 30).join(", ")}${ids.length > 30 ? ", …" : ""}.`;
 }
 
 /** The routine's model as a person reads it ("Preset: Email writer", "Claude Opus 5.5"), or its id when it's gone from the list. */

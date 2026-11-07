@@ -173,7 +173,7 @@ await test("runner choice: Claude plan by default when signed in, else the OpenA
 await test("OpenAI key path still picks the Codex executor, and its auth failure says what to do", () => {
   assert.deepEqual(runner.pickPcRunner({ choice: "openai", claude: "connected", openaiKey: true, local: true }), { runner: "openai", chosen: true });
   const said = runner.executorWords("Local executor exited with code 1 (authentication rejected).");
-  assert.match(said, /environment key made in OpenAI Platform under Agents, Environments, Keys \(Create\), in the same project as your OPENAI_API_KEY/);
+  assert.match(said, /environment key made in OpenAI Platform under Agents, Environments, Keys \(Create\), in the same project as your OpenAI chat account/);
   assert.match(said, /An ordinary API key is turned down/);
   assert.match(runner.PC_WORDS.addKey, /environment key/);
   assert.match(runner.PC_WORDS.addKey, /An ordinary API key won't work/);
