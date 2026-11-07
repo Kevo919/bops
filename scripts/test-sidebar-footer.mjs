@@ -371,11 +371,12 @@ await test("all five fit the sidebar, People's room left empty at the end: four 
   assert.match(html, /data-footer-row="true" class="flex items-center gap-1 pb-1 pt-3 pr-10"/, "4px apart, no padding at the left, People's 40px kept empty at the right");
   const app = srcText("components/app/bops-app.tsx");
   const side = srcText("components/app/sidebar.tsx");
-  const width = Number(app.match(/grid-cols-\[(\d+)px_minmax/)[1]);
+  // The grid template moved into gridColumns (chat-edge.tsx); the sidebar's width is named in bops-app.
+  const width = Number(app.match(/const sidebarWidth = sidebarOpen \? (\d+) : 72;/)[1]);
   assert.equal(width, 340, "the sidebar's width");
   assert.match(side, /<aside className="flex min-h-0 w-\[340px\] shrink-0 flex-col [^"]*px-2\.5 /, "the column's width, 10px at each side");
   // Its 1px edge is the column's, drawn inside it (bops-app.tsx), so it takes none of the 340px.
-  assert.match(app, /bg-\[#F9F9F8\] shadow-\[inset_-1px_0_0_#ECECEA\]/, "a 1px edge on the right, inside the column");
+  assert.match(app, /shadow-\[inset_-1px_0_0_var\(--h-ececea\)]/, "a 1px edge on the right, inside the column (palette vars now)");
   // The room People's button had (36px and its 4px gap) stays empty, so the pill doesn't stretch into it.
   const pill = width - 2 * 10 - 40 - 4 * 36 - 4 * 4;
   assert.equal(pill, 120, "as wide as it was with People there");
@@ -407,7 +408,7 @@ await test("the workspace switcher says under the default why Orgo still shows b
 
 await test("no em or en dashes in what the footer shows", () => {
   for (const f of ["components/app/sidebar-footer.tsx", "components/app/sidebar.tsx"]) {
-    const shown = srcText("${f}").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    const shown = srcText(f).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     assert.ok(!/[–—]/.test(shown), `${f} shows a dash`);
   }
 });

@@ -235,7 +235,7 @@ await test("the app: a 72px rail, its column sliding with the title bar's, and n
   assert.match(app, /<SidebarRail/);
   assert.match(app, /\$\{sliding \? "overflow-clip" : ""\}/, "clipped while it slides, never scrolled sideways");
   assert.match(app, /setSliding\(\(n\) => n \+ 1\)/, "a second toggle mid-slide gets its own full slide");
-  assert.match(app, /\{ left: sidebarOpen \? 12 : 84, bottom: 76 \}/, "the compact call bar waits past the rail");
+  assert.match(app, /style=\{callHere && slotBox \? \{ left: slotBox.x[^}]*\} : \{ left: sidebarOpen \|\| narrow \? 12 : 84, bottom: 76 \}\}/, "the compact call bar waits past the rail (docked, or pinned to its slot)");
   assert.match(app, /footer=\{openPage\}/);
 });
 
