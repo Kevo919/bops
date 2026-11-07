@@ -75,6 +75,7 @@ import { pingIfWorthIt } from "./attention";
 import { recordTokens, usageTags } from "./usage";
 import { foldChat, soFar, windowOf } from "./chat-summary";
 import { heard } from "@/lib/chat-summary";
+import { ownPlatform } from "./owner-platform";
 import { LIGHT, logRoute, routeChat, speedFor, tierParam, withSpeed, type Config } from "./routing";
 
 /**
@@ -82,7 +83,6 @@ import { LIGHT, logRoute, routeChat, speedFor, tierParam, withSpeed, type Config
  * throughout, so the bot wrote "on your Mac" back): fixed words only, never a name, title or message (computerWordsFor
  * leaves what's interpolated exactly as it is).
  */
-import { ownPlatform } from "./owner-platform";
 const pcWords = (text: TemplateStringsArray, ...values: unknown[]) => computerWordsFor(ownPlatform())(text, ...values);
 const pc = (text: string) => computerWords(text, ownPlatform());
 

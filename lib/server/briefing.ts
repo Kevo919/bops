@@ -1,5 +1,5 @@
-import { computerWordsFor } from "@/lib/computer-words";
 import "server-only";
+import { computerWordsFor } from "@/lib/computer-words";
 
 import { ownPlatform } from "./owner-platform";
 import { BLOCKER_LABEL, DISPLAYS, isScreenWatch, live, workspaceOf, type Session } from "@/lib/types";
