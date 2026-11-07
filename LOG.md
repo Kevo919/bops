@@ -220,3 +220,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 12:48 lead: after the container restart: zai pushed #113 fa23036 (re-review started) and opened #118, a duplicate of #117 (zai asked to close it). Task 90 belongs to zai. zai was told not to place calls. Codex is still on hold.
 - 12:53 lead: #115 re-review = APPROVE WITH NITS (CI green incl. gitleaks); merge-when-green running. Nit filed as task 91.
 - 12:53 lead: merged #115 (chat error cards, Claude readiness, gitleaks fingerprint) at d4b6782. #113, #116 and #117 updated to the new base.
+- 12:54 lead: #113 re-review = REQUEST CHANGES (sitter attaches late so children escape; a sitter failure kills the turn; DLL cache never rebuilds; Node logging; glob brace bypass). Notes in messages 1315.
