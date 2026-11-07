@@ -91,6 +91,8 @@ const settle = async () => {
   for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r));
 };
 const noop = () => {};
+/** A component's source, its line endings as Linux has them too (a Windows checkout is CRLF). */
+const src = (p) => readFileSync(`${rootPath}/${p}`, "utf8").replace(/\r\n/g, "\n");
 const text = (html) => html.replace(/<[^>]+>/g, " ").replace(/&#x27;|&apos;/g, "'").replace(/\s+/g, " ");
 
 /* ---------------- Fixtures ---------------- */
@@ -266,7 +268,7 @@ await check("a chat's older messages come from Bops Cloud a page at a time, past
   assert.match(renderToStaticMarkup(h(ChatView, props)), /Show earlier messages/, "with only two here");
   const all = viewState(own(), { ...listed, wsId: WS }, cloudState(), {});
   assert.ok(!/Show earlier messages/.test(renderToStaticMarkup(h(ChatView, { ...props, state: all, chat: all.chats[0] }))), "none when it has them all");
-  const src = readFileSync(`${rootPath}/components/app/chat-view.tsx`, "utf8");
+  const src = src("components/app/chat-view.tsx");
   assert.match(src, /void post\("\/api\/workspaces\/shared", \{ older: c\.id \}\)/);
 });
 
@@ -495,7 +497,7 @@ await check("two bots' conversation with each other pages back too, so Asked ●
   assert.equal(await copy.older("pair:boppy:zed"), false);
   assert.equal(f.calls.length, asked);
   // The window asks for a page more while the exchange it opened at isn't there yet (an effect: as written).
-  assert.match(readFileSync(`${rootPath}/components/app/chat-view.tsx`, "utf8"), /if \(olderThere && !found\) void post\("\/api\/workspaces\/shared", \{ older: pairId \}\);/);
+  assert.match(src("components/app/chat-view.tsx"), /if \(olderThere && !found\) void post\("\/api\/workspaces\/shared", \{ older: pairId \}\);/);
   // The user's own: all of it is on their Mac, nothing to read.
   assert.ok(!/Show earlier messages/.test(sheet({ ...own(), bots: v.bots, messages: v.messages.filter((m) => m.chatId === pair) })));
 });
@@ -561,7 +563,7 @@ await check("while a shared workspace is open, what its bots wait on the owner's
   assert.deepEqual(viewState(mine, { ...listed, wsId: WS }, cloudState(), {}).appApprovals, []);
   // The chat and the thread show their cards whole (chat-view.tsx): who answers one is the card's to say (lib/shared.ts
   // askAnswerer), with a line in place of its buttons for anyone else. Nothing is ever switched off and left looking live.
-  const src = readFileSync(`${rootPath}/components/app/chat-view.tsx`, "utf8");
+  const src = src("components/app/chat-view.tsx");
   assert.ok(!src.includes("OwnerOnly") && !/\binert\b/.test(src), "no card made inert");
   assert.equal(src.split("<AppApprovalCard key={a.id} state={state} approval={a}").length - 1, 2, "in the chat and in the thread");
   assert.match(src, /const answerer = askAnswerer\(state, a\);/);
@@ -582,7 +584,7 @@ await check("while a shared workspace is open, the user's own news still chimes:
   assert.deepEqual(v.ownPings, duePings(mine), "the same keys the window chimes for in the user's own workspace, so nothing chimes twice");
   assert.ok(!v.messages.some((m) => m.id === "own-2"), "and nothing of theirs shows in the shared workspace");
   // The window chimes for those while one is open (as the whole window renders, which isn't rendered here: read from its source).
-  const src = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
+  const src = src("components/app/bops-app.tsx");
   assert.match(src, /const due = state\.shared \? \(state\.ownPings \?\? \[\]\) : duePings\(state\);/);
   assert.ok(!/if \(!state \|\| state\.shared\) return;\n\s*const due/.test(src), "it no longer stops for a shared workspace");
 });
@@ -792,14 +794,14 @@ await check("nothing else that would change a shared workspace is offered: a thr
 });
 
 await check("the guard is on as the window renders, before what it draws runs its effects", () => {
-  const src = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
+  const src = src("components/app/bops-app.tsx");
   assert.match(src, /\n {2}viewOnly\(state\?\.shared \? readOnlyLine\(\) : null\);/);
   assert.ok(!/useEffect\(\(\) => viewOnly/.test(src), "never in an effect (a child's effect would run first)");
 });
 
 await check("the window never cuts to what waits on a shared workspace's owner: no jump to a thread's ask, no bringing forward an urgent alert's screen", () => {
   // (Both happen as the whole window renders and runs its effects, which isn't rendered here: read from its source.)
-  const src = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
+  const src = src("components/app/bops-app.tsx");
   assert.match(src, /const \[ask\] = state\.shared \? \[\] : chatAsks\(state, chat\.id\);/);
   assert.match(src, /bringForward\.current = \(\) => \{\n(?: *\/\/[^\n]*\n)* *if \(state\.shared\) return;/);
 });
@@ -817,7 +819,7 @@ await check("the sidebar of a shared workspace makes nothing new", () => {
   assert.ok(!shared.includes('aria-keyshortcuts="Alt+ArrowUp'));
   assert.match(mine, /data-favorite="issues" draggable="true" aria-keyshortcuts="Alt\+ArrowUp Alt\+ArrowDown"/, "the user's own: as always");
   // Neither the user's own issues nor this Mac's setup go under its bots as cards: they're the user's, not the owner's.
-  const src = readFileSync(`${rootPath}/components/app/sidebar.tsx`, "utf8");
+  const src = src("components/app/sidebar.tsx");
   assert.match(src, /useIssues\(ws, user, categoriesOpen\(state\) && !state\.shared\)/);
   assert.match(src, /needsByBot\(state, issues\?\.issues \?\? null, state\.shared \? \[\] : setup\)/);
 });
@@ -1350,7 +1352,7 @@ await check("the viewer's own Mac is never a shared workspace's: no Your Mac tab
   assert.deepEqual(tabsShown([mac], st, opts(st)), []);
   assert.equal(opensMacTab(st, st.sessions[0]), false, "a lead or a thread on the owner's Mac");
   // (As the window has it: the follower and an opened thread go by opensMacTab.)
-  const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
+  const app = src("components/app/bops-app.tsx");
   assert.match(app, /if \(opensMacTab\(state, lead\)\) \{/);
   assert.match(app, /if \(opensMacTab\(state, s\)\) \{/);
   assert.equal((app.match(/kind: "mac" \}\]\)/g) ?? []).length, 2, "nowhere else opens it on its own");
@@ -1416,7 +1418,7 @@ await check("nor anywhere else: no full width Your Mac carried over or kept capt
   const mine = { ...own(), host: "mac", watches: c.state.watches };
   assert.match(text(renderToStaticMarkup(h(MacComputer, { state: mine, mode: "focus", onBack: noop, onOpenThread: noop }))), /Your Mac/, "the user's own: as always");
   // (As the window has it: full width on the Mac goes when a shared workspace opens, and the hidden one isn't kept.)
-  const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
+  const app = src("components/app/bops-app.tsx");
   assert.match(app, /if \(state\.shared && macFocus\) \{\n\s*setMacFocus\(false\);/);
   assert.match(app, /\) : focus && macFocus && !state\.shared \? \(/);
   assert.match(app, /const macHeld = [^;\n]*&& !state\.shared;/);
@@ -1434,7 +1436,7 @@ await check("nor anywhere else: no full width Your Mac carried over or kept capt
   const onMac = viewState({ ...own(), host: "mac" }, { ...listed, role: "member", wsId: WS }, { ...c, state: { ...c.state, bots: [{ ...c.state.bots[0], runsOn: "mac" }] } }, {});
   assert.match(text(renderToStaticMarkup(h(BotComputersList, { state: onMac, keys: null, padded: false }))), /Dana's Boppy Works on the owner's Mac/);
   assert.match(text(renderToStaticMarkup(h(BotComputersList, { state: { ...own(), host: "mac" }, keys: null, padded: false }))), /Your bots' computers Sam's Boppy Uses this Mac/, "the user's own: as always");
-  assert.match(readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8"), /<BotComputers state=\{state\} padded=\{!selfHosted\} askKeys=\{!selfHosted && !state\.shared\} \/>/, "nor asked about the owner's computers' keys");
+  assert.match(src("components/app/bops-app.tsx"), /<BotComputers state=\{state\} padded=\{!selfHosted\} askKeys=\{!selfHosted && !state\.shared\} \/>/, "nor asked about the owner's computers' keys");
   // The tabs: a helper's computer tab is its main bot's, as its Details say.
   const helper = st.bots.find((b) => b.id === "helper");
   assert.equal(computerOf(st, helper).id, "boppy");
@@ -1539,7 +1541,7 @@ await check("a thread of the user's own that ended waiting for a sign in on its 
   const shown = text(sheet(mine, waits));
   assert.match(shown, /Sign in for Sam's Boppy/);
   assert.match(shown, /I signed in/);
-  const src = readFileSync(`${rootPath}/components/app/chat-view.tsx`, "utf8");
+  const src = src("components/app/chat-view.tsx");
   assert.match(src, /sign_in: \["I signed in", "I signed in\. Carry on\."\]/, "the reply it sends");
   // Still at work (its screen hit the sign in a moment ago): nothing to carry on.
   const working = { ...waits, status: "running", endedAt: undefined };
@@ -2185,7 +2187,7 @@ await check("the owner's app work: an app thread's ask or question is answered o
   assert.deepEqual(copy.refusal({ act: "answer", askId: "apr-app", reply: "once" }), { status: 403, error: L.APP_WORK_LINE, code: "member_apps_read_only" });
   assert.equal(copy.refusal({ act: "reply", sessionId: "t-app", text: "x" }).code, "member_apps_read_only");
   // A reply or Dismiss on its way waits only a while: its card never makes the answer's promise.
-  const src = readFileSync(`${rootPath}/components/app/chat-view.tsx`, "utf8");
+  const src = src("components/app/chat-view.tsx");
   const from = src.indexOf("function NeedsYouCard(");
   const card = src.slice(from, src.indexOf("\nfunction ", from + 1));
   assert.ok(card.includes("REPLY_WAITS_LINE") && !card.includes("ANSWER_WAITS_LINE"));

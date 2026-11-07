@@ -43,8 +43,7 @@ process.env.HOME = scratch;
 symlinkSync(join(rootPath, "node_modules"), join(scratch, "node_modules"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
-mkdirSync(join(scratch, "keychain"));
-process.env.BOPS_TEST_KEYCHAIN = join(scratch, "keychain");
+
 // This app's version, as the build sets it (next.config.ts): every call to the cloud says it.
 process.env.BOPS_APP_VERSION = "9.9.9";
 // macOS's `security`, with a folder for a Keychain.
@@ -282,6 +281,7 @@ const K = await import(`${rootUrl}/lib/server/skills.ts`);
 const U = await import(`${rootUrl}/lib/server/usage.ts`);
 const ACCOUNT = await import(`${rootUrl}/app/api/account/route.ts`);
 const { MAIN_WORKSPACE, PAIR_CODE_MS, botChatId, levelOf } = await import(`${rootUrl}/lib/types.ts`);
+const { getSecret } = await import(`${rootUrl}/lib/server/keychain.ts`);
 const { buildURL: sidebandURL } = await import(`${rootUrl}/node_modules/openai/resources/live/sideband/internal-base.mjs`);
 
 const KEY = "orgo_test_key";
@@ -419,7 +419,7 @@ await selfHosted({ OPENAI_API_KEY: "sk-self" }, async () => {
   assert.equal(String(sidebandURL(ai, { session_id: "s" })), "wss://api.openai.com/v1/live/sessions/s/attach");
   web.answer = providers;
 });
-await selfHosted({}, () => assert.rejects(ai.responses.create({ model: "x", input: "x" }), /No OpenAI key is set: add OPENAI_API_KEY to \.env\.local\./));
+await selfHosted({}, () => assert.rejects(ai.responses.create({ model: "x", input: "x" }), /No key for the chat's models[^]*OPENAI_API_KEY[^]*\.env\.local[^]*restart Bops/));
 signOut();
 await assert.rejects(ai.responses.create({ model: "x", input: "x" }), /Sign in with Orgo first\./);
 await signIn();
@@ -1890,7 +1890,7 @@ R.relayAfterSignIn();
 await until(() => S.getState().relay?.on, "routing on by default", 15_000);
 assert.equal(S.getState().relay.deviceId, "dev_1");
 assert.equal(S.getState().relay.turnedOff, undefined);
-assert.deepEqual(JSON.parse(readFileSync(join(scratch, "keychain", encodeURIComponent("orgo-relay:u1")), "utf8")), { deviceId: "dev_1", code: "code_dev_1" }, "the pairing code in the Keychain");
+assert.deepEqual(JSON.parse(await getSecret("orgo-relay:u1")), { deviceId: "dev_1", code: "code_dev_1" }, "the pairing code in the vault");
 await until(async () => (await statusNow()).running, "the relay running", 15_000);
 let rs = await statusNow();
 assert.deepEqual([rs.available, rs.on], [true, true]);
