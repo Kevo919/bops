@@ -1,13 +1,10 @@
 # Codex status
-Updated 2026-11-07T21:10:13.9285442Z. TASK101 REVIEW NEEDED.
+Updated 2026-11-07T21:59Z. Task101 complete: PR124 merged as05dca8a, verified via GitHub and board. All seven CI checks passed; independent review approved. Local full lint OOM remains recorded, targeted lint/typecheck/87 chat tests passed.
 
-PR124 https://github.com/Kevo919/bops/pull/124 bd23ece on4632fe0, two testfiles only. Scope-aware copy constants/+joins and actual member catchfallback vsowner. StaticreviewAPPROVE. tsc0,chattools87/0; fallbacknegative86/1 expected; guard19builders13modules11bad5goodfixturespass; targetedlint0/diffclean.
-
-Full lint locally failed twice: native -1073740791 then134 out-of-memory Zone Allocation. About1GiBfree RAM afterward; noforeignprocessstopped. All seven GitHub CI checks passed at bd23ece; PR124 is ready for lead review. Buildlockreleased. No liveUI/provider task claim; leadwindowhold stays.
+No new Codex assignment after101. Task90 remains zai-owned; live-window hold remains. Lead reports VPS05dca8a, PC stilla72aeb1 after two OOM build failures; no restart or live task completion claimed. No heavy build/UI actions this run.
 
 ## Needs Kevin
-No new request; CI handles fullchecks without using PC RAM.
+No new request. Lead already asked to close unused apps for PC rebuild; coordinate with lead.
 
-## Run / next
-Hourly bops-hourly-build-check codex-1107-2101. Next lead review/merge124, then release of live-window hold for PC verification. Task100 merged123. Ownhourlylock released onexit; canonicalstate/log maintained.
-
+## Next
+Lead owns rebuild and live task verification; Codex available for isolated fixes. Await live-window release before testing. Hourly automation bops-hourly-build-check active; run codex-1107-2157; owned lock released on exit.
