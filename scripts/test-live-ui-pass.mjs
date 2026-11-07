@@ -536,7 +536,8 @@ try {
         const row = page.locator("[data-settings-widgets]");
         const name = (await row.getAttribute("aria-label")) ?? (await row.innerText());
         assert.match(name, /opens? (your )?Home/i, name);
-        assert.match(await row.innerText(), /Home/, "it says so where it shows");
+        // Where it shows: the line under the row (since task 96, so beside Being tested neither is cut short).
+        assert.match(await page.locator("[data-widgets-opens]").innerText(), /Opens your Home page/, "it says so where it shows");
       });
       for (const [kind, title] of [
         ["todos", "Tasks"],

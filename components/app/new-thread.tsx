@@ -247,10 +247,12 @@ export function boxAgents(state: AppState, b: Bot, value: string | null, keys?: 
  * (/api/computer) for an agent on a Claude or ChatGPT plan there. Read once, and again when the window comes to
  * the front (a sign in done meanwhile, the computer fallen asleep); never polled.
  */
-export function useRunPlace(state: AppState, b: Bot | undefined, agent: BotAgent | undefined): RunPlace {
+export function useRunPlace(state: AppState, b: Bot | undefined, agent: BotAgent | BotAgent[] | undefined): RunPlace {
   const where = b ? nextRunWhere(b, state) : "cloud";
-  const wantPc = !!b && !state.shared && where === "pc" && agent?.kind === "claude" && agent.pays === "plan";
-  const wantComputer = !!b && !state.shared && where === "cloud" && !!agent && agent.pays === "plan";
+  // Every agent the chip offers is said where it would run (task 93): read what any of them needs.
+  const agents = Array.isArray(agent) ? agent : agent ? [agent] : [];
+  const wantPc = !!b && !state.shared && where === "pc" && agents.some((x) => x.kind === "claude" && x.pays === "plan");
+  const wantComputer = !!b && !state.shared && where === "cloud" && agents.some((x) => x.pays === "plan");
   const [pc, setPc] = useState<RunPlace["pc"]>(undefined);
   const [computerStatus, setStatus] = useState<string | undefined>(undefined);
   const [again, setAgain] = useState(0);
@@ -302,15 +304,20 @@ export function AgentChipPick({ state, bot: b, value, keys, defaultOpen = false,
   useDismiss(open, () => setOpen(false), box);
   const ownWords = useOwnComputerWords(state);
   const first = boxAgents(state, b, value, keys);
-  // Where the next message's tasks run, and how that is now: the Default is said as it would really run (nextRunState).
-  const place = useRunPlace(state, b, first.def);
-  const { options, now, def, defReady } = boxAgents(state, b, value, keys, place);
+  // Where the next message's tasks run, and how that is now: each agent offered is said as it would really run
+  // (nextRunState), the one picked as well as the Default (task 93: a pick on this PC showed no status at all).
+  const place = useRunPlace(state, b, first.options);
+  const { options, now, def } = boxAgents(state, b, value, keys, place);
   if (options.length < 2 || state.shared) return null;
   const at = { bot: b, state };
-  const defSaid = nextRunState(def, b, state, place, keys, ownWords);
-  const off = (x: BotAgent) => (x.id === def.id && !defReady ? notReadyWords(defSaid) : "");
+  const saidOf = (x: BotAgent) => nextRunState(x, b, state, place, keys, ownWords);
+  const nowSaid = saidOf(now);
+  const off = (x: BotAgent) => {
+    const st = x.id === now.id ? nowSaid : saidOf(x);
+    return st.ready ? "" : notReadyWords(st);
+  };
   // Ready, with something worth knowing (its computer asleep: it wakes when you send).
-  const note = now.id === def.id && defReady ? defSaid.note : undefined;
+  const note = nowSaid.ready ? nowSaid.note : undefined;
   // Its name, or (not ready) its kind and why, which a narrow chip mustn't cut off; the menu and its name say which.
   const label = off(now) ? `${AGENTS[now.kind].name} · ${off(now)}` : agentName(now, at);
   return (
@@ -322,12 +329,12 @@ export function AgentChipPick({ state, bot: b, value, keys, defaultOpen = false,
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         aria-label={`Agent for new tasks: ${agentName(now, at)}${off(now) ? `, ${off(now)}` : note ? `, ${note}` : ""}`}
-        data-agent-ready={off(now) ? (defSaid.checking ? "checking" : "no") : "yes"}
-        title={value && now.id === value ? `Tasks from this message run on ${agentLabel(now, at)}` : `Tasks run on ${b.name}'s Default, ${agentLabel(now, at)}${off(now) || note ? `. ${defSaid.line}` : ""}`}
+        data-agent-ready={off(now) ? (nowSaid.checking ? "checking" : "no") : "yes"}
+        title={`${value && now.id === value ? `Tasks from this message run on ${agentLabel(now, at)}` : `Tasks run on ${b.name}'s Default, ${agentLabel(now, at)}`}${off(now) || note ? `. ${nowSaid.line}` : ""}`}
         className="flex h-[30px] items-center gap-1.5 rounded-full px-2 text-[12.5px] leading-4 text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)]"
       >
         <AgentMark kind={now.kind} size={15} />
-        <span className={`max-w-[170px] truncate ${off(now) && !defSaid.checking ? "text-[color:var(--ht-b54708)]" : ""}`}>{label}</span>
+        <span data-agent-status className={`max-w-[220px] truncate ${off(now) && !nowSaid.checking ? "text-[color:var(--ht-b54708)]" : ""}`}>{label}</span>
         {note && <span data-agent-note className="max-w-[180px] truncate text-[11px] text-[color:var(--ht-6b6b6b)]">· {note}</span>}
         {(now.pays === "plan" || now.model?.startsWith("zai-coding/")) && <span className="max-w-[180px] truncate text-[11px]">· {paysLabel(now, state, workBot(b, state.bots).computerId)}</span>}
         <span aria-hidden className="text-[9px] text-[color:var(--ht-9a9a98)]">
@@ -342,18 +349,19 @@ export function AgentChipPick({ state, bot: b, value, keys, defaultOpen = false,
               type="button"
               role="menuitemradio"
               aria-checked={x.id === now.id}
-              aria-disabled={!!off(x) || undefined}
+              // Never refused (task 93: a Default not signed in on this PC was aria-disabled, so the menu offered nothing
+              // a click or an accessibility client could take): it says why it isn't ready, and picking it is allowed;
+              // the server runs it where it can and says so, as it does for the Default.
               onClick={() => {
-                if (off(x)) return;
                 onPick(x.id === def.id ? null : x.id);
                 setOpen(false);
               }}
-              className={`flex items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[13px] leading-4 hover:bg-[color:var(--hb-f6f6f4)] ${x.id === now.id ? "bg-[color:var(--hb-f6f6f4)]" : ""} ${off(x) ? "cursor-default opacity-60" : ""}`}
+              className={`flex items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[13px] leading-4 hover:bg-[color:var(--hb-f6f6f4)] ${x.id === now.id ? "bg-[color:var(--hb-f6f6f4)]" : ""}`}
             >
               <AgentMark kind={x.kind} size={15} />
               <span className="flex-1">
                 {agentLabel(x, at)}
-                {off(x) ? ` · ${off(x)}` : ""}
+                {off(x) && <span className="text-[color:var(--ht-b54708)]"> · {off(x)}</span>}
               </span>
               {x.id === def.id && <span className="text-[11px] text-[color:var(--ht-6b6b6b)]">Default</span>}
             </button>

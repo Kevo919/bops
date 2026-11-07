@@ -160,8 +160,29 @@ export function chatErrorKind(i: Pick<ChatErrorInput, "status" | "code" | "messa
   return "other";
 }
 
-/** "Settings → AI subscriptions" (the card's own place since #116): where the card's button goes, and what each line points to. */
+/** "Settings → AI subscriptions" (the card's own place since #116): the card's second button, for a plan or a sign in. */
 export const AI_PLANS = "Settings → AI subscriptions";
+/** Where a chat's model is picked: the chat box's own picker (chat-model.tsx), which the card's first button opens. */
+export const MODEL_PICKER = "the chat box's model picker";
+
+/** The line a Bops from before #115 wrote for a provider's no, its raw words after it (chat.ts's fallback still does). */
+const OLD_FAILURE = /^Something went wrong on my side: ([\s\S]+)$/;
+
+/**
+ * A stored message from before the card (task 95: history still showed "429 You have no credits remaining"), read as
+ * the card would have shown it: its raw words through chatErrorOf, keys taken out. Null for any other message, and for
+ * words no provider's no reads as (left as they were written).
+ */
+export function storedChatError(text: string | undefined, bot?: string): ChatErrorInfo | null {
+  const m = OLD_FAILURE.exec((text ?? "").trim());
+  if (!m) return null;
+  const message = m[1];
+  const status = statusIn(message);
+  const kind = chatErrorKind({ status, message });
+  if (kind === "other" && status === undefined) return null;
+  const provider = /openai|insufficient_quota|exceeded your current quota/i.test(message) ? "openai" : /anthropic|claude/i.test(message) ? "anthropic" : undefined;
+  return chatErrorOf({ message, status, ...(provider ? { provider } : {}), ...(bot ? { bot } : {}) });
+}
 
 /**
  * A provider's no, for the chat: its kind, a heading, the plain line, and the provider's words for Details (`keys`:
@@ -173,7 +194,8 @@ export function chatErrorOf(i: ChatErrorInput, keys: readonly string[] = []): Ch
   const name = providerName(i.provider);
   const who = name ?? "The AI provider";
   const bot = i.bot?.trim() || "your bot";
-  const elsewhere = `pick another model in ${AI_PLANS}`;
+  // The chat's model is picked in the chat box (task 95): AI subscriptions is the card's second way out, not this line's.
+  const elsewhere = `pick another model in ${MODEL_PICKER}`;
   const model = modelName(i.model);
   const raw = (i.message ?? "").replace(/\s+/g, " ").trim();
   const details = raw ? withoutKeys([status && !raw.startsWith(String(status)) ? `${status}` : "", i.code && !raw.includes(i.code) ? `(${i.code})` : "", raw].filter(Boolean).join(" "), keys).slice(0, 600) : undefined;
