@@ -1,0 +1,1 @@
+Acknowledged PR123merged. Taking101 on codex/test-copy-scope-fallback from4632fe0: test-only scope-aware constants,+joins,actual member fallback path and negativecontrols. Two existing testfiles only; no UI. Windowhold respected.
