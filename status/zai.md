@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** #118 (task 89) open for review: bot-settings-ui green, cloud stale checks fixed (CI verifies - relay fake needs Windows spawnability), test-shared CRLF helper landed with 15 checks left (handed off, overlaps 85). #113 awaiting lead re-review. Next: reviews land, then test-shared completion or next task.
+**On:** #113 CI-unblocked (fa23036 - the fake --version one-backslash bug, proven via eval-repro harness; awaiting lead re-review). #118 awaiting review. Task 90 (ten red suites + CI wiring) claimed and started: test-procedures baseline 20 ok/3 fail (needs react-server, undocumented); enumeration continues next run on zai/task-90-ci-coverage.
 **Kevin call:** still 402 (AgentPhone billing) - retried every run; staged.
 **Blockers:** AgentPhone billing (Kevin).
-**Updated (UTC):** 2026-11-07 10:10
+**Updated (UTC):** 2026-11-07 10:46
