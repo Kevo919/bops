@@ -1,5 +1,6 @@
 /** Shared shapes for the Bops app state, used by both the server and the UI. */
 
+import type { ChatErrorInfo } from "./chat-error";
 import type { AppHosting, AppsForMembers, IngotToken } from "./hosted-apps";
 import type { Chain } from "./chain";
 import type { ComputerSize } from "./bops-billing";
@@ -941,6 +942,12 @@ export type Message = {
    * limit), never the model's: a shared workspace reads it in the owner's voice (lib/server/shared-core.ts viewState).
    */
   bops?: true;
+  /**
+   * Set on a bot's message in place of a reply when the chat model's provider said no (out of credit, too many
+   * requests, a bad key, no such model, down: lib/chat-error.ts): the chat shows it as a card with the plain line
+   * (also `text`), a button to Settings → AI plans, and the provider's own words behind Details, never with a key.
+   */
+  chatError?: ChatErrorInfo;
   /**
    * Set on the "While you were busy" message (lib/server/attention.ts flush), which the workspace's main bot
    * posts for every bot's watches: each line it tells and the bot whose watch it came from, so a shared

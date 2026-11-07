@@ -143,7 +143,7 @@ export type AccountInfo = {
     id: string;
     name: string;
     /** The workspace's number: people text and call its main bot there. */
-    line?: { phone: string; imessage: boolean; main?: string };
+    line?: { phone: string; imessage: boolean; main?: string; whose?: "bops" | "agentphone" };
     bots: { id: string; name: string; color: string; isMain: boolean; email?: string; phone?: string }[];
   }[];
 };

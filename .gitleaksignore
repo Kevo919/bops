@@ -33,3 +33,5 @@ dde234dc68b82239e236be9d193b93d185e425fd:tests/2026-11-05-1158-reviewer-pr69-pr7
 588d2a741ea8a443417116bf5259ec65f97a5f17:scripts/test-pc-task-runner.mjs:generic-api-key:25
 # PR #83 test: the literal placeholder ZAPIER_MCP_URL=that_url the card tells people to paste, not a credential.
 480f6fb7f825c62d72a4fea594ad556f7bbc01c1:scripts/test-connections-ui.mjs:generic-api-key:115
+# PR #115 test: fake fixture in its first commit (sk-proj-SECRET...), not a real key. Kevin approved this entry on 2026-11-07.
+da8d5ffa23722e8d2ff1d71429ec41d81a197aea:scripts/test-chat-error.mjs:generic-api-key:15
