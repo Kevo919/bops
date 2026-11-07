@@ -151,10 +151,31 @@ export const CLAUDE_SETTINGS = {
 };
 /** The flags the CLI must know for a task to run on it safely; one that doesn't (an older Claude Code) isn't used. */
 export const REQUIRED_FLAGS = ["--restricted", "--setting-sources", "--settings", "--tools", "--permission-prompt-tool", "--strict-mcp-config", "--disallowedTools"];
+/**
+ * The oldest Claude Code a task may run on: the release these flags and their --settings shape were checked
+ * against by hand (2.1.318). Not exact — the CLI updates itself, and anything newer is welcome — but a task
+ * never runs on something older than what its safety flags were proven on.
+ */
+export const MIN_CLAUDE_VERSION = [2, 1, 318];
+
+/** A version string's numbers, where 2.1.318 (and 2.1.318-beta.1) is [2, 1, 318]. */
+const versionNumbers = (text: string): number[] => {
+  const got = /(\d+)\.(\d+)\.(\d+)/.exec(text);
+  return got ? [Number(got[1]), Number(got[2]), Number(got[3])] : [];
+};
+/** Lexicographic: the first part where they differ decides ([3,0,0] > [2,1,318]). */
+const atLeast = (version: number[], floor: number[]) => {
+  if (version.length !== floor.length) return false;
+  for (let i = 0; i < floor.length; i++) {
+    if (version[i] !== floor[i]) return version[i] > floor[i];
+  }
+  return true;
+};
 
 const helpChecked = new Map<string, boolean>();
-/** Whether this claude knows every flag in REQUIRED_FLAGS (its --help, once per binary and its change): each flag
- *  as its own word in the help, not a substring of another flag's name (`--tools` isn't proved by `--toolsets`). */
+/** Whether this claude is at least MIN_CLAUDE_VERSION and knows every flag in REQUIRED_FLAGS (its --version and
+ *  --help, once per binary and its change): each flag as its own word in the help, not a substring of another
+ *  flag's name (`--tools` isn't proved by `--toolsets`). */
 export function claudeSupportsTasks(claude: string, env: NodeJS.ProcessEnv): boolean {
   let stamp = claude;
   try {
@@ -166,7 +187,10 @@ export function claudeSupportsTasks(claude: string, env: NodeJS.ProcessEnv): boo
   if (known !== undefined) return known;
   let ok = false;
   try {
-    const help = execFileSync(claude, ["--help"], { env, encoding: "utf8", timeout: 15_000, windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+    const run = (args: string[]) => execFileSync(claude, args, { env, encoding: "utf8", timeout: 15_000, windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+    const version = versionNumbers(run(["--version"]));
+    if (!atLeast(version, MIN_CLAUDE_VERSION)) throw new Error(`Claude Code ${version.join(".") || "?"} is older than ${MIN_CLAUDE_VERSION.join(".")}`);
+    const help = run(["--help"]);
     const words = new Set(help.split(/\s+/).map((w) => w.replace(/^[[("'{]+/, "").replace(/[\])}"'`,.;:]+$/, "")));
     ok = REQUIRED_FLAGS.every((f) => words.has(f));
   } catch {
@@ -261,14 +285,24 @@ export const siteOf = (tool: string, input: Record<string, unknown>) =>
   tool === "WebFetch" || tool === "mcp__browser__browser_navigate" || tool === "mcp__browser__browser_tabs" ? originOf(input.url) : undefined;
 
 /**
+ * Glob syntax that can expand to more than its words say: brace lists (`{..,x}/secret*` is `../secret*` too) and
+ * extglob groups (`@(..)`, `!(..)`, `+(..)`, `*(..)`, `?(..)`). Checked as text, never expanded.
+ */
+const GLOB_CONSTRUCT = /\{|@\(|!\(|\+\(|\*\(|\?\(/;
+
+/**
  * Whether a glob pattern stays where it was put (Glob's `pattern`, which says what to find, and Grep's `glob`,
  * which filters the files searched): no `..` segment and no absolute path, either of which would walk the search
- * out of the folder the tool was given. Nothing to check counts as staying put (the path itself is still checked).
+ * out of the folder the tool was given. A brace list or extglob group that anywhere says `..` is taken for the
+ * escape it can expand to (a plain `..` segment is caught above; the constructs are caught here because what
+ * they expand to can't be read from the text). Nothing to check counts as staying put (the path itself is still
+ * checked).
  */
 export const patternStaysPut = (pattern: unknown): boolean => {
   if (typeof pattern !== "string" || !pattern) return true;
   const p = pattern.replace(/\\/g, "/");
   if (p.startsWith("/") || p.startsWith("~") || /^[A-Za-z]:/.test(p)) return false;
+  if (GLOB_CONSTRUCT.test(p) && p.includes("..")) return false;
   return !p.split("/").includes("..");
 };
 
@@ -330,13 +364,17 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * On Windows, hold a Job Object (kill on close) on the turn's Claude Code (vm/win-job-sitter.ps1): whatever it
- * starts joins the job, so nothing of the turn outlives it even if Bops dies before Stop. Fire and forget: when
- * the sitter can't run, stopClaude's taskkill of the whole tree is still what ends a turn's processes.
+ * starts joins the job, so nothing of the turn outlives it even if Bops dies before Stop. Started the moment the
+ * CLI is spawned (the sitter's compiled assembly is cached, so it assigns within a moment, before the CLI can
+ * fork; the first run on a machine pays one compile). A sitter that can't run says why in its log and leaves;
+ * stopClaude's taskkill of the whole tree is still what ends a turn's processes.
  */
 function startJobSitter(claudePid: number): void {
   if (process.platform !== "win32") return;
   const powershell = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-  const script = join(process.cwd(), "vm", "win-job-sitter.ps1");
+  // The install dir as the packaged app knows it (BOPS_SERVER_JS, desktop/main.cjs), else where the repo runs.
+  const installDir = process.env.BOPS_SERVER_JS ? dirname(process.env.BOPS_SERVER_JS) : process.cwd();
+  const script = join(installDir, "vm", "win-job-sitter.ps1");
   try {
     const sitter = spawn(powershell, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-Child", String(claudePid), "-Parent", String(process.pid)], {
       stdio: "ignore",
