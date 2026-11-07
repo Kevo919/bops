@@ -1,4 +1,4 @@
-import { BRAINS_ON, planName, signInOn, threadRunner, workBot, workspaceOf, type AgentKind, type AgentPays, type AppState, type Bot, type BotAgent, type BotAi, type Brain, type CliKind, type Session } from "@/lib/types";
+import { BRAINS_ON, computerAsleep, computerStaysDown, planName, signInOn, threadRunner, workBot, workspaceOf, type AgentKind, type AgentPays, type AppState, type Bot, type BotAgent, type BotAi, type Brain, type CliKind, type Session } from "@/lib/types";
 import { ACCOUNT_LABEL } from "./accounts";
 
 /**
@@ -420,6 +420,12 @@ export type AgentState = {
   button?: "sign_in" | "show" | "retry" | "own_computer" | "add_key";
   /** Not in Bops yet, and why. */
   soon?: string;
+  /** For a chip: why it isn't ready in a word or two ("not signed in on this PC"), when the button's words don't say it. */
+  short?: string;
+  /** Ready, with something worth knowing in a few words ("asleep, wakes when you send"). */
+  note?: string;
+  /** Not known yet (still being checked): a chip says so without calling it ready or broken. */
+  checking?: boolean;
 };
 
 /**
@@ -460,6 +466,71 @@ export function agentState(
   const on = signInOn(acct, host.computerId);
   if (on) return { ready: true, line: `${x.kind === "codex" ? "ChatGPT plan" : planName(on.account?.plan)} · signed in here` };
   return { ready: false, line: `Not signed in on ${host.name}'s computer yet.`, button: "sign_in" };
+}
+
+/**
+ * Where a bot's next message starts its tasks, and what's known of that place now, for the message box's agent chip:
+ * - `pc`: Bot tasks on this PC (/api/pc-task-runner): who runs them (Claude on the plan signed in here, or the OpenAI
+ *   key), and why neither when that's so; undefined until it answers, null where it can't be read (not the desktop app).
+ * - `computerStatus`: the bot's cloud computer as Orgo has it ("running", "suspended": asleep), undefined until read.
+ */
+export type RunPlace = { pc?: { runner: "claude" | "openai" | null; problem?: string } | null; computerStatus?: string };
+
+/** Where a bot's tasks start from its next message: this PC when it (or this whole Bops) works here, else its cloud computer. */
+export const nextRunWhere = (b: Pick<Bot, "runsOn">, state: Pick<AppState, "host">): "pc" | "cloud" => (state.host === "mac" || b.runsOn === "mac" ? "pc" : "cloud");
+
+/**
+ * Whether the agent a bot's next message would run on is ready there, in plain words: what the chip in the message box
+ * shows, so it matches what the task will really use. agentState says what the agent is like on the bot's cloud
+ * computer; this goes where the task runs:
+ * - This PC (nextRunWhere "pc"): a task here runs on Bot tasks on this PC (sessions.ts pcRunnerNow), never on a cloud
+ *   computer's sign in. A Claude plan agent is ready when Claude is signed in here and runs them; "Claude isn't signed
+ *   in on this PC" when it isn't, and the OpenAI key's words when that's what runs them. Another CLI agent doesn't run here.
+ * - The cloud computer: the agent's own account signed in on the computer the bot works on (another of its Claude
+ *   accounts signed in there is named, so the two aren't mixed up). Asleep is still ready: it wakes when you send.
+ *   Stopped or in error isn't: nothing wakes it.
+ * Bops agent, and agents this build doesn't run, are as agentState says.
+ */
+export function nextRunState(
+  x: BotAgent,
+  b: Bot,
+  state: Pick<AppState, "bots" | "brains" | "host">,
+  place: RunPlace = {},
+  keys?: ReadonlySet<string>,
+  words: (text: TemplateStringsArray, ...values: unknown[]) => string = (text, ...values) => text.map((part, i) => part + (i < values.length ? String(values[i]) : "")).join(""),
+): AgentState & { where: "pc" | "cloud" } {
+  const where = nextRunWhere(b, state);
+  if (x.kind === "bops" || AGENTS[x.kind].soon || !BRAINS_ON) return { ...agentState(x, b, state, keys, words), where };
+  const name = AGENTS[x.kind].name;
+  if (where === "pc") {
+    if (x.kind !== "claude" || x.pays !== "plan")
+      return { ready: false, where, line: words`${name}${x.pays === "key" ? ` on a key` : ""} doesn't run tasks on this PC. Tasks here run on your Claude plan or an OpenAI key.`, short: "not on this PC" };
+    const pc = place.pc;
+    if (pc === undefined) return { ready: false, where, line: words`Checking Claude on this PC…`, short: "checking", checking: true };
+    if (pc === null) return { ready: false, where, line: words`Claude can only be checked in the Bops app on this PC.`, short: "can't check here" };
+    if (pc.runner === "claude") return { ready: true, where, line: words`Your Claude plan · signed in on this PC` };
+    if (pc.runner === "openai") return { ready: false, where, line: words`Tasks on this PC run on the OpenAI key. Choose Your Claude plan in Settings → AI plans to run them on Claude.`, short: "OpenAI key runs tasks here" };
+    return { ready: false, where, line: words`Claude isn't signed in on this PC.${pc.problem ? ` ${pc.problem}` : ""}`, short: "not signed in on this PC", button: "sign_in" };
+  }
+  const st = agentState(x, b, state, keys, words);
+  if (x.pays !== "plan") return { ...st, where };
+  const host = workBot(b, state.bots);
+  if (!st.ready) {
+    if (st.button !== "sign_in") return { ...st, where };
+    // Another of its accounts of this kind is signed in there: said, so "connected" in Settings isn't read as this one.
+    const other = aiOf(b, state).agents.find((y) => y.id !== x.id && y.kind === x.kind && y.pays === "plan" && !!accountOf(y, state) && !!signInOn(accountOf(y, state)!, host.computerId));
+    const at = { bot: b, state };
+    return {
+      ...st,
+      where,
+      line: `${name}${agentTag(x, at) ? ` (${agentTag(x, at)})` : ""} isn't signed in on ${host.name}'s computer.${other ? ` ${agentName(other, at)} is: pick it, or sign this one in.` : ""}`,
+      short: "not signed in",
+    };
+  }
+  const status = place.computerStatus;
+  if (computerStaysDown(status)) return { ready: false, where, line: `${host.name}'s computer is ${status === "error" ? "broken" : status}, and nothing wakes it by itself. Start it again on orgo.ai, or pick another agent.`, short: "computer is off" };
+  if (computerAsleep(status)) return { ...st, where, line: `${host.name}'s computer is asleep; it wakes when you send.`, note: "asleep, wakes when you send" };
+  return { ...st, where };
 }
 
 /**
