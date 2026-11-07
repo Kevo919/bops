@@ -6,16 +6,16 @@
 #   powershell -NoProfile -ExecutionPolicy Bypass -File win-job-sitter.ps1 -Child <claudePid> -Parent <bopsPid>
 # When this script can't run or can't make the job, it says so in %LOCALAPPDATA%\Bops-team\win-job-sitter.log,
 # writes <GoFile>.failed (so the launcher stops waiting and the turn fails closed, never running outside
-# the job), and leaves. Every failure before the assignment goes through Fail.
+# the job), and leaves. Every failure before the go file is written goes through Fail.
 param([int]$Child, [int]$Parent, [string]$GoFile = "")
 $log = Join-Path $env:LOCALAPPDATA "Bops-team\win-job-sitter.log"
 function Note([string]$what) {
   try { Add-Content -Path $log -Value ("{0} child={1} parent={2}: {3}" -f (Get-Date -Format o), $Child, $Parent, $what) } catch {}
 }
-$assigned = $false
 function Fail([string]$what) {
   Note $what
-  if ($GoFile -and -not $assigned) { try { Set-Content -Path "$GoFile.failed" -Value $what -NoNewline } catch {} }
+  # Whenever no go file was written (before the assignment, or after it when the go file itself failed).
+  if ($GoFile -and -not (Test-Path -LiteralPath $GoFile)) { try { Set-Content -Path "$GoFile.failed" -Value $what -NoNewline } catch {} }
   exit 1
 }
 # Anything this script didn't foresee fails the same way, so the launcher never waits it out.
@@ -110,12 +110,12 @@ if ($childHandle -eq [IntPtr]::Zero) { Fail "OpenProcess(child) failed: $([Runti
 if (-not [BopsJob]::AssignProcessToJobObject($job, $childHandle)) {
   Fail "assign failed (err $([Runtime.InteropServices.Marshal]::GetLastWin32Error())); the launcher won't start the turn"
 }
-$assigned = $true
 # The launcher waits for this file before it runs the CLI (win-job-launcher.cjs): only once the
 # assignment took does the CLI start, so nothing it forks can predate the job. No GoFile given (an
 # older runner, or a direct use of the sitter) means no one is waiting on it.
-# A go file that can't be written ends the sitter, so the job closes and takes the launcher with it.
-if ($GoFile) { try { Set-Content -Path $GoFile -Value "go" -NoNewline -ErrorAction Stop } catch { Note "go file couldn't be written: $($_.Exception.Message)"; exit 1 } }
+# A go file that can't be written fails like any step before it (marker, then gone), so the job closes and takes
+# the launcher with it; the runner, finding no go file at the turn's end, says the turn couldn't start.
+if ($GoFile) { try { Set-Content -Path $GoFile -Value "go" -NoNewline -ErrorAction Stop } catch { Fail "go file couldn't be written: $($_.Exception.Message)" } }
 
 # Wait on the handles themselves: whichever signals first (Claude Code exits, or Bops is gone) ends
 # the sitter, closing the job's handle, which ends whatever of the turn is still running. When the

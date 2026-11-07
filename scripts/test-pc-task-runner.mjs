@@ -415,19 +415,70 @@ await test("round 3: a missing CLI behind the launcher says Claude Code isn't in
 
 await test("round 3: the sitter writes the failure marker on every failure before it assigns, and compiles race-free", async () => {
   const ps = readFileSync(join(root, "vm", "win-job-sitter.ps1"), "utf8");
-  const assignedAt = ps.indexOf("$assigned = $true");
-  assert.ok(assignedAt > 0, "the sitter marks when the assignment took");
   const fail = /function Fail\([^)]*\) \{[\s\S]*?\n\}/.exec(ps)?.[0] ?? "";
   assert.match(fail, /Set-Content -Path "\$GoFile\.failed"/, "Fail writes <go>.failed");
   assert.match(fail, /exit 1/);
-  const beforeAssign = ps.slice(0, assignedAt).replace(fail, "");
-  assert.doesNotMatch(beforeAssign, /\bexit\b/, "no way out before the assignment but Fail");
-  assert.match(beforeAssign, /trap \{ Fail /, "unforeseen errors fail the same way");
+  const rest = ps.replace(fail, "");
+  assert.doesNotMatch(rest, /\bexit\b/, "no way out of the sitter but Fail");
+  assert.match(rest, /trap \{ Fail /, "unforeseen errors fail the same way");
   assert.doesNotMatch(ps, /-OutputAssembly \$dll\b/, "never compiles straight to the shared path");
   assert.match(ps, /-OutputAssembly \$tmpDll/);
   assert.match(ps, /Move-Item -LiteralPath \$tmpDll -Destination \$dll/);
   assert.match(ps, /if \(-not \(Test-Path \$dll\)\) \{ throw \}/, "losing the move to another sitter counts as success");
   assert.match(ps, /\[guid\]::NewGuid\(\)/, "each compile has its own temp name");
+});
+
+await test("round 3: a go file that can't be written after the assign fails like the rest (marker), and the turn says noJob", async () => {
+  const ps = readFileSync(join(root, "vm", "win-job-sitter.ps1"), "utf8");
+  assert.match(ps, /Set-Content -Path \$GoFile -Value "go"[^\n]*catch \{ Fail "go file couldn't be written/, "the go file's failure goes through Fail");
+  const fail = /function Fail\([^)]*\) \{[\s\S]*?\n\}/.exec(ps)?.[0] ?? "";
+  assert.match(fail, /-not \(Test-Path -LiteralPath \$GoFile\)/, "the marker is written whenever no go file was, assigned or not");
+  // The job's close kills the launcher with no [bops-launcher] line: no go file at the turn's end is what says it.
+  assert.equal(runner.launcherFailure(1, "Not logged in · Please run /login", false), runner.PC_WORDS.noJob, "not a sign-in error");
+  assert.equal(runner.launcherFailure(null, "", false), runner.PC_WORDS.noJob);
+  assert.equal(runner.launcherFailure(1, "Not logged in · Please run /login", true), undefined, "a CLI that ran keeps its own failure words");
+});
+
+await test("round 3: the sitter's late exit after the turn is over writes no marker and warns nothing", { skip: process.platform === "win32" }, async () => {
+  // A stand-in powershell.exe (under a fake SystemRoot) that exits 1 a moment after it starts, as a sitter does
+  // when its launcher ends.
+  const sysRoot = join(tmp, "sysroot");
+  const psDir = join(sysRoot, "System32", "WindowsPowerShell", "v1.0");
+  mkdirSync(psDir, { recursive: true });
+  writeFileSync(join(psDir, "powershell.exe"), `#!${process.execPath}\nsetTimeout(() => process.exit(1), 300);\n`);
+  chmodSync(join(psDir, "powershell.exe"), 0o755);
+  const was = { SystemRoot: process.env.SystemRoot, TEMP: process.env.TEMP };
+  Object.assign(process.env, { SystemRoot: sysRoot, TEMP: tmp });
+  try {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    // A healthy turn: go written, turn ends (cleanup), then the sitter exits.
+    let jt = runner.windowsJobTurn({ file: "claude", args: [], env: {} }, "win32");
+    writeFileSync(jt.goFile, "go");
+    const logged = logs.length;
+    jt.started(process.pid);
+    assert.equal(jt.wentAhead(), true);
+    jt.cleanup();
+    await wait(800);
+    assert.ok(!existsSync(jt.goFile) && !existsSync(`${jt.goFile}.failed`), "no stale marker after a healthy turn");
+    assert.ok(!logs.slice(logged).some((l) => /left before it held the job/.test(l)), "no warning for a turn that ran");
+    // Stop during the wait: no go file yet, the turn ends, then the sitter exits.
+    jt = runner.windowsJobTurn({ file: "claude", args: [], env: {} }, "win32");
+    jt.started(process.pid);
+    assert.equal(jt.wentAhead(), false);
+    jt.cleanup();
+    await wait(800);
+    assert.ok(!existsSync(`${jt.goFile}.failed`), "Stop leaves no marker behind");
+    // While the turn is still on, a sitter that leaves without a go file still writes the marker.
+    jt = runner.windowsJobTurn({ file: "claude", args: [], env: {} }, "win32");
+    jt.started(process.pid);
+    await wait(800);
+    assert.ok(existsSync(`${jt.goFile}.failed`), "a live turn's launcher is told");
+    jt.cleanup();
+    assert.ok(!existsSync(`${jt.goFile}.failed`), "cleanup removes the marker");
+  } finally {
+    for (const [k, v] of Object.entries(was)) if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
 });
 
 

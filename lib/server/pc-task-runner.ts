@@ -375,7 +375,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * the same code isn't taken for it. Keep in step with the launcher.
  */
 export const LAUNCHER_EXIT = { noCli: 127, noJob: 75 } as const;
-export function launcherFailure(code: number | null, errTail: string): string | undefined {
+export function launcherFailure(code: number | null, errTail: string, wentAhead = true): string | undefined {
+  // No go file by the turn's end means the CLI never ran, whatever killed the launcher (a sitter that held the
+  // job but couldn't write the go file exits, and the job's close ends the launcher with no line of its own).
+  if (!wentAhead) return PC_WORDS.noJob;
   if (!errTail.includes("[bops-launcher]")) return undefined;
   if (code === LAUNCHER_EXIT.noCli) return PC_WORDS.noClaude;
   if (code === LAUNCHER_EXIT.noJob) return PC_WORDS.noJob;
@@ -403,7 +406,7 @@ export const JOB_WAIT_MS = 30_000;
 export function windowsJobTurn(
   cmd: { file: string; args: string[]; env: NodeJS.ProcessEnv },
   platform: NodeJS.Platform = process.platform,
-): { file: string; args: string[]; env: NodeJS.ProcessEnv; goFile: string; started: (launcherPid: number) => void; cleanup: () => void } | null {
+): { file: string; args: string[]; env: NodeJS.ProcessEnv; goFile: string; started: (launcherPid: number) => void; wentAhead: () => boolean; cleanup: () => void } | null {
   if (platform !== "win32") return null;
   const powershell = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
   // The install dir as the packaged app knows it (BOPS_SERVER_JS, desktop/main.cjs), else where the repo runs.
@@ -412,7 +415,11 @@ export function windowsJobTurn(
   const launcher = join(installDir, "vm", "win-job-launcher.cjs");
   const goFile = join(process.env.TEMP ?? ".", `bops-job-go-${randomUUID()}`);
   const failFile = `${goFile}.failed`;
+  // Once the turn is over (cleanup), the sitter's late events (it exits when the launcher does) say nothing:
+  // no marker is written for a turn that's gone, and no warning for one that ran.
+  let done = false;
   const failed = (why: string) => {
+    if (done) return;
     console.warn(`[pc-task] the job sitter ${why}; the turn won't start without its job`);
     try {
       writeFileSync(/*turbopackIgnore: true*/ failFile, why);
@@ -443,14 +450,16 @@ export function windowsJobTurn(
         sitter.once("error", (e: Error) => failed(`couldn't start (${e.message})`));
         sitter.once("exit", (code: number | null) => {
           // Gone before it said go: whatever the reason (its log says which step gave), the launcher stops now.
-          if (!existsSync(/*turbopackIgnore: true*/ goFile)) failed(`left before it held the job (exit ${code})`);
+          if (!done && !existsSync(/*turbopackIgnore: true*/ goFile)) failed(`left before it held the job (exit ${code})`);
         });
         sitter.unref();
       } catch (e) {
         failed(`couldn't start (${(e as Error).message})`);
       }
     },
+    wentAhead: () => existsSync(/*turbopackIgnore: true*/ goFile),
     cleanup: () => {
+      done = true;
       rmSync(/*turbopackIgnore: true*/ goFile, { force: true });
       rmSync(/*turbopackIgnore: true*/ failFile, { force: true });
     },
@@ -549,11 +558,13 @@ export function runClaudeTurn(o: {
       o.signal?.removeEventListener("abort", abort);
       // Whatever it left running (an MCP server, a command its shell started) goes too, before the turn is over.
       const gone = await stopClaude(child, o.graceMs);
+      // Read before cleanup removes it: whether the launcher was ever told to run the CLI.
+      const wentAhead = jobTurn?.wentAhead() ?? true;
       jobTurn?.cleanup();
       if (!gone) return reject(new PcTaskError("Claude Code didn't stop on this PC. Restart Bops before the next task."));
       if (cut) return reject(cut);
       // The launcher never ran the CLI (not installed, or no job to hold it): said as such, not as a CLI failure.
-      const launcherWhy = jobTurn && !result ? launcherFailure(code, errTail) : undefined;
+      const launcherWhy = jobTurn && !result ? launcherFailure(code, errTail, wentAhead) : undefined;
       if (launcherWhy) return reject(new PcTaskError(launcherWhy));
       if (result?.ok && code === 0 && !sig) return resolve({ text: (result.text || said).trim(), session });
       if (result?.ok) return reject(new PcTaskError("Claude Code ended with an error after it answered, so this may not be finished. Try again."));
