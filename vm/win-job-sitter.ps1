@@ -6,7 +6,7 @@
 #   powershell -NoProfile -ExecutionPolicy Bypass -File win-job-sitter.ps1 -Child <claudePid> -Parent <bopsPid>
 # When this script can't run or can't make the job, it says so in %LOCALAPPDATA%\Bops-team\win-job-sitter.log
 # and leaves; stopClaude's taskkill of the whole tree still ends a turn's processes the ordinary way.
-param([int]$Child, [int]$Parent)
+param([int]$Child, [int]$Parent, [string]$GoFile = "")
 if (-not $Child -or -not $Parent) { exit 1 }
 $log = Join-Path $env:LOCALAPPDATA "Bops-team\win-job-sitter.log"
 function Note([string]$what) {
@@ -57,16 +57,21 @@ public static class BopsJob {
 }
 '@
 
-# Compile once per machine: the assembly is kept beside the log, so a later sitter starts (and so
-# assigns the turn's Claude Code) without compiling again.
+# Compile once per source: the assembly is cached beside the log under a hash of its own source, so a
+# changed sitter takes effect at once (the cache never serves an old build) and a later sitter starts
+# (and so assigns the turn's Claude Code) without compiling again.
 $dir = Join-Path $env:LOCALAPPDATA "Bops-team"
-$dll = Join-Path $dir "win-job-sitter.dll"
+$sha = [Security.Cryptography.SHA256]::Create()
+$hash = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($src)))).Replace("-", "").Substring(0, 16).ToLowerInvariant()
+$dll = Join-Path $dir "win-job-sitter.$hash.dll"
 try {
   if (Test-Path $dll) { Add-Type -Path $dll }
   else {
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     Add-Type -TypeDefinition $src -OutputAssembly $dll -OutputType Library
     Add-Type -Path $dll
+    # Old builds of the assembly don't pile up.
+    Get-ChildItem $dir -Filter "win-job-sitter.*.dll" | Where-Object { $_.Name -ne "win-job-sitter.$hash.dll" } | Remove-Item -ErrorAction SilentlyContinue
   }
 } catch { Note "compile failed: $($_.Exception.Message)"; exit 1 }
 
@@ -77,6 +82,8 @@ $limits.BasicLimitInformation.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JO
 $size = [Runtime.InteropServices.Marshal]::SizeOf([type][BopsJob+Extended])
 if (-not [BopsJob]::SetInformationJobObject($job, 9, [ref]$limits, $size)) { Note "SetInformationJobObject failed"; exit 1 }
 
+$parentHandle = [BopsJob]::OpenProcess(0x00100000, $false, $Parent)
+
 # The job on Claude Code itself; everything it spawns joins with it (no breakaway is allowed).
 # AssignProcessToJobObject needs PROCESS_SET_QUOTA (0x0100) and PROCESS_TERMINATE (0x0001); SYNCHRONIZE
 # (0x00100000) is what makes the handle waitable. Handles, not PIDs: a handle can't be reused.
@@ -86,9 +93,19 @@ if (-not [BopsJob]::AssignProcessToJobObject($job, $childHandle)) {
   Note "assign failed (err $([Runtime.InteropServices.Marshal]::GetLastWin32Error())); the tree stop (taskkill) is what ends this turn's processes"
   exit 1
 }
-$parentHandle = [BopsJob]::OpenProcess(0x00100000, $false, $Parent)
-if ($parentHandle -eq [IntPtr]::Zero) { Note "OpenProcess(parent) failed"; exit 1 }
+# The launcher waits for this file before it runs the CLI (win-job-launcher.cjs): only once the
+# assignment took does the CLI start, so nothing it forks can predate the job. No GoFile given (an
+# older runner, or a direct use of the sitter) means no one is waiting on it.
+if ($GoFile) { try { Set-Content -Path $GoFile -Value "go" -NoNewline } catch { Note "go file couldn't be written: $($_.Exception.Message)" } }
 
 # Wait on the handles themselves: whichever signals first (Claude Code exits, or Bops is gone) ends
-# the sitter, closing the job's handle, which ends whatever of the turn is still running.
-[void][BopsJob]::WaitForMultipleObjects(2, @($childHandle, $parentHandle), $false, -1)
+# the sitter, closing the job's handle, which ends whatever of the turn is still running. When the
+# parent can't be watched (OpenProcess failed: it may already be gone, or rights changed), say so and
+# watch only Claude Code - a sitter that can't watch must never end a turn that's still running; the
+# runner's own tree-kill at the turn's end is the fallback for a Bops that dies unwatched.
+if ($parentHandle -eq [IntPtr]::Zero) {
+  Note "parent unwatchable (err $([Runtime.InteropServices.Marshal]::GetLastWin32Error())); watching the turn only"
+  [void][BopsJob]::WaitForMultipleObjects(1, @($childHandle), $false, -1)
+} else {
+  [void][BopsJob]::WaitForMultipleObjects(2, @($childHandle, $parentHandle), $false, -1)
+}

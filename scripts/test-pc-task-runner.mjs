@@ -295,7 +295,8 @@ await test("a search whose pattern walks out of its folder asks, wherever its pa
   assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "secret", glob: "..\\other/*" }), { behavior: "ask" }, "backslash .. walks out");
   assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "secret", glob: "/etc/*" }), { behavior: "ask" });
   // Brace lists and extglob groups that anywhere say ..: taken for the escape they can expand to.
-  for (const p of ["{..,x}/secret*", "{a,..}/**", "@(..)/*", "!(..)/*", "+(..)/*", "*(..)/*", "?(..)/*"])
+  // Round 2: brace and extglob syntax asks outright - {.}{.}/x and .{.,}/x never spell .. but expand to it.
+  for (const p of ["{.}{.}/x", ".{.}/x", ".{.,}/x", "{..,x}/secret*", "{a,..}/**", "@(..)/*", "!(..)/*", "+(..)/*", "*(..)/*", "?(..)/*"])
     assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: p }), { behavior: "ask" }, `${p} asks`);
   assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "{a,b}/*.md" }), { behavior: "allow" }, "braces without .. stay");
 });
