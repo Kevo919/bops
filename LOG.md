@@ -225,3 +225,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 13:21 lead: #116 re-review = REQUEST CHANGES (the chat-error Settings button points at the moved AI subscriptions card; test-chat-error-ui and mobile-layout fail). Builder fixing. Task 92 follow-up added.
 - 13:35 lead: merged #116 (UI, tasks 83-87) at 61b03c6. PC rebuild started (Kevin told). Live recipe replay next.
 - 13:51 lead: live retest at 61b03c6: tasks 79, 81-84 and 86 verified fixed. Open/new: 93 (agent picker regression and chip status), 94 (first Send click ignored), 95 (error card points to the wrong place; old 429s still raw), 96 (85/87 leftovers). All with builder C. The recipes README is updated.
+- 13:57 lead: merged #117 (task 89: three red tests into CI; owner's platform in SharedOpen) at 61683e1. Closed #118 as a duplicate.
