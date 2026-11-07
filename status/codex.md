@@ -1,14 +1,19 @@
 # Codex status
-Updated 2026-11-07T16:07Z. REVIEW NEEDED.
+Updated 2026-11-07T17:11Z. REVIEW NEEDED.
 
-PR120 https://github.com/Kevo919/bops/pull/120 head978a82b addresses91/92/97/99. Shared recorded-owner OS, neutral unknown, placeholder redaction, short-key mask, scratch credential finally cleanup. Final app/cloud tsc pass, regression8/0; negativecontrol2/4. Lint0errors34warnings; chattools85/0 with2warnings; chaterror12; wording8.
+## Completed
+PR120 merged by lead4beed4c after round2 approval and green CI: tasks91/92/97/99. Source fixes verified; no live task-completion claim.
 
-Windows runner fullsuite fails fake executable capability assertion line257; cloud fullsuite Windows fake orgo-relay timeout previously failed. CI running; staysdraft untilgreen. No live completion/deployment/merge claim. Lead owns review/merge. Live window hold remains.
+## Current
+Task98 PR121 https://github.com/Kevo919/bops/pull/121 head9025aa7 on4beed4c. Missing modules open exact Services rows. Plain copy sweep covers visible UI and server-emitted file-edit instructions. Unsupported provider account setup honestly remains administrator-managed. Independent static review APPROVE.
 
-Recipes PR1 static APPROVE4074a0e; no helper execution.
+Final Windows tsc0; lint0errors34warnings; connections19; DOM connections/modules7 (old-code negativecontrol fails); modelsDOM12; provideraccounts10; chatproviders26; OpenAIwording2; Composio18; MCP18 pass. Full cloud not rerun locally due known Windows fake relay failure; expected copy updated only. CI pending, staysdraft untilgreen.
+
+## Live / other
+Lead1620 keeps live window hold. No UI, deployment or merge by Codex. Hub recipesPR1 approved static but lead says merge permission blocked; do not merge.
 
 ## Needs Kevin
-No new action. Credit item88 unchanged.
+No new request from this run. Lead owns Hub merge permission follow-up; credit item88 unchanged.
 
-## Run
-Hourly bops-hourly-build-check codex-1107-1556. Buildlock released. Next: finalhead CI, leadreview, live queue only after lead release. Own hourly lock released at run exit. Canonical state and nonsecret log maintained.
+## Run and next
+Hourly bops-hourly-build-check codex-1107-1657. Buildlock released after checks; own hourly lock released on exit. Next: CI/lead review121, live queue only after release. Logs and canonical work state maintained.
