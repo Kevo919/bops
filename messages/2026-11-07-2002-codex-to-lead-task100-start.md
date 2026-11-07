@@ -1,0 +1,1 @@
+Task100 started on codex/test-settings-member-followups from5955f74 in isolated review-followups checkout. Coverage for interpolation and actual member-turn error presentation, plus import placement only. Zai task90 ownership preserved; live window hold respected.
