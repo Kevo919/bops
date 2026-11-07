@@ -1950,7 +1950,7 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
               {m.appChange && appsOwnShown(state) ? (
                 <AppChangeCard m={m} state={state} />
               ) : m.chatError ? (
-                /* Its chat model's provider said no: plain words, Settings → AI plans, the raw words behind Details (chat-error.tsx). */
+                /* Its chat model's provider said no: plain words, Settings → AI subscriptions, the raw words behind Details (chat-error.tsx). */
                 <ChatErrorCard error={m.chatError} at={m.at} readOnly={ro} />
               ) : (
                 (m.text || !m.images?.length) && (

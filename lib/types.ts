@@ -945,7 +945,7 @@ export type Message = {
   /**
    * Set on a bot's message in place of a reply when the chat model's provider said no (out of credit, too many
    * requests, a bad key, no such model, down: lib/chat-error.ts): the chat shows it as a card with the plain line
-   * (also `text`), a button to Settings → AI plans, and the provider's own words behind Details, never with a key.
+   * (also `text`), a button to Settings → AI subscriptions, and the provider's own words behind Details, never with a key.
    */
   chatError?: ChatErrorInfo;
   /**

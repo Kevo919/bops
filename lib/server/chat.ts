@@ -3682,7 +3682,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       return { text: null };
     }
     // The model's provider said no (out of credit, too many requests, a bad key, no such model, down): in plain words,
-    // with a way to Settings → AI plans, its raw words behind Details and never a key (lib/chat-error.ts).
+    // with a way to Settings → AI subscriptions, its raw words behind Details and never a key (lib/chat-error.ts).
     const failure = chatFailure(e, { model: turnModel, bot: b.name });
     if (failure) console.warn(`[chat] ${botId} couldn't answer: ${failure.kind} (${failure.provider ?? "provider"} ${failure.status ?? ""})`.trim());
     addMessage({ chatId, role: "bot", botId, text: failure ? failure.text : `Something went wrong on my side: ${(e as Error).message}`, ...(failure ? { chatError: failure, bops: true as const } : {}), replyTo: opts.replyTo });

@@ -509,7 +509,7 @@ export function nextRunState(
     if (pc === undefined) return { ready: false, where, line: words`Checking Claude on this PC…`, short: "checking", checking: true };
     if (pc === null) return { ready: false, where, line: words`Claude can only be checked in the Bops app on this PC.`, short: "can't check here" };
     if (pc.runner === "claude") return { ready: true, where, line: words`Your Claude plan · signed in on this PC` };
-    if (pc.runner === "openai") return { ready: false, where, line: words`Tasks on this PC run on the OpenAI key. Choose Your Claude plan in Settings → AI plans to run them on Claude.`, short: "OpenAI key runs tasks here" };
+    if (pc.runner === "openai") return { ready: false, where, line: words`Tasks on this PC run on the OpenAI key. Choose Your Claude plan in Settings → AI subscriptions to run them on Claude.`, short: "OpenAI key runs tasks here" };
     return { ready: false, where, line: words`Claude isn't signed in on this PC.${pc.problem ? ` ${pc.problem}` : ""}`, short: "not signed in on this PC", button: "sign_in" };
   }
   const st = agentState(x, b, state, keys, words);
