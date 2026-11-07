@@ -175,7 +175,7 @@ check("85: the bot's own prompt says this PC's word (no 'on your Mac' for the bo
   });
   assert.deepEqual(raw, [], "prompt copy with a raw Mac in it");
   assert.match(src, /pc\("What you say to the user as you start/, "the start line's example");
-  assert.match(src, /const ownPlatform = \(\) => \(onRunner\(\) \|\| currentTurn\(\) \? "darwin" : process\.platform\)/, "a runner's turn keeps the owner's words");
+  assert.match(src, /import \{ ownPlatform \} from "\.\/owner-platform"/, "owner wording uses the shared recorded-platform helper");
   const words = computerWordsFor("win32");
   assert.equal(words`Pulling up ${"Jordan"}'s chat on your Mac.`, "Pulling up Jordan's chat on your PC.");
 });

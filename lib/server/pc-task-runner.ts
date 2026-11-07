@@ -77,8 +77,8 @@ export const EXECUTOR_KEY = "OPENAI_EXECUTOR_API_KEY";
  * a line or start another setting. Whether it can connect an environment is only known when a task runs.
  */
 export const looksLikeOpenAiKey = (v: string) => /^[A-Za-z0-9._-]{20,400}$/.test(v);
-/** How a saved key shows: never the key, only that it's there and its last four characters. */
-export const maskKey = (v: string | undefined) => (v ? `ends in ${v.slice(-4)}` : "");
+/** Keys shorter than the 20-character accepted minimum show only saved, never a tail. */
+export const maskKey = (v: string | undefined) => (!v ? "" : v.length >= 20 ? `ends in ${v.slice(-4)}` : "saved");
 
 /**
  * Set (or with "" remove) OPENAI_EXECUTOR_API_KEY in this PC's .env.local, the file Bops reads its keys from

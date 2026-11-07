@@ -3,10 +3,8 @@ import { computerWords, computerWordsFor } from "@/lib/computer-words";
 import { sendExecutorInput, withExecutor } from "./executor-lifecycle";
 import { agentApiPath } from "./agent-api-path";
 import "server-only";
-import { currentTurn } from "./turn-context";
 
-// A runner describes the owner, not its own host: preserve owner wording there.
-const ownPlatform = () => (onRunner() || currentTurn() ? "darwin" : process.platform);
+import { ownPlatform } from "./owner-platform";
 import { holdAwake } from "./awake";
 import { brainMcp } from "./mcp";
 import { setting } from "./models";
@@ -2013,11 +2011,21 @@ function instructions(botName: string, role: string, mac: boolean, display: numb
   return [
     `You are ${botName}, the ${role} bot in Bops.`,
     ownerLine(),
-    ...(mac && process.platform === "win32"
+    ...(mac && ownPlatform() === "win32"
       ? [
           ...windowsTaskInstructions(owner, full),
           macChromeNote(owner),
           ...(apps ? [appsLine] : []),
+        ]
+      : mac && ownPlatform() !== "darwin"
+      ? [
+          computerWordsFor(ownPlatform())`You work on ${owner}'s computer. Its operating system is not recorded as Windows or macOS; do not assume either platform or its commands and apps.`,
+          full
+            ? "Use only the tools and permissions actually provided. Verify the operating system before any platform-specific shell command or native app action."
+            : "Use only the browser tools and connected apps. Do not run shell commands or access local files or native apps.",
+          macChromeNote(owner),
+          ...(apps ? [appsLine] : []),
+          "Bops itself is off limits: never access or change its windows, server, configuration, credentials, or permissions, and never approve an action on the owner's behalf.",
         ]
       : mac && full
       ? [

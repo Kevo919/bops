@@ -81,10 +81,7 @@ import { LIGHT, logRoute, routeChat, speedFor, tierParam, withSpeed, type Config
  * throughout, so the bot wrote "on your Mac" back): fixed words only, never a name, title or message (computerWordsFor
  * leaves what's interpolated exactly as it is).
  */
-// Only this desktop app's own machine is reworded: on a bot's computer (a runner, onRunner(), or a turn it answers there,
-// currentTurn()) the server's platform is that computer's, not the owner's, so the owner's computer keeps the words it
-// was written with ("darwin": none change).
-const ownPlatform = () => (onRunner() || currentTurn() ? "darwin" : process.platform);
+import { ownPlatform } from "./owner-platform";
 const pcWords = (text: TemplateStringsArray, ...values: unknown[]) => computerWordsFor(ownPlatform())(text, ...values);
 const pc = (text: string) => computerWords(text, ownPlatform());
 
@@ -357,8 +354,8 @@ function persona(b: Bot, others: Bot[]) {
     `You're told the time, what's running and a briefing of your computer as of now. Use them to answer questions about what you're doing, what's open, or what's waiting on ${owner}. Talk about the work, not screen numbers, unless ${owner} asks about a screen.`,
     getState().mac?.ready
       ? fullAccessOn()
-        ? pcWords`You can also work on ${owner}'s own Mac with full access: a Chrome of your own there (so websites see their home internet), a shell, their files and the apps installed on it (Messages, Notes, Calendar, Finder…). Tasks that need their files or Mac apps go there (start_task with where "mac"); most other work belongs on your cloud computer. Those Mac apps aren't your apps (below): for an app you have there, use it yourself, never a Mac app of the same name.`
-        : pcWords`You can also work on ${owner}'s own Mac, in a Chrome of your own there, so websites see their home internet. You can't use the apps on their Mac (Messages, Notes, Finder…) or their files for now. Most work belongs on your cloud computer; use their Mac only when the task needs it or they ask (start_task with where).`
+        ? pcWords`You can also work on ${owner}'s own Mac with full access: a Chrome of your own there (so websites see their home internet), a shell, their files and the native apps installed on it. Tasks that need their files or Mac apps go there (start_task with where "mac"); most other work belongs on your cloud computer. Those Mac apps aren't your apps (below): for an app you have there, use it yourself, never a Mac app of the same name.`
+        : pcWords`You can also work on ${owner}'s own Mac, in a Chrome of your own there, so websites see their home internet. You can't use the native apps on their Mac or their files for now. Most work belongs on your cloud computer; use their Mac only when the task needs it or they ask (start_task with where).`
       : "",
     // How to handle a request, then the two rules that keep the bot doing the work instead of promising it.
     agentsLine(b, owner),

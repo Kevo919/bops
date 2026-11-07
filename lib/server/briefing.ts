@@ -1,9 +1,7 @@
 import { computerWordsFor } from "@/lib/computer-words";
 import "server-only";
-import { currentTurn } from "./turn-context";
 
-// A runner describes the owner, not its own host: preserve owner wording there.
-const ownPlatform = () => (onRunner() || currentTurn() ? "darwin" : process.platform);
+import { ownPlatform } from "./owner-platform";
 import { BLOCKER_LABEL, DISPLAYS, isScreenWatch, live, workspaceOf, type Session } from "@/lib/types";
 import { fullAccessOn } from "./full-access";
 import { sameComputer, screenPages, workComputer } from "./screens";
@@ -13,7 +11,6 @@ import { asksNow } from "./chart";
 import { belowOf } from "@/lib/chain";
 import { appsOpen } from "@/lib/apps-access";
 import { reposLine } from "./repos";
-import { onRunner } from "./persist";
 
 /**
  * A bot's computer, in a few lines, for the bot itself: what each screen is doing (its threads,
@@ -147,7 +144,7 @@ async function macBriefing(botId: string) {
   const onMac = state.sessions.filter((s) => s.runsOn === "mac" && live(s));
   const yours = onMac.filter((s) => s.botId === botId);
   return [
-    ...(ownPlatform() === "win32" ? ["The local host is a Windows PC. Use Windows terminology and paths; do not assume macOS apps or commands are available."] : []),
+    ...(ownPlatform() === "win32" ? [`${owner}'s computer is a Windows PC. Use Windows terminology and paths when working there; do not assume macOS apps or commands are available.`] : []),
     fullAccessOn()
       ? computerWordsFor(ownPlatform())`${owner}'s Mac: available with full access: a Chrome of the bot's own there (websites see ${owner}'s home internet), a shell, ${owner}'s files and their apps (local desktop apps).`
       : computerWordsFor(ownPlatform())`${owner}'s Mac: available, in a Chrome of the bot's own there (websites see ${owner}'s home internet). Not its apps (local desktop apps) or files: bots can't use those for now.`,
