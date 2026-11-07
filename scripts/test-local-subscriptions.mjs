@@ -176,7 +176,7 @@ await test('the chip\'s cached check reuses the last minute\'s answer, and a sig
   assert.equal(calls.length,before+2);
   assert.equal((await api.cachedLocalSubscriptionStatus('claude')).state,'signed-out');
   assert.equal(calls.length,before+2);
-  // A sign-out here (Settings, AI plans) drops the old answer; its own check after is what the chip reads, not the old one.
+  // A sign-out here (Settings, AI subscriptions) drops the old answer; its own check after is what the chip reads, not the old one.
   reply={code:0,text:'{"loggedIn":true,"authMethod":"claude.ai","subscriptionType":"pro"}'};
   await api.logoutLocalSubscription('claude');
   const after=calls.length;

@@ -52,7 +52,7 @@ check("bad key: 401 (and a 403 about the key) says the key wasn't accepted", () 
   const e = chatErrorOf({ provider: "openai", status: 401, message: `401 Incorrect API key provided: ${KEY}. You can find your API key at https://platform.openai.com/account/api-keys.`, bot: "Boppy" });
   assert.equal(e.kind, "key");
   assert.equal(e.title, "Key not accepted");
-  assert.match(e.text, /^OpenAI didn't accept your API key, so Boppy can't answer\. Check the key in Keys, or pick another model in Settings → AI plans\.$/);
+  assert.match(e.text, /^OpenAI didn't accept your API key, so Boppy can't answer\. Check the key in Keys, or pick another model in Settings → AI subscriptions\.$/);
   assert.ok(!e.details.includes(KEY) && !e.details.includes("SECRET"), "never the key, even one Bops wasn't told about");
   assert.equal(chatErrorKind({ status: 403, message: "invalid x-api-key" }), "key");
 });
@@ -72,7 +72,7 @@ check("provider down: any 5xx, and an overloaded or bad gateway answer with no s
   assert.equal(e.text, `Z.ai is having trouble on its side right now, so Boppy can't answer. Try again in a minute, or pick another model in ${AI_PLANS}.`);
 });
 
-check("anything else: plain, still pointing at AI plans, with its words behind Details", () => {
+check("anything else: plain, still pointing at AI subscriptions, with its words behind Details", () => {
   const e = chatErrorOf({ provider: "openrouter", status: 400, message: "Bad request: messages[0] invalid", bot: "pip" });
   assert.equal(e.kind, "other");
   assert.equal(e.text, `Pip couldn't answer: OpenRouter turned the request down. Try again, or pick another model in ${AI_PLANS}.`);

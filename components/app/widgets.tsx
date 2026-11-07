@@ -89,7 +89,11 @@ export function PagesNav({ state, open, onOpen }: { state: AppState; open: strin
     >
       <span className="flex size-5 shrink-0 items-center justify-center text-pencil">{p.id === HOME ? <HomeIcon /> : <WidgetsIcon size={13} />}</span>
       <span className="min-w-0 flex-1 truncate">{p.name}</span>
-      {p.widgets.length > 0 && <span className="shrink-0 text-[12px] leading-4 text-pencil">{p.widgets.length}</span>}
+      {p.widgets.length > 0 && (
+        <span data-page-count className="shrink-0 text-[12px] leading-4 text-pencil">
+          {p.widgets.length}
+        </span>
+      )}
     </button>
   );
   return (
@@ -177,7 +181,10 @@ export function WidgetPageView({ state, pageId, onClose, onGone, links, covered 
   if (!page) return null;
   const pinned = layout.tabs.find((t) => t.page === page.id && !t.widget);
   const act = async (ops: LayoutOp[]) => setError((await change(ops)) ?? "");
-  const pill = "rounded-full px-3 py-1 text-[12px] font-semibold leading-4 text-ink shadow-[0_0_0_1px_var(--color-rule)] hover:bg-[color:var(--bops-tint)]/[0.04] disabled:opacity-40 max-md:min-h-10";
+  // The words' color is part of each look (task 84): an outlined pill reads in ink, a filled one (Done, Remove for sure)
+  // in the fill's own words, never both classes at once, where whichever Tailwind wrote last won (black on black).
+  const shape = "rounded-full px-3 py-1 text-[12px] font-semibold leading-4 disabled:opacity-40 max-md:min-h-10";
+  const pill = `${shape} text-ink shadow-[0_0_0_1px_var(--color-rule)] hover:bg-[color:var(--bops-tint)]/[0.04]`;
   return (
     <div className="motion-fade-in flex min-h-0 w-full flex-1 flex-col bg-desk" data-widget-page={page.id}>
       <div className="flex shrink-0 flex-wrap items-center gap-2 px-6 pb-3 pt-5 max-md:px-4">
@@ -195,7 +202,7 @@ export function WidgetPageView({ state, pageId, onClose, onGone, links, covered 
           <h1 className="min-w-0 truncate text-[20px] font-semibold leading-7 text-ink">{page.name}</h1>
         )}
         <span className="min-w-0 flex-1" />
-        <button onClick={() => setEditing(!editing)} className={`${pill} ${editing ? "bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)] hover:bg-[color:var(--hb-0a0a0a)]" : ""}`} data-edit-widgets>
+        <button onClick={() => setEditing(!editing)} className={editing ? `${shape} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)] shadow-[0_0_0_1px_var(--h-0a0a0a)]` : pill} data-edit-widgets>
           {editing ? "Done" : "Edit"}
         </button>
         {pinned ? (
@@ -218,7 +225,7 @@ export function WidgetPageView({ state, pageId, onClose, onGone, links, covered 
                 void act([{ action: "remove_page", page: page.id }]);
               }}
               onBlur={() => setConfirmRemove(false)}
-              className={`${pill} ${confirmRemove ? "bg-[color:var(--hb-b42318)] text-[color:var(--bops-on-fill)] hover:bg-[color:var(--hb-b42318)]" : ""}`}
+              className={confirmRemove ? `${shape} bg-[color:var(--hb-b42318)] text-[color:var(--bops-on-fill)]` : pill}
             >
               {confirmRemove ? "Remove for sure?" : "Remove page"}
             </button>
@@ -300,6 +307,8 @@ function WidgetCard({ state, page, widget: w, index, editing, links }: { state: 
   };
   const edit = (more: Omit<LayoutOp, "action" | "page" | "widget">, quiet = false) => act([{ action: "update_widget", page: page.id, widget: w.id, ...more }], quiet);
   const icon = "flex size-7 items-center justify-center rounded-full text-ink hover:bg-[color:var(--bops-tint)]/[0.06] disabled:opacity-30 max-md:size-10";
+  // Its name in each tool's, so a page of widgets doesn't have ten buttons all called Remove (task 86).
+  const name = w.title ?? WIDGET_KINDS[w.kind].name;
   return (
     <section className="motion-widget-in flex h-full min-h-[132px] flex-col rounded-[16px] bg-white p-3.5 shadow-[0_0_0_1px_var(--color-rule)]" data-widget={w.kind} data-widget-id={w.id} aria-label={w.title ?? WIDGET_KINDS[w.kind].name}>
       {/* In Edit the title takes a line of its own, in full, with the tools under it: a small card's name isn't cut short. */}
@@ -309,17 +318,17 @@ function WidgetCard({ state, page, widget: w, index, editing, links }: { state: 
         </span>
         {editing && (
           <div className="flex shrink-0 items-center gap-0.5" data-widget-tools>
-            <button className={icon} disabled={index === 0} onClick={() => void act([{ action: "move_widget", page: page.id, widget: w.id, position: index }])} aria-label="Move earlier" title="Move earlier">
+            <button className={icon} disabled={index === 0} onClick={() => void act([{ action: "move_widget", page: page.id, widget: w.id, position: index }])} aria-label={`Move ${name} earlier`} title="Move earlier">
               <svg width="10" height="10" viewBox="0 0 8 12" aria-hidden>
                 <path d="M6 1.5L1.5 6 6 10.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
-            <button className={icon} disabled={index === page.widgets.length - 1} onClick={() => void act([{ action: "move_widget", page: page.id, widget: w.id, position: index + 2 }])} aria-label="Move later" title="Move later">
+            <button className={icon} disabled={index === page.widgets.length - 1} onClick={() => void act([{ action: "move_widget", page: page.id, widget: w.id, position: index + 2 }])} aria-label={`Move ${name} later`} title="Move later">
               <svg width="10" height="10" viewBox="0 0 8 12" aria-hidden>
                 <path d="M2 1.5L6.5 6 2 10.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
-            <button className={`${icon} ${setup ? "bg-[color:var(--bops-tint)]/[0.06]" : ""}`} onClick={() => setSetup(!setup)} aria-label="Set it up" title="Set it up">
+            <button className={`${icon} ${setup ? "bg-[color:var(--bops-tint)]/[0.06]" : ""}`} onClick={() => setSetup(!setup)} aria-label={`Set up ${name}`} aria-expanded={setup} title="Set it up">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
                 <path d="M3 4.5h10M3 8h10M3 11.5h10" strokeLinecap="round" />
                 <circle cx="6" cy="4.5" r="1.4" fill="var(--color-white)" />
@@ -331,7 +340,7 @@ function WidgetCard({ state, page, widget: w, index, editing, links }: { state: 
               className={`${icon} ${confirm ? "bg-[color:var(--hb-b42318)] text-[color:var(--bops-on-fill)] hover:bg-[color:var(--hb-b42318)]" : ""}`}
               onClick={() => (confirm ? void act([{ action: "remove_widget", page: page.id, widget: w.id }]) : setConfirm(true))}
               onBlur={() => setConfirm(false)}
-              aria-label={confirm ? "Remove for sure" : "Remove"}
+              aria-label={confirm ? `Remove ${name} for sure` : `Remove ${name}`}
               title={confirm ? "Press again to remove" : "Remove"}
             >
               <svg width="9" height="9" viewBox="0 0 12 12" aria-hidden>
@@ -342,9 +351,27 @@ function WidgetCard({ state, page, widget: w, index, editing, links }: { state: 
         )}
       </div>
       {editing && (
-        <div role="radiogroup" aria-label="Size" className="mb-2 flex w-fit gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[3px]">
-          {SIZES.map((s) => (
-            <button key={s} role="radio" aria-checked={w.size === s} onClick={() => w.size !== s && void edit({ size: s })} className={`rounded-full px-2.5 py-0.5 text-[12px] leading-4 ${w.size === s ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "text-pencil hover:text-ink"}`}>
+        // Buttons that say whether they're pressed (task 86): an accessibility client presses a button (its Invoke), which
+        // an ARIA radio drawn on a button didn't take; each named for its widget, as a page has several.
+        <div role="group" aria-label={`${name}'s size`} className="mb-2 flex w-fit gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[3px]">
+          {SIZES.map((s, i) => (
+            <button
+              key={s}
+              type="button"
+              aria-pressed={w.size === s}
+              aria-label={`${SIZE_WORD[s]} size for ${name}`}
+              onClick={() => w.size !== s && void edit({ size: s })}
+              // The arrow keys move along the sizes and pick, as Look's choices do (segmented.tsx).
+              onKeyDown={(e) => {
+                const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+                if (!step) return;
+                e.preventDefault();
+                const next = (i + step + SIZES.length) % SIZES.length;
+                e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
+                if (SIZES[next] !== w.size) void edit({ size: SIZES[next] });
+              }}
+              className={`rounded-full px-2.5 py-0.5 text-[12px] leading-4 outline-none focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] ${w.size === s ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "text-pencil hover:text-ink"}`}
+            >
               {SIZE_WORD[s]}
             </button>
           ))}

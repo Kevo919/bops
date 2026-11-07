@@ -130,7 +130,7 @@ export function BopsApp() {
   return (
     <>
       {/* How the window looks (AppState.look): one style element over everything, even the screens before Bops opens. */}
-      <LookStyle look={state?.look?.current} />
+      <LookStyle look={state?.look?.current} ready={!!state} />
       <Bops state={auth ? state : null} />
       {pick.view && <PickComputer view={pick.view} onDone={pick.done} />}
     </>
@@ -1171,6 +1171,8 @@ function Bops({ state }: { state: AppState | null }) {
             onOpenMemory={leavePages(openMemory)}
             onOpenAutopilot={leavePages(({ section, focus: item }: AutopilotOpen) => openAutopilot(section, item, null))}
             footer={footer}
+            footerOpen={openPage}
+            chatInSight={!covered}
             menuActions={pageMenuActions}
             pageOpen={widgetPageOn ? widgetPage : null}
             onOpenPage={
@@ -1948,7 +1950,7 @@ function PhoneService() {
 }
 
 /** Who the bots work for: the name they call you by, and what they should know about you (in every bot's instructions). */
-function OwnerSettings({ owner }: { owner: AppState["owner"] }) {
+function OwnerSettings({ owner, email }: { owner: AppState["owner"]; email?: string }) {
   const [name, setName] = useState(owner?.name ?? "");
   const [about, setAbout] = useState(owner?.about ?? "");
   const [saved, setSaved] = useState(false);
@@ -1987,6 +1989,11 @@ function OwnerSettings({ owner }: { owner: AppState["owner"] }) {
           </button>
           {saved && <span className="text-[12px] text-[color:var(--ht-6b6b6b)]">Saved</span>}
         </div>
+      </div>
+      <span className="pt-2 text-[13px] font-semibold">Account</span>
+      <div data-profile-account className="flex items-center gap-3 rounded-[14px] p-3.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
+        <span className="w-[120px] text-[13px] font-medium">Signed in as</span>
+        <span className="min-w-0 flex-1 truncate text-[13px] text-[color:var(--ht-3a3a38)]">{email ?? "Not signed in"}</span>
       </div>
     </div>
   );
@@ -2074,7 +2081,7 @@ function WhereBotsWork({ state }: { state: AppState }) {
 }
 
 /** Settings' places: Account (yours, in every workspace), then Workspace (the one open now), then Orgo's team's own. */
-export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "phone" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains" | "look" | "repos" | "services" | "agents";
+export type SettingsPane = "profile" | "plan" | "usage" | "reach" | "phone" | "subscriptions" | "ai" | "privacy" | "mac" | "general" | "team" | "chart" | "bots" | "logins" | "email" | "apps" | "domains" | "look" | "repos" | "services" | "agents";
 
 /** A place in Settings' nav: its name, its glyph, and a quiet value on the right. */
 type NavItem = { id: SettingsPane; name: string; icon: React.ReactNode; value?: string | number };
@@ -2090,6 +2097,8 @@ const GLYPHS: Record<SettingsPane, string> = {
   usage: "M3 13V9M6.3 13V6M9.6 13V8M13 13V3.5",
   reach: "M5 2h6v12H5zM7.3 12h1.4",
   phone: "M5 1.8h6v12.4H5zM7.3 12.3h1.4M2.6 5.5a3.6 3.6 0 0 1 0 5M13.4 5.5a3.6 3.6 0 0 0 0 5",
+  // A ticket: a plan you hold (Services is the plug, AI plans the sparkle).
+  subscriptions: "M2.5 4.5h11v2a1.5 1.5 0 0 0 0 3v2h-11v-2a1.5 1.5 0 0 0 0-3zM9.5 4.5v7",
   ai: "M8 2l1.3 3.4L13 6.7l-3.7 1.3L8 11.5 6.7 8 3 6.7l3.7-1.3z",
   privacy: "M8 2l5 1.9v3.9c0 3.1-2.1 5.6-5 6.6-2.9-1-5-3.5-5-6.6V3.9z",
   mac: "M2.5 3.5h11v7.5h-11zM1.5 13h13",
@@ -2312,7 +2321,7 @@ export function Settings({
   // An Admin of a shared workspace has its Team too (who's in: lib/server/shared-people.ts); never its chart or email.
   const adminHere = state.shared?.role === "admin";
   // The look is the owner's own window (never a shared workspace's): its pane is theirs alone too.
-  const fits = (p?: SettingsPane) => !!p && (p !== "domains" || domains) && (p !== "apps" || apps) && (p !== "look" || !state.shared) && (p !== "repos" || !state.shared) && (p !== "agents" || (!state.shared && selfHosted)) && (p !== "phone" || !state.shared) && (!state.shared || ((p !== "team" || adminHere) && p !== "chart" && p !== "email"));
+  const fits = (p?: SettingsPane) => !!p && (p !== "domains" || domains) && (p !== "apps" || apps) && (p !== "look" || !state.shared) && (p !== "repos" || !state.shared) && (p !== "agents" || (!state.shared && selfHosted)) && (p !== "phone" || !state.shared) && (p !== "subscriptions" || !state.shared) && (!state.shared || ((p !== "team" || adminHere) && p !== "chart" && p !== "email"));
   const [pane, setPane] = useState<SettingsPane>(fits(at) ? at! : "profile");
   // A narrow window (narrow.ts) shows the nav or a place, never both: the nav first when Settings opened at no place in
   // particular; a place asked for (Logins, Plan and credit) opens at it, its Back going to the nav.
@@ -2356,6 +2365,9 @@ export function Settings({
     item("usage", "Usage"),
     item("reach", "How bots reach you"),
     ...(pairable && !shared ? [item("phone", "Your phone")] : []),
+    // Your own Claude and ChatGPT plans, signed in on this PC or a bot's cloud computer (setup.tsx AiSubscriptionsCard): a
+    // place of its own (task 83: it once sat on top of Profile, so Profile opened on it), never a shared workspace's.
+    ...(!shared ? [item("subscriptions", "AI subscriptions")] : []),
     ...(BRAINS_ON ? [item("ai", "AI plans")] : []),
     ...(!selfHosted ? [item("privacy", "Privacy")] : []),
     item("look", "Look"),
@@ -2428,7 +2440,7 @@ export function Settings({
     body = (
       <>
         <PaneHead title="Profile" sub="Who your bots work for, in every workspace." />
-        <OwnerSettings owner={state.owner} />
+        <OwnerSettings owner={state.owner} email={user?.email} />
       </>
     );
   else if (pane === "plan")
@@ -2461,6 +2473,13 @@ export function Settings({
         </div>
       </>
     );
+  else if (pane === "subscriptions" && !shared)
+    body = (
+      <>
+        <PaneHead title="AI subscriptions" sub="Your own Claude and ChatGPT plans, signed in on this PC or on a bot's cloud computer." />
+        <AiSubscriptionsCard state={state} onShowScreen={onShowScreen} onOpenVault={onOpenVault} />
+      </>
+    );
   else if (pane === "ai" && BRAINS_ON)
     body = (
       <>
@@ -2482,7 +2501,10 @@ export function Settings({
     body = (
       <>
         <PaneHead title="Look" sub="How this window looks. Ask a bot in the chat to change it too." />
-        <LookSettings state={state} />
+        {/* The pane's own gutter, as every other place has (task 87: the card ran to the pane's edges). */}
+        <div className="px-[22px] pt-4">
+          <LookSettings state={state} />
+        </div>
       </>
     );
   else if (pane === "repos" && !shared)
@@ -2589,10 +2611,22 @@ export function Settings({
         {group("Workspace", shared ? "Shared with you" : "Shared with its people", workspace, switcher)}
         {/* Your widgets: opens Home (widgets.tsx), marked as being tested while lib/feature-status.ts says so. */}
         {!shared && onOpenPages && (
+          // It leaves Settings for Home, where widgets live: it says so (task 87), with the arrow a link out has.
           <InProgressRow id="widgets-by-chat">
-            <button data-settings-widgets onClick={onOpenPages} className="flex h-[30px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)] max-md:h-11 max-md:text-[15px]">
+            <button data-settings-widgets
+              onClick={onOpenPages}
+              aria-label="Widgets: opens your Home page"
+              title="Opens your Home page, where your widgets are"
+              className="flex h-[30px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)] max-md:h-11 max-md:text-[15px]"
+            >
               {glyph(WIDGETS_GLYPH)}
               <span className="min-w-0 flex-1 truncate">Widgets</span>
+              <span aria-hidden className="flex shrink-0 items-center gap-1 text-[11.5px] text-[color:var(--ht-8a8a88)]">
+                Opens Home
+                <svg width="10" height="10" viewBox="0 0 12 12">
+                  <path d="M4 2.5h5.5V8M9.5 2.5L3 9" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
             </button>
           </InProgressRow>
         )}
@@ -2610,7 +2644,6 @@ export function Settings({
             </button>
           </div>
         )}
-        {(pane === "profile" || pane === "ai") && <AiSubscriptionsCard state={state} onShowScreen={onShowScreen} onOpenVault={onOpenVault} />}
         {body}
       </main>
     </div>

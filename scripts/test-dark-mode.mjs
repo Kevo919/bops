@@ -602,7 +602,7 @@ try {
       await page.getByRole("button", { name: /team, account and settings/ }).first().click();
       await page.getByRole("menuitem", { name: "Settings", exact: true }).first().click();
       await page.locator('[data-settings-nav="look"]').click();
-      await page.getByRole("radio", { name: "Dark" }).or(page.getByRole("button", { name: "Dark", exact: true })).first().click();
+      await page.getByRole("radio", { name: "Dark" }).or(page.getByRole("button", { name: /^Dark( theme)?$/ })).first().click();
       await page.waitForFunction(() => getComputedStyle(document.documentElement).colorScheme.includes("dark"), null, { timeout: 10000 });
       const kept = await fetch(`${BASE}/api/state`, { headers: owner }).then((r) => r.json());
       assert.equal(kept?.state?.look?.current?.theme, "dark", "the state keeps it");

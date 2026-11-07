@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld("bopsMac", {
   // Restart Bops, cleanly: the state saved, cached sessions dropped, the server started
   // again, and the app opened again. Still signed in, nothing lost (desktop/main.cjs).
   relaunch: () => ipcRenderer.invoke("relaunch"),
+  // The look's theme (Settings, Look), for the window's own frame: Windows' title and menu bar follow it, not the PC's.
+  setTheme: (theme) => ipcRenderer.invoke("set-theme", theme),
   // Copy a key from the Vault, kept out of clipboard managers and other devices, and cleared after a minute.
   copySecret: (value) => ipcRenderer.invoke("copy-secret", value),
   // A Preview that asks for a password, beside a bot's chat: its cookie put in that app's preview session ({ partition, url, name, value }).

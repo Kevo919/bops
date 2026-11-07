@@ -1,6 +1,6 @@
 // Tests for the message box's agent chip (lib/agents.ts nextRunState, components/app/new-thread.tsx boxAgents): it
 // says whether the agent the next message would run on is ready where that message's tasks really run, in plain words.
-// The case from Kevin's PC: Boppy's Default is a second Claude Code agent ("Max plan 2") while Settings, AI plans shows
+// The case from Kevin's PC: Boppy's Default is a second Claude Code agent ("Max plan 2") while Settings, AI subscriptions shows
 // Claude connected. The chip goes by the Default and the place its tasks run, never by another profile's sign in:
 // - on this PC (Boppy works here), Bot tasks on this PC run them: ready when Claude is signed in here and runs them,
 //   "Claude isn't signed in on this PC" when not, and never ready because a cloud computer's account is;
@@ -91,7 +91,7 @@ check("on this PC, the OpenAI key runs tasks: a Claude agent isn't what runs, so
   const b = boppy({ runsOn: "mac" });
   const r = A.nextRunState(two, b, stateOf(b), { pc: { runner: "openai" } });
   assert.equal(r.ready, false);
-  assert.match(r.line, /OpenAI key.*Settings → AI plans/);
+  assert.match(r.line, /OpenAI key.*Settings → AI subscriptions/);
 });
 
 check("on this PC, not checked yet: not called ready, marked as checking; can't be checked here: says why", () => {

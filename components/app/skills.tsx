@@ -946,7 +946,7 @@ function SuggestToggle({ ws, on }: { ws: string; on: boolean }) {
   return (
     <div className="flex flex-col gap-1">
       <button type="button" role="switch" aria-checked={on} disabled={busy} data-label-suggest onClick={() => void flip()} className="flex items-center gap-2.5 self-start text-left disabled:opacity-50">
-        <span className={`flex h-[18px] w-[30px] shrink-0 items-center rounded-full p-0.5 transition-colors ${on ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-d6d6d3)]"}`}>
+        <span className={`flex h-[18px] w-[30px] shrink-0 items-center rounded-full p-0.5 transition-colors ${on ? "bg-[color:var(--color-ink)]" : "bg-[color:var(--hb-d6d6d3)]"}`}>
           <span className={`size-[14px] rounded-full bg-white transition-transform ${on ? "translate-x-[12px]" : ""}`} />
         </span>
         <span className="flex flex-col gap-0.5">

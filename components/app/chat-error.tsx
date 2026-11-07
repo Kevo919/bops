@@ -2,12 +2,11 @@
 
 import { useContext, useId, useState } from "react";
 import type { ChatErrorInfo } from "@/lib/chat-error";
-import { BRAINS_ON } from "@/lib/types";
 import { OpenSettings } from "./open-settings";
 
 /**
  * A bot couldn't answer because its chat model's provider said no (Message.chatError, lib/chat-error.ts): the plain
- * line, a button to Settings → AI plans to pick another model, and Details, which shows the provider's own words
+ * line, a button to Settings → AI subscriptions to pick another model, and Details, which shows the provider's own words
  * (never a key: the server took them out). In place of the bot's bubble; its look follows the theme's tokens.
  */
 /** When this window opened: a card for an error from before (loaded with the chat's history) is a status, not an alert. */
@@ -46,11 +45,11 @@ export function ChatErrorCard({ error, at, readOnly = false }: { error: ChatErro
           <button
             type="button"
             data-chat-error-settings
-            aria-label={`Open Settings → AI plans, for the ${what}`}
-            onClick={() => openSettings(BRAINS_ON ? "ai" : "profile")}
+            aria-label={`Open Settings → AI subscriptions, for the ${what}`}
+            onClick={() => openSettings("subscriptions")}
             className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-[color:var(--bops-on-fill)]"
           >
-            Open Settings → AI plans
+            Open Settings → AI subscriptions
           </button>
         )}
         {error.details && (

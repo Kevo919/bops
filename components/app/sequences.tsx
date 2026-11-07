@@ -48,7 +48,7 @@ export function Toggle({ label, on, onFlip, disabled, tip }: { label: string; on
       data-tip={tip}
       disabled={disabled}
       onClick={() => onFlip?.(!on)}
-      className={`relative h-[18px] w-[30px] shrink-0 rounded-full transition-colors disabled:cursor-default ${on ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-d9d9d5)]"} ${disabled && !tip ? "opacity-50" : ""}`}
+      className={`relative h-[18px] w-[30px] shrink-0 rounded-full transition-colors disabled:cursor-default ${on ? "bg-[color:var(--color-ink)]" : "bg-[color:var(--hb-d9d9d5)]"} ${disabled && !tip ? "opacity-50" : ""}`}
     >
       <span className={`absolute top-0.5 size-[14px] rounded-full bg-white shadow-[0_1px_2px_var(--h-00000033)] transition-all ${on ? "left-[14px]" : "left-0.5"}`} />
     </button>

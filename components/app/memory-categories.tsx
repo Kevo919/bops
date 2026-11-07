@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { CATEGORIES, categoryOf, GROUP_NAME, settled, upcoming, whenLabel, type CategoryId, type KnowledgeFilter, type ItemSource, type MemoryItem, type MemorySnapshot } from "@/lib/memory-categories";
 import { Mascot, Spinner } from "./mascot";
@@ -12,6 +12,7 @@ import { menuPoint, PinIcon, SideMenu, useFavorites, type Favorites } from "./fa
 import { Fold } from "./fold";
 import { Chevron, since, small, undash } from "./side-group";
 import { clockTime, CloseButton, useNow } from "./ui";
+import { OpenSettings } from "./open-settings";
 
 /*
  * Knowledge: what Bops knows, sorted into kinds that fill themselves from the workspace's memory
@@ -991,6 +992,8 @@ export function MemoryPage({
   // "Updated 5m ago", and when Tidy up can run again, stay current.
   useNow(30_000);
   const c = category === "all" ? undefined : (categoryOf(category) ?? CATEGORIES[0]);
+  // Memory's own row in Settings, Services, where it's turned on (null where there's no window to open it in).
+  const openSettings = useContext(OpenSettings);
   const [search, setSearch] = useState(query ?? "");
   const [openId, setOpenId] = useState<string | null>(focus ?? null);
   // A new ask from the sidebar puts its search here (none: a search left here could hide what was asked for), and the item asked for opens.
@@ -1143,7 +1146,18 @@ export function MemoryPage({
           <Spinner size={16} color="#9A9A98" />
         </div>
       ) : !snap.on ? (
-        <div className="py-12 text-center text-[13.5px] leading-5 text-[color:var(--ht-6b6b6b)]">Memory isn&rsquo;t on yet.</div>
+        // Off: what would be here and how to turn it on (task 87: Tasks and People said only "Memory isn't on yet").
+        <div data-memory-off className="flex flex-col items-center gap-3 py-12 text-center">
+          <span className="max-w-[340px] text-[13.5px] leading-5 text-[color:var(--ht-3a3a38)]">
+            {c ? `${c.empty.replace(/\.$/, "")} once memory is on.` : "What your bots learn as you chat shows up here once memory is on: people, plans, promises and more."}
+          </span>
+          <span className="max-w-[340px] text-[12.5px] leading-[18px] text-[color:var(--ht-6b6b6b)]">Memory isn&rsquo;t on yet. It&rsquo;s turned on in Settings, Services.</span>
+          {openSettings && (
+            <button onClick={() => openSettings("services", { service: "memory" })} className={BUTTON}>
+              Set up memory
+            </button>
+          )}
+        </div>
       ) : !all.length ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
           <Mascot botId="boppy" color="#0A0A0A" size={52} />
@@ -1196,9 +1210,18 @@ export function MemoryPage({
             <KnowledgeIcon size={20} />
           </span>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="text-[20px] font-semibold leading-6 tracking-[-0.01em]">{GROUP_NAME}</span>
+            {/* One kind open (Tasks, People...): its own name, in Knowledge (task 87); all of them: Knowledge. */}
+            <span data-knowledge-title className="text-[20px] font-semibold leading-6 tracking-[-0.01em]">
+              {c?.label ?? GROUP_NAME}
+            </span>
             <span className="text-[13px] leading-[19px] text-[color:var(--ht-6b6b6b)]">
-              {owners ? "What the bots here know, learned as the owner chats" : snap?.on && items.length ? `${items.length.toLocaleString("en-US")} things your bots know, learned as you chat` : "What your bots know, learned as you chat"}
+              {c
+                ? `In ${GROUP_NAME}: ${c.about.charAt(0).toLowerCase()}${c.about.slice(1)}`
+                : owners
+                  ? "What the bots here know, learned as the owner chats"
+                  : snap?.on && items.length
+                    ? `${items.length.toLocaleString("en-US")} things your bots know, learned as you chat`
+                    : "What your bots know, learned as you chat"}
             </span>
           </div>
           <CloseButton onClick={onClose} className="mt-1.5" />
