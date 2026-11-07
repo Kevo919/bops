@@ -58,11 +58,12 @@ $size = [Runtime.InteropServices.Marshal]::SizeOf([type][BopsJob+Extended])
 if (-not [BopsJob]::SetInformationJobObject($job, 9, [ref]$limits, $size)) { exit 1 }
 
 # The job on Claude Code itself; everything it spawns joins with it (no breakaway is allowed).
-$process = [BopsJob]::OpenProcess(0x0400, $false, $Child)  # PROCESS_SET_QUOTA, all Assign needs
-if ($process -ne [IntPtr]::Zero) {
-  [void][BopsJob]::AssignProcessToJobObject($job, $process)
-  [void][Runtime.InteropServices.Marshal]::GetLastWin32Error()
-}
+# Assign needs PROCESS_SET_QUOTA and PROCESS_TERMINATE. When it's denied (the CLI already sits in a
+# job that won't take a second one), the job can hold nothing: leave, and the ordinary stop (taskkill
+# of the whole tree) is what ends the turn's processes, as before.
+$process = [BopsJob]::OpenProcess(0x0401, $false, $Child)
+if ($process -eq [IntPtr]::Zero) { exit 1 }
+if (-not [BopsJob]::AssignProcessToJobObject($job, $process)) { exit 1 }
 
 # Stay while Claude Code runs AND Bops is alive; leaving closes the handle, ending the job.
 while ($true) {

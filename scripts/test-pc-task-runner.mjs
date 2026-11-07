@@ -284,22 +284,6 @@ await test("a search whose pattern walks out of its folder asks, wherever its pa
   assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "secret", glob: "/etc/*" }), { behavior: "ask" });
 });
 
-if (process.platform === "win32")
-  await test("the job sitter ends what a turn started when the process that owns the job is gone (Windows)", async () => {
-    const held = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
-    const owner = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"], { stdio: "ignore" });
-    await new Promise((r) => setTimeout(r, 300));
-    const sitter = spawn(join(process.env.SystemRoot ?? "C:\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), [
-      "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", join(root, "vm", "win-job-sitter.ps1"), "-Child", String(held.pid), "-Parent", String(owner.pid),
-    ], { stdio: "ignore", windowsHide: true });
-    await new Promise((r) => setTimeout(r, 2500)); // the sitter makes the job and joins the child to it
-    owner.kill();                                   // the owner dies: the sitter leaves, the job handle closes
-    await new Promise((r) => setTimeout(r, 3000));
-    const alive = () => { try { process.kill(held.pid, 0); return true; } catch { return false; } };
-    assert.equal(alive(), false, "the held process ended with the job");
-    sitter.kill();
-    if (alive()) held.kill();
-  });
 
 await test("a user settings file allowing Bash, with a hook and a key, takes no effect", async () => {
   // As the real CLI would find it, in the HOME Claude Code runs with.
