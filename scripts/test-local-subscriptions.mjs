@@ -162,4 +162,25 @@ await test('Claude printed manual code URLs are never exposed as a usable sign-i
   assert.equal(snapshot.state,'connecting'); assert.equal(snapshot.loginUrl,undefined);
   reply={code:1,text:'{"loggedIn":false}'}; await api.cancelLocalLogin('claude');
 });
+await test('the chip\'s cached check reuses the last minute\'s answer, and a sign-in change or a full check replaces it', async () => {
+  closeOnKill=true; api.forgetLocalChecks();
+  reply={code:0,text:'{"loggedIn":true,"authMethod":"claude.ai","subscriptionType":"max"}'};
+  const before=calls.length;
+  assert.equal((await api.cachedLocalSubscriptionStatus('claude')).state,'connected');
+  assert.equal(calls.length,before+1,'the first read asks the CLI');
+  for (let i=0;i<3;i++) assert.equal((await api.cachedLocalSubscriptionStatus('claude')).state,'connected');
+  assert.equal(calls.length,before+1,'mounting the chip or focusing the window again doesn\'t');
+  // Settings' own check always asks, and what it found is what the chip reads next.
+  reply={code:1,text:'{"loggedIn":false}'};
+  assert.equal((await api.getLocalSubscriptionStatus('claude')).state,'signed-out');
+  assert.equal(calls.length,before+2);
+  assert.equal((await api.cachedLocalSubscriptionStatus('claude')).state,'signed-out');
+  assert.equal(calls.length,before+2);
+  // A sign-out here (Settings, AI plans) drops the old answer; its own check after is what the chip reads, not the old one.
+  reply={code:0,text:'{"loggedIn":true,"authMethod":"claude.ai","subscriptionType":"pro"}'};
+  await api.logoutLocalSubscription('claude');
+  const after=calls.length;
+  const now=await api.cachedLocalSubscriptionStatus('claude'); assert.equal(now.plan,'pro',JSON.stringify(now));
+  assert.equal(calls.length,after,'the sign-out\'s own check is reused');
+});
 console.log(`local subscriptions: ${passed} passed`);

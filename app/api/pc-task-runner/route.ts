@@ -24,8 +24,9 @@ function denied(request: Request) {
   return allowed ? notReady() : Response.json({ error: "Bot tasks on this PC can only be set up by the owner in the desktop app." }, { status: 403, headers });
 }
 
-async function view() {
-  const pick = await pcRunnerNow();
+/** `cached`: a plain read (the chat box's chip, Settings opening) may use the last minute's Claude check; a change never does. */
+async function view(cached = false) {
+  const pick = await pcRunnerNow({ cached });
   const key = process.env[EXECUTOR_KEY]?.trim();
   return { choice: readPcRunnerChoice(pcRunnerFile()) ?? null, runner: pick.runner, ...(pick.runner ? {} : { problem: pick.error }), openaiKey: { set: !!key, masked: maskKey(key) } };
 }
@@ -33,7 +34,7 @@ async function view() {
 export async function GET(request: Request) {
   const blocked = denied(request);
   if (blocked) return blocked;
-  return Response.json(await view(), { headers });
+  return Response.json(await view(true), { headers });
 }
 
 export async function POST(request: Request) {
