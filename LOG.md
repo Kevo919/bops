@@ -223,3 +223,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 12:54 lead: #113 re-review = REQUEST CHANGES (sitter attaches late so children escape; a sitter failure kills the turn; DLL cache never rebuilds; Node logging; glob brace bypass). Notes in messages 1315.
 - 13:19 lead: status update sent to Kevin (about 80%, ETA Sun Nov 8). Codex asked to review agent-desktop-hub PR #1. #116 re-review is running; #117 builder is fixing; #113 is back with zai (round 2).
 - 13:21 lead: #116 re-review = REQUEST CHANGES (the chat-error Settings button points at the moved AI subscriptions card; test-chat-error-ui and mobile-layout fail). Builder fixing. Task 92 follow-up added.
+- 13:35 lead: merged #116 (UI, tasks 83-87) at 61b03c6. PC rebuild started (Kevin told). Live recipe replay next.
