@@ -10,13 +10,23 @@ import { OpenSettings } from "./open-settings";
  * line, a button to Settings → AI plans to pick another model, and Details, which shows the provider's own words
  * (never a key: the server took them out). In place of the bot's bubble; its look follows the theme's tokens.
  */
-export function ChatErrorCard({ error, readOnly = false }: { error: ChatErrorInfo; readOnly?: boolean }) {
+/** When this window opened: a card for an error from before (loaded with the chat's history) is a status, not an alert. */
+const openedAt = Date.now();
+
+/** "3:04 PM": the card's time, for its button's name, so each card's button is told apart. */
+const timeOf = (at: number) => new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+export function ChatErrorCard({ error, at, readOnly = false }: { error: ChatErrorInfo; /** When the bot's message was written. */ at: number; readOnly?: boolean }) {
   const openSettings = useContext(OpenSettings);
   const [open, setOpen] = useState(false);
   const detailsId = useId();
+  // Only an error that happened while this window was open is announced as it appears; one from history is just there.
+  const fresh = at >= openedAt;
+  const what = `${error.provider ? `${error.provider} ` : ""}error at ${timeOf(at)}`;
   return (
     <div
-      role="alert"
+      role={fresh ? "alert" : "status"}
+      aria-label={`${error.title}: ${what}`}
       data-chat-error={error.kind}
       className="flex max-w-[460px] flex-col gap-2 rounded-[18px] bg-[color:var(--hb-fafaf9)] px-3.5 py-3 text-[14px] leading-5 shadow-[0_0_0_1px_var(--h-e6e6e3)]"
     >
@@ -36,6 +46,7 @@ export function ChatErrorCard({ error, readOnly = false }: { error: ChatErrorInf
           <button
             type="button"
             data-chat-error-settings
+            aria-label={`Open Settings → AI plans, for the ${what}`}
             onClick={() => openSettings(BRAINS_ON ? "ai" : "profile")}
             className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-[color:var(--bops-on-fill)]"
           >
@@ -46,6 +57,7 @@ export function ChatErrorCard({ error, readOnly = false }: { error: ChatErrorInf
           <button
             type="button"
             data-chat-error-toggle
+            aria-label={`${open ? "Hide" : "Show"} details of the ${what}`}
             aria-expanded={open}
             aria-controls={detailsId}
             onClick={() => setOpen((o) => !o)}

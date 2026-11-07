@@ -1951,7 +1951,7 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
                 <AppChangeCard m={m} state={state} />
               ) : m.chatError ? (
                 /* Its chat model's provider said no: plain words, Settings → AI plans, the raw words behind Details (chat-error.tsx). */
-                <ChatErrorCard error={m.chatError} readOnly={ro} />
+                <ChatErrorCard error={m.chatError} at={m.at} readOnly={ro} />
               ) : (
                 (m.text || !m.images?.length) && (
                   <div className="whitespace-pre-wrap rounded-[18px] bg-[color:var(--hb-f2f2f0)] px-3.5 py-2 text-[14px] leading-5 [overflow-wrap:anywhere]">

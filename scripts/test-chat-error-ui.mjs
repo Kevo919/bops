@@ -242,7 +242,9 @@ try {
       await check(`${tag}: the card says it plainly, never the raw 429 or a key, with Settings → AI plans and Details`, async () => {
         const card = await openChat(page);
         assert.equal(await card.getAttribute("data-chat-error"), "credit");
-        assert.equal(await card.getAttribute("role"), "alert");
+        // From the chat's history, not new in this window: a status, not an alert.
+        assert.equal(await card.getAttribute("role"), "status");
+        assert.match(await card.locator("[data-chat-error-settings]").getAttribute("aria-label"), /^Open Settings → AI plans, for the OpenAI error at \d{1,2}:\d{2}/);
         assert.equal((await card.locator("[data-chat-error-title]").innerText()).trim(), "Out of credit");
         assert.equal((await card.locator("[data-chat-error-text]").innerText()).trim(), failure.text);
         const seen = await card.innerText();

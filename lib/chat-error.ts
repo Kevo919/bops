@@ -68,26 +68,61 @@ export function providerName(p: string | undefined): string | undefined {
   return NAMES[v.toLowerCase()] ?? Object.values(NAMES).find((n) => n.toLowerCase() === v.toLowerCase()) ?? v;
 }
 
-/** Key-like strings, whoever's: an OpenAI or Anthropic key, a bearer token, a key in a URL's query. */
-const KEYISH = [
-  /\bsk-(?:ant-|proj-|or-v1-|svcacct-)?[A-Za-z0-9_-]{8,}/g,
-  /\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi,
-  /([?&](?:key|api[_-]?key|token|access_token)=)[^&\s"']+/gi,
-  /\b(?:xai|gsk|pk|rk|AIza)[-_][A-Za-z0-9_-]{12,}/g,
+/**
+ * Key-like strings, whoever's, each with what's kept before the secret (a header's or a field's name), so the words
+ * still read: provider keys (OpenAI, Anthropic, OpenRouter, Google, GitHub, Stripe-style live and test keys, Z.ai's
+ * "<id>.<secret>"), bearer and basic credentials, `x-api-key:` and `authorization:` headers, JSON fields named like a
+ * key, a URL's user:password@, and a key or token in a URL's query.
+ */
+const KEYISH: RegExp[] = [
+  // Headers and JSON fields first, so their names stay and only the value goes.
+  /((?:^|[\s{,;"'])(?:x-api-key|x-goog-api-key|api-key|authorization|proxy-authorization)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|(?:Bearer|Basic|Token)\s+\S+|[^\s,;}]+)/gi,
+  /("(?:api[_-]?key|apiKey|access[_-]?token|accessToken|refresh[_-]?token|token|secret|client[_-]?secret|password|key)"\s*:\s*")[^"]*(?=")/gi,
+  /((?:^|[\s{,])(?:api[_-]?key|apiKey|token|secret|password)\s*[=:]\s*)[^\s,;}&"']+/gi,
+  /\b((?:Bearer|Basic|Token))\s+[A-Za-z0-9._~+/=-]{6,}/gi,
+  // A URL's user:password@, and a key or token in its query.
+  /(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi,
+  /([?&#](?:key|api[_-]?key|apikey|token|access[_-]?token|auth|secret|sig|signature)=)[^&\s"'#]+/gi,
+  // Bare keys by shape.
+  /\bsk-(?:ant-(?:api\d+-)?|proj-|or-v1-|svcacct-|admin-)?[A-Za-z0-9_-]{8,}/g,
+  /\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{8,}/g,
+  /\bAIza[0-9A-Za-z_-]{30,}/g,
+  /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}/g,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}/g,
+  /\b(?:xai|gsk|hf)[-_][A-Za-z0-9_-]{12,}/g,
+  /\b[0-9a-f]{32}\.[A-Za-z0-9]{16,}\b/gi,
 ];
 
 /**
- * `text` with every key taken out: the ones given (the keys this server has), and anything shaped like one. Never
- * shows a key, even one Bops wasn't told about.
+ * `text` with every key taken out: the ones given (every key this server has, at any length), and anything shaped like
+ * one. Never shows a key, even one Bops wasn't told about.
  */
 export function withoutKeys(text: string, keys: readonly string[] = []): string {
   let out = text;
-  for (const k of keys) if (k && k.length >= 6) out = out.split(k).join("…");
-  for (const re of KEYISH) out = out.replace(re, (m, lead?: string) => (typeof lead === "string" && m.startsWith(lead) ? `${lead}…` : "…"));
+  // Longest first, so a key that contains another goes whole.
+  for (const k of [...keys].map((x) => x?.trim()).filter(Boolean).sort((a, b) => b.length - a.length)) out = out.split(k).join("…");
+  for (const re of KEYISH) out = out.replace(re, (m: string, ...rest: unknown[]) => {
+      const lead = typeof rest[0] === "string" ? rest[0] : undefined;
+      if (lead && /^(Bearer|Basic|Token)$/i.test(lead)) return `${lead} …`;
+      return lead && m.startsWith(lead) ? `${lead}…` : "…";
+    });
   return out;
 }
 
-const CREDIT = /insufficient[ _]quota|no credits?( remaining| left)?|out of credits?|credit balance|insufficient[ _](balance|credits?|funds)|exceeded your current quota|quota exceeded|billing|payment required|top ?up|no (resource package|balance)|\b1113\b/i;
+/*
+ * The kind of a no. A provider's structured code (or error type) says it best, so it's read first: OpenAI's
+ * `insufficient_quota` is credit and its `rate_limit_exceeded` is a rate limit, whatever the words around them (a rate
+ * limit's message links ".../account/billing", and "Used 1113" in a tokens-per-minute message is a count, not Z.ai's
+ * 1113). A code Bops doesn't know (Anthropic's `invalid_request_error`, which its low-credit 400 has) says nothing either
+ * way, so then the status and the message's words decide; 1113 counts only as a code, never in the words.
+ */
+const CREDIT_CODE = /^(insufficient_quota|insufficient_balance|billing_hard_limit_reached|billing_not_active|payment_required|credit_balance_too_low|1113)$/i;
+const RATE_CODE = /^(rate_limit_exceeded|rate_limit_error|rate_limited|too_many_requests|requests_limit_reached|tokens_limit_reached|1302|1303)$/i;
+const KEY_CODE = /^(invalid_api_key|authentication_error|unauthorized|invalid_authentication|permission_error|1000|1001|1002)$/i;
+const MODEL_CODE = /^(model_not_found|not_found_error|model_not_available|1211)$/i;
+const DOWN_CODE = /^(overloaded_error|server_error|api_error|service_unavailable|internal_error|engine_overloaded)$/i;
+
+const CREDIT = /insufficient[ _]quota|no credits?( remaining| left)?|out of credits?|credit balance|insufficient[ _](balance|credits?|funds)|exceeded your current quota|quota exceeded|payment required|no (resource package|balance)/i;
 const RATE = /rate[ _-]?limit|too many requests|slow down|requests per (minute|min|second)|tokens per (minute|min)|\btpm\b|\brpm\b|try again in \d/i;
 const KEY = /invalid[ _](api[ _])?key|incorrect api key|api key|unauthori[sz]ed|authentication|invalid[ _]token|invalid x-api-key|permission denied|not authori[sz]ed/i;
 const MODEL = /model[^.]*(not[ _]found|does not exist|not exist|invalid|unknown|not supported|unavailable)|unknown model|invalid model|no such model|model_not_found/i;
@@ -102,15 +137,26 @@ const statusIn = (message: string | undefined) => {
 /** The model's own name, without its provider ("openai/gpt-5.5" is gpt-5.5). */
 const modelName = (m: string | undefined) => (m ? m.replace(/^[a-z-]+\//, "") : undefined);
 
-/** Which kind of no it was, from its status, code and words. */
+/** Which kind of no it was: its code first, else its status and words (above). */
 export function chatErrorKind(i: Pick<ChatErrorInput, "status" | "code" | "message">): ChatErrorKind {
   const status = i.status ?? statusIn(i.message);
-  const words = `${i.code ?? ""} ${i.message ?? ""}`;
-  if (status === 402 || /insufficient_quota|billing_hard_limit|insufficient_balance/i.test(i.code ?? "") || ((status === 429 || status === 403 || status === 400 || status === undefined) && CREDIT.test(words))) return "credit";
+  const code = i.code?.trim() ?? "";
+  if (code) {
+    if (CREDIT_CODE.test(code)) return "credit";
+    if (RATE_CODE.test(code)) return "rate";
+    if (KEY_CODE.test(code)) return "key";
+    if (MODEL_CODE.test(code)) return "model";
+    if (DOWN_CODE.test(code)) return "down";
+  }
+  const words = i.message ?? "";
+  if (status !== undefined && status >= 500) return "down";
+  if (status === 402) return "credit";
+  // A 429 is a rate limit unless its words say credit and not a rate (a quota used up, no credits left).
+  if ((status === 429 || status === 403 || status === 400 || status === undefined) && CREDIT.test(words) && !(status === 429 && RATE.test(words))) return "credit";
   if (status === 429 || (status === undefined && RATE.test(words))) return "rate";
   if (status === 401 || ((status === 403 || status === undefined) && KEY.test(words))) return "key";
-  if (status === 404 || /model_not_found/i.test(i.code ?? "") || ((status === 400 || status === undefined) && MODEL.test(words))) return "model";
-  if ((status !== undefined && status >= 500) || (status === undefined && DOWN.test(words))) return "down";
+  if (status === 404 || ((status === 400 || status === undefined) && MODEL.test(words))) return "model";
+  if (status === undefined && DOWN.test(words)) return "down";
   return "other";
 }
 
