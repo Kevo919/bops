@@ -840,11 +840,13 @@ function LoginPanel({
           <div className={card}>
             {own.map((w) => {
               const isHome = (a && home === w.id) || (k && home === w.id);
-              // A site login is on in a workspace through its bots (siteLoginIn): one with no bots can't take it, so its
-              // switch is held off and says why, not pressed and left as it was (task 96: a click that did nothing).
+              // A site login is on in a workspace through its bots (siteLoginIn): one with no bots can't be turned on there,
+              // so its switch is held while off and says why (task 96: a click that did nothing). Turning one off always
+              // works (the #119 review: on and locked couldn't be turned off).
               const noBots = !!l && !state.bots.some((b) => workspaceOf(b) === w.id);
-              const locked = !!isHome || (!!k && k.scope === "all") || noBots;
-              const on = (locked && !noBots) || inWs.includes(w.id);
+              const fixed = !!isHome || (!!k && k.scope === "all");
+              const on = fixed || inWs.includes(w.id);
+              const locked = fixed || (noBots && !on);
               return (
                 <div key={w.id} className="flex items-center gap-3 border-b border-[color:var(--h-f0f0ee)] px-3.5 py-2.5 last:border-0">
                   <span className="flex size-5 shrink-0 items-center justify-center rounded-[6px] bg-[color:var(--hb-1f5f4a)] text-[10.5px] font-semibold uppercase text-[color:var(--bops-on-fill)]">{w.name[0]}</span>

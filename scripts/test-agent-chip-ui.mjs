@@ -49,7 +49,15 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 // This PC's Bot tasks: no runner, Claude isn't signed in here (Kevin's PC as the retest found it).
 globalThis.fetch = async (u) => ({
   ok: true,
-  json: async () => (String(u).includes("pc-task-runner") ? { runner: null, choice: null, problem: "Sign in to Claude in Settings, AI subscriptions, This PC." } : String(u).includes("/api/config") ? { platform: "win32" } : {}),
+  json: async () =>
+    String(u).includes("pc-task-runner")
+      ? { runner: null, choice: null, problem: "Sign in to Claude in Settings, AI subscriptions, This PC." }
+      : String(u).includes("/api/computer")
+        ? // Rook's cloud computer is stopped: nothing wakes it by itself.
+          { computer: { status: "stopped" } }
+        : String(u).includes("/api/config")
+          ? { platform: "win32" }
+          : {},
 });
 
 const now = Date.now();
@@ -84,12 +92,12 @@ const test = async (name, f) => {
 const settle = async () => {
   for (let i = 0; i < 6; i++) await act(async () => await new Promise((r) => setTimeout(r, 5)));
 };
-async function mount(value) {
+async function mount(value, bot = boppy, st = state) {
   const picks = [];
   const box = document.createElement("div");
   document.body.appendChild(box);
   const root = createRoot(box);
-  await act(async () => root.render(h(AgentChipPick, { state, bot: boppy, value, onPick: (id) => picks.push(id) })));
+  await act(async () => root.render(h(AgentChipPick, { state: st, bot, value, onPick: (id) => picks.push(id) })));
   await settle();
   return { box, picks, chip: box.querySelector('button[aria-haspopup="menu"]'), unmount: () => act(async () => root.unmount()) };
 }
@@ -125,11 +133,27 @@ await test("the picker opens and lists its agents, none refused; the one not rea
   await m.unmount();
 });
 
-await test("a pick that isn't ready where it would run (another Claude plan, on this PC) shows that, never no status", async () => {
-  const m = await mount("ag_AAAAAAAAAA");
+await test("a pick other than the Default is said where it would run: Rook's Claude pick on its stopped computer shows that", async () => {
+  // Rook works on its cloud computer, its Default is Bops agent, and Claude Code (signed in there) is picked. Before the
+  // fix only the Default was judged where it runs, so the pick showed no status though the computer is stopped.
+  const rook = {
+    id: "rook",
+    name: "Rook",
+    role: "Recruiting",
+    color: "#47C46B",
+    isMain: false,
+    computerId: "pc-rook",
+    computerStatus: "stopped",
+    workspaceId: "ws_main",
+    ai: { agents: [{ id: "bops", kind: "bops", pays: "credit" }, { id: "ag_ROOKCLAUDE", kind: "claude", pays: "plan", account: "brain_rook" }], default: "bops" },
+  };
+  const st = { host: "orgo", bots: [rook], brains: [{ id: "brain_rook", kind: "claude", name: "Claude Code", auth: "plan", bots: ["rook"], workspaceId: "ws_main", createdAt: 3, signIns: [{ computerId: "pc-rook", at: now, account: { plan: "max" } }] }], chats: [], sessions: [] };
+  const m = await mount("ag_ROOKCLAUDE", rook, st);
+  assert.ok(m.chip, "no chip");
   const label = m.chip.getAttribute("aria-label");
-  if (/Claude Max plan(?! 2)/.test(label)) assert.match(label, /not signed in on this PC/, `the pick shows no status: ${label}`);
-  else assert.match(label, /not signed in on this PC/);
+  assert.match(label, /^Agent for new tasks: Claude Code.*, computer is off$/, `the pick shows no status: ${label}`);
+  assert.equal(m.chip.getAttribute("data-agent-ready"), "no");
+  assert.match(m.chip.getAttribute("title"), /Rook's computer is stopped/);
   await m.unmount();
 });
 

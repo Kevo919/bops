@@ -315,6 +315,8 @@ const chat = async (page) => {
   await page.locator("#composer").waitFor({ state: "visible", timeout: 15000 });
 };
 
+// Whether a pass turned off a login that was on in a workspace with no bots (the light pass does: checked at the end).
+let rentTurnedOff = false;
 try {
   for (const theme of ["light", "dark"]) {
     await setTheme(theme);
@@ -467,10 +469,18 @@ try {
       await page.locator(`${pane} [data-logins]`).getByRole("button", { name: "rent.example.com", exact: true }).first().click();
       await page.locator("[data-login-panel]").waitFor({ state: "visible", timeout: 10000 });
       await page.waitForTimeout(400);
-      // Rentals LLC has no bots: a site login can't be switched there, so its switch is held and says why.
+      // Rentals LLC has no bots: a site login can't be turned on there, so its switch says why; one that's on (the
+      // login was made for every bot, so the light pass starts on) can always be turned off, then is held off.
       const rent = page.locator('[data-login-panel] [role="switch"][aria-label="Used in Rentals LLC"]');
-      assert.equal(await rent.isDisabled(), true, "Rentals LLC's switch takes a click it can't keep");
       assert.match(await page.locator("[data-login-panel]").innerText(), /No bots here yet/);
+      if ((await rent.getAttribute("aria-checked")) === "true") {
+        assert.equal(await rent.isDisabled(), false, "on in a workspace with no bots, and it can't be turned off");
+        await rent.click();
+        await page.waitForFunction((el) => el.getAttribute("aria-checked") === "false", await rent.elementHandle(), { timeout: 5000 });
+        rentTurnedOff = true;
+      }
+      assert.equal(await rent.getAttribute("aria-checked"), "false");
+      assert.equal(await rent.isDisabled(), true, "off in a workspace with no bots, and it takes a click it can't keep");
       await flipAll("[data-login-panel]", "Logins");
       await shot(page, `${theme}-96-logins-switches`);
       await home(page);
@@ -487,6 +497,7 @@ try {
       assert.match(main, /ipcMain\.handle\("set-theme"[\s\S]{0,400}writeFileSync\(themeFile\(\), next\)/, "the theme isn't kept");
       assert.match(main, /async function createWindow\(\) \{\s*startTheme\(\);/, "the window doesn't start with it");
     });
+    if (theme === "dark") await check(T("96 a login on in a workspace with no bots was turned off (the light pass)"), async () => assert.ok(rentTurnedOff || only, "never on, so turning it off was never tried"));
     await check(T("nothing threw"), async () => assert.deepEqual(errors, []));
     await ctx.close();
   }

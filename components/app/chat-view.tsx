@@ -1943,6 +1943,8 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
   const b = state.bots.find((x) => x.id === m.botId);
   // Posted by a routine (a reminder, or a run in the chat): which one, by its name while it's there.
   const fromRoutine = m.routine && state.routines.find((r) => r.id === m.routine!.id);
+  // A provider's no: the card's own (Message.chatError), else one stored before the card, read once (lib/chat-error.ts).
+  const chatError = m.chatError ?? (m.role === "bot" ? storedChatError(m.text, b?.name) : null);
   return (
     <div className={`group/msg flex max-w-[86%] items-end gap-2 self-start ${enterClass}`}>
       {showSender && (b && !continued ? <Mascot botId={b.id} color={b.color} size={24} /> : <span className="w-6 shrink-0" />)}
@@ -1962,10 +1964,10 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
               {/* What a task changed in one of the owner's apps (app-change.tsx), in place of its words, which an older Bops shows. */}
               {m.appChange && appsOwnShown(state) ? (
                 <AppChangeCard m={m} state={state} />
-              ) : m.chatError || (m.role === "bot" && storedChatError(m.text, m.botId ? state.bots.find((x) => x.id === m.botId)?.name : undefined)) ? (
+              ) : chatError ? (
                 /* Its chat model's provider said no: plain words, the model picker and AI subscriptions, the raw words behind
                    Details (chat-error.tsx); one stored before the card (task 95) is read as the card would have shown it. */
-                <ChatErrorCard error={m.chatError ?? storedChatError(m.text, m.botId ? state.bots.find((x) => x.id === m.botId)?.name : undefined)!} at={m.at} readOnly={ro} />
+                <ChatErrorCard error={chatError} at={m.at} readOnly={ro} />
               ) : (
                 (m.text || !m.images?.length) && (
                   <div className="whitespace-pre-wrap rounded-[18px] bg-[color:var(--hb-f2f2f0)] px-3.5 py-2 text-[14px] leading-5 [overflow-wrap:anywhere]">
