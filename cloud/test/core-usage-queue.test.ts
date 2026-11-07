@@ -935,3 +935,25 @@ test("a use parked in memory stays parked while a replay is still writing it, so
   );
   assert.equal(usageQueueState().parked, 0);
 });
+
+// A use counted once the cloud is stopping — a turn's session lookup finishing after the drain — is
+// spooled first (durable on disk), never only in memory where the stop would drop it.
+test("a use counted after the drain goes on the spool first, and is written by a replay", async () => {
+  process.env.BOPS_USAGE_SPOOL = spoolPath();
+  await failWrites(true);
+  // The stop: nothing under way, and from here nothing waits for what's counted next.
+  await drainUsage(0);
+  const late = keepUsage(alice, "agentphone.sms", 2, { direction: "out" });
+  // The write is still tried after spooling (it fails: the database refuses it), so wait for the
+  // use to leave the queue too, not only for its line to land.
+  await until(
+    async () => (await spooled()).some((u) => u.ref === late) && usageQueueState().pending === 0,
+    "it to reach the spool and leave the queue's memory",
+  );
+  assert.equal(usageQueueState().pending, 0, "not left only in the queue's memory");
+  assert.equal(usageQueueState().parked, 0, "the spool took it, so it isn't parked either");
+  // The database takes writes again: the replay writes it once, like any spooled use.
+  await failWrites(false);
+  await replayUsage();
+  assert.equal((await rowsOf(late)).length, 1);
+});

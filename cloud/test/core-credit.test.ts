@@ -283,6 +283,50 @@ test("the same count seen later with dearer detail takes only the difference fro
   assert.deepEqual(rows.map((r) => [r.units, r.cost, r.detail.cached]), [[1100, dear, 0]]);
 });
 
+test("a price rise since the row was written re-prices only the detail's difference, never the whole use again", async () => {
+  const u = await newUser();
+  const ref = `turn_${tag}_rise`;
+  const said = (cached: number) => ({ model: "gpt-6.1-sol", source: "agent", input: 1000, cached, output: 100 });
+  const cheap = costOf("openai.tokens", 1100, { ...said(900), ref });
+  const dear = costOf("openai.tokens", 1100, { ...said(0), ref });
+  assert.ok(dear > cheap);
+  await recordUsageFor(u, "openai.tokens", ref, 1100, said(900));
+  // The row was written when prices were lower: what it cost then is less than the same use today.
+  const then = Math.max(0, cheap - 123);
+  await query("UPDATE bops.cloud_usage SET cost_micros = $1 WHERE user_id = $2 AND detail->>'ref' = $3", [then, u, ref]);
+  await setCredit(u, { free: 1_000_000 });
+  // The same count with a dearer detail pays only what the detail adds at today's prices (dear less
+  // cheap), not today's price on the whole use less what was paid then (dear less then).
+  await recordUsageFor(u, "openai.tokens", ref, 1100, said(0));
+  assert.equal(await creditLeft(u), 1_000_000 - (dear - cheap), "only the difference, at one price");
+  const risen = await usageOf(u, "openai.tokens");
+  assert.deepEqual(risen.map((r) => [r.units, r.cost]), [[1100, then + (dear - cheap)]]);
+  // The cheaper detail again, and the dearer one again, take nothing.
+  await recordUsageFor(u, "openai.tokens", ref, 1100, said(900));
+  await recordUsageFor(u, "openai.tokens", ref, 1100, said(0));
+  assert.equal(await creditLeft(u), 1_000_000 - (dear - cheap));
+});
+
+test("a larger sighting without its model is priced at the row's known model, and the row keeps it", async () => {
+  const u = await newUser();
+  const ref = `turn_${tag}_model`;
+  // A first sighting that knows the model (a cheap one), then the same ref grown without one.
+  const said = (units: number, model?: string) => ({ ...(model ? { model } : {}), source: "agent", input: units - 100, cached: 0, output: 100 });
+  await recordUsageFor(u, "openai.tokens", ref, 1000, said(1000, "gpt-6-luna"));
+  await recordUsageFor(u, "openai.tokens", ref, 2000, said(2000));
+  const rows = await usageOf(u, "openai.tokens");
+  const atLuna = costOf("openai.tokens", 2000, { ...said(2000, "gpt-6-luna"), ref });
+  const atDearest = costOf("openai.tokens", 2000, { ...said(2000), ref });
+  assert.ok(atDearest > atLuna, "the dearest is dearer, so this really prices at the row's model");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].detail.model, "gpt-6-luna", "the row keeps the model it knew");
+  assert.equal(rows[0].cost, atLuna, "priced at the row's model, not the dearest");
+  // A later sighting at the same count without a model is still not dearer, and takes nothing.
+  const before = rows[0].cost;
+  await recordUsageFor(u, "openai.tokens", ref, 2000, said(2000));
+  assert.equal((await usageOf(u, "openai.tokens"))[0].cost, before);
+});
+
 /* ---------------- Through the proxies ---------------- */
 
 test("an agent turn is priced at its session's model, from the turn's own read or its session's stream", async () => {

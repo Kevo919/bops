@@ -34,7 +34,10 @@ import { recordUsageFor, type Use } from "./usage.ts";
  *
  * Other writes the proxy doesn't wait for (counted in proxy.ts: web searches, a call's seconds, the
  * lookup of a turn's session before its tokens are kept) are tracked here too, so a stop waits for
- * them (drainUsage), though they aren't retried: an agent turn's are read back by reconcile.ts anyway.
+ * them (drainUsage), though they aren't retried: an agent turn's are read back by reconcile.ts
+ * anyway. One whose wait outlives the stop — a session lookup finishing after the drain — is counted
+ * with the cloud already stopping: it goes on the spool first (spoolFirst), so it's durable rather
+ * than dropped.
  */
 
 export type QueuedUse = {
@@ -99,8 +102,26 @@ export function keepUsage(
     at: Date.now(),
   };
   pending.set(use.id, use);
-  void track(writeWithRetries(use));
+  void track(stopping ? spoolFirst(use) : writeWithRetries(use));
   return use.ref;
+}
+
+/**
+ * A use counted while the cloud is stopping (a turn's session lookup finishing after the drain began):
+ * nothing waits for its write anymore, so it goes on the spool first — fsynced, it outlives the
+ * process, and the next start's replay writes it. The write is still tried (a row is written once per
+ * ref, usage.ts, so a replay after a restart pays nothing more); whichever way it goes, the use ends
+ * up on the spool or parked, never only in memory where a stop would drop it.
+ */
+async function spoolFirst(use: QueuedUse) {
+  await spool([use]);
+  try {
+    await write(use);
+    parked.delete(use.id);
+  } catch {
+    // It's on the spool (or parked when there's none): written by a replay, or logged at a stop.
+  }
+  pending.delete(use.id);
 }
 
 /** keepUsage for a use usage.ts worked out (tokensUse, imagesUse…), nothing when there's none. Its ref. */
