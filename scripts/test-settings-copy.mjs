@@ -23,9 +23,9 @@ assert.deepEqual(failures, [], failures.join("\n"));
 console.log(`PASS: user-facing prose sweep across ${files.length} message-builder files`);
 
 const { MODULES } = createRequire(import.meta.url)("../config/modules.cjs");
-for (const module of MODULES) {
- for (const text of [module.name, module.help, ...module.settings.flatMap(s => [s.label, s.help])]) {
-  if (text) assert.doesNotMatch(text, bad, `${module.id}: real module display metadata`);
+for (const entry of MODULES) {
+ for (const text of [entry.name, entry.help, ...entry.settings.flatMap(s => [s.label, s.help])]) {
+  if (text) assert.doesNotMatch(text, bad, `${entry.id}: real module display metadata`);
  }
 }
 console.log(`PASS: display metadata from all ${MODULES.length} real modules`);
