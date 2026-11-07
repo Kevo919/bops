@@ -1,5 +1,6 @@
 "use client";
 
+import { WHOSE_WORDS } from "@/lib/bot-number";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AccountInfo, BopsPlan, SpendKind, TokenSource, UsageTotals } from "@/lib/account";
 import type { BopsTier } from "@/cloud/protocol";
@@ -1091,9 +1092,12 @@ function Reach({ info }: { info: AccountInfo }) {
                 <span className="text-[13px] font-medium">{w.name}</span>
                 <span className="flex-1" />
                 {w.line ? (
-                  <span className="flex items-center gap-1.5 text-[12.5px] text-[color:var(--ht-3a3a38)]">
-                    <span className="text-[color:var(--ht-9a9a98)]">Text or call {w.line.main ?? "the main bot"} at</span>
+                  <span className="flex items-center gap-1.5 text-[12.5px] text-[color:var(--ht-3a3a38)]" data-bot-number={w.line.whose ?? "bops"}>
+                    <span className="text-[color:var(--ht-9a9a98)]">
+                      {w.line.whose === "agentphone" && !w.line.incoming ? `${w.line.main ?? "The main bot"} calls and texts from` : `Text or call ${w.line.main ?? "the main bot"} at`}
+                    </span>
                     <Copy text={w.line.phone} />
+                    <span className="text-[color:var(--ht-9a9a98)]">({WHOSE_WORDS[w.line.whose ?? "bops"]})</span>
                   </span>
                 ) : (
                   <span className="text-[12.5px] text-[color:var(--ht-9a9a98)]">No number yet</span>

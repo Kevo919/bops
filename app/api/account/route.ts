@@ -1,4 +1,5 @@
 import type { CloudUsage } from "@/cloud/protocol";
+import { botNumbers } from "@/lib/server/bot-number";
 import type { AccountInfo, OrgoBilling, SpendKind, TokenSource, UsageTotals } from "@/lib/account";
 import { bopsComputers, planName, planShort, planShortText, planUp } from "@/lib/orgo-plans";
 import { cloudJson, cloudOn, cloudSessionNow } from "@/lib/server/cloud";
@@ -40,6 +41,7 @@ export async function GET() {
   const usage = bops?.usage;
   const filled = usage && usage.balanceCents === undefined && orgo?.creditsCents !== undefined ? { ...bops!, usage: { ...usage, balanceCents: orgo.creditsCents } } : bops;
   const billing = viaCloud ? cloudSessionNow()?.plan?.billing : undefined;
+  const numbers = botNumbers(state);
   const info: AccountInfo = {
     user,
     signedInAt: state.account?.signedInAt,
@@ -57,10 +59,13 @@ export async function GET() {
     reach: (state.workspaces?.length ? state.workspaces : [{ id: MAIN_WORKSPACE, name: "Main" }]).map((w) => {
       const bots = state.bots.filter((b) => workspaceOf(b) === w.id);
       const line = "line" in w ? w.line : undefined;
+      // The number every screen shows (lib/bot-number.ts): the workspace's line, or your own AgentPhone number.
+      const number = numbers[w.id];
+      const own = !line && number?.whose === "agentphone" ? number : undefined;
       return {
         id: w.id,
         name: w.name,
-        line: line ? { phone: prettyPhone(line.phone), imessage: line.type === "imessage", main: bots.find((b) => b.isMain)?.name } : undefined,
+        line: line ? { phone: prettyPhone(line.phone), imessage: line.type === "imessage", main: bots.find((b) => b.isMain)?.name, whose: "bops" as const } : own ? { phone: own.phone, imessage: false, main: bots.find((b) => b.isMain)?.name, whose: "agentphone" as const, incoming: own.incoming } : undefined,
         bots: bots
           .sort((a, b) => Number(b.isMain) - Number(a.isMain))
           .map((b) => ({ id: b.id, name: b.name, color: b.color, isMain: b.isMain, email: b.email, phone: b.phone ? prettyPhone(b.phone) : undefined })),

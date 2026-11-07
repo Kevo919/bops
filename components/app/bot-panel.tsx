@@ -27,6 +27,7 @@ import { WhereToFind } from "./channels";
 import { undash } from "./side-group";
 import { numberPausedUntil, readOnly, you, your, Your, yourMac } from "@/lib/shared";
 import { BOOK_A_CALL } from "@/lib/links";
+import { numberSentence, workspaceNumber, WHOSE_WORDS, type BotNumber } from "@/lib/bot-number";
 import { aiKinds, aiLine, SETTINGS_WORDS, teamLine, type SettingsSection } from "@/lib/bot-settings";
 import { onCount } from "@/lib/sequences";
 
@@ -238,7 +239,7 @@ function Details({
   // Fixed words only, for this computer: a shared workspace's are the owner's computer, which this one can't name.
   const ownWords = useOwnComputerWords(state);
   const plan = usePhonePlan();
-  const { line, main, reach, numberRoom, emailRoom, emailOnAsk } = contactOf(state, b, plan);
+  const { line, main, reach, number, numberRoom, emailRoom, emailOnAsk } = contactOf(state, b, plan);
   const glass = GLASS;
   const running = state.sessions.filter((s) => s.botId === b.id && live(s)).length;
   const [copied, setCopied] = useState(false);
@@ -272,15 +273,22 @@ function Details({
       <ContactActions state={state} bot={b} plan={plan} onOpenChat={onOpenChat} />
       {tabs}
 
-      <div className={`flex w-full flex-col rounded-2xl ${glass}`}>
+      <div className={`flex w-full flex-col rounded-2xl ${glass}`} data-bot-number={number?.whose ?? ""}>
         <Field
           label={
-            line && b.isMain ? `mobile · ${line.type === "imessage" ? "iMessage" : "texts"} · the team's number` : b.phoneLine?.paused ? `mobile · ${numberPausedUntil(state, b.phoneLine.unpaid)}` : "mobile · texts and calls"
+            line && b.isMain
+              ? `mobile · ${line.type === "imessage" ? "iMessage" : "texts"} · the team's number, ${WHOSE_WORDS.bops}`
+              : b.phoneLine?.paused
+                ? `mobile · ${numberPausedUntil(state, b.phoneLine.unpaid)}`
+                : number
+                  ? `mobile · ${WHOSE_WORDS[number.whose]}`
+                  : "mobile · texts and calls"
           }
           value={reach ? prettyPhone(reach) : undefined}
           empty={line && main ? `Text ${main.name} at ${prettyPhone(line.phone)}: ${main.name} passes work to ${b.name}.` : "No number yet."}
         />
-        {!line && !b.phone && <GetNumber bot={b} plan={plan} room={numberRoom} onUpgrade={onUpgrade} />}
+        {number?.whose === "agentphone" && !number.incoming && <span className="px-4 pb-[11px] text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{numberSentence(number, b.name)}</span>}
+        {!line && !b.phone && !number && <GetNumber bot={b} plan={plan} room={numberRoom} onUpgrade={onUpgrade} />}
         {/* Whose phone the number is linked to: the first to call or text it, then calls and texts from it count as the user. */}
         {reach && <LineLink key={reach} phone={reach} className="px-4 pb-[11px]" />}
         <div className="h-px bg-[color:var(--bops-tint)]/[0.05]" />
@@ -412,8 +420,14 @@ export function contactOf(state: AppState, b: Bot, plan: PhonePlan) {
   // The workspace's number belongs to its main bot; the other bots are reached through it.
   const line = state.workspaces?.find((w) => w.id === workspaceOf(b))?.line;
   const main = state.bots.find((x) => x.isMain && workspaceOf(x) === workspaceOf(b));
-  const reach = line ? (b.isMain ? line.phone : undefined) : b.phone;
-  return { line, main, reach, numberRoom, emailRoom, emailOnAsk };
+  // The main bot's number by the one rule every screen uses (lib/bot-number.ts), as /api/phone says it; before it
+  // answers, what this state alone says (a number Bops set up, never your AgentPhone number).
+  const said = plan.numbers?.[workspaceOf(b)];
+  const number: BotNumber | null = b.isMain ? (said !== undefined ? said : workspaceNumber({ line, mainPhone: b.phone && b.phoneLine ? b.phone : null, defaultWorkspace: false })) : null;
+  // Your AgentPhone number has no line in the state: its digits, for Text and Call.
+  const own = number?.whose === "agentphone" ? `+${number.phone.replace(/\D/g, "")}` : undefined;
+  const reach = line ? (b.isMain ? line.phone : undefined) : (b.phone ?? own);
+  return { line, main, reach, number, numberRoom, emailRoom, emailOnAsk };
 }
 
 /** Text or message it, call its number, book a video call, email it: the panel's four round buttons (`size` 44 on the page). */
@@ -653,7 +667,8 @@ type Found = { areaCode: string; options: NumberOption[]; anywhere?: boolean };
 
 /** What the Bops plan holds now (lib/server/plan-room.ts): null where Bops Cloud doesn't hold plans to what they include. */
 type Room = { tier: BopsTier; numbers: number; emails: number } | null;
-export type PhonePlan = { on: boolean | null; planNeeded: boolean; room: Room };
+/** `numbers`: each workspace's bot number from /api/phone (lib/bot-number.ts); null until it answers. */
+export type PhonePlan = { on: boolean | null; planNeeded: boolean; room: Room; numbers?: Record<string, BotNumber | null> | null };
 
 /**
  * Phones on here (AgentPhone through Bops Cloud), and whether a number or an inbox needs Pro or Max:
@@ -661,16 +676,17 @@ export type PhonePlan = { on: boolean | null; planNeeded: boolean; room: Room };
  * Bops comes back to the front while it still says Free: the user may have just paid in the browser.
  */
 export function usePhonePlan(): PhonePlan {
-  const [plan, setPlan] = useState<PhonePlan>({ on: null, planNeeded: false, room: null });
+  const [plan, setPlan] = useState<PhonePlan>({ on: null, planNeeded: false, room: null, numbers: null });
   const needed = useRef(false);
   useEffect(() => {
     const ask = (fresh: boolean) =>
       void fetch(`/api/phone${fresh ? "?fresh=1" : ""}`, { cache: "no-store" })
         .then((r) => r.json())
-        .then((j: { on?: boolean; planNeeded?: boolean; room?: Room }) => {
+        .then((j: { on?: boolean; planNeeded?: boolean; room?: Room; workspaces?: { id: string; number?: BotNumber | null }[] }) => {
           // Asked again on focus while the plan has less than Max: the user may have just upgraded.
           needed.current = !!j.planNeeded || (!!j.room && j.room.tier !== "max_bops");
-          setPlan({ on: !!j.on, planNeeded: !!j.planNeeded, room: j.room ?? null });
+          const numbers = j.workspaces ? Object.fromEntries(j.workspaces.map((w) => [w.id, w.number ?? null])) : null;
+          setPlan({ on: !!j.on, planNeeded: !!j.planNeeded, room: j.room ?? null, numbers });
         })
         .catch(() => {});
     ask(false);

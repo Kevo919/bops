@@ -352,13 +352,13 @@ await check("Settings, Services: the AgentPhone panel from a read-only probe, th
   assert.ok(ap.seen.every((x) => x.method === "GET"), "only reads");
   assert.equal(probe.number, "+1 (555) 010-2000");
   let v = St.agentPhoneView("ends in Zq42");
-  assert.deepEqual([v.number, v.agent, v.calls, v.texts], ["+1 (555) 010-2000", "Front desk", "ready", "registration needed"]);
+  assert.deepEqual([v.number, v.agent, v.calls, v.texts], ["+1 (555) 010-2000", "Front desk", "funds not checked", "registration needed"]);
   assert.equal(v.textsWords, St.TEN_DLC_WORDS);
   assert.ok(!JSON.stringify(v).includes(KEY));
   St.noteCalls("needs funds");
   v = St.agentPhoneView("ends in Zq42");
   assert.equal(v.calls, "needs funds");
-  assert.equal(v.callsWords, St.FUNDS_WORDS);
+  assert.equal(v.callsWords, St.NEEDS_FUNDS_WORDS);
   ap.numbers[0].outboundSms = "enabled";
   await St.probeAccount(KEY);
   v = St.agentPhoneView("ends in Zq42");
@@ -370,6 +370,113 @@ await check("Settings, Services: the AgentPhone panel from a read-only probe, th
   await St.probeAccount("wrong-key");
   v = St.agentPhoneView("x");
   assert.match(v.problem, /turned the key down/);
+});
+
+await check("funds: AgentPhone has no balance to read, so a key that works says funds not checked, never ready; the probe only reads", async () => {
+  St.forgetAgentPhoneStatus();
+  ap.seen.length = 0;
+  ap.numbers = [{ id: "num_1", phoneNumber: "+15550102000", agentId: "agt_1", outboundSms: "enabled" }];
+  await St.probeAccount(KEY);
+  const v = St.agentPhoneView("ends in Zq42");
+  assert.equal(v.calls, "funds not checked");
+  assert.equal(v.callsWords, "Key works; funds not checked. If a call fails, add funds in AgentPhone → Billing.");
+  assert.doesNotMatch(JSON.stringify(v), /Ready to call/);
+  assert.deepEqual(ap.seen.map((x) => `${x.method} ${x.path.split("?")[0]}`).sort(), ["GET /v1/agents", "GET /v1/numbers"], "no balance, usage or call request: two reads");
+  assert.equal(posts("/v1/calls").length, 0, "never a call to find out");
+  // Probing again (Check, or the pane opening) never changes it to ready.
+  await St.probeIfStale(KEY);
+  assert.equal(St.agentPhoneView("x").calls, "funds not checked");
+});
+
+await check("after a real call's 402: calls need funds until a call goes through, across a restart, for this key only", async () => {
+  St.forgetAgentPhoneStatus();
+  await St.probeAccount(KEY);
+  ap.calls = () => [402, { detail: "Add funds on the Billing page to place outbound calls" }];
+  const a = await ask("call me at +15550109999", "place_call", { to: "+15550109999", purpose: "Say hi.", greeting: "Hi!" });
+  await answer(a, "once", "It didn't go.");
+  let v = St.agentPhoneView("x");
+  assert.equal(v.calls, "needs funds");
+  assert.equal(v.callsWords, "Calls need funds: add funds in AgentPhone → Billing.");
+  // A probe after it (Check) doesn't clear it: only a call that goes does.
+  await St.probeAccount(KEY);
+  assert.equal(St.agentPhoneView("x").calls, "needs funds");
+  // Bops restarts: the server's memory is gone, the outcome on disk stays.
+  const file = join(work, ".data", "agentphone-calls.json");
+  const kept = JSON.parse(readFileSync(file, "utf8"));
+  assert.equal(kept.state, "needs funds");
+  assert.ok(!readFileSync(file, "utf8").includes(KEY), "never the key on disk");
+  for (const k of Object.keys(globalThis.bopsAgentPhoneStatus)) delete globalThis.bopsAgentPhoneStatus[k];
+  await St.probeAccount(KEY);
+  assert.equal(St.agentPhoneView("x").calls, "needs funds", "still after a restart");
+  // Another key (another account) doesn't inherit it.
+  process.env.AGENTPHONE_API_KEY = "fake-other-key";
+  for (const k of Object.keys(globalThis.bopsAgentPhoneStatus)) delete globalThis.bopsAgentPhoneStatus[k];
+  await St.probeAccount(KEY);
+  assert.equal(St.agentPhoneView("x").calls, "funds not checked", "a new key starts again");
+  process.env.AGENTPHONE_API_KEY = KEY;
+  for (const k of Object.keys(globalThis.bopsAgentPhoneStatus)) delete globalThis.bopsAgentPhoneStatus[k];
+  await St.probeAccount(KEY);
+  assert.equal(St.agentPhoneView("x").calls, "needs funds");
+  // A call that goes clears it, on disk too.
+  ap.calls = () => [201, { id: "call_1", agentId: "agt_1", toNumber: "+15550109999", status: "in-progress" }];
+  ap.call = { id: "call_1", status: "completed", transcript: [] };
+  const b = await ask("call me at +15550109999", "place_call", { to: "+15550109999", purpose: "Say hi.", greeting: "Hi!" });
+  await answer(b, "once", "Calling now.");
+  v = St.agentPhoneView("x");
+  assert.equal(v.calls, "working");
+  assert.equal(JSON.parse(readFileSync(file, "utf8")).state, "working");
+});
+
+await check("the bot's number: one rule for Services, Email and phone, and the profile; your AgentPhone number when Bops set up none", async () => {
+  const N = await import(`${rootUrl}/lib/server/bot-number.ts`);
+  const L = await import(`${rootUrl}/lib/bot-number.ts`);
+  const Phone = await import(`${rootUrl}/app/api/phone/route.ts`);
+  const Acct = await import(`${rootUrl}/app/api/account/route.ts`);
+  St.forgetAgentPhoneStatus();
+  ap.numbers = [{ id: "num_1", phoneNumber: "+15550102000", agentId: "agt_1", outboundSms: "enabled" }];
+  S.update((s) => {
+    s.workspaces = [{ id: "ws_main", name: "Main", createdAt: 1 }, { id: "ws_two", name: "Side", createdAt: 2 }];
+    for (const b of s.bots) if (b.isMain) b.workspaceId = "ws_main";
+  });
+  // /api/phone (Email and phone; the bot's profile and settings page read it): the read-only probe first, then the number.
+  ap.seen.length = 0;
+  const phone = await (await Phone.GET(new Request("http://127.0.0.1:3210/api/phone"))).json();
+  assert.ok(ap.seen.every((x) => x.method === "GET"), "only reads");
+  assert.equal(posts("/v1/calls").length + posts("/v1/messages").length, 0);
+  const main = phone.workspaces.find((w) => w.id === "ws_main");
+  assert.deepEqual(main.number, { phone: "+1 (555) 010-2000", whose: "agentphone", incoming: false });
+  assert.equal(phone.workspaces.find((w) => w.id === "ws_two").number, null, "only the default workspace gets your own number");
+  // Settings, Services: the same number, said whose.
+  const services = { ...St.agentPhoneView("x"), botNumber: N.botNumbers().ws_main };
+  assert.deepEqual(services.botNumber, main.number);
+  assert.equal(services.number, main.number.phone);
+  // How bots reach you (/api/account): the same.
+  const acct = await (await Acct.GET(new Request("http://127.0.0.1:3210/api/account"))).json();
+  const r = acct.reach.find((w) => w.id === "ws_main");
+  assert.equal(r.line.phone, main.number.phone);
+  assert.equal(r.line.whose, "agentphone");
+  assert.equal(L.numberSentence(main.number, "Boppy"), "Boppy calls and texts from +1 (555) 010-2000 (your AgentPhone number). Texts to it reach Boppy once the public address is set in Settings → Services.");
+  // With the public address set, texts reach it.
+  process.env.BOPS_AGENTPHONE_HOOK_URL = "https://hooks.example.test/agentphone";
+  assert.equal(L.numberSentence(N.botNumbers().ws_main, "Boppy"), "Text or call Boppy at +1 (555) 010-2000 (your AgentPhone number)");
+  delete process.env.BOPS_AGENTPHONE_HOOK_URL;
+  // A number Bops set up wins, everywhere, and says so.
+  S.update((s) => {
+    s.workspaces[0].line = { phone: "+14155550199", numberId: "nw", agentId: "aw", type: "sms", scope: "sub", at: 1 };
+  });
+  const again = await (await Phone.GET(new Request("http://127.0.0.1:3210/api/phone"))).json();
+  assert.deepEqual(again.workspaces.find((w) => w.id === "ws_main").number, { phone: "+1 (415) 555-0199", whose: "bops" });
+  assert.deepEqual(N.botNumbers().ws_main, { phone: "+1 (415) 555-0199", whose: "bops" });
+  assert.equal(L.numberSentence(N.botNumbers().ws_main, "Boppy"), "Text or call Boppy at +1 (415) 555-0199 (a number Bops set up)");
+  // No key: no AgentPhone number.
+  S.update((s) => void delete s.workspaces[0].line);
+  const keep = process.env.AGENTPHONE_API_KEY;
+  delete process.env.AGENTPHONE_API_KEY;
+  assert.equal(N.botNumbers().ws_main, null);
+  process.env.AGENTPHONE_API_KEY = keep;
+  // The rule itself.
+  assert.deepEqual(L.workspaceNumber({ line: null, mainPhone: "+15550100000", own: "+15550102000", defaultWorkspace: true }), { phone: "+1 (555) 010-0000", whose: "bops" });
+  assert.equal(L.workspaceNumber({ own: null, defaultWorkspace: true }), null);
 });
 
 await check("never a request to the real AgentPhone, and the key only to the stub", () => {

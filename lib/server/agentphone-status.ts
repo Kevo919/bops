@@ -1,16 +1,31 @@
 /**
  * How the user's own AgentPhone account stands for calls and texts Bops places for them (agentphone-outbound.ts), in
- * one small place both the chat tools and Settings, Services read. Nothing here reaches the network: it only keeps
- * what the last read-only probe (GET /v1/numbers and /v1/agents, on Check) and the last real call or text said.
+ * one small place both the chat tools and Settings, Services read. Nothing here places a call or sends a text: it only
+ * keeps what the last read-only probe (GET /v1/numbers and /v1/agents, on Check) and the last real call or text said.
  *
- * Kept in this server's memory only (a restart forgets it, and the next Check or call says again). Never a key.
+ * Funds: AgentPhone has no read-only balance (its skills.md: "/v1/usage reports activity counts, not dollar costs";
+ * the balance lives on its dashboard's Billing page), so a key that works says "funds not checked", never "ready".
+ * The last real call's outcome is kept on disk (.data/agentphone-calls.json, with a hash of the key it was for, never
+ * the key): after a 402, calls show "need funds" until a call goes through, across restarts. Probes and texts are in
+ * this server's memory only (the next Check says again).
  */
 
-export type CallsReady = "ready" | "needs funds" | "working" | "unknown";
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import type { BotNumber } from "../bot-number";
+import { cloudOn } from "./cloud";
+import { dataRoot } from "./user-paths";
+
+export type CallsReady = "funds not checked" | "needs funds" | "working" | "unknown";
 export type TextsReady = "enabled" | "activating" | "registration needed" | "working" | "unknown";
 
 /** The plain words for each state, the same in the chat and in Settings. Never AgentPhone's own words. */
 export const FUNDS_WORDS = "Add funds in AgentPhone → Billing to make calls.";
+/** Settings, Services after a 402, until a call goes through. */
+export const NEEDS_FUNDS_WORDS = "Calls need funds: add funds in AgentPhone → Billing.";
+/** Settings, Services with a key that works: AgentPhone can't be asked about money without a call. */
+export const FUNDS_NOT_CHECKED_WORDS = "Key works; funds not checked. If a call fails, add funds in AgentPhone → Billing.";
 export const TEN_DLC_WORDS = "Texting needs AgentPhone's 10DLC registration: agentphone.ai/register";
 export const TEN_DLC_LINK = "https://agentphone.ai/register";
 
@@ -30,27 +45,73 @@ export type AgentPhoneProbe = {
   problem?: string;
 };
 
-type Seen = { probe?: AgentPhoneProbe; calls?: { state: CallsReady; at: number }; texts?: { state: TextsReady; at: number } };
+type CallsSeen = { state: CallsReady; at: number };
+type Seen = { probe?: AgentPhoneProbe; calls?: CallsSeen; texts?: { state: TextsReady; at: number } };
 const g = globalThis as unknown as { bopsAgentPhoneStatus?: Seen };
 const seen: Seen = (g.bopsAgentPhoneStatus ??= {});
 
+/** The last real call's outcome, on disk: { state, at, key: a hash of the key it was for }. */
+const callsFile = () => join(dataRoot(), "agentphone-calls.json");
+const keyHash = (key = process.env.AGENTPHONE_API_KEY) => (key ? createHash("sha256").update(key).digest("hex").slice(0, 16) : "");
+function lastCall(): CallsSeen | undefined {
+  // Read each time (a few bytes, only for Settings, Services): what the last call said, even from before a restart.
+  try {
+    const j = JSON.parse(readFileSync(callsFile(), "utf8")) as { state?: unknown; at?: unknown; key?: unknown };
+    // Only for the key Bops runs with now: a new key (another account) starts again.
+    return (j.state === "needs funds" || j.state === "working") && typeof j.at === "number" && j.key === keyHash() ? { state: j.state, at: j.at } : undefined;
+  } catch {
+    // No file (no call yet, or it couldn't be written): this server's memory.
+    return seen.calls;
+  }
+}
+
 export const noteProbe = (p: AgentPhoneProbe) => void (seen.probe = p);
-export const noteCalls = (state: CallsReady) => void (seen.calls = { state, at: Date.now() });
+/** A real call's outcome: a 402 ("needs funds") or one that went ("working"). Kept until the next real call. */
+export const noteCalls = (state: CallsReady) => {
+  seen.calls = { state, at: Date.now() };
+  try {
+    mkdirSync(dataRoot(), { recursive: true });
+    writeFileSync(callsFile(), JSON.stringify({ state, at: seen.calls.at, key: keyHash() }));
+  } catch {}
+};
 export const noteTexts = (state: TextsReady) => void (seen.texts = { state, at: Date.now() });
 export const lastProbe = () => seen.probe;
 
-/** For tests: forget everything. */
+/** For tests: forget everything (the call outcome on disk too). */
 export const forgetAgentPhoneStatus = () => {
   delete seen.probe;
   delete seen.calls;
   delete seen.texts;
+  try {
+    rmSync(callsFile(), { force: true });
+  } catch {}
 };
+
+/**
+ * The user's own AgentPhone number, found with the key Bops runs with (local mode only: Bops Cloud's numbers are its
+ * own), as +1 (555) 010-2000; null when there's no key or the last probe found none. Reads nothing new.
+ */
+export function ownAgentPhoneNumber(): string | null {
+  if (cloudOn() || !process.env.AGENTPHONE_API_KEY?.trim()) return null;
+  const p = seen.probe;
+  return p && !p.problem && p.number ? p.number : null;
+}
+
+/** The read-only probe again if it's older than five minutes (or never ran): GET /v1/numbers and /v1/agents only. */
+export async function probeIfStale(key = process.env.AGENTPHONE_API_KEY?.trim(), fetcher: typeof fetch = fetch) {
+  if (!key || cloudOn()) return;
+  const p = seen.probe;
+  if (!p || Date.now() - p.at > 5 * 60_000) await probeAccount(key, fetcher).catch(() => null);
+}
 
 export type AgentPhoneView = {
   /** The key as Settings shows it ("ends in P1a2"), never more. */
   key: string;
+  /** The number the AgentPhone account calls and texts from (the probe's). */
   number: string | null;
   agent: string | null;
+  /** The bot's number, as every other screen shows it (lib/bot-number.ts), when services.ts has it. */
+  botNumber?: BotNumber | null;
   calls: CallsReady;
   callsWords: string;
   texts: TextsReady;
@@ -62,24 +123,24 @@ export type AgentPhoneView = {
 
 /**
  * What Settings, Services shows under AgentPhone: what the last probe found, with what the last real call or text
- * said on top (a 402 means calls need funds whatever the probe saw; a sent text means texting works).
+ * said on top. A 402 means calls need funds whatever the probe saw, until a call goes through; a key that works with a
+ * number and an agent says funds weren't checked (AgentPhone has no balance to read), never "ready".
  */
 export function agentPhoneView(key: string): AgentPhoneView {
   const p = seen.probe;
   const found = !!p && !p.problem && !!p.number && !!p.agent;
-  let calls: CallsReady = seen.calls?.state ?? (found ? "ready" : "unknown");
-  // A probe newer than a refused call doesn't clear "needs funds": only a call that went does.
-  if (seen.calls?.state !== "needs funds" && seen.calls?.state !== "working" && found) calls = "ready";
+  const call = lastCall();
+  const calls: CallsReady = call?.state === "needs funds" || call?.state === "working" ? call.state : found ? "funds not checked" : "unknown";
   const fromProbe: TextsReady = !p?.outboundSms ? "unknown" : p.outboundSms === "enabled" ? "enabled" : p.outboundSms === "activating" ? "activating" : "registration needed";
   // The newer of the probe and the last text says how texting stands.
   const texts: TextsReady = seen.texts && (!p || seen.texts.at >= p.at) ? seen.texts.state : fromProbe;
   const callsWords =
     calls === "needs funds"
-      ? FUNDS_WORDS
+      ? NEEDS_FUNDS_WORDS
       : calls === "working"
-        ? "Calls work: the last one went through."
-        : calls === "ready"
-          ? "Ready to call: a number and an agent were found. Bops asks you before every call."
+        ? "Calls work: the last one went through. Bops asks you before every call."
+        : calls === "funds not checked"
+          ? FUNDS_NOT_CHECKED_WORDS
           : p?.problem
             ? p.problem
             : !p
