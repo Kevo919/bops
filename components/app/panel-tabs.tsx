@@ -264,7 +264,7 @@ function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState
         ? b && seesBrowser(state, b)
           ? `${b.name}'s browser`
           : b?.runsOn === "mac"
-          ? computerWords("Owner's Mac")
+          ? "Owner's Mac"
           : "Owner's computer"
         : host && host.id !== b?.id
         ? `${host.name}'s computer`

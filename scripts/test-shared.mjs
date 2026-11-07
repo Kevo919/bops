@@ -936,7 +936,8 @@ await check("nothing in a shared workspace's open chat says the owner's as the v
   assert.match(ownChat, /data-tip="Also sent to dana@acme\.test, as a reply to your email"/);
   assert.match(ot, /You emailed Dana's Boppy/);
   assert.match(ot, /needs you to sign in/);
-  assert.match(ownChat, /title="On your Mac"/);
+  // (Before /api/config answers, this computer's words are neutral: components/app/computer-words.ts, 274073e. The owner's Mac above keeps its word.)
+  assert.match(ownChat, /title="On your computer"/);
   assert.match(ownChat, /data-tip="Needs you"/);
   assert.match(ot, /Dana's Boppy needs your OK to go on/);
   assert.match(ot, /Dana's Boppy needs you to approve it on your phone/);
@@ -945,8 +946,8 @@ await check("nothing in a shared workspace's open chat says the owner's as the v
   const ownSheet = (id) => text(sheetOf(mine, id));
   assert.match(ownSheet("s1"), /Dana's Boppy is waiting on you/);
   assert.match(ownSheet("sign"), /Dana's Boppy needs you to sign in/);
-  assert.match(ownSheet("mac"), /on your Mac ·/);
-  assert.match(ownSheet("where"), /It starts as soon as you pick\. Your messages here go along with it\. Your Mac/);
+  assert.match(ownSheet("mac"), /on your computer ·/);
+  assert.match(ownSheet("where"), /It starts as soon as you pick\. Your messages here go along with it\. Your computer/);
   assert.match(ownSheet("where"), /Waiting for you for /);
   const ownGroup = text(renderToStaticMarkup(h(ChatView, chatProps({ ...mine, messages: [] }, "g1"))));
   assert.match(ownGroup, /Dana's Boppy, Ava and you/);
@@ -1370,6 +1371,9 @@ await check("the viewer's own Mac is never a shared workspace's: no Your Mac tab
   assert.ok(!/Mirroring|This is my computer|Real screen|scale=/.test(view), text(view).slice(0, 400));
   const onMac = viewState({ ...own(), host: "mac" }, { ...listed, role: "member", wsId: WS }, { ...c, state: { ...c.state, bots: [{ ...c.state.bots[0], runsOn: "mac" }] } }, {});
   assert.match(text(renderToStaticMarkup(h(ComputerView, { state: onMac, bot: onMac.bots[0], display: 100, onDisplay: noop, follow: { on: true, auto: noop, resume: noop }, mode: "panel" }))), /Dana's Boppy works on the owner's Mac\./);
+  // Its tab says so too: the owner's Mac keeps its word, which this window can't swap for its own (useOwnComputerWords).
+  const macTab = renderToStaticMarkup(h(TabBar, { state: onMac, tabs: [{ id: "tab_c", kind: "computer", botId: "boppy" }], active: "chat", chatBotId: "boppy", onPick: noop, onClose: noop, onNew: noop }));
+  assert.match(macTab, />Owner&#x27;s Mac</, text(macTab));
   // Nor does a stream or a screenshot go while it's open, whatever draws one (an EventSource or an image never passes through fetch).
   viewOnly("View only");
   for (const url of ["/api/mirror?bot=boppy&display=100", "/api/screen?bot=boppy&display=100&scale=0.3", "/api/screen?bot=boppy&mac=1&scale=0.4"]) {
@@ -1385,7 +1389,7 @@ await check("the viewer's own Mac is never a shared workspace's: no Your Mac tab
   assert.ok(!/this Mac/.test(text(details(st))), text(details(st)));
   assert.match(text(details(st)), /Dana's Boppy's cloud computer/);
   assert.match(text(renderToStaticMarkup(h(ComputerSummary, { state: onMac, bot: onMac.bots[0] }))), /Works on the owner's Mac/);
-  assert.match(text(renderToStaticMarkup(h(ComputerSummary, { state: { ...own(), host: "mac" }, bot: own().bots[0] }))), /Browsers on this Mac/, "the user's own, on their Mac");
+  assert.match(text(renderToStaticMarkup(h(ComputerSummary, { state: { ...own(), host: "mac" }, bot: own().bots[0] }))), /Browsers on this computer/, "the user's own, on their Mac (neutral words before /api/config)");
   // A bot sharing the owner's main bot's computer, the viewer's own app in the cloud: no Shared or Its own to pick.
   const c2 = cloudState();
   c2.state.bots = [...c2.state.bots, { id: "ava", name: "Ava", role: "Research", color: "#654321", isMain: false, workspaceId: "ws_main", computerStatus: "none" }];
@@ -1414,7 +1418,7 @@ await check("nor anywhere else: no full width Your Mac carried over or kept capt
     assert.equal(html, "", text(html).slice(0, 300));
   }
   const mine = { ...own(), host: "mac", watches: c.state.watches };
-  assert.match(text(renderToStaticMarkup(h(MacComputer, { state: mine, mode: "focus", onBack: noop, onOpenThread: noop }))), /Your Mac/, "the user's own: as always");
+  assert.match(text(renderToStaticMarkup(h(MacComputer, { state: mine, mode: "focus", onBack: noop, onOpenThread: noop }))), /Your computer/, "the user's own: as always (neutral words before /api/config)");
   // (As the window has it: full width on the Mac goes when a shared workspace opens, and the hidden one isn't kept.)
   const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
   assert.match(app, /if \(state\.shared && macFocus\) \{\n\s*setMacFocus\(false\);/);
@@ -1433,7 +1437,7 @@ await check("nor anywhere else: no full width Your Mac carried over or kept capt
   assert.match(list, /Dana's Helper Works on Dana's Boppy's computer/);
   const onMac = viewState({ ...own(), host: "mac" }, { ...listed, role: "member", wsId: WS }, { ...c, state: { ...c.state, bots: [{ ...c.state.bots[0], runsOn: "mac" }] } }, {});
   assert.match(text(renderToStaticMarkup(h(BotComputersList, { state: onMac, keys: null, padded: false }))), /Dana's Boppy Works on the owner's Mac/);
-  assert.match(text(renderToStaticMarkup(h(BotComputersList, { state: { ...own(), host: "mac" }, keys: null, padded: false }))), /Your bots' computers Sam's Boppy Uses this Mac/, "the user's own: as always");
+  assert.match(text(renderToStaticMarkup(h(BotComputersList, { state: { ...own(), host: "mac" }, keys: null, padded: false }))), /Your bots' computers Sam's Boppy Uses this computer/, "the user's own: as always (neutral words before /api/config)");
   assert.match(readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8"), /<BotComputers state=\{state\} padded=\{!selfHosted\} askKeys=\{!selfHosted && !state\.shared\} \/>/, "nor asked about the owner's computers' keys");
   // The tabs: a helper's computer tab is its main bot's, as its Details say.
   const helper = st.bots.find((b) => b.id === "helper");
@@ -1477,20 +1481,21 @@ await check("the owner's messages, thread replies and calls come in on the left,
   const bubble = (html, words) => html.slice(Math.max(0, html.lastIndexOf("<div", html.indexOf(words) - 1) - 1200), html.indexOf(words) + words.length);
   const asked = bubble(chat, "Dana asked for leads");
   assert.match(asked, /items-start self-start/);
-  assert.ok(!/bg-ink[^"]*text-white[^"]*">Dana asked for leads/.test(chat), "not the viewer's own bubble");
+  // The outgoing bubble's fill is the look palette's tokens (the dark look turns it), never a raw bg-ink/text-white.
+  assert.ok(!/bg-\[color:var\(--hb-0a0a0a\)\][^"]*text-\[color:var\(--bops-on-fill\)\][^"]*">Dana asked for leads/.test(chat), "not the viewer's own bubble");
   assert.match(text(asked), /Owner Dana asked for leads/);
   const call = bubble(chat, "Call ended");
   assert.match(text(call), /Owner .*40s · Call ended/);
   assert.ok(!/self-end[^"]*"[^>]*>(?:(?!<\/div>).)*Call ended/s.test(chat), "the call too");
   const sheet = renderToStaticMarkup(h(ThreadSheet, { state, session: state.sessions[0], onClose: noop, onShowComputer: noop }));
   assert.match(text(sheet), /Owner The first one/);
-  assert.ok(!/self-end[^"]*bg-ink[^"]*">The first one/.test(sheet), "the owner's reply in a thread too");
+  assert.ok(!/self-end[^"]*bg-\[color:var\(--hb-0a0a0a\)\][^"]*">The first one/.test(sheet), "the owner's reply in a thread too");
   // The user's own: theirs, on the right, as always.
   const mine = { ...state, shared: undefined };
   const own_ = renderToStaticMarkup(h(ChatView, chatProps(mine, "bot:boppy")));
-  assert.match(own_, /bg-ink text-white[^"]*">Dana asked for leads/);
+  assert.match(own_, /bg-\[color:var\(--hb-0a0a0a\)\] text-\[color:var\(--bops-on-fill\)\][^"]*">Dana asked for leads/);
   assert.ok(!/>Owner</.test(own_));
-  assert.match(renderToStaticMarkup(h(ThreadSheet, { state: mine, session: mine.sessions[0], onClose: noop, onShowComputer: noop })), /self-end[^"]*bg-ink[^"]*">The first one/);
+  assert.match(renderToStaticMarkup(h(ThreadSheet, { state: mine, session: mine.sessions[0], onClose: noop, onShowComputer: noop })), /self-end[^"]*bg-\[color:var\(--hb-0a0a0a\)\][^"]*">The first one/);
 });
 
 await check("the owner's Boppy's profile never shows the viewer's own logins, keys or channels as its own, though the viewer's first bot is \"boppy\" too", async () => {
@@ -1733,7 +1738,7 @@ await check("Write: what the viewer did shows as theirs at once, says how it sta
   assert.deepEqual([mine.role, mine.member, mine.memberSend], ["user", { ...sam, ref: "key_chat_0001" }, { state: "waiting", key: "key_chat_0001" }]);
   const html = renderToStaticMarkup(h(ChatView, chatProps(shown(), "bot:boppy")));
   assert.match(html, /Waiting for the owner&#x27;s Bops to open\./);
-  assert.match(html, /bg-ink text-white[^"]*">Use the second list/, "on the right, as theirs");
+  assert.match(html, /bg-\[color:var\(--hb-0a0a0a\)\] text-\[color:var\(--bops-on-fill\)\][^"]*">Use the second list/, "on the right, as theirs");
   // Waiting too long: it didn't go, with Try again.
   t += 11 * 60_000;
   const late = shown().messages.find((m) => m.id === "acting_key_chat_0001");
@@ -2040,7 +2045,10 @@ await check("every card kind, for every role: live buttons for whoever may answe
     mac: { owner: "you", memberRead: 7, memberWrite: 5, memberAdminsAct: 5, memberNoComputer: 5, admin: 5, adminOld: 5, adminOldCloud: 5 },
   };
   const card = (html) => {
-    const c = html.slice(html.indexOf("rounded-2xl bg-[#FBFFE0]"));
+    // The card's fill is the look palette's token (app/look-palette.css --hb-fbffe0); it must be there to slice from.
+    const at = html.indexOf("rounded-2xl bg-[color:var(--hb-fbffe0)]");
+    assert.ok(at >= 0, "the card is drawn");
+    const c = html.slice(at);
     const end = [c.indexOf("data-read-only"), c.indexOf('id="thread-reply"')].filter((i) => i > 0);
     return end.length ? c.slice(0, Math.min(...end)) : c;
   };
@@ -2073,7 +2081,10 @@ await check("every card kind, for every role: live buttons for whoever may answe
       const ask = { id: `apr-${k}`, botId: "boppy", chatId: "bot:boppy", resources: ["leads@acme.test"], preview: "to: leads@acme.test", at: 4, ...a };
       const st = view(role, [thread], [ask]);
       const html = renderToStaticMarkup(h(ThreadSheet, { state: st, session: st.sessions[0], onClose: noop, onShowComputer: noop }));
-      const c0 = html.slice(html.indexOf("shadow-[0_0_0_1px_#0000000F"));
+      // The sheet's ring is the look palette's token (app/look-palette.css --h-0000000f); it must be there to slice from.
+      const at = html.indexOf("shadow-[0_0_0_1px_var(--h-0000000f)");
+      assert.ok(at >= 0, `${k} ${role}: the sheet is drawn`);
+      const c0 = html.slice(at);
       const c = c0.slice(0, c0.indexOf("data-read-only") > 0 ? c0.indexOf("data-read-only") : undefined);
       const w = askWant[k][role];
       assert.ok(!html.includes('<div class="opacity-60" inert="">'), `${k} ${role}: never switched off`);

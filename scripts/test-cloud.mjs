@@ -273,6 +273,7 @@ const D = await import(`${rootUrl}/lib/server/decide.ts`);
 const V = await import(`${rootUrl}/lib/server/verify.ts`);
 const T = await import(`${rootUrl}/lib/server/cloud-tunnel.ts`);
 const R = await import(`${rootUrl}/lib/server/relay.ts`);
+const KC = await import(`${rootUrl}/lib/server/keychain.ts`);
 const AP = await import(`${rootUrl}/app/api/phone/agentphone/route.ts`);
 const OAI = await import(`${rootUrl}/app/api/phone/openai/route.ts`);
 const EV = await import(`${rootUrl}/app/api/cloud/event/route.ts`);
@@ -419,7 +420,14 @@ await selfHosted({ OPENAI_API_KEY: "sk-self" }, async () => {
   assert.equal(String(sidebandURL(ai, { session_id: "s" })), "wss://api.openai.com/v1/live/sessions/s/attach");
   web.answer = providers;
 });
-await selfHosted({}, () => assert.rejects(ai.responses.create({ model: "x", input: "x" }), /No OpenAI key is set: add OPENAI_API_KEY to \.env\.local\./));
+// Self-hosting with no key: the whole of the client's words (lib/server/openai-client.ts, 0e99189), which say which key
+// powers the chat (this computer's OPENAI_API_KEY, on Windows the .env.local next to the app) and which doesn't (Logins').
+await selfHosted({}, () =>
+  assert.rejects(ai.responses.create({ model: "x", input: "x" }), {
+    message:
+      "No key for the chat's models: the chat reads OPENAI_API_KEY from this computer's environment - on the Windows app, the .env.local file next to the app (like C:\\Users\\<you>\\bops\\.env.local), then restart Bops. An OpenAI key saved in Logins is the vault's, for bots' API calls; it doesn't power the chat.",
+  }),
+);
 signOut();
 await assert.rejects(ai.responses.create({ model: "x", input: "x" }), /Sign in with Orgo first\./);
 await signIn();
@@ -1890,7 +1898,9 @@ R.relayAfterSignIn();
 await until(() => S.getState().relay?.on, "routing on by default", 15_000);
 assert.equal(S.getState().relay.deviceId, "dev_1");
 assert.equal(S.getState().relay.turnedOff, undefined);
-assert.deepEqual(JSON.parse(readFileSync(join(scratch, "keychain", encodeURIComponent("orgo-relay:u1")), "utf8")), { deviceId: "dev_1", code: "code_dev_1" }, "the pairing code in the Keychain");
+// Read back through the app's own secret store (lib/server/keychain.ts): the Keychain stand-in on a Mac, the encrypted
+// file (secret-file.ts) on Windows and Linux, where there's no `security` for the stand-in to answer for.
+assert.deepEqual(JSON.parse((await KC.getSecret("orgo-relay:u1")) ?? "null"), { deviceId: "dev_1", code: "code_dev_1" }, "the pairing code in this computer's secret store");
 await until(async () => (await statusNow()).running, "the relay running", 15_000);
 let rs = await statusNow();
 assert.deepEqual([rs.available, rs.on], [true, true]);
