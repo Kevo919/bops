@@ -281,7 +281,8 @@ try {
   });
 
   test("LLMs: the shipped config/llms.yaml reads clean, and its OpenRouter examples parse when turned on", () => {
-    const shipped = readFileSync(new URL("../config/llms.yaml", import.meta.url), "utf8");
+    // The comment-unwrapping fixture below uses LF; Git may check this file out with CRLF on Windows.
+    const shipped = readFileSync(new URL("../config/llms.yaml", import.meta.url), "utf8").replace(/\r\n/g, "\n");
     const problems = [];
     assert.ok(llms.clean(require("yaml").parse(shipped), problems).length >= 1);
     assert.deepEqual(problems, []);
