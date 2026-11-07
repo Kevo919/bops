@@ -11,12 +11,11 @@ import { getState } from "./store";
  */
 export function botNumbers(state: AppState = getState()): Record<string, BotNumber | null> {
   const own = ownAgentPhoneNumber();
-  const incoming = !!process.env.BOPS_AGENTPHONE_HOOK_URL?.trim();
   const out: Record<string, BotNumber | null> = {};
   const list = state.workspaces?.length ? state.workspaces : [{ id: MAIN_WORKSPACE, line: undefined }];
   for (const w of list) {
     const main = (state.bots ?? []).find((b) => b.isMain && workspaceOf(b) === w.id);
-    out[w.id] = workspaceNumber({ line: w.line, mainPhone: main?.phone && main.phoneLine ? main.phone : null, own, defaultWorkspace: w.id === MAIN_WORKSPACE, incoming });
+    out[w.id] = workspaceNumber({ line: w.line, mainPhone: main?.phone && main.phoneLine ? main.phone : null, own, defaultWorkspace: w.id === MAIN_WORKSPACE });
   }
   return out;
 }

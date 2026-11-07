@@ -1094,10 +1094,13 @@ function Reach({ info }: { info: AccountInfo }) {
                 {w.line ? (
                   <span className="flex items-center gap-1.5 text-[12.5px] text-[color:var(--ht-3a3a38)]" data-bot-number={w.line.whose ?? "bops"}>
                     <span className="text-[color:var(--ht-9a9a98)]">
-                      {w.line.whose === "agentphone" && !w.line.incoming ? `${w.line.main ?? "The main bot"} calls and texts from` : `Text or call ${w.line.main ?? "the main bot"} at`}
+                      {w.line.whose === "agentphone" ? `${w.line.main ?? "The main bot"} can call and text from` : `Text or call ${w.line.main ?? "the main bot"} at`}
                     </span>
                     <Copy text={w.line.phone} />
-                    <span className="text-[color:var(--ht-9a9a98)]">({WHOSE_WORDS[w.line.whose ?? "bops"]})</span>
+                    {/* Your own AgentPhone number never takes texts for the bot (lib/bot-number.ts numberSentence). */}
+                    <span className="text-[color:var(--ht-9a9a98)]">
+                      {w.line.whose === "agentphone" ? `(${WHOSE_WORDS.agentphone}; texts to it don't reach ${w.line.main ?? "the main bot"} yet)` : `(${WHOSE_WORDS.bops})`}
+                    </span>
                   </span>
                 ) : (
                   <span className="text-[12.5px] text-[color:var(--ht-9a9a98)]">No number yet</span>

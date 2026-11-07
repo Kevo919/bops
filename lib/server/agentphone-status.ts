@@ -11,7 +11,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BotNumber } from "../bot-number";
 import { cloudOn } from "./cloud";
@@ -69,10 +69,17 @@ export const noteProbe = (p: AgentPhoneProbe) => void (seen.probe = p);
 /** A real call's outcome: a 402 ("needs funds") or one that went ("working"). Kept until the next real call. */
 export const noteCalls = (state: CallsReady) => {
   seen.calls = { state, at: Date.now() };
+  // Owner-only and whole (a temp file, then renamed over it), as the other .data files are written.
+  const file = callsFile();
+  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
   try {
-    mkdirSync(dataRoot(), { recursive: true });
-    writeFileSync(callsFile(), JSON.stringify({ state, at: seen.calls.at, key: keyHash() }));
-  } catch {}
+    mkdirSync(/*turbopackIgnore: true*/ dataRoot(), { recursive: true });
+    writeFileSync(/*turbopackIgnore: true*/ tmp, JSON.stringify({ state, at: seen.calls.at, key: keyHash() }), { mode: 0o600 });
+    renameSync(/*turbopackIgnore: true*/ tmp, file);
+  } catch {
+  } finally {
+    rmSync(/*turbopackIgnore: true*/ tmp, { force: true });
+  }
 };
 export const noteTexts = (state: TextsReady) => void (seen.texts = { state, at: Date.now() });
 export const lastProbe = () => seen.probe;

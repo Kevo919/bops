@@ -15,11 +15,6 @@ export type BotNumber = {
   /** As people read it: +1 (555) 010-2000. */
   phone: string;
   whose: BotNumberWhose;
-  /**
-   * Your AgentPhone number only: whether texts sent to it reach the bot here (the public address is set in Settings,
-   * Services). Calls and texts the bot places go out from it either way.
-   */
-  incoming?: boolean;
 };
 
 export const WHOSE_WORDS: Record<BotNumberWhose, string> = {
@@ -34,10 +29,10 @@ export const prettyNumber = (n: string) => {
 };
 
 /** The rule above. `own` is the AgentPhone number found with the key (null when none was, or there's no key). */
-export function workspaceNumber(o: { line?: { phone: string } | null; mainPhone?: string | null; own?: string | null; defaultWorkspace: boolean; incoming?: boolean }): BotNumber | null {
+export function workspaceNumber(o: { line?: { phone: string } | null; mainPhone?: string | null; own?: string | null; defaultWorkspace: boolean }): BotNumber | null {
   if (o.line?.phone) return { phone: prettyNumber(o.line.phone), whose: "bops" };
   if (o.mainPhone) return { phone: prettyNumber(o.mainPhone), whose: "bops" };
-  if (o.own && o.defaultWorkspace) return { phone: prettyNumber(o.own), whose: "agentphone", incoming: !!o.incoming };
+  if (o.own && o.defaultWorkspace) return { phone: prettyNumber(o.own), whose: "agentphone" };
   return null;
 }
 
@@ -45,11 +40,12 @@ export function workspaceNumber(o: { line?: { phone: string } | null; mainPhone?
 export const numberWithWhose = (n: BotNumber) => `${n.phone}, ${WHOSE_WORDS[n.whose]}`;
 
 /**
- * How a screen says where to reach the bot (`who`, its name): "Text or call Boppy at +1 (555) 010-2000 (your
- * AgentPhone number)". Your AgentPhone number without the public address: Boppy calls and texts from it, and texts
- * to it reach Boppy once the address is set.
+ * How a screen says where to reach the bot (`who`, its name). A number Bops set up: "Text or call Boppy at +1 (555)
+ * 010-2000 (a number Bops set up)". Your own AgentPhone number is never "text Boppy at": the bot calls and texts from
+ * it, but nothing connects texts to it with Bops (only a workspace line Bops sets up does, phone.ts
+ * assignWorkspaceLine, and Bops refuses webhooks it didn't make), whatever public address is saved.
  */
 export function numberSentence(n: BotNumber, who: string) {
-  if (n.whose === "agentphone" && !n.incoming) return `${who} calls and texts from ${n.phone} (${WHOSE_WORDS.agentphone}). Texts to it reach ${who} once the public address is set in Settings → Services.`;
-  return `Text or call ${who} at ${n.phone} (${WHOSE_WORDS[n.whose]})`;
+  if (n.whose === "agentphone") return `Your AgentPhone number: ${n.phone}. ${who} can call and text from it; texts to it don't reach ${who} yet.`;
+  return `Text or call ${who} at ${n.phone} (${WHOSE_WORDS.bops})`;
 }

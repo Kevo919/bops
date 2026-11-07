@@ -65,7 +65,7 @@ export async function GET() {
       return {
         id: w.id,
         name: w.name,
-        line: line ? { phone: prettyPhone(line.phone), imessage: line.type === "imessage", main: bots.find((b) => b.isMain)?.name, whose: "bops" as const } : own ? { phone: own.phone, imessage: false, main: bots.find((b) => b.isMain)?.name, whose: "agentphone" as const, incoming: own.incoming } : undefined,
+        line: line ? { phone: prettyPhone(line.phone), imessage: line.type === "imessage", main: bots.find((b) => b.isMain)?.name, whose: "bops" as const } : own ? { phone: own.phone, imessage: false, main: bots.find((b) => b.isMain)?.name, whose: "agentphone" as const } : undefined,
         bots: bots
           .sort((a, b) => Number(b.isMain) - Number(a.isMain))
           .map((b) => ({ id: b.id, name: b.name, color: b.color, isMain: b.isMain, email: b.email, phone: b.phone ? prettyPhone(b.phone) : undefined })),

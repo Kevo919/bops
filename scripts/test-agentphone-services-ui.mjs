@@ -149,6 +149,8 @@ const server = spawn(process.execPath, [join(root, "node_modules", "next", "dist
     BOPS_TELEMETRY: "0",
     AGENTPHONE_API_KEY: KEY,
     BOPS_AGENTPHONE_BASE: apBase,
+    // The public address saved: Kevin's own number still never takes texts for Boppy (only a line Bops sets up does).
+    BOPS_AGENTPHONE_HOOK_URL: "https://hooks.example.test/agentphone",
     BOPS_ENV_LOCAL: join(dir, "home", "env.local"),
   },
   stdio: ["ignore", "pipe", "pipe"],
@@ -311,8 +313,10 @@ try {
         const box = page.locator('[data-bot-number="agentphone"]').first();
         await box.waitFor({ state: "visible", timeout: 15000 });
         const text = await box.innerText();
-        assert.match(text, /Boppy calls and texts from \+1 \(555\) 010-2000 \(your AgentPhone number\)/);
-        assert.doesNotMatch(await page.locator("main, body").first().innerText(), /No number yet/);
+        assert.match(text, /Your AgentPhone number: \+1 \(555\) 010-2000\. Boppy can call and text from it; texts to it don't reach Boppy yet\./);
+        const all = await page.locator("main, body").first().innerText();
+        assert.doesNotMatch(all, /No number yet/);
+        assert.doesNotMatch(all, /text (or call )?Boppy at/i, "never 'text Boppy at' your own number, address saved or not");
         await noSideways(page, `${tag} email and phone`);
         await shot(page, `agentphone-email-phone-${tag}`);
       });
@@ -324,6 +328,8 @@ try {
         assert.match(text, /mobile · your AgentPhone number/);
         assert.match(text, /\+1 \(555\) 010-2000/);
         assert.doesNotMatch(text, /No number yet/);
+        assert.match(text, /Boppy can call and text from it; texts to it don't reach Boppy yet\./);
+        assert.doesNotMatch(text, /text (or call )?Boppy at/i);
         assert.ok(await page.getByRole("button", { name: "Call +1 (555) 010-2000" }).first().isVisible(), "Call it");
         await noSideways(page, `${tag} profile`);
         await shot(page, `agentphone-profile-${tag}`);

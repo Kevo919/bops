@@ -560,8 +560,8 @@ function PhoneBody({ state, bot: b, set, reach, number: shown, today, older, onO
           value={number}
           empty={W.noNumber}
         />
-        {/* Your AgentPhone number, before texts to it can reach the bot: it says so (lib/bot-number.ts). */}
-        {shown?.whose === "agentphone" && !shown.incoming && <span className="block px-4 pb-[11px] text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]" data-bot-number="agentphone">{numberSentence(shown, b.name)}</span>}
+        {/* Your AgentPhone number: the bot calls and texts from it, texts to it don't reach it (lib/bot-number.ts). */}
+        {shown?.whose === "agentphone" && <span className="block px-4 pb-[11px] text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]" data-bot-number="agentphone">{numberSentence(shown, b.name)}</span>}
         <LineLink key={reach} phone={reach} className="px-4 pb-[11px]" />
       </div>
       <VoicePicker state={state} bot={b} set={set} number={number} agentId={line && b.isMain ? line.agentId : b.phoneLine?.agentId} />

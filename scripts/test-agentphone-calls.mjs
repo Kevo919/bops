@@ -11,7 +11,7 @@
 // throwaway folder: nothing reaches a real service, and a request to api.agentphone.ai fails the test.
 // Usage: node --conditions=react-server scripts/test-agentphone-calls.mjs
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
@@ -404,6 +404,8 @@ await check("after a real call's 402: calls need funds until a call goes through
   const file = join(work, ".data", "agentphone-calls.json");
   const kept = JSON.parse(readFileSync(file, "utf8"));
   assert.equal(kept.state, "needs funds");
+  if (process.platform !== "win32") assert.equal(statSync(file).mode & 0o777, 0o600, "owner-only");
+  assert.deepEqual(readdirSync(join(work, ".data")).filter((f) => f.startsWith("agentphone-calls") && f.endsWith(".tmp")), [], "no temp file left");
   assert.ok(!readFileSync(file, "utf8").includes(KEY), "never the key on disk");
   for (const k of Object.keys(globalThis.bopsAgentPhoneStatus)) delete globalThis.bopsAgentPhoneStatus[k];
   await St.probeAccount(KEY);
@@ -425,6 +427,7 @@ await check("after a real call's 402: calls need funds until a call goes through
   v = St.agentPhoneView("x");
   assert.equal(v.calls, "working");
   assert.equal(JSON.parse(readFileSync(file, "utf8")).state, "working");
+  if (process.platform !== "win32") assert.equal(statSync(file).mode & 0o777, 0o600, "still owner-only after the rewrite");
 });
 
 await check("the bot's number: one rule for Services, Email and phone, and the profile; your AgentPhone number when Bops set up none", async () => {
@@ -444,7 +447,7 @@ await check("the bot's number: one rule for Services, Email and phone, and the p
   assert.ok(ap.seen.every((x) => x.method === "GET"), "only reads");
   assert.equal(posts("/v1/calls").length + posts("/v1/messages").length, 0);
   const main = phone.workspaces.find((w) => w.id === "ws_main");
-  assert.deepEqual(main.number, { phone: "+1 (555) 010-2000", whose: "agentphone", incoming: false });
+  assert.deepEqual(main.number, { phone: "+1 (555) 010-2000", whose: "agentphone" });
   assert.equal(phone.workspaces.find((w) => w.id === "ws_two").number, null, "only the default workspace gets your own number");
   // Settings, Services: the same number, said whose.
   const services = { ...St.agentPhoneView("x"), botNumber: N.botNumbers().ws_main };
@@ -455,11 +458,22 @@ await check("the bot's number: one rule for Services, Email and phone, and the p
   const r = acct.reach.find((w) => w.id === "ws_main");
   assert.equal(r.line.phone, main.number.phone);
   assert.equal(r.line.whose, "agentphone");
-  assert.equal(L.numberSentence(main.number, "Boppy"), "Boppy calls and texts from +1 (555) 010-2000 (your AgentPhone number). Texts to it reach Boppy once the public address is set in Settings → Services.");
-  // With the public address set, texts reach it.
+  assert.equal(L.numberSentence(main.number, "Boppy"), "Your AgentPhone number: +1 (555) 010-2000. Boppy can call and text from it; texts to it don't reach Boppy yet.");
+  // With the public address saved, your own number still never takes texts for Boppy: no "text Boppy at" anywhere.
   process.env.BOPS_AGENTPHONE_HOOK_URL = "https://hooks.example.test/agentphone";
-  assert.equal(L.numberSentence(N.botNumbers().ws_main, "Boppy"), "Text or call Boppy at +1 (555) 010-2000 (your AgentPhone number)");
-  delete process.env.BOPS_AGENTPHONE_HOOK_URL;
+  try {
+    const withHook = N.botNumbers().ws_main;
+    assert.deepEqual(withHook, { phone: "+1 (555) 010-2000", whose: "agentphone" });
+    const said = L.numberSentence(withHook, "Boppy");
+    assert.doesNotMatch(said, /text (or call )?Boppy at/i);
+    assert.match(said, /texts to it don't reach Boppy yet/);
+    const viaRoute = (await (await Phone.GET(new Request("http://127.0.0.1:3210/api/phone"))).json()).workspaces.find((w) => w.id === "ws_main").number;
+    assert.doesNotMatch(L.numberSentence(viaRoute, "Boppy"), /text (or call )?Boppy at/i);
+    const acctLine = (await (await Acct.GET(new Request("http://127.0.0.1:3210/api/account"))).json()).reach.find((w) => w.id === "ws_main").line;
+    assert.deepEqual(Object.keys(acctLine).sort(), ["imessage", "main", "phone", "whose"], "no 'incoming' flag to flip the wording");
+  } finally {
+    delete process.env.BOPS_AGENTPHONE_HOOK_URL;
+  }
   // A number Bops set up wins, everywhere, and says so.
   S.update((s) => {
     s.workspaces[0].line = { phone: "+14155550199", numberId: "nw", agentId: "aw", type: "sms", scope: "sub", at: 1 };

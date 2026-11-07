@@ -287,7 +287,7 @@ function Details({
           value={reach ? prettyPhone(reach) : undefined}
           empty={line && main ? `Text ${main.name} at ${prettyPhone(line.phone)}: ${main.name} passes work to ${b.name}.` : "No number yet."}
         />
-        {number?.whose === "agentphone" && !number.incoming && <span className="px-4 pb-[11px] text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{numberSentence(number, b.name)}</span>}
+        {number?.whose === "agentphone" && <span className="px-4 pb-[11px] text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{numberSentence(number, b.name)}</span>}
         {!line && !b.phone && !number && <GetNumber bot={b} plan={plan} room={numberRoom} onUpgrade={onUpgrade} />}
         {/* Whose phone the number is linked to: the first to call or text it, then calls and texts from it count as the user. */}
         {reach && <LineLink key={reach} phone={reach} className="px-4 pb-[11px]" />}
