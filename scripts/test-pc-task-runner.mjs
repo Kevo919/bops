@@ -1,4 +1,5 @@
-// Bot tasks on this PC (lib/server/pc-task-runner.ts, pc-task-setting.ts, app/api/pc-task-runner, vm/pc-approve-mcp.mjs,
+
+// Bot tasks on this PC (lib/server/pc-task-runner.ts, pc-task-setting.ts, app/api/pc-task-runner, vm/pc-approve-mcp.mjs,
 // cli-agents.ts approveTool): who runs a task (the owner's signed in Claude plan, or the OpenAI key for the Codex
 // executor), how Claude Code is started (its flags and permissions, its working folder), how its stream-json output
 // becomes the thread's steps and answer, what a failure says, and that no key reaches Claude Code, a log or the state.
@@ -14,7 +15,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { basename, delimiter, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -301,6 +302,132 @@ await test("a search whose pattern walks out of its folder asks, wherever its pa
   // Round 2: brace syntax asks outright, whatever it seems to say (the lead's instruction).
   assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "{a,b}/*.md" }), { behavior: "ask" }, "brace syntax asks outright");
   assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "src/*/[ab]/*.md" }), { behavior: "allow" }, "character classes (not brace syntax) still allow");
+});
+
+// Round 3 (task 60). Glob and Grep: a backslash off Windows asks; Grep's `pattern` is a regex, never a path.
+await test("round 3: a backslash in a glob asks off Windows (an escape, not a separator); Windows still reads it as one", async () => {
+  assert.equal(runner.patternStaysPut("src\\*.md", "linux"), false, "a backslash asks off Windows");
+  assert.equal(runner.patternStaysPut("\\.\\./x", "darwin"), false);
+  assert.equal(runner.patternStaysPut("src\\*.md", "win32"), true, "a separator on Windows");
+  assert.equal(runner.patternStaysPut("..\\x", "win32"), false, ".. still walks out on Windows");
+  if (process.platform !== "win32") {
+    const ws = { workspace, origins: new Set() };
+    assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "src\\*.md" }), { behavior: "ask" });
+    assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "x", glob: "src\\*.ts" }), { behavior: "ask" });
+  }
+});
+
+await test("round 3: Grep's pattern is a regex and isn't read as a path; its glob and path still are", async () => {
+  const ws = { workspace, origins: new Set() };
+  for (const pattern of ["\\d{3}", "interface\\{\\}", "a+(b)", "/api/", "^\\.\\./", "C:/x"])
+    assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern, glob: "*.ts" }), { behavior: "allow" }, `${pattern} doesn't ask`);
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "\\d{3}" }), { behavior: "allow" }, "no glob at all");
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "x", glob: "{a,b}/*.ts" }), { behavior: "ask" }, "the glob is still checked");
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "x", glob: "../*.ts" }), { behavior: "ask" });
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: "/etc", pattern: "x" }), { behavior: "ask" }, "the path is still checked");
+});
+
+await test("round 3: the Windows turn runs the launcher as Node (ELECTRON_RUN_AS_NODE), with a unique go file and a 30 s cap", async () => {
+  assert.equal(runner.windowsJobTurn({ file: "claude", args: [], env: {} }, "linux"), null, "only on Windows");
+  const a = runner.windowsJobTurn({ file: "C:\\claude.exe", args: ["-p"], env: { PATH: "x" } }, "win32");
+  const b = runner.windowsJobTurn({ file: "C:\\claude.exe", args: ["-p"], env: { PATH: "x" } }, "win32");
+  assert.equal(a.file, process.execPath, "the launcher runs on Bops' own executable (Bops.exe when packaged)");
+  assert.equal(a.env.ELECTRON_RUN_AS_NODE, "1", "so Bops.exe runs it as Node instead of opening Bops again");
+  assert.equal(a.env.BOPS_JOB_KEEP_RUN_AS_NODE, undefined, "the turn's own env didn't have it, so the CLI won't either");
+  assert.equal(a.env.PATH, "x");
+  assert.deepEqual(a.args.slice(1), ["C:\\claude.exe", "-p"]);
+  assert.ok(Number(a.env.BOPS_JOB_WAIT_MS) >= 30_000, "a cold PowerShell plus the first compile fits in the wait");
+  assert.match(basename(a.goFile), /^bops-job-go-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/, "a randomUUID in the name");
+  assert.notEqual(a.goFile, b.goFile);
+  assert.equal(a.env.BOPS_JOB_GO, a.goFile);
+  const kept = runner.windowsJobTurn({ file: "claude", args: [], env: { ELECTRON_RUN_AS_NODE: "1" } }, "win32");
+  assert.equal(kept.env.BOPS_JOB_KEEP_RUN_AS_NODE, "1");
+});
+
+// The launcher itself is plain Node, so it runs here as it does on Windows (only the job and the sitter don't).
+const launcherScript = join(root, "vm", "win-job-launcher.cjs");
+const probe = join(bin, "launch-probe");
+writeFileSync(probe, `#!${process.execPath}
+const fs = require("node:fs");
+fs.writeFileSync(process.env.PROBE_OUT, JSON.stringify({ go: fs.existsSync(process.env.BOPS_JOB_GO), asNode: process.env.ELECTRON_RUN_AS_NODE ?? null, keep: process.env.BOPS_JOB_KEEP_RUN_AS_NODE ?? null }));
+`);
+chmodSync(probe, 0o755);
+let launches = 0;
+const launch = ({ env = {}, goAt, failAt, cli = probe } = {}) =>
+  new Promise((resolveLaunch) => {
+    const n = ++launches;
+    const go = join(tmp, `launch-go-${n}`);
+    const out = join(tmp, `launch-out-${n}.json`);
+    const e = { ...process.env, BOPS_JOB_GO: go, PROBE_OUT: out, ...env };
+    if (!("BOPS_JOB_WAIT_MS" in env)) delete e.BOPS_JOB_WAIT_MS;
+    const t0 = Date.now();
+    const kid = spawn(process.execPath, [launcherScript, cli], { env: e, stdio: ["ignore", "pipe", "pipe"] });
+    let stderr = "";
+    kid.stderr.on("data", (d) => (stderr += d));
+    const timers = [];
+    if (goAt !== undefined) timers.push(setTimeout(() => writeFileSync(go, "go"), goAt));
+    if (failAt !== undefined) timers.push(setTimeout(() => writeFileSync(`${go}.failed`, "assign failed"), failAt));
+    kid.on("exit", (code) => {
+      timers.forEach(clearTimeout);
+      resolveLaunch({ code, stderr, ms: Date.now() - t0, ran: existsSync(out) ? JSON.parse(readFileSync(out, "utf8")) : null });
+    });
+  });
+
+await test("round 3: no go file within the cap: the launcher fails closed, loudly, without running the CLI", { skip: process.platform === "win32" }, async () => {
+  const r = await launch({ env: { BOPS_JOB_WAIT_MS: "400" } });
+  assert.equal(r.ran, null, "the CLI never ran outside the job");
+  assert.equal(r.code, runner.LAUNCHER_EXIT.noJob);
+  assert.match(r.stderr, /\[bops-launcher\] NOT starting Claude Code: the job sitter didn't say go within 400 ms/);
+  assert.equal(runner.launcherFailure(r.code, r.stderr), runner.PC_WORDS.noJob, "the turn says it couldn't start");
+});
+
+await test("round 3: the sitter's failure marker ends the wait at once, and fails closed", { skip: process.platform === "win32" }, async () => {
+  const r = await launch({ failAt: 200 });
+  assert.equal(r.ran, null);
+  assert.equal(r.code, runner.LAUNCHER_EXIT.noJob);
+  assert.match(r.stderr, /failed before it held this turn/);
+  assert.ok(r.ms < 2500, `stopped as soon as the marker came (${r.ms} ms), not at the cap`);
+});
+
+await test("round 3: a go file that comes late (cold PowerShell, first compile) still starts the CLI inside the job", { skip: process.platform === "win32" }, async () => {
+  const r = await launch({ goAt: 3500 });
+  assert.equal(r.code, 0, r.stderr);
+  assert.deepEqual(r.ran, { go: true, asNode: null, keep: null }, "the CLI started only after the go file, and without ELECTRON_RUN_AS_NODE");
+});
+
+await test("round 3: the launcher takes ELECTRON_RUN_AS_NODE back out of the CLI's env unless the turn had it", { skip: process.platform === "win32" }, async () => {
+  const r = await launch({ goAt: 0, env: { ELECTRON_RUN_AS_NODE: "1" } });
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(r.ran.asNode, null);
+  const k = await launch({ goAt: 0, env: { ELECTRON_RUN_AS_NODE: "1", BOPS_JOB_KEEP_RUN_AS_NODE: "1" } });
+  assert.deepEqual(k.ran, { go: true, asNode: "1", keep: null });
+});
+
+await test("round 3: a missing CLI behind the launcher says Claude Code isn't installed, as ENOENT does without it", { skip: process.platform === "win32" }, async () => {
+  const r = await launch({ goAt: 0, cli: join(tmp, "no-such-claude") });
+  assert.equal(r.code, runner.LAUNCHER_EXIT.noCli, r.stderr);
+  assert.match(r.stderr, /\[bops-launcher\] Claude Code isn't installed/);
+  assert.equal(runner.launcherFailure(r.code, r.stderr), runner.PC_WORDS.noClaude);
+  // The CLI's own exit codes aren't taken for the launcher's: only with its stderr line.
+  assert.equal(runner.launcherFailure(127, "some CLI error"), undefined);
+  assert.equal(runner.launcherFailure(1, "[bops-launcher] x"), undefined);
+});
+
+await test("round 3: the sitter writes the failure marker on every failure before it assigns, and compiles race-free", async () => {
+  const ps = readFileSync(join(root, "vm", "win-job-sitter.ps1"), "utf8");
+  const assignedAt = ps.indexOf("$assigned = $true");
+  assert.ok(assignedAt > 0, "the sitter marks when the assignment took");
+  const fail = /function Fail\([^)]*\) \{[\s\S]*?\n\}/.exec(ps)?.[0] ?? "";
+  assert.match(fail, /Set-Content -Path "\$GoFile\.failed"/, "Fail writes <go>.failed");
+  assert.match(fail, /exit 1/);
+  const beforeAssign = ps.slice(0, assignedAt).replace(fail, "");
+  assert.doesNotMatch(beforeAssign, /\bexit\b/, "no way out before the assignment but Fail");
+  assert.match(beforeAssign, /trap \{ Fail /, "unforeseen errors fail the same way");
+  assert.doesNotMatch(ps, /-OutputAssembly \$dll\b/, "never compiles straight to the shared path");
+  assert.match(ps, /-OutputAssembly \$tmpDll/);
+  assert.match(ps, /Move-Item -LiteralPath \$tmpDll -Destination \$dll/);
+  assert.match(ps, /if \(-not \(Test-Path \$dll\)\) \{ throw \}/, "losing the move to another sitter counts as success");
+  assert.match(ps, /\[guid\]::NewGuid\(\)/, "each compile has its own temp name");
 });
 
 

@@ -1,5 +1,6 @@
 import "server-only";
 import { spawn, execFile, execFileSync, type ChildProcess } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { StringDecoder } from "node:string_decoder";
@@ -23,6 +24,7 @@ export type ClaudeSignIn = "connected" | "signed-out" | "connecting" | "missing"
 export const PC_WORDS = {
   signIn: "Sign in to Claude in Settings, AI subscriptions, This PC, then try again.",
   noClaude: "Claude Code isn't installed on this PC. Install it, sign in to Claude in Settings, AI subscriptions, This PC, then try again.",
+  noJob: "Bops couldn't hold this task's processes on this PC, so Claude Code wasn't started. Try again, or restart Bops if it keeps happening.",
   addKey: "Add an OpenAI environment key in Settings, Bot tasks on this PC, then try again. Make it in OpenAI Platform under Agents, Environments, Keys (Create), in the same project as your OPENAI_API_KEY. An ordinary API key won't work.",
   none: "No AI is set up for bot tasks on this PC. Sign in to Claude in Settings, AI subscriptions, This PC (recommended), or add an OpenAI environment key in Settings, Bot tasks on this PC.",
   limit: "Your Claude plan reached its usage limit. Try again once it resets, or switch Bot tasks on this PC to OpenAI key.",
@@ -296,11 +298,13 @@ const GLOB_CONSTRUCT = /[{}]|@\(|!\(|\+\(|\*\(|\?\(/;
  * which filters the files searched): no `..` segment and no absolute path, either of which would walk the search
  * out of the folder the tool was given, and no brace list or extglob group at all (what those expand to can't be
  * read from the text, so they always ask). Nothing to check counts as staying put (the path itself is still
- * checked).
+ * checked). A backslash is a path separator only on Windows; elsewhere it's an escape whose effect can't be
+ * read from the text either (`\.\./x`), so any backslash off Windows asks.
  */
-export const patternStaysPut = (pattern: unknown): boolean => {
+export const patternStaysPut = (pattern: unknown, platform: NodeJS.Platform = process.platform): boolean => {
   if (typeof pattern !== "string" || !pattern) return true;
-  const p = pattern.replace(/\\/g, "/");
+  if (platform !== "win32" && pattern.includes("\\")) return false;
+  const p = platform === "win32" ? pattern.replace(/\\/g, "/") : pattern;
   if (p.startsWith("/") || p.startsWith("~") || /^[A-Za-z]:/.test(p)) return false;
   if (GLOB_CONSTRUCT.test(p)) return false;
   return !p.split("/").includes("..");
@@ -315,8 +319,10 @@ export function pcDecision(t: Pick<PcThread, "workspace" | "origins">, tool: str
   const file = FILE_TOOLS[tool];
   if (file) {
     // A search whose pattern walks out of the folder it was given is a read outside it: ask, whichever folder
-    // the tool's own path argument named.
-    if ((tool === "Glob" || tool === "Grep") && !(patternStaysPut(input.pattern) && patternStaysPut(input.glob))) return { behavior: "ask" };
+    // the tool's own path argument named. Glob's `pattern` is a glob; Grep's `pattern` is a regex over file
+    // contents (never a path), so only Grep's `glob` file filter is checked.
+    if (tool === "Glob" && !patternStaysPut(input.pattern)) return { behavior: "ask" };
+    if (tool === "Grep" && !patternStaysPut(input.glob)) return { behavior: "ask" };
     const target = typeof input[file.key] === "string" && input[file.key] ? String(input[file.key]) : ".";
     if (insideWorkspace(t.workspace, target)) return { behavior: "allow" };
     return file.writes ? { behavior: "deny", message: "Files outside this task's folder can't be changed. Keep your work in your working folder." } : { behavior: "ask" };
@@ -363,29 +369,70 @@ export function claudeFailure(text: string): string {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * How the launcher (vm/win-job-launcher.cjs) says it never ran the CLI, by exit code: the CLI isn't there
+ * (as a spawn's ENOENT is when there's no launcher), or the job never held the launcher (fail closed: no turn
+ * runs uncontained). It writes a `[bops-launcher]` line to stderr with each, so a CLI that happens to exit with
+ * the same code isn't taken for it. Keep in step with the launcher.
+ */
+export const LAUNCHER_EXIT = { noCli: 127, noJob: 75 } as const;
+export function launcherFailure(code: number | null, errTail: string): string | undefined {
+  if (!errTail.includes("[bops-launcher]")) return undefined;
+  if (code === LAUNCHER_EXIT.noCli) return PC_WORDS.noClaude;
+  if (code === LAUNCHER_EXIT.noJob) return PC_WORDS.noJob;
+  return undefined;
+}
+
+/** How long the launcher waits for the sitter's word (cold PowerShell plus the first Add-Type compile). */
+export const JOB_WAIT_MS = 30_000;
+
+/**
  * On Windows, the turn runs through the launcher (vm/win-job-launcher.cjs): the runner spawns the launcher with
  * the CLI's command, the sitter (vm/win-job-sitter.ps1) puts the LAUNCHER in the job and writes the go file, and
  * only then does the launcher run the CLI as its own child with inherited stdio - so the CLI and everything it
- * ever forks inherit the job from the launcher, with no window after the CLI starts in which a fork escapes. The
- * go file and its wait cap live in the environment the launcher reads; the sitter's compiled assembly is cached
- * per source hash, so it assigns within a moment (the first run on a machine pays one compile). A sitter that
- * can't run says why in its log; the launcher then starts the CLI anyway once the wait is up, and the turn's
- * processes are ended by stopClaude's taskkill of the whole tree, as before the job existed.
+ * ever forks inherit the job from the launcher, with no window after the CLI starts in which a fork escapes.
+ *
+ * Fail closed: the launcher runs the CLI only once the go file is there. A sitter that fails before it assigns
+ * writes `<go>.failed` (and the runner writes it too when the sitter couldn't start or left with no go file), so
+ * the launcher stops at once; with no word at all it stops after JOB_WAIT_MS. Either way it exits
+ * LAUNCHER_EXIT.noJob and the turn says so (PC_WORDS.noJob), rather than running without the job.
+ *
+ * The launcher is process.execPath, which in the packaged app is Bops.exe itself: ELECTRON_RUN_AS_NODE makes it
+ * run the script as Node instead of opening Bops again (the turn's env, claude.env's allowlist, doesn't carry
+ * it). The launcher takes it back out of the CLI's env unless the turn's own env had it.
  */
-function windowsJobTurn(cmd: { file: string; args: string[]; env: NodeJS.ProcessEnv }): { file: string; args: string[]; env: NodeJS.ProcessEnv; started: (launcherPid: number) => void } | null {
-  if (process.platform !== "win32") return null;
+export function windowsJobTurn(
+  cmd: { file: string; args: string[]; env: NodeJS.ProcessEnv },
+  platform: NodeJS.Platform = process.platform,
+): { file: string; args: string[]; env: NodeJS.ProcessEnv; goFile: string; started: (launcherPid: number) => void; cleanup: () => void } | null {
+  if (platform !== "win32") return null;
   const powershell = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
   // The install dir as the packaged app knows it (BOPS_SERVER_JS, desktop/main.cjs), else where the repo runs.
   const installDir = process.env.BOPS_SERVER_JS ? dirname(process.env.BOPS_SERVER_JS) : process.cwd();
   const sitterScript = join(installDir, "vm", "win-job-sitter.ps1");
   const launcher = join(installDir, "vm", "win-job-launcher.cjs");
-  const goFile = join(process.env.TEMP ?? ".", `bops-job-go-${process.pid}-${Date.now()}`);
+  const goFile = join(process.env.TEMP ?? ".", `bops-job-go-${randomUUID()}`);
+  const failFile = `${goFile}.failed`;
+  const failed = (why: string) => {
+    console.warn(`[pc-task] the job sitter ${why}; the turn won't start without its job`);
+    try {
+      writeFileSync(/*turbopackIgnore: true*/ failFile, why);
+    } catch {
+      /* the launcher's own cap still ends its wait */
+    }
+  };
   return {
     file: process.execPath,
     args: [launcher, cmd.file, ...cmd.args],
     // The launcher reads the go file and its wait cap from its environment; everything else is the
-    // turn's own (the two BOPS_JOB_ names reach the CLI too, and say nothing it can use).
-    env: { ...cmd.env, BOPS_JOB_GO: goFile, BOPS_JOB_WAIT_MS: "3000" },
+    // turn's own (the BOPS_JOB_ names reach the CLI too, and say nothing it can use).
+    env: {
+      ...cmd.env,
+      ELECTRON_RUN_AS_NODE: "1",
+      ...(cmd.env.ELECTRON_RUN_AS_NODE === "1" ? { BOPS_JOB_KEEP_RUN_AS_NODE: "1" } : {}),
+      BOPS_JOB_GO: goFile,
+      BOPS_JOB_WAIT_MS: String(JOB_WAIT_MS),
+    },
+    goFile,
     started: (launcherPid: number) => {
       try {
         const sitter = spawn(powershell, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", sitterScript, "-Child", String(launcherPid), "-Parent", String(process.pid), "-GoFile", goFile], {
@@ -393,17 +440,19 @@ function windowsJobTurn(cmd: { file: string; args: string[]; env: NodeJS.Process
           windowsHide: true,
           detached: true,
         });
-        // Said, never swallowed: a sitter that couldn't start or couldn't hold the job means this turn's
-        // processes are ended by the tree stop (taskkill) alone. The sitter's own file says which step gave.
-        sitter.once("error", (e: Error) => console.warn(`[pc-task] the job sitter couldn't start (${e.message}); the turn's tree stop ends its processes`));
+        sitter.once("error", (e: Error) => failed(`couldn't start (${e.message})`));
         sitter.once("exit", (code: number | null) => {
-          rmSync(/*turbopackIgnore: true*/ goFile, { force: true });
-          if (code !== 0 && code !== null) console.warn(`[pc-task] the job sitter left early (exit ${code}); the turn's tree stop ends its processes`);
+          // Gone before it said go: whatever the reason (its log says which step gave), the launcher stops now.
+          if (!existsSync(/*turbopackIgnore: true*/ goFile)) failed(`left before it held the job (exit ${code})`);
         });
         sitter.unref();
       } catch (e) {
-        console.warn(`[pc-task] the job sitter couldn't start (${(e as Error).message}); the turn's tree stop ends its processes`);
+        failed(`couldn't start (${(e as Error).message})`);
       }
+    },
+    cleanup: () => {
+      rmSync(/*turbopackIgnore: true*/ goFile, { force: true });
+      rmSync(/*turbopackIgnore: true*/ failFile, { force: true });
     },
   };
 }
@@ -500,8 +549,12 @@ export function runClaudeTurn(o: {
       o.signal?.removeEventListener("abort", abort);
       // Whatever it left running (an MCP server, a command its shell started) goes too, before the turn is over.
       const gone = await stopClaude(child, o.graceMs);
+      jobTurn?.cleanup();
       if (!gone) return reject(new PcTaskError("Claude Code didn't stop on this PC. Restart Bops before the next task."));
       if (cut) return reject(cut);
+      // The launcher never ran the CLI (not installed, or no job to hold it): said as such, not as a CLI failure.
+      const launcherWhy = jobTurn && !result ? launcherFailure(code, errTail) : undefined;
+      if (launcherWhy) return reject(new PcTaskError(launcherWhy));
       if (result?.ok && code === 0 && !sig) return resolve({ text: (result.text || said).trim(), session });
       if (result?.ok) return reject(new PcTaskError("Claude Code ended with an error after it answered, so this may not be finished. Try again."));
       reject(new PcTaskError(claudeFailure(result?.text ?? errTail)));
