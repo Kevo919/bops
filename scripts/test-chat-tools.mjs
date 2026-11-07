@@ -71,6 +71,13 @@ registerHooks({
     }
   },
   load(url, context, next) {
+    // Negative control changes only this process's loaded copy, never the shared checkout.
+    if (process.argv.includes("--negative-member-copy") && url.endsWith("/lib/setup-words.ts")) {
+      const loaded = next(url, context);
+      const source = String(loaded.source);
+      assert.ok(source.includes("if (!member) return text;"));
+      return { ...loaded, source: source.replace("if (!member) return text;", "return text;") };
+    }
     const name = url.match(/\/lib\/server\/([a-z-]+)\.ts$/)?.[1];
     if (!name || !STAND_INS.has(name)) return next(url, context);
     const names = [...readFileSync(new URL(url), "utf8").matchAll(/^export (?:async )?(?:function\*? |const |let |class )([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]);
@@ -1954,6 +1961,49 @@ const giveAccess = (sam, tom = { boppy: "write" }) =>
   S.update((s) => {
     s.workspaces[0].memberAccess = { "sam@example.com": { others: "none", bots: sam }, "tom@orgo.ai": { others: "none", bots: tom } };
   });
+await check("real member provider failure asks the manager; owner failure keeps the actual setup guide", async () => {
+  const savedModel = S.chat(chatId).model;
+  const savedAccess = S.getState().workspaces[0].memberAccess;
+  const savedKey = process.env.ANTHROPIC_API_KEY;
+  const savedAnswers = [...answers];
+  const savedFetch = globalThis.fetch;
+  let providerCalls = 0;
+  globalThis.fetch = (...args) => {
+    if (String(args[0]).includes("api.anthropic.com")) providerCalls++;
+    return savedFetch(...args);
+  };
+  try {
+    delete process.env.ANTHROPIC_API_KEY;
+    giveAccess({ boppy: "write" });
+    S.update(() => { S.chat(chatId).model = "anthropic/claude-sonnet-5-5"; });
+    const sam = { userId: "user_sam", email: "sam@example.com", name: "Sam", ref: "key_setup_copy_member" };
+    for (const member of [sam, undefined]) {
+      const before = new Set(messages().map(m => m.id));
+      await Chat.handleMessage(chatId, "Check the connection.", undefined, undefined, undefined, undefined, undefined, undefined, undefined, member);
+      const fresh = messages().filter(m => !before.has(m.id));
+      assert.ok(fresh.some(m => m.role === "user" && (member ? m.member?.userId === sam.userId : !m.member)), "the real speaker's message was recorded");
+      const failure = fresh.find(m => m.role === "bot" && m.chatError);
+      assert.ok(failure, "the member passed the access gate and a real provider failure was presented");
+      for (const text of [failure.text, failure.chatError.text, failure.chatError.details]) {
+        assert.ok(text, "all displayed error fields are exercised");
+        if (member) {
+          assert.match(text, /Ask the person who manages Bops/);
+          assert.doesNotMatch(text, /Settings →|How to get keys/);
+        } else {
+          assert.match(text, /Settings → This (PC|Mac|computer) → Keys/);
+          assert.doesNotMatch(text, /person who manages/);
+        }
+      }
+    }
+    assert.equal(providerCalls, 0, "missing credentials fail locally, before any provider request");
+  } finally {
+    S.update(() => { S.chat(chatId).model = savedModel; S.getState().workspaces[0].memberAccess = savedAccess; });
+    if (savedKey === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = savedKey;
+    answers.splice(0, answers.length, ...savedAnswers);
+    globalThis.fetch = savedFetch;
+  }
+});
+
 giveAccess({ boppy: "write" });
 
 await check("a member's turn (someone the owner gave Write on the bot, from their own Bops): their words named as theirs, never the owner's; the bot's own work and the logins it has, every write asking the owner; none of the owner's drafts, Mac, memory or standing things", async () => {
