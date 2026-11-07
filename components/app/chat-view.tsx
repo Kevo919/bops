@@ -1,6 +1,6 @@
 "use client";
 
-import { useComputerWords } from "./computer-words";
+import { useComputerWords, useOwnComputerWords } from "./computer-words";
 
 import { screenMap, screenNo } from "@/lib/screens";
 import { askKind, chatAsks } from "@/lib/asks";
@@ -62,6 +62,7 @@ function repliedToWho(m: Message, state: AppState): string {
 
 /** Whose Mac a thread runs on or could move to, the same way: "Your Mac", or the owner's in a shared workspace. */
 const ownerMac = (state: AppState) => (state.shared ? "Owner's Mac" : "Your Mac");
+// (Shown through useOwnComputerWords: the owner's, in a shared workspace, named for the owner's computer, SharedOpen.platform.)
 /** What a blocked thread needs (BLOCKER_ASK says it of the user), of the owner in a shared workspace. */
 const OWNER_BLOCKER_ASK: Record<Blocker, string> = {
   sign_in: "the owner to sign in",
@@ -2370,7 +2371,8 @@ function readableOn(hex: string) {
 
 /** A thread, collapsed to one line in the chat. Opens the thread sheet. */
 function SessionChip({ session: s, state, onClick }: { session: Session; state: AppState; onClick: () => void }) {
-  const computerWords = useComputerWords();
+  // The owner's Mac in a shared workspace is the owner's own computer, which this window can't name: its words stay.
+  const ownWords = useOwnComputerWords(state);
   const b = state.bots.find((x) => x.id === s.botId);
   const waiting = needsYou(s);
   // In a shared workspace, what it waits on is the viewer's to answer too (Write on its bot): said so, not "the owner".
@@ -2395,9 +2397,9 @@ function SessionChip({ session: s, state, onClick }: { session: Session; state: 
       <span className={`truncate text-[14px] leading-[18px] ${live(s) || waiting ? "text-ink" : "text-[color:var(--ht-6b6b6b)]"}`}>{s.title}</span>
       {/* Where it runs: the user's Mac (the owner's, in a shared workspace) or the cloud (deciding: nothing yet). */}
       {s.runsOn === "mac" ? (
-        <span title={computerWords`On ${state.shared ? "the owner's" : "your"} Mac`} className="flex shrink-0 items-center gap-1 rounded-full bg-[color:var(--hb-f2f2f0)] px-1.5 py-px text-[11px] leading-[14px] text-[color:var(--ht-3a3a38)]">
+        <span title={ownWords`On ${state.shared ? "the owner's" : "your"} Mac`} className="flex shrink-0 items-center gap-1 rounded-full bg-[color:var(--hb-f2f2f0)] px-1.5 py-px text-[11px] leading-[14px] text-[color:var(--ht-3a3a38)]">
           <MacIcon size={11} />
-          {computerWords(ownerMac(state))}
+          {ownWords(ownerMac(state))}
         </span>
       ) : s.askWhere && live(s) ? (
         <span className="shrink-0 text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">· where?</span>
@@ -2465,6 +2467,8 @@ export function ThreadSheet({
   onShowScreen?: (botId: string, display: number, sessionId?: string) => void;
 }) {
   const computerWords = useComputerWords();
+  // The owner's Mac in a shared workspace keeps its words (useOwnComputerWords); the user's own go by this computer's.
+  const ownWords = useOwnComputerWords(state);
   // "Working for 1m 23s" counts up while it's open.
   useNow(live(s) ? 1000 : 60_000);
   // Opening it plays its entrance; coming back to it (the chat column is drawn again after a
@@ -2559,7 +2563,7 @@ export function ThreadSheet({
             </div>
             {agentPays && <span className="text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]">{agentPays}</span>}
             <button onClick={onShowComputer} className="flex items-center gap-1.5 text-left text-[12px] leading-4 text-[color:var(--ht-6b6b6b)] hover:text-ink">
-              {b.name} · {s.runsOn === "mac" ? computerWords`on ${state.shared ? "the owner's" : "your"} Mac · ` : ""}
+              {b.name} · {s.runsOn === "mac" ? ownWords`on ${state.shared ? "the owner's" : "your"} Mac · ` : ""}
               {terminal !== undefined ? "in the terminal" : s.askWhere && live(s) ? `waiting for ${ownerYou(state)}` : live(s) ? "working" : s.status === "done" ? "finished" : "stopped"} · {toolCount} steps
               {/* Its screen, by the number the panel and the bots use. */}
               {s.runsOn !== "mac" && (live(s) && s.display !== undefined ? ` · screen ${screenNo(s.display)}` : !live(s) && s.lastDisplay !== undefined ? ` · left off on screen ${screenNo(s.lastDisplay)}` : "")}
@@ -2795,7 +2799,7 @@ export function ThreadSheet({
         ) : !writesThread(state, s) ? (
           // With Write on its bot, but it runs on the owner's Mac: a member's words never reach work there (Bops Cloud refuses them).
           <div data-read-only className="mx-3 mb-3 rounded-[14px] bg-[color:var(--hb-f7f7f5)] px-3.5 py-2.5 text-center text-[13px] leading-[18px] text-[color:var(--ht-6b6b6b)]">
-            {computerWords("This runs on the owner's Mac. Only the owner can tell it more.")}</div>
+            {ownWords("This runs on the owner's Mac. Only the owner can tell it more.")}</div>
         ) : (
         <form
           onSubmit={(e) => {

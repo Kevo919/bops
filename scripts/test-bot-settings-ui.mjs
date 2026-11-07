@@ -317,7 +317,8 @@ await test("the left column: Back to chat, the bot, its eight sections, the pick
   assert.match(mark.getAttribute("style") ?? "", /background:\s*#4F7BF7/i, "filled with that bot's colour");
   for (const r of rows.filter((x) => x !== picked[0])) {
     assert.equal(r.querySelector("[data-marker]").getAttribute("style"), null, `${r.textContent}: empty`);
-    assert.match(r.querySelector("[data-marker]").className, /border-\[#9A9A97\]/);
+    // The empty marker's grey is the look palette's token (app/look-palette.css --h-9a9a97), so it turns with the dark look.
+    assert.match(r.querySelector("[data-marker]").className, /(?:^| )border-\[color:var\(--h-9a9a97\)\](?: |$)/);
   }
   assert.deepEqual([...m.box.querySelectorAll("[data-card] > button[aria-expanded='true']")].map((b) => b.closest("[data-card]").getAttribute("data-card")), ["ai", "email"]);
   // A click opens its card and picks it.
@@ -585,7 +586,7 @@ await test("Phone and voice: the voice menu, samples, Answers calls, Someone els
   await click(answers);
   assert.deepEqual(lastBots(), { botId: "juno", answersCalls: false });
   await keepSet("juno", { answersCalls: false });
-  assert.match(m.box.querySelector("[data-answers]").textContent, /When you call, you hear that Juno isn't taking calls and can text instead\. Anyone else hears a short no\. While your Mac is away, Bops Cloud still answers\./);
+  assert.match(m.box.querySelector("[data-answers]").textContent, /When you call, you hear that Juno isn't taking calls and can text instead\. Anyone else hears a short no\. While your computer is away, Bops Cloud still answers\./, "this computer's words: neutral before /api/config answers (274073e)");
   assert.match(card(m.box, "phone").querySelector("[data-summary]").textContent, / · not taking calls$/);
   // The sequences.
   const rows = [...m.box.querySelectorAll("[data-sequences=phone] [data-seq]")];

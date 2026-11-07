@@ -21,7 +21,11 @@ import { dataRoot } from "./user-paths";
  */
 
 const SERVICE = "Bops Vault";
-const KEY_ACCOUNT = "bops-file-key";
+/**
+ * The Credential Manager entry the key is in. A test sets BOPS_TEST_SECRET_KEY_ACCOUNT to a scratch name of its own, so
+ * it never reads or makes the real one (scripts/test-cloud.mjs on Windows).
+ */
+const keyAccount = () => process.env.BOPS_TEST_SECRET_KEY_ACCOUNT?.trim() || "bops-file-key";
 const file = () => join(dataRoot(), "secrets.enc.json");
 
 type Sealed = { iv: string; tag: string; data: string };
@@ -31,7 +35,7 @@ let keyPromise: Promise<Buffer> | undefined;
 /** Windows Credential Manager, through @napi-rs/keyring (a prebuilt native module, loaded only on Windows). */
 async function windowsKey(): Promise<Buffer> {
   const { Entry } = (await import("@napi-rs/keyring")) as typeof import("@napi-rs/keyring");
-  const entry = new Entry(SERVICE, KEY_ACCOUNT);
+  const entry = new Entry(SERVICE, keyAccount());
   // Any error reading it (Credential Manager locked or unavailable) stops here: making a new key then
   // would leave every saved secret unreadable for good. Only "there is none" makes one.
   const hex = entry.getPassword() ?? null;

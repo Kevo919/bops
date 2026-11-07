@@ -25,9 +25,10 @@ export function useComputerPlatform() {
 }
 /**
  * The same words for the user's own workspace only: in one shared with them, "the owner's Mac" is the owner's own
- * computer, which this window can't name (it may well be a Mac), so its words stay as they are.
+ * computer, named by the owner's platform as Bops Cloud says it (SharedOpen.platform, lib/shared.ts ownerWords): a PC,
+ * a Mac, or "computer" when it doesn't say. Never this computer's words.
  */
-export function useOwnComputerWords(state: { shared?: unknown }) {
+export function useOwnComputerWords(state: { shared?: { platform?: string } | null }) {
   const words = useComputerWords();
-  return (text: string | TemplateStringsArray, ...values: unknown[]) => state.shared ? (typeof text === "string" ? text : text.map((part, i) => part + (i < values.length ? String(values[i]) : "")).join("")) : words(text, ...values);
+  return state.shared ? computerWordsFor(state.shared.platform ?? "unknown") : words;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useComputerWords } from "./computer-words";
+import { useComputerWords, useOwnComputerWords } from "./computer-words";
 
 import { createContext, createElement, useEffect, useRef, useState } from "react";
 import { APPS_NAME, appsLine } from "@/lib/apps-access";
@@ -234,6 +234,8 @@ export function TabBar({
 
 function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState; tab: PanelTab; on: boolean; closable: boolean; onPick: () => void; onClose: () => void }) {
   const computerWords = useComputerWords();
+  // The owner's computer in a shared workspace, named as it is (SharedOpen.platform), never as this one.
+  const ownWords = useOwnComputerWords(state);
   // New since the bar first showed, decided once as it mounts (see shownTabs).
   const [opening] = useState(() => barShown && !shownTabs.has(t.id));
   useEffect(() => {
@@ -265,7 +267,7 @@ function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState
         ? b && seesBrowser(state, b)
           ? `${b.name}'s browser`
           : b?.runsOn === "mac"
-          ? computerWords("Owner's Mac")
+          ? ownWords("Owner's Mac")
           : "Owner's computer"
         : host && host.id !== b?.id
         ? `${host.name}'s computer`
