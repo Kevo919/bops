@@ -1,0 +1,137 @@
+# Task 90: every scripts/test-*.mjs not in fork CI, run daily (and on demand) so failures can't
+# hide. The suites here were seen green on the Windows PC (serial run, 2026-11-07 audit,
+# team-board tests/2026-11-07-1150-zai-task90-audit.md); Linux-green is observed by the first
+# runs of this workflow, not assumed - a suite that fails here but not there (or the other way)
+# gets fixed in either the suite or the check, then moves into fork-ci.yml's PR path.
+name: Fork CI audit
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch: {}
+jobs:
+  audit:
+    if: github.repository != 'OrgoAI/bops'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677268 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      - name: Suites seen green on Windows (plain)
+        run: |
+          node scripts/test-app-change-ui.mjs
+          node scripts/test-app-labels.mjs
+          node scripts/test-asks.mjs
+          node scripts/test-bot-groups.mjs
+          node scripts/test-bot-moods.mjs
+          node scripts/test-brains-off.mjs
+          node scripts/test-browser-relay.mjs
+          node scripts/test-chain.mjs
+          node scripts/test-chat-switch-ui.mjs
+          node scripts/test-cloud-chat.mjs
+          node scripts/test-compat-0032.mjs
+          node scripts/test-computer-scope.mjs
+          node scripts/test-crawl-low-1.mjs
+          node scripts/test-crawl-low-2.mjs
+          node scripts/test-cursor-path.mjs
+          node scripts/test-delete-messages-ui.mjs
+          node scripts/test-in-progress-ui.mjs
+          node scripts/test-in-progress.mjs
+          node scripts/test-live-thumbnail.mjs
+          node scripts/test-live.mjs
+          node scripts/test-local-preview.mjs
+          node scripts/test-look-ui.mjs
+          node scripts/test-mac-tasks.mjs
+          node scripts/test-mac-ui.mjs
+          node scripts/test-made-apps.mjs
+          node scripts/test-members-ui.mjs
+          node scripts/test-memory-reachable.mjs
+          node scripts/test-memory-sheet-ui.mjs
+          node scripts/test-openai-key-wording.mjs
+          node scripts/test-page-script.mjs
+          node scripts/test-permission.mjs
+          node scripts/test-persist-pg.mjs
+          node scripts/test-phone-card-ui.mjs
+          node scripts/test-plain-words.mjs
+          node scripts/test-pointer-cursor.mjs
+          node scripts/test-preview-frames.mjs
+          node scripts/test-preview-tools.mjs
+          node scripts/test-refused-load-ui.mjs
+          node scripts/test-repos-ui.mjs
+          node scripts/test-runner-chat.mjs
+          node scripts/test-sidebar.mjs
+          node scripts/test-skills-ui-labels.mjs
+          node scripts/test-source-view.mjs
+          node scripts/test-state-merge.mjs
+          node scripts/test-task-sites.mjs
+          node scripts/test-team-chart-ui.mjs
+          node scripts/test-update-notice.mjs
+          node scripts/test-updates.mjs
+          node scripts/test-usage-billing-ui.mjs
+          node scripts/test-vault.mjs
+          node scripts/test-vnc-decode.mjs
+          node scripts/test-widgets-ui.mjs
+          node scripts/test-windows-installer.mjs
+          node scripts/test-ws-delete-ui.mjs
+      - name: Suites seen green on Windows (react-server)
+        run: |
+          node --conditions=react-server scripts/test-access.mjs
+          node --conditions=react-server scripts/test-analytics.mjs
+          node --conditions=react-server scripts/test-app-restore.mjs
+          node --conditions=react-server scripts/test-asleep-computer.mjs
+          node --conditions=react-server scripts/test-bops-sync.mjs
+          node --conditions=react-server scripts/test-bot-settings.mjs
+          node --conditions=react-server scripts/test-builtin-skills.mjs
+          node --conditions=react-server scripts/test-chat-compact.mjs
+          node --conditions=react-server scripts/test-chat-search.mjs
+          node --conditions=react-server scripts/test-chat-tools.mjs
+          node --conditions=react-server scripts/test-computer-size.mjs
+          node --conditions=react-server scripts/test-crawl-low-3.mjs
+          node --conditions=react-server scripts/test-credit-topup.mjs
+          node --conditions=react-server scripts/test-crm-sync.mjs
+          node --conditions=react-server scripts/test-fake-exports.mjs
+          node --conditions=react-server scripts/test-goals.mjs
+          node --conditions=react-server scripts/test-hosted-apps-swap.mjs
+          node --conditions=react-server scripts/test-keys.mjs
+          node --conditions=react-server scripts/test-labels-unsorted.mjs
+          node --conditions=react-server scripts/test-logins.mjs
+          node --conditions=react-server scripts/test-made-apps-server.mjs
+          node --conditions=react-server scripts/test-made-apps-sync.mjs
+          node --conditions=react-server scripts/test-mcp.mjs
+          node --conditions=react-server scripts/test-member-acts.mjs
+          node --conditions=react-server scripts/test-members.mjs
+          node --conditions=react-server scripts/test-memory-own.mjs
+          node --conditions=react-server scripts/test-monitors.mjs
+          node --conditions=react-server scripts/test-no-unbacked-claims.mjs
+          node --conditions=react-server scripts/test-orbit-issues.mjs
+          node --conditions=react-server scripts/test-orbit-sync.mjs
+          node --conditions=react-server scripts/test-phone-voice.mjs
+          node --conditions=react-server scripts/test-preview-password.mjs
+          node --conditions=react-server scripts/test-render.mjs
+          node --conditions=react-server scripts/test-repos.mjs
+          node --conditions=react-server scripts/test-responses-ws.mjs
+          node --conditions=react-server scripts/test-routine-suggestions.mjs
+          node --conditions=react-server scripts/test-routine-sync.mjs
+          node --conditions=react-server scripts/test-routines-away.mjs
+          node --conditions=react-server scripts/test-routing.mjs
+          node --conditions=react-server scripts/test-runner.mjs
+          node --conditions=react-server scripts/test-runs-on-keys.mjs
+          node --conditions=react-server scripts/test-screens.mjs
+          node --conditions=react-server scripts/test-session-by.mjs
+          node --conditions=react-server scripts/test-shared-people.mjs
+          node --conditions=react-server scripts/test-sign-in.mjs
+          node --conditions=react-server scripts/test-skill-labels.mjs
+          node --conditions=react-server scripts/test-stream.mjs
+          node --conditions=react-server scripts/test-thread-asks.mjs
+          node --conditions=react-server scripts/test-verify.mjs
+          node --conditions=react-server scripts/test-voice-mail.mjs
+          node --conditions=react-server scripts/test-widgets.mjs
+          node --conditions=react-server scripts/test-windows-ssh.mjs
+          node --conditions=react-server scripts/test-ws-delete.mjs
