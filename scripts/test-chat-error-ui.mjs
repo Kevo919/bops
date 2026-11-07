@@ -1,6 +1,6 @@
 // The chat's error card (components/app/chat-error.tsx, Message.chatError), in the real built app: a bot whose model's
 // provider said no (OpenAI out of credit, "429 You have no credits remaining" with a URL) shows a plain line in place
-// of the raw words, a button that opens Settings → AI plans, and a Details toggle with the provider's words (never a
+// of the raw words, a button that opens Settings → AI subscriptions, and a Details toggle with the provider's words (never a
 // key), in light and in dark, at 1280 px and at a phone's 412 px, nothing sideways, and nothing thrown.
 // The same harness as scripts/test-in-progress-ui.mjs: the production build (`npx next build` first) with `next start`
 // in a scratch folder, a made-up Orgo on 127.0.0.1, a made-up bot; nothing leaves this computer.
@@ -63,7 +63,7 @@ mkdirSync(join(dir, ".data", "users", user), { recursive: true });
 const failure = {
   kind: "credit",
   title: "Out of credit",
-  text: "Your OpenAI account is out of credit, so Boppy can't answer. Add credit at platform.openai.com, Billing, or pick another model in Settings → AI plans.",
+  text: "Your OpenAI account is out of credit, so Boppy can't answer. Add credit at platform.openai.com, Billing, or pick another model in the chat box's model picker.",
   provider: "OpenAI",
   status: 429,
   details: "429 You have no credits remaining. Add credits at https://platform.openai.com/settings/organization/billing (key …)",
@@ -239,12 +239,12 @@ try {
     for (const kind of ["desktop", "phone"]) {
       const { ctx, page, errors } = await context(kind === "phone" ? "phone" : "owner");
       const tag = `${kind}-${theme}`;
-      await check(`${tag}: the card says it plainly, never the raw 429 or a key, with Settings → AI plans and Details`, async () => {
+      await check(`${tag}: the card says it plainly, never the raw 429 or a key, with Settings → AI subscriptions and Details`, async () => {
         const card = await openChat(page);
         assert.equal(await card.getAttribute("data-chat-error"), "credit");
         // From the chat's history, not new in this window: a status, not an alert.
         assert.equal(await card.getAttribute("role"), "status");
-        assert.match(await card.locator("[data-chat-error-settings]").getAttribute("aria-label"), /^Open Settings → AI plans, for the OpenAI error at \d{1,2}:\d{2}/);
+        assert.match(await card.locator("[data-chat-error-settings]").getAttribute("aria-label"), /^Open Settings → AI subscriptions, for the OpenAI error at \d{1,2}:\d{2}/);
         assert.equal((await card.locator("[data-chat-error-title]").innerText()).trim(), "Out of credit");
         assert.equal((await card.locator("[data-chat-error-text]").innerText()).trim(), failure.text);
         const seen = await card.innerText();
@@ -274,10 +274,18 @@ try {
         await toggle.click();
         assert.equal(await card.locator("[data-chat-error-details]").count(), 0, "Hide details closes it");
       });
-      await check(`${tag}: its button opens Settings at AI plans (the AI subscriptions card)`, async () => {
+      await check(`${tag}: its button opens Settings at AI subscriptions, with the AI subscriptions card in sight`, async () => {
         const card = page.locator("[data-chat-error]").filter({ visible: true }).first();
         await card.locator("[data-chat-error-settings]").click();
-        await page.locator('section[aria-label="AI subscriptions"]').filter({ visible: true }).first().waitFor({ state: "visible", timeout: 10000 });
+        // The card's own place since #116 (it once sat on top of Profile): that pane, and the card shown in it.
+        const pane = page.locator('main[data-settings-pane="subscriptions"]');
+        await pane.waitFor({ state: "visible", timeout: 10000 });
+        const subs = pane.locator('section[aria-label="AI subscriptions"]');
+        await subs.waitFor({ state: "visible", timeout: 10000 });
+        await subs.scrollIntoViewIfNeeded();
+        assert.ok(await subs.isVisible(), "the AI subscriptions card isn't in sight");
+        assert.match(await subs.innerText(), /AI subscriptions/);
+        assert.equal(await page.locator('main[data-settings-pane="profile"]').count(), 0, "it opened Profile");
         await noSideways(page, `${tag} settings`);
         await shot(page, `${tag}-chat-error-settings`);
       });

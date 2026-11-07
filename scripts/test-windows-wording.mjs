@@ -17,6 +17,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { registerHooks } from "node:module";
+import ts from "typescript";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -40,6 +41,13 @@ registerHooks({
           }
       throw e;
     }
+  },
+  // A .tsx (handy-card.tsx, task 85) loads with its JSX compiled by the TypeScript in node_modules, as the UI tests do.
+  load(url, context, next) {
+    if (!url.endsWith(".tsx")) return next(url, context);
+    const source = readFileSync(fileURLToPath(url), "utf8");
+    const out = ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }, fileName: url });
+    return { format: "module", source: out.outputText, shortCircuit: true };
   },
 });
 const { computerWords } = await import(new URL("lib/computer-words.ts", rootUrl).href);
@@ -133,15 +141,71 @@ check("the Claude and ChatGPT cards on This PC say what a sign in does now (neve
   assert.match(setup, /claudeLocalLine\(s\?\.connected, runner\)/);
 });
 
+// ---- Task 85: the three Mac words the live pass found on Kevin's PC ---------------------------------------------------
+const { handySteps, HANDY_STEPS } = await import(new URL("components/app/handy-card.tsx", rootUrl).href);
+
+check("85: Handy's install steps on a PC give the Windows installer, never the Mac's .dmg", () => {
+  assert.equal(typeof handySteps, "function", "handySteps(platform): the steps for this computer");
+  const win = handySteps("win32").map((x) => `${x.title}. ${x.words}`).join(" ");
+  assert.match(win, /Handy_<version>_x64-setup\.exe/);
+  assert.doesNotMatch(win, /\.dmg|\bMacs?\b|macOS|Accessibility/, win);
+  assert.match(win, /When Windows asks, let Handy use the microphone/);
+  const mac = handySteps("darwin").map((x) => x.words).join(" ");
+  assert.match(mac, /\.dmg/);
+  assert.doesNotMatch(mac, /\.exe/, "a Mac's steps don't name the Windows installer");
+  assert.equal(handySteps("unknown"), HANDY_STEPS, "not known yet: every kind's");
+  assert.equal(handySteps("win32").length, HANDY_STEPS.length);
+});
+
+check("85: the bot's own prompt says this PC's word (no 'on your Mac' for the bot to say back)", () => {
+  // Every line of the chat prompt's copy that names the owner's computer goes through the words helpers (pcWords for a
+  // template, pc() for a plain string), never raw: the bot's "Pulling up Jordan's chat on your Mac." was the prompt's.
+  const src = read("lib/server/chat.ts");
+  const raw = [];
+  src.split("\n").forEach((line, i) => {
+    const t = line.trim();
+    if (t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")) return;
+    // Mac as a word in copy: a string or a template, not an identifier (moveToMac, thenOnMac) or the "mac" enum.
+    if (!/[\s"'`(]Mac('s)?\b(?!\w)/.test(line.replace(/\b(moveToMac|mentionsMac|asksForMac|thenOnMac|onTheirMac)\b/g, ""))) return;
+    if (/pcWords`|pc\(|computerWordsFor\((?:process\.platform|ownPlatform\(\))\)`|computerWords\(/.test(line)) return;
+    // Said on a bot's computer (a runner, or a turn it answers): that computer's platform isn't the owner's, so the
+    // owner's computer keeps its written words there (the #116 review: "not from Alex's computer").
+    if (/onRunner\(\) \?|You're answering from your computer/.test(line)) return;
+    raw.push(`${i + 1}: ${t.slice(0, 100)}`);
+  });
+  assert.deepEqual(raw, [], "prompt copy with a raw Mac in it");
+  assert.match(src, /pc\("What you say to the user as you start/, "the start line's example");
+  assert.match(src, /import \{ ownPlatform \} from "\.\/owner-platform"/, "owner wording uses the shared recorded-platform helper");
+  const words = computerWordsFor("win32");
+  assert.equal(words`Pulling up ${"Jordan"}'s chat on your Mac.`, "Pulling up Jordan's chat on your PC.");
+});
+
+check("85: a thread's title says On this PC, never a half replaced 'On this Window'", () => {
+  // The task title's rule in the prompt: this PC's word for where it runs (the model wrote "On this Window" without one).
+  assert.match(read("lib/server/chat.ts"), /title: \{[\s\S]{0,300}description: pc\('A 2-5 word label[^']*call the user\\'s computer "this Mac" \("Inbox on this Mac"\)/);
+  for (const [mac, pcSays] of [
+    ["Inbox On this Mac", "Inbox On this PC"],
+    ["Inbox on this Mac", "Inbox on this PC"],
+    ["Check the files · on your Mac", "Check the files · on your PC"],
+    ["Set up Bops for Mac", "Set up Bops for Windows"],
+    ["On this Mac's screen", "On this PC's screen"],
+    ["All your Macs", "All your PCs"],
+  ]) {
+    const got = computerWords(mac, "win32");
+    assert.equal(got, pcSays);
+    assert.doesNotMatch(got, /\bWindow\b/, `a half replaced word: ${got}`);
+  }
+  // A title someone gave (data) is never run through the words.
+  assert.equal(computerWordsFor("win32")`${"Mac Studio setup"} · on your Mac`, "Mac Studio setup · on your PC");
+});
+
 // ---- Task 62: the screens, rendered on Windows -----------------------------------------------------------------------
 /**
  * Mac words that are right on a Windows PC too, each for its reason. Matched against the visible text and each
  * tooltip; anything else that says Mac, Macs, macOS or Keychain fails.
  */
 const ALLOWED_MAC = [
-  // Handy (This PC, Voice typing): its own installers, one for each kind of computer.
-  /on a Mac, the \.dmg/,
-  /on a Mac, Accessibility/,
+  // (Handy's steps, This PC's Voice typing, once named the Mac's .dmg on a PC too: task 85 gives a PC its own steps.)
   // The workspace's own name, as someone gave it (the screens' state names it so on purpose).
   /\bMac Team\b/,
 ];
@@ -415,19 +479,20 @@ net.Socket.prototype.connect = function (...a) {
         assert.match(nav.text, new RegExp(`This ${PC}`));
         if (!mac) assert.ok(!MAC_WORDS.test(ALLOWED_MAC.reduce((t, ok) => t.replace(new RegExp(ok.source, "g"), ""), nav.text)), nav.text);
       });
-      // Profile: who you are, then AI subscriptions on This PC: what the Claude sign in does now, and the ChatGPT one.
-      await screen("Settings, Profile (AI subscriptions, This PC)", async () => {
-        await settings("profile");
-        const pane = 'main[data-settings-pane="profile"]';
+      // AI subscriptions on This PC (its own place since task 83; it once sat on top of Profile): what the Claude sign in
+      // does now, and the ChatGPT one.
+      await screen("Settings, AI subscriptions (This PC)", async () => {
+        await settings("subscriptions");
+        const pane = 'main[data-settings-pane="subscriptions"]';
         await page.locator(`${pane} [data-local-line="claude"]`).waitFor({ state: "visible", timeout: 15000 });
         await page.locator(`${pane} [data-local-line="claude"]`).filter({ hasText: /signed in/ }).waitFor({ timeout: 15000 });
-        await judge("settings-profile", pane, (text) => {
+        await judge("settings-subscriptions", pane, (text) => {
           assert.match(text, /Claude Code is signed in on this PC, and bot tasks on this PC run on your Claude plan\./, "the Claude card says what tasks do now");
           assert.match(text, /Bops chat and bot tasks don't run on a ChatGPT plan yet/, "the ChatGPT card says it as it is");
           assert.ok(!/not enabled|enabled yet/i.test(text), "no stale 'not enabled'");
         });
       });
-      for (const [pane, label] of [["mac", `This ${PC}`], ["general", "General"], ["team", "Team"], ["bots", "Bots"], ["logins", "Logins"], ["look", "Look"], ["services", "Services"]])
+      for (const [pane, label] of [["profile", "Profile"], ["mac", `This ${PC}`], ["general", "General"], ["team", "Team"], ["bots", "Bots"], ["logins", "Logins"], ["look", "Look"], ["services", "Services"]])
         await screen(`Settings, ${label}`, async () => {
           await settings(pane);
           await judge(`settings-${pane}`, `main[data-settings-pane="${pane}"]`);

@@ -2,16 +2,31 @@
 
 import { useContext, useId, useState } from "react";
 import type { ChatErrorInfo } from "@/lib/chat-error";
-import { BRAINS_ON } from "@/lib/types";
 import { OpenSettings } from "./open-settings";
 
 /**
  * A bot couldn't answer because its chat model's provider said no (Message.chatError, lib/chat-error.ts): the plain
- * line, a button to Settings → AI plans to pick another model, and Details, which shows the provider's own words
+ * line, Pick another model (the chat box's picker), AI subscriptions (Settings) for a plan or a sign in, and Details, which shows the provider's own words
  * (never a key: the server took them out). In place of the bot's bubble; its look follows the theme's tokens.
  */
 /** When this window opened: a card for an error from before (loaded with the chat's history) is a status, not an alert. */
 const openedAt = Date.now();
+
+/**
+ * The chat box's model picker (chat-model.tsx ChatModelPick), focused and opened where the browser can (showPicker, in
+ * the click that asked for it); focused alone where it can't, so the arrow keys or a click choose from there.
+ */
+export function openModelPicker() {
+  const pick = document.querySelector<HTMLSelectElement>('select[aria-label="Model for this chat"]');
+  if (!pick) return;
+  pick.scrollIntoView({ block: "nearest" });
+  pick.focus();
+  try {
+    (pick as HTMLSelectElement & { showPicker?: () => void }).showPicker?.();
+  } catch {
+    /* focused is enough */
+  }
+}
 
 /** "3:04 PM": the card's time, for its button's name, so each card's button is told apart. */
 const timeOf = (at: number) => new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -42,15 +57,28 @@ export function ChatErrorCard({ error, at, readOnly = false }: { error: ChatErro
         {error.text}
       </p>
       <div className="flex flex-wrap items-center gap-2 pt-0.5">
+        {/* First: the chat box's own model picker, where the chat's model is picked (task 95). */}
+        {!readOnly && (
+          <button
+            type="button"
+            data-chat-error-model
+            aria-label={`Pick another model in the chat box, for the ${what}`}
+            onClick={openModelPicker}
+            className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-[color:var(--bops-on-fill)]"
+          >
+            Pick another model
+          </button>
+        )}
+        {/* Second: a plan or a sign in, in Settings → AI subscriptions. */}
         {openSettings && !readOnly && (
           <button
             type="button"
             data-chat-error-settings
-            aria-label={`Open Settings → AI plans, for the ${what}`}
-            onClick={() => openSettings(BRAINS_ON ? "ai" : "profile")}
-            className="rounded-full bg-[color:var(--hb-0a0a0a)] px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-[color:var(--bops-on-fill)]"
+            aria-label={`Open Settings → AI subscriptions, for the ${what}`}
+            onClick={() => openSettings("subscriptions")}
+            className="rounded-full px-2.5 py-1.5 text-[12.5px] font-medium leading-4 text-[color:var(--ht-3a3a38)] shadow-[0_0_0_1px_var(--h-e2e2df)] hover:bg-[color:var(--hb-f2f2f0)]"
           >
-            Open Settings → AI plans
+            AI subscriptions
           </button>
         )}
         {error.details && (

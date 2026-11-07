@@ -37,7 +37,7 @@ const advance = (kind: LocalSubscriptionKind) => { generations.set(kind, (genera
 /**
  * The last sign-in check per CLI, for readers that only need to know roughly (the chat box's agent chip, through
  * /api/pc-task-runner): reused for CHECKED_MS, so mounting the chip or focusing the window doesn't run the CLI each
- * time. Gone on any sign-in change here (advance), and replaced by every full check (Settings, AI plans).
+ * time. Gone on any sign-in change here (advance), and replaced by every full check (Settings, AI subscriptions).
  */
 const CHECKED_MS = 60_000;
 const checked = new Map<LocalSubscriptionKind, { at: number; generation: number; value: LocalSubscriptionStatus }>();

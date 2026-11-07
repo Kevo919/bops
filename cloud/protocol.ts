@@ -775,6 +775,12 @@ export type SharedWsSlice = {
    */
   adminActs?: true;
   ownerOld?: true;
+  /**
+   * For anyone but the owner: the operating system the owner's Bops runs on (cloud/ws-slice.ts ownerPlatformOf), so their
+   * window names the owner's computer as it is ("the owner's PC", "the owner's Mac"). None when the owner's Bops hasn't
+   * said, or the owner's computers aren't all the same kind: then it's "the owner's computer".
+   */
+  platform?: "win32" | "darwin" | "linux";
 };
 /** One computer's bots shown (SharedWsSlice.groups; lib/bot-groups.ts SharedGroup, spelled out). */
 export type SharedGroup = { key: string; bots: string[]; name?: string; host?: string };

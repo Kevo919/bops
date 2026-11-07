@@ -267,7 +267,9 @@ ${DARK_PALETTE}`;
  * light on an accent dark enough to need it (black or white, whichever reads on the accent's lightness). And the
  * hint in an empty box is the faint ink, whatever share of the ink it was in light: still 4.5:1 on any field. The
  * loading Boppy and its notes (mascot.tsx, drawn in the ink's #0A0A0A) are the raised grey of a dark fill, not black
- * on the dark paper.
+ * on the dark paper. An icon button's glyph drawn in one of the inks (stroke="#0A0A0A" and the greys: SVG attributes
+ * the palette's classes never reach) takes that ink's dark-look word color, so it reads at 3:1 or more on the dark
+ * paper (task 87: the sidebar's and the side panel's toggles were near-black on it).
  */
 const DARK_CSS = `:root {
 ${DARK_VARS}
@@ -281,6 +283,29 @@ textarea::placeholder {
 }
 .boppy-loading-scene [fill="#0A0A0A"] {
   fill: var(--hb-0a0a0a);
+}
+button svg[stroke="#0A0A0A" i],
+button svg [stroke="#0A0A0A" i] {
+  stroke: var(--ht-0a0a0a);
+}
+button svg[stroke="#3A3A38" i],
+button svg [stroke="#3A3A38" i] {
+  stroke: var(--ht-3a3a38);
+}
+button svg[stroke="#6B6B6B" i],
+button svg [stroke="#6B6B6B" i] {
+  stroke: var(--ht-6b6b6b);
+}
+button svg[stroke="#8A8A88" i],
+button svg [stroke="#8A8A88" i] {
+  stroke: var(--ht-8a8a88);
+}
+button svg[stroke="#9A9A98" i],
+button svg [stroke="#9A9A98" i] {
+  stroke: var(--ht-9a9a98);
+}
+button svg [fill="#3A3A38" i] {
+  fill: var(--ht-3a3a38);
 }`;
 
 /**

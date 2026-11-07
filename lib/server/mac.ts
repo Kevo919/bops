@@ -58,7 +58,8 @@ export async function checkMac() {
     next = "chrome";
     reason = `Install Google Chrome so bots can work on ${here}`;
   } else ready = true;
-  const now = { ready, reason, next, installing: next === "codex" && installStatus()?.state === "installing" };
+  const platform = (["win32", "darwin", "linux"] as const).find((p) => p === process.platform);
+  const now = { ready, reason, next, installing: next === "codex" && installStatus()?.state === "installing", platform };
   // Only a change goes out to the app.
   const was = getState().mac;
   if (was && (Object.keys(now) as (keyof typeof now)[]).every((k) => was[k] === now[k])) return ready;

@@ -1,7 +1,7 @@
 "use client";
 
 import { botChatId, type AppState, type Bot, type Session } from "@/lib/types";
-import { Your, yourMac } from "@/lib/shared";
+import { Your, ownerWords, yourMac } from "@/lib/shared";
 import { BotAiSection } from "./bot-ai";
 import { useComputerWords } from "./computer-words";
 import { Segmented } from "./segmented";
@@ -31,7 +31,7 @@ export function AiSlot({
   const runsOn = b.runsOn ?? "auto";
   // Fixed words only: this computer's own name on Windows ("your PC"). A shared workspace's is the owner's, whose computer this one can't name.
   const computerWords = useComputerWords();
-  const words = (text: string) => (state.shared ? text : computerWords(text));
+  const words = (text: string) => (state.shared ? ownerWords(state)(text) : computerWords(text));
   return (
     <div className="flex flex-col gap-3" data-ai-slot>
       <BotAiSection

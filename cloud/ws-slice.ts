@@ -1,3 +1,5 @@
+import { ownerPlatformOf } from "./owner-platform.ts";
+export { ownerPlatformOf } from "./owner-platform.ts";
 import { createHash } from "node:crypto";
 import { appsOpenTo } from "./apps-team.ts";
 import { accessOf, adminAccess, appsLevelOf, currentFor, isAccessLevel, levelOf, permits, seesChat, usesComputer, type AccessLevel, type MemberAccess, type MemberAccessMap } from "./member-access.ts";
@@ -553,8 +555,11 @@ export function sharedSlice(blob: Record<string, unknown>, ws: string, viewer: S
     // The owner's Bops takes an Admin's acts (members.ts adminGate), said to anyone but the owner: an Admin answers the
     // owner's own asks then, and a Member's window says an Admin can. An Admin's says when it can't yet (ownerOld).
     ...(access && viewer.adminActs ? { adminActs: true as const } : access && viewer.role === "admin" ? { ownerOld: true as const } : {}),
+    // What the owner's computer is, so their window doesn't call a PC a Mac (ownerPlatformOf).
+    ...(access && ownerPlatformOf(blob) ? { platform: ownerPlatformOf(blob) } : {}),
   };
 }
+
 
 /**
  * The Orgo computer each of the `shown` bots works on (hostOf: its own, or the main bot's it shares), by bot id: for an

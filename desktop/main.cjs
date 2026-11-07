@@ -3,7 +3,7 @@
  * isn't already running, opens the window with the Mac title bar from the design, and on quit
  * stops what it started, including the bots' background browsers.
  */
-const { app, autoUpdater, BrowserWindow, clipboard, desktopCapturer, dialog, ipcMain, Menu, nativeImage, Notification, powerMonitor, screen, session, shell, systemPreferences, Tray } = require("electron");
+const { app, autoUpdater, BrowserWindow, clipboard, desktopCapturer, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerMonitor, screen, session, shell, systemPreferences, Tray } = require("electron");
 const { execFile, execFileSync, spawn } = require("node:child_process");
 const winHost = require("./windows.cjs");
 const { installBackground } = require("./background.cjs");
@@ -733,6 +733,7 @@ function showMain() {
 }
 
 async function createWindow() {
+  startTheme();
   const win = new BrowserWindow({
     // Started by Windows at sign-in (desktop/background.cjs): hidden until opened from the tray.
     show: !background.startHidden() || mainWin !== undefined,
@@ -1216,6 +1217,28 @@ function restart() {
   return restarting;
 }
 ipcMain.handle("relaunch", () => restart());
+// The look's theme (components/app/look-style.tsx): the window's frame follows it. On Windows the title bar and the
+// menu bar are the system's, drawn dark on a PC set to dark even while Bops is Light; "system" goes back to the PC's.
+// It's kept (userData/theme), so the next start opens with the frame already right, before the page has said it.
+const themeFile = () => path.join(app.getPath("userData"), "theme");
+const themeOf = (t) => (t === "dark" || t === "light" ? t : "system");
+ipcMain.handle("set-theme", (_, theme) => {
+  const next = themeOf(theme);
+  nativeTheme.themeSource = next;
+  try {
+    fs.writeFileSync(themeFile(), next);
+  } catch {
+    /* only the next start's first moment */
+  }
+});
+/** The theme the page last asked for, put on the frame as the app starts (before any window shows). */
+function startTheme() {
+  try {
+    nativeTheme.themeSource = themeOf(fs.readFileSync(themeFile(), "utf8").trim());
+  } catch {
+    /* none kept yet: the PC's own */
+  }
+}
 
 /** Stops a release build's server this app didn't start (the one on the port, which gave this process id if it answered), once it's surely Bops' own. Says whether it did. */
 async function stopOtherServer(pid) {

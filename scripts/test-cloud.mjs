@@ -45,6 +45,10 @@ const bin = join(scratch, "bin");
 mkdirSync(bin);
 mkdirSync(join(scratch, "keychain"));
 process.env.BOPS_TEST_KEYCHAIN = join(scratch, "keychain");
+// Off the Mac, secrets go to an encrypted file (lib/server/secret-file.ts) whose key, on Windows, is in Credential Manager:
+// a scratch entry of this run's own, never the real "Bops Vault/bops-file-key" (taken out again at the end).
+process.env.BOPS_TEST_SECRET_KEY_ACCOUNT = `bops-test-cloud-${process.pid}-${Date.now()}`;
+try {
 // This app's version, as the build sets it (next.config.ts): every call to the cloud says it.
 process.env.BOPS_APP_VERSION = "9.9.9";
 // macOS's `security`, with a folder for a Keychain.
@@ -273,6 +277,7 @@ const D = await import(`${rootUrl}/lib/server/decide.ts`);
 const V = await import(`${rootUrl}/lib/server/verify.ts`);
 const T = await import(`${rootUrl}/lib/server/cloud-tunnel.ts`);
 const R = await import(`${rootUrl}/lib/server/relay.ts`);
+const KC = await import(`${rootUrl}/lib/server/keychain.ts`);
 const AP = await import(`${rootUrl}/app/api/phone/agentphone/route.ts`);
 const OAI = await import(`${rootUrl}/app/api/phone/openai/route.ts`);
 const EV = await import(`${rootUrl}/app/api/cloud/event/route.ts`);
@@ -419,7 +424,14 @@ await selfHosted({ OPENAI_API_KEY: "sk-self" }, async () => {
   assert.equal(String(sidebandURL(ai, { session_id: "s" })), "wss://api.openai.com/v1/live/sessions/s/attach");
   web.answer = providers;
 });
-await selfHosted({}, () => assert.rejects(ai.responses.create({ model: "x", input: "x" }), /No OpenAI key is set: add OPENAI_API_KEY to \.env\.local\./));
+// Self-hosting with no key: the whole of the client's words (lib/server/openai-client.ts, 0e99189), which say which key
+// powers the chat (this computer's OPENAI_API_KEY, on Windows the .env.local next to the app) and which doesn't (Logins').
+await selfHosted({}, () =>
+  assert.rejects(ai.responses.create({ model: "x", input: "x" }), {
+    message:
+      "No key for the chat's models: the chat reads OPENAI_API_KEY from this computer's environment - on the Windows app, the .env.local file next to the app (like C:\\Users\\<you>\\bops\\.env.local), then restart Bops. An OpenAI key saved in Logins is the vault's, for bots' API calls; it doesn't power the chat.",
+  }),
+);
 signOut();
 await assert.rejects(ai.responses.create({ model: "x", input: "x" }), /Sign in with Orgo first\./);
 await signIn();
@@ -1890,7 +1902,9 @@ R.relayAfterSignIn();
 await until(() => S.getState().relay?.on, "routing on by default", 15_000);
 assert.equal(S.getState().relay.deviceId, "dev_1");
 assert.equal(S.getState().relay.turnedOff, undefined);
-assert.deepEqual(JSON.parse(readFileSync(join(scratch, "keychain", encodeURIComponent("orgo-relay:u1")), "utf8")), { deviceId: "dev_1", code: "code_dev_1" }, "the pairing code in the Keychain");
+// Read back through the app's own secret store (lib/server/keychain.ts): the Keychain stand-in on a Mac, the encrypted
+// file (secret-file.ts) on Windows and Linux, where there's no `security` for the stand-in to answer for.
+assert.deepEqual(JSON.parse((await KC.getSecret("orgo-relay:u1")) ?? "null"), { deviceId: "dev_1", code: "code_dev_1" }, "the pairing code in this computer's secret store");
 await until(async () => (await statusNow()).running, "the relay running", 15_000);
 let rs = await statusNow();
 assert.deepEqual([rs.available, rs.on], [true, true]);
@@ -2361,9 +2375,17 @@ assert.ok(toOrgo.length > 0 && toOrgo.every((c) => c.headers["x-bops-version"] =
 assert.deepEqual(web.calls.filter((c) => c.headers["x-bops-version"] && c.host !== "www.orgo.ai").map((c) => c.host), [], "never to anyone else");
 assert.ok(toOrgo.every((c) => c.headers["x-bops-telemetry"] === undefined), "Orgo's API never gets the usage switch");
 console.log(`all cloud tests passed (${cloud.requests.length} requests to the fake cloud, ${cloud.connections.length} tunnels, ${web.calls.length} stubbed calls, none to the network)`);
+} finally {
+// This run's Credential Manager entry, on Windows (the scratch key for the secrets file).
+if (process.platform === "win32")
+  try {
+    const { Entry } = createRequire(import.meta.url)("@napi-rs/keyring");
+    new Entry("Bops Vault", process.env.BOPS_TEST_SECRET_KEY_ACCOUNT).deletePassword();
+  } catch {}
 // The link to the project's node_modules goes first, on its own, so nothing behind it is touched.
-unlinkSync(join(scratch, "node_modules"));
+try { unlinkSync(join(scratch, "node_modules")); } catch {}
 try {
   rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 } catch {}
+}
 process.exit(0);

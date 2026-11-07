@@ -649,7 +649,11 @@ function Pill<V extends string>({ label, value, options, onPick, disabled }: { l
   );
 }
 
-/** A switch, on or off (Used in). `locked`: shown, not changed, with why. */
+/**
+ * A switch, on or off (Used in). `locked`: shown, not changed, with why. On is the ink's own color (task 87: the dark
+ * look's raised grey for an ink fill was darker than its off grey, so a switch that said on looked off); the knob is the
+ * paper's, so on is a bright track with a dark knob in Dark and the black track with a white one in Light.
+ */
 function Toggle({ label, on, locked, onFlip }: { label: string; on: boolean; locked?: boolean; onFlip: (on: boolean) => void }) {
   return (
     <button
@@ -659,7 +663,7 @@ function Toggle({ label, on, locked, onFlip }: { label: string; on: boolean; loc
       aria-label={label}
       disabled={locked}
       onClick={() => onFlip(!on)}
-      className={`relative h-[18px] w-[30px] shrink-0 rounded-full transition-colors disabled:cursor-default ${on ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-d9d9d6)]"} ${locked ? "opacity-50" : ""}`}
+      className={`relative h-[18px] w-[30px] shrink-0 rounded-full transition-colors disabled:cursor-default ${on ? "bg-[color:var(--color-ink)]" : "bg-[color:var(--hb-d9d9d6)]"} ${locked ? "opacity-50" : ""}`}
     >
       <span className={`absolute top-[2px] size-[14px] rounded-full bg-white transition-[left] ${on ? "left-[14px]" : "left-[2px]"}`} />
     </button>
@@ -836,8 +840,13 @@ function LoginPanel({
           <div className={card}>
             {own.map((w) => {
               const isHome = (a && home === w.id) || (k && home === w.id);
-              const locked = !!isHome || (!!k && k.scope === "all");
-              const on = locked || inWs.includes(w.id);
+              // A site login is on in a workspace through its bots (siteLoginIn): one with no bots can't be turned on there,
+              // so its switch is held while off and says why (task 96: a click that did nothing). Turning one off always
+              // works (the #119 review: on and locked couldn't be turned off).
+              const noBots = !!l && !state.bots.some((b) => workspaceOf(b) === w.id);
+              const fixed = !!isHome || (!!k && k.scope === "all");
+              const on = fixed || inWs.includes(w.id);
+              const locked = fixed || (noBots && !on);
               return (
                 <div key={w.id} className="flex items-center gap-3 border-b border-[color:var(--h-f0f0ee)] px-3.5 py-2.5 last:border-0">
                   <span className="flex size-5 shrink-0 items-center justify-center rounded-[6px] bg-[color:var(--hb-1f5f4a)] text-[10.5px] font-semibold uppercase text-[color:var(--bops-on-fill)]">{w.name[0]}</span>
@@ -847,6 +856,8 @@ function LoginPanel({
                       <span className="text-[11.5px] leading-4 text-[color:var(--ht-9a9a98)]">{a ? "Connected here" : "Its own workspace"}</span>
                     ) : k?.scope === "all" ? (
                       <span className="text-[11.5px] leading-4 text-[color:var(--ht-9a9a98)]">From your account</span>
+                    ) : noBots ? (
+                      <span className="text-[11.5px] leading-4 text-[color:var(--ht-9a9a98)]">No bots here yet</span>
                     ) : null}
                   </span>
                   <Toggle label={`Used in ${w.name}`} on={on} locked={locked || busy} onFlip={(x) => flip(w.id, x)} />
