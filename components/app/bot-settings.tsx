@@ -17,6 +17,7 @@ import { BotSkills } from "./bot-skills";
 import { WhereToFind } from "./channels";
 import { ComputerSummary } from "./computer";
 import { BotKeys } from "./keys";
+import { numberSentence, WHOSE_WORDS, type BotNumber } from "@/lib/bot-number";
 import { LineLink } from "./line-link";
 import { Mascot } from "./mascot";
 import { BotRoutines, routineCount } from "./routines";
@@ -306,7 +307,7 @@ export function BotSettingsBody({
         "phone",
         phoneSummary,
         reach ? (
-          <PhoneBody state={state} bot={b} set={set} reach={reach} today={today} older={older} onOpenChat={() => links.onOpenChat(botChatId(b.id))} />
+          <PhoneBody state={state} bot={b} set={set} reach={reach} number={contact.number} today={today} older={older} onOpenChat={() => links.onOpenChat(botChatId(b.id))} />
         ) : (
           <ContactBody bot={b} plan={plan} contact={contact} onUpgrade={links.onUpgrade} />
         ),
@@ -545,7 +546,7 @@ function EmailBody({ state, bot: b, set, plan, contact, today, older, onUpgrade 
 
 /* ---------------- Phone and voice, or Contact ---------------- */
 
-function PhoneBody({ state, bot: b, set, reach, today, older, onOpenChat }: { state: AppState; bot: Bot; set: BotSettings; reach: string; today: ReturnType<typeof todayOf>; older: boolean; onOpenChat: () => void }) {
+function PhoneBody({ state, bot: b, set, reach, number: shown, today, older, onOpenChat }: { state: AppState; bot: Bot; set: BotSettings; reach: string; number: BotNumber | null; today: ReturnType<typeof todayOf>; older: boolean; onOpenChat: () => void }) {
   const { busy, error, send } = useBotSave(b.id);
   const ownWords = useOwnComputerWords(state);
   const line = state.workspaces?.find((w) => w.id === workspaceOf(b))?.line;
@@ -555,10 +556,12 @@ function PhoneBody({ state, bot: b, set, reach, today, older, onOpenChat }: { st
     <div className="flex flex-col" data-phone-body>
       <div className="-mx-4">
         <Field
-          label={line && b.isMain ? W.teamNumber(line.type === "imessage" ? "iMessage" : "texts") : b.phoneLine?.paused ? `mobile · ${numberPausedUntil(state, b.phoneLine.unpaid)}` : W.phoneLabel}
+          label={line && b.isMain ? W.teamNumber(line.type === "imessage" ? "iMessage" : "texts") : b.phoneLine?.paused ? `mobile · ${numberPausedUntil(state, b.phoneLine.unpaid)}` : shown ? `mobile · ${WHOSE_WORDS[shown.whose]}` : W.phoneLabel}
           value={number}
           empty={W.noNumber}
         />
+        {/* Your AgentPhone number: the bot calls and texts from it, texts to it don't reach it (lib/bot-number.ts). */}
+        {shown?.whose === "agentphone" && <span className="block px-4 pb-[11px] text-[12px] leading-4 text-[color:var(--ht-6b6b6b)]" data-bot-number="agentphone">{numberSentence(shown, b.name)}</span>}
         <LineLink key={reach} phone={reach} className="px-4 pb-[11px]" />
       </div>
       <VoicePicker state={state} bot={b} set={set} number={number} agentId={line && b.isMain ? line.agentId : b.phoneLine?.agentId} />
