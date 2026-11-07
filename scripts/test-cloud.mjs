@@ -48,6 +48,7 @@ process.env.BOPS_TEST_KEYCHAIN = join(scratch, "keychain");
 // Off the Mac, secrets go to an encrypted file (lib/server/secret-file.ts) whose key, on Windows, is in Credential Manager:
 // a scratch entry of this run's own, never the real "Bops Vault/bops-file-key" (taken out again at the end).
 process.env.BOPS_TEST_SECRET_KEY_ACCOUNT = `bops-test-cloud-${process.pid}-${Date.now()}`;
+try {
 // This app's version, as the build sets it (next.config.ts): every call to the cloud says it.
 process.env.BOPS_APP_VERSION = "9.9.9";
 // macOS's `security`, with a folder for a Keychain.
@@ -2374,6 +2375,7 @@ assert.ok(toOrgo.length > 0 && toOrgo.every((c) => c.headers["x-bops-version"] =
 assert.deepEqual(web.calls.filter((c) => c.headers["x-bops-version"] && c.host !== "www.orgo.ai").map((c) => c.host), [], "never to anyone else");
 assert.ok(toOrgo.every((c) => c.headers["x-bops-telemetry"] === undefined), "Orgo's API never gets the usage switch");
 console.log(`all cloud tests passed (${cloud.requests.length} requests to the fake cloud, ${cloud.connections.length} tunnels, ${web.calls.length} stubbed calls, none to the network)`);
+} finally {
 // This run's Credential Manager entry, on Windows (the scratch key for the secrets file).
 if (process.platform === "win32")
   try {
@@ -2381,8 +2383,9 @@ if (process.platform === "win32")
     new Entry("Bops Vault", process.env.BOPS_TEST_SECRET_KEY_ACCOUNT).deletePassword();
   } catch {}
 // The link to the project's node_modules goes first, on its own, so nothing behind it is touched.
-unlinkSync(join(scratch, "node_modules"));
+try { unlinkSync(join(scratch, "node_modules")); } catch {}
 try {
   rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 } catch {}
+}
 process.exit(0);

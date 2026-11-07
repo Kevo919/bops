@@ -167,7 +167,7 @@ check("85: the bot's own prompt says this PC's word (no 'on your Mac' for the bo
     if (t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")) return;
     // Mac as a word in copy: a string or a template, not an identifier (moveToMac, thenOnMac) or the "mac" enum.
     if (!/[\s"'`(]Mac('s)?\b(?!\w)/.test(line.replace(/\b(moveToMac|mentionsMac|asksForMac|thenOnMac|onTheirMac)\b/g, ""))) return;
-    if (/pcWords`|pc\(|computerWordsFor\(process\.platform\)`|computerWords\(/.test(line)) return;
+    if (/pcWords`|pc\(|computerWordsFor\((?:process\.platform|ownPlatform\(\))\)`|computerWords\(/.test(line)) return;
     // Said on a bot's computer (a runner, or a turn it answers): that computer's platform isn't the owner's, so the
     // owner's computer keeps its written words there (the #116 review: "not from Alex's computer").
     if (/onRunner\(\) \?|You're answering from your computer/.test(line)) return;

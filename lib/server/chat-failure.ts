@@ -9,8 +9,8 @@ function serverKeys(): string[] {
   const out: string[] = [];
   for (const [k, v] of Object.entries(process.env)) {
     const val = v?.trim();
-    if (!val) continue;
-    // A provider's key (OPENAI_API_KEY, ZAI_API_KEY__WORK, ...): whatever its length. Any other secret-named value from 8.
+    if (!val || val.length < 8 || /^(?:ollama|not[-_ ]?(?:needed|required)|none|dummy|placeholder|replace[-_ ]?me|your[-_ ]?(?:api[-_ ]?)?key|changeme)$/i.test(val)) continue;
+    // Ignore short values and exact placeholder literals, not real provider credentials.
     if (/_API_KEY(?:__|$)|^(?:ANTHROPIC|OPENAI|ZAI|DEEPSEEK|OPENROUTER|DEEPINFRA|OLLAMA)_/i.test(k) && /KEY|TOKEN|SECRET/i.test(k)) out.push(val);
     else if (val.length >= 8 && /KEY|TOKEN|SECRET|PASSWORD/i.test(k)) out.push(val);
   }

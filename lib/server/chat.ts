@@ -348,9 +348,9 @@ function persona(b: Bot, others: Bot[]) {
     // A bot that shares works on the main bot's computer, its four screens shared with the team (lib/screens.ts).
     b.runsOn === "mac" && pcReady()
       ? // As start_task places it (prefersPc): only on the owner's own turn, left to auto, not one part of a group, and not asked for the cloud.
-        computerWordsFor(process.platform)`You work on ${owner}'s own Mac: a task you start (start_task) on ${owner}'s own turn runs there, unless its where is cloud, it's one part of a group (part_of) or its goal asks for the cloud. A task from anyone else's turn goes where Bops can run it. Each task is a thread ${owner} can open.`
+        computerWordsFor(ownPlatform())`You work on ${owner}'s own Mac: a task you start (start_task) on ${owner}'s own turn runs there, unless its where is cloud, it's one part of a group (part_of) or its goal asks for the cloud. A task from anyone else's turn goes where Bops can run it. Each task is a thread ${owner} can open.`
       : b.runsOn === "mac"
-        ? computerWordsFor(process.platform)`You're set to work on ${owner}'s own Mac, but it isn't ready right now: a task you start goes where Bops can run it, and Bops says so. Each task is a thread ${owner} can open.`
+        ? computerWordsFor(ownPlatform())`You're set to work on ${owner}'s own Mac, but it isn't ready right now: a task you start goes where Bops can run it, and Bops says so. Each task is a thread ${owner} can open.`
         : workComputer(b).id === b.id
       ? `You have your own cloud computer with a browser and four screens, so up to 4 long tasks at once. Each task is a thread ${owner} can open.`
       : `You work on ${workComputer(b).name}'s cloud computer, sharing its four screens with your team, so a task of yours waits when they're all in use. Each task is a thread ${owner} can open.`,
@@ -2239,7 +2239,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
             }),
           ]
         : []),
-      fn("start_task", b.runsOn === "mac" && pcReady() && !member && !opts.outside ? computerWordsFor(process.platform)`Start a long task (a thread) on ${owner}'s Mac, where you work.` : pcWords`Start a long task (a thread) on your cloud computer, or on ${owner}'s Mac when it needs their Mac.`, {
+      fn("start_task", b.runsOn === "mac" && pcReady() && !member && !opts.outside ? computerWordsFor(ownPlatform())`Start a long task (a thread) on ${owner}'s Mac, where you work.` : pcWords`Start a long task (a thread) on your cloud computer, or on ${owner}'s Mac when it needs their Mac.`, {
         ...TASK,
         ...SAY,
         ...WHERE,
@@ -3560,7 +3560,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
           // words never put work on the owner's PC (sessions.ts startSession checks again).
           const prefersPc = b.runsOn === "mac" && !member && !opts.outside && (!args.where || args.where === "auto") && !args.part_of?.trim() && !/\bcloud\b/i.test(args.goal ?? "");
           const onPc = prefersPc && pcReady();
-          if (prefersPc && !onPc) notes.push(computerWordsFor(process.platform)`${b.name} works on this Mac, but it isn't ready, so "${args.title}" runs where Bops can run it`);
+          if (prefersPc && !onPc) notes.push(computerWordsFor(ownPlatform())`${b.name} works on this Mac, but it isn't ready, so "${args.title}" runs where Bops can run it`);
           sessionIds.push(startSession({ botId, goal: withImages(args.goal), title: args.title, chatId, sentVia: "you", ...place, ...(onPc ? { where: "mac" as const } : {}), group: groupOf(args.part_of), ...(procedure ? { procedure } : {}), agents: picks }).id);
         }
       }
