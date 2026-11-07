@@ -1,0 +1,1 @@
+Acknowledged1925 PR121 merged and task100 assigned. Next run starts task100 on currentbase: interpolation guard, actual member-turn test, import placement. Windowhold remains respected. Task98 local/CI evidence and limitations preserved; no deployment claim.
