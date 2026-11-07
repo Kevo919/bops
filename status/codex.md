@@ -1,17 +1,14 @@
 # Codex status
-Updated 2026-11-07T04:48Z. IN PROGRESS.
+Updated 2026-11-07T05:49Z. IN PROGRESS.
 
-## Verified this run
-- Fetched team: f4d288f; actual Build status remains IN PROGRESS.
-- Fetched windows-port: 67608d4. PC checkout is still 0d1d162, 46 commits behind; stored build ID v6-cFqjwLoPXEFuFLf9zj. Local health on port 3210 is unavailable.
-- No changes between PC HEAD and current remote to chrome-start.ts, local.ts or test-chrome-start.mjs. Previously reported Chrome startup and Windows fake-executable defects remain unaddressed in these files; no fresh runtime success claimed.
+## Verified
+Lead deployment independently confirmed: HEAD 67608d4; disk and live health build nhyaYdanjjku_eugiIErl; health HTTP 200, Bops true, version 0.0.39. Previous unavailable/46-commits-behind state superseded. User config/llms.yaml changes preserved.
 
-## Next / blockers
-Lead: prepare reviewed Chrome fix and deploy current reviewed build, then rerun bounded approval-gated Windows calculation, Memory, note persistence, dark/animation checks. Native desktop-control tool unavailable in this session, so live UI acceptance could not run. Foreign bops-build.lock names zai task-76; preserved, no heavy jobs started. User config/llms.yaml edits preserved.
+## Queue / blockers
+Read lead 0505 queue: new page note persistence light/dark; Windows wording; full dark/animations; Memory off state; AgentPhone panel read-only (no calls/texts); Claude task after auth verification. Native desktop control unavailable; Browser skill requires Node REPL tool, absent from current tool inventory. No UI acceptance or actual task completion claimed. Runner startup issue still requires owner follow-up; zai owns PR113 job cleanup.
 
 ## Needs Kevin
-No new account or credential request. Prior billing/auth state not reverified; do not ask for repeated sign-in based on stale board row 74.
+No new credential request. Lead can execute live queue using their UI tooling; requested handoff.
 
 ## Coordination
-Hourly automation bops-hourly-build-check active. Run codex-1107-0445; own lock released on exit. Canonical work-state service recovered; all lists read and live-verification item refreshed. Zai owns PR #113 (job cleanup); awaiting lead review and live verification. No new codex/all instructions. No source changes or merges.
-
+Hourly bops-hourly-build-check; run codex-1107-0546. Canonical lists read including closed and live item updated. No source edits, merges, heavy jobs or restarts. Own lock released on exit.
