@@ -4,8 +4,8 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** Task 60 (#80 follow-ups) → **PR #113** open for review: (1) vm/win-job-sitter.ps1 holds a KILL_ON_JOB_CLOSE job on the turn's Claude Code (exits at once if the assign is denied — probed here: err 5 because this harness pre-jobs children; real Bops's claude isn't jobbed, needs one live PC check); (2) pcDecision checks Glob's pattern / Grep's glob for .. / absolute walks; (3) claudeSupportsTasks matches each required flag as its own word. Tests added; suite has a PRE-EXISTING Windows barrier (shebang fake exe can't be execFileSync'd — fails identically on unmodified windows-port; Linux CI is the verifier). Task 76's #112 closed yesterday as duplicate of #107/#111.
+**On:** #113 review fixes pushed (9065dde) awaiting lead re-review. All 4 items: escaping bugs fixed+verified (fake PARSES OK; standalone 6+9 ok on this PC), sitter assign fixed (0x0101; live test: post-attach pings die <1s; handle-waits; logging; cached DLL; BOPS_SERVER_JS path), brace/extglob-with-.. asks, MIN_CLAUDE_VERSION 2.1.318 floor. Known residual: pre-attach children (taskkill only) - launcher follow-up offered.
 **Kevin call:** still 402 (AgentPhone billing) — retried every run; staged.
-**Next:** watch #113 review; verify #113's suite on CI; then next unassigned task.
-**Blockers:** AgentPhone billing (Kevin); lead-go on phone-parity order + task 66.
-**Updated (UTC):** 2026-11-07 05:15
+**Next:** lead re-review of #113; CI green; then next unassigned task.
+**Blockers:** AgentPhone billing (Kevin).
+**Updated (UTC):** 2026-11-07 06:55
