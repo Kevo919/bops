@@ -57,7 +57,7 @@ export function LookSettings({ state }: { state: AppState }) {
     <div className="flex flex-col gap-3" data-look-settings>
       <div className="rounded-[14px] bg-white px-3.5 py-1 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
         <div className={rows}>
-          <Segmented<LookTheme> title="Theme" hint="The window's colors, or following this computer's." value={look.theme ?? "light"} options={[["light", "Light"], ["system", "System"], ["dark", "Dark"]]} onPick={(theme) => send({ theme })} />
+          <Segmented<LookTheme> as="buttons" title="Theme" hint="The window's colors, or following this computer's." value={look.theme ?? "light"} options={[["light", "Light"], ["system", "System"], ["dark", "Dark"]]} onPick={(theme) => send({ theme })} />
         </div>
         <div className={rows}>
           {line("Accent color", "Buttons, highlights and what needs you.")}
@@ -70,7 +70,7 @@ export function LookSettings({ state }: { state: AppState }) {
             className="size-7 cursor-pointer rounded-full border border-[color:var(--h-e6e6e3)] bg-transparent p-0"
           />
           {look.accent && (
-            <button onClick={() => send({ accent: "" })} className="rounded-full px-2 py-0.5 text-[12px] font-medium leading-4 text-ink hover:bg-[color:var(--bops-tint)]/[0.05]">
+            <button onClick={() => send({ accent: "" })} aria-label="Default accent color" className="rounded-full px-2 py-0.5 text-[12px] font-medium leading-4 text-ink hover:bg-[color:var(--bops-tint)]/[0.05]">
               Default
             </button>
           )}
@@ -89,11 +89,12 @@ export function LookSettings({ state }: { state: AppState }) {
           />
         </div>
         <div className={rows}>
-          <Segmented<LookDensity> title="Spacing" hint="How much room the window's parts keep." value={look.density ?? "normal"} options={[["compact", "Compact"], ["normal", "Normal"], ["roomy", "Roomy"]]} onPick={(density) => send({ density })} />
+          <Segmented<LookDensity> as="buttons" title="Spacing" hint="How much room the window's parts keep." value={look.density ?? "normal"} options={[["compact", "Compact"], ["normal", "Normal"], ["roomy", "Roomy"]]} onPick={(density) => send({ density })} />
         </div>
         <InProgress id="animations-setting">
         <div className={rows} data-animations>
           <Segmented<MotionLevel>
+            as="buttons"
             title="Animations"
             hint={reduced ? "Off for now: this computer asks for less motion." : "How much things move as they come and go."}
             value={look.motion ?? "normal"}
@@ -103,6 +104,7 @@ export function LookSettings({ state }: { state: AppState }) {
         </div>
         <div className={rows} data-animation-speed>
           <Segmented<MotionSpeed>
+            as="buttons"
             title="Speed"
             hint="How fast animations play."
             value={look.motionSpeed ?? "normal"}

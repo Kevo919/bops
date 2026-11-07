@@ -1,7 +1,7 @@
 /**
  * A chat model's provider said no (out of credit, too many requests, a bad key, no such model, down): what the chat
  * shows instead of the provider's raw words ("429 You have no credits remaining …"). One plain, actionable line, the
- * kind of no it was (for the card's look and its button to Settings → AI plans), and the provider's own words kept for
+ * kind of no it was (for the card's look and its button to Settings → AI subscriptions), and the provider's own words kept for
  * the card's Details toggle, with any key taken out. Shared by the server (lib/server/chat.ts, which writes it on the
  * bot's message as Message.chatError) and the window (components/app/chat-error.tsx), and free of imports so its
  * tests run on it alone (scripts/test-chat-error.mjs).
@@ -160,8 +160,8 @@ export function chatErrorKind(i: Pick<ChatErrorInput, "status" | "code" | "messa
   return "other";
 }
 
-/** "Settings → AI plans": where the card's button goes, and what each line points to. */
-export const AI_PLANS = "Settings → AI plans";
+/** "Settings → AI subscriptions" (the card's own place since #116): where the card's button goes, and what each line points to. */
+export const AI_PLANS = "Settings → AI subscriptions";
 
 /**
  * A provider's no, for the chat: its kind, a heading, the plain line, and the provider's words for Details (`keys`:

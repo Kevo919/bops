@@ -720,7 +720,7 @@ await check("Auto, and OpenAI says the account has no credits: the chat says so 
   }
   const said = S.getState().messages.filter((m) => m.chatId === chatId && m.role === "bot").at(-1);
   assert.equal(said.chatError?.kind, "credit", JSON.stringify(said));
-  assert.match(said.text, /^Your OpenAI account is out of credit, so \w+ can't answer\. Add credit at platform\.openai\.com, Billing, or pick another model in Settings → AI plans\.$/);
+  assert.match(said.text, /^Your OpenAI account is out of credit, so \w+ can't answer\. Add credit at platform\.openai\.com, Billing, or pick another model in Settings → AI subscriptions\.$/);
   assert.equal(said.chatError.text, said.text);
   assert.equal(said.chatError.status, 429);
   assert.match(said.chatError.details, /no credits remaining/);

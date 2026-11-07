@@ -649,7 +649,11 @@ function Pill<V extends string>({ label, value, options, onPick, disabled }: { l
   );
 }
 
-/** A switch, on or off (Used in). `locked`: shown, not changed, with why. */
+/**
+ * A switch, on or off (Used in). `locked`: shown, not changed, with why. On is the ink's own color (task 87: the dark
+ * look's raised grey for an ink fill was darker than its off grey, so a switch that said on looked off); the knob is the
+ * paper's, so on is a bright track with a dark knob in Dark and the black track with a white one in Light.
+ */
 function Toggle({ label, on, locked, onFlip }: { label: string; on: boolean; locked?: boolean; onFlip: (on: boolean) => void }) {
   return (
     <button
@@ -659,7 +663,7 @@ function Toggle({ label, on, locked, onFlip }: { label: string; on: boolean; loc
       aria-label={label}
       disabled={locked}
       onClick={() => onFlip(!on)}
-      className={`relative h-[18px] w-[30px] shrink-0 rounded-full transition-colors disabled:cursor-default ${on ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-d9d9d6)]"} ${locked ? "opacity-50" : ""}`}
+      className={`relative h-[18px] w-[30px] shrink-0 rounded-full transition-colors disabled:cursor-default ${on ? "bg-[color:var(--color-ink)]" : "bg-[color:var(--hb-d9d9d6)]"} ${locked ? "opacity-50" : ""}`}
     >
       <span className={`absolute top-[2px] size-[14px] rounded-full bg-white transition-[left] ${on ? "left-[14px]" : "left-[2px]"}`} />
     </button>

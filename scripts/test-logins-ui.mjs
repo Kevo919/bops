@@ -200,7 +200,7 @@ await test("Settings: Account, then Workspace with its switcher, then Orgo team 
   const panes = [];
   const m = await mount(settings(stateOf(), { props: { onPane: (p) => panes.push(p) } }));
   try {
-    assert.deepEqual(nav(m.box), ["profile", "plan", "usage", "reach", "ai", "privacy", "mac", "general", "team", "chart", "bots", "logins", "email"], "in the mockup's order");
+    assert.deepEqual(nav(m.box), ["profile", "plan", "usage", "reach", "subscriptions", "ai", "privacy", "mac", "general", "team", "chart", "bots", "logins", "email"], "in the mockup's order");
     const text = m.box.querySelector("nav").textContent;
     assert.match(text, /Account\s*Yours, in every workspace/);
     assert.match(text, /Workspace[^]*fernway[^]*Shared with its people/, "the switcher as the group's heading");

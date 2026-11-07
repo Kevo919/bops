@@ -21,7 +21,8 @@ import { ORBIT_OWNER_ONLY, ORBIT_TOOL_NAMES, ORBIT_TOOLS, orbitNote, orbitNowLin
 import type { ResponseInputItem } from "openai/resources/responses/responses";
 import { openaiClient } from "./openai-client";
 import { chatModelName, modelWithTools, respond, toolsDropped } from "./chat-providers";
-import { computerWordsFor } from "@/lib/computer-words";
+import { computerWords, computerWordsFor } from "@/lib/computer-words";
+
 import { chatModelLabel, chatModels, providerOf } from "@/lib/chat-models";
 import { contactLine, createBot, namesTheUser } from "./bots";
 import { creditsOut, noteOutOfCredit, outOfCreditWords } from "./cloud";
@@ -74,6 +75,18 @@ import { recordTokens, usageTags } from "./usage";
 import { foldChat, soFar, windowOf } from "./chat-summary";
 import { heard } from "@/lib/chat-summary";
 import { LIGHT, logRoute, routeChat, speedFor, tierParam, withSpeed, type Config } from "./routing";
+
+/**
+ * The owner's computer in this computer's words, for the prompt's own copy (task 85: on Windows the prompt said "Mac"
+ * throughout, so the bot wrote "on your Mac" back): fixed words only, never a name, title or message (computerWordsFor
+ * leaves what's interpolated exactly as it is).
+ */
+// Only this desktop app's own machine is reworded: on a bot's computer (a runner, onRunner(), or a turn it answers there,
+// currentTurn()) the server's platform is that computer's, not the owner's, so the owner's computer keeps the words it
+// was written with ("darwin": none change).
+const ownPlatform = () => (onRunner() || currentTurn() ? "darwin" : process.platform);
+const pcWords = (text: TemplateStringsArray, ...values: unknown[]) => computerWordsFor(ownPlatform())(text, ...values);
+const pc = (text: string) => computerWords(text, ownPlatform());
 
 /**
  * Chat engine. Every bot answers in its own chat, like texting a person: it replies, looks things up
@@ -234,7 +247,11 @@ const SEARCHING = [
 ].join("\n");
 
 const TASK = {
-  title: { type: "string", description: "A 2-5 word label, e.g. \"Lisbon flights\"." },
+  title: {
+    type: "string",
+    // Where it runs is never in a title as the computer's kind in other words (task 85: "On this Window"): this PC's own word.
+    description: pc('A 2-5 word label, e.g. "Lisbon flights". When the label says where it runs, call the user\'s computer "this Mac" ("Inbox on this Mac"), never by another name.'),
+  },
   goal: { type: "string", description: "A complete, standalone instruction. The worker sees only this." },
 };
 
@@ -251,7 +268,7 @@ const SAY = {
   say: {
     type: "string",
     description:
-      "What you say to the user as you start, as your chat reply: one short, natural line in your own words about what you're about to do (the task isn't done yet: no answers or results), fitting what they asked, like a person would text back (\"Pulling up Jordan's chat on your Mac.\", \"I'll have Max go through your LinkedIn DMs.\", \"Looking for flights to Denver now.\"). Not \"On it.\" or \"Got it.\" alone, and no task title in quotes.",
+      pc("What you say to the user as you start, as your chat reply: one short, natural line in your own words about what you're about to do (the task isn't done yet: no answers or results), fitting what they asked, like a person would text back (\"Pulling up Jordan's chat on your Mac.\", \"I'll have Max go through your LinkedIn DMs.\", \"Looking for flights to Denver now.\"). Not \"On it.\" or \"Got it.\" alone, and no task title in quotes."),
   },
 };
 
@@ -264,7 +281,7 @@ const WHERE = {
   },
   then_on_mac: {
     type: ["string", "null"],
-    description: "For a task with a last step that needs a browser on the user's Mac, on their home internet: that step, run on their Mac with the cloud part's result. Otherwise null.",
+    description: pc("For a task with a last step that needs a browser on the user's Mac, on their home internet: that step, run on their Mac with the cloud part's result. Otherwise null."),
   },
 };
 
@@ -340,8 +357,8 @@ function persona(b: Bot, others: Bot[]) {
     `You're told the time, what's running and a briefing of your computer as of now. Use them to answer questions about what you're doing, what's open, or what's waiting on ${owner}. Talk about the work, not screen numbers, unless ${owner} asks about a screen.`,
     getState().mac?.ready
       ? fullAccessOn()
-        ? `You can also work on ${owner}'s own Mac with full access: a Chrome of your own there (so websites see their home internet), a shell, their files and the apps installed on it (Messages, Notes, Calendar, Finder…). Tasks that need their files or Mac apps go there (start_task with where "mac"); most other work belongs on your cloud computer. Those Mac apps aren't your apps (below): for an app you have there, use it yourself, never a Mac app of the same name.`
-        : `You can also work on ${owner}'s own Mac, in a Chrome of your own there, so websites see their home internet. You can't use the apps on their Mac (Messages, Notes, Finder…) or their files for now. Most work belongs on your cloud computer; use their Mac only when the task needs it or they ask (start_task with where).`
+        ? pcWords`You can also work on ${owner}'s own Mac with full access: a Chrome of your own there (so websites see their home internet), a shell, their files and the apps installed on it (Messages, Notes, Calendar, Finder…). Tasks that need their files or Mac apps go there (start_task with where "mac"); most other work belongs on your cloud computer. Those Mac apps aren't your apps (below): for an app you have there, use it yourself, never a Mac app of the same name.`
+        : pcWords`You can also work on ${owner}'s own Mac, in a Chrome of your own there, so websites see their home internet. You can't use the apps on their Mac (Messages, Notes, Finder…) or their files for now. Most work belongs on your cloud computer; use their Mac only when the task needs it or they ask (start_task with where).`
       : "",
     // How to handle a request, then the two rules that keep the bot doing the work instead of promising it.
     agentsLine(b, owner),
@@ -361,7 +378,7 @@ function persona(b: Bot, others: Bot[]) {
       ? `Your teammates can be reached at: ${others.map((o) => [o.name, o.email, o.phone].filter(Boolean).join(", ")).join("; ")}.`
       : "",
     textingLine(b) && ownerPhone()
-      ? `To text ${owner} on their phone ("text me…", "send me an iMessage"), use text_me, or schedule with deliver_to text for later. Never use their Mac's Messages app for it, and never just post here when they asked for a text.`
+      ? pcWords`To text ${owner} on their phone ("text me…", "send me an iMessage"), use text_me, or schedule with deliver_to text for later. Never use their Mac's Messages app for it, and never just post here when they asked for a text.`
       : "",
     outboundOn()
       ? `To call or text someone from ${owner}'s own AgentPhone number (including ${owner}: "call me at +1… and tell me…", "text me…" with a number), use place_call or send_text. ${owner} is asked first every time. A call only starts with the tool: never say you called, spoke with, or reached anyone unless place_call said the call started, and never say what was said until the call's result shows in the chat.`
@@ -1550,7 +1567,7 @@ const zoneWords = (r: Routine) => (r.timeZone ? ` (${r.timeZone} time)` : "");
 
 /** The note in the chat that shows what was scheduled. */
 function scheduledNote(r: Routine) {
-  const how = r.reminder ? " · a reminder" : r.where && r.where !== "auto" ? ` · ${r.where === "mac" ? "on your Mac" : "in the cloud"}` : "";
+  const how = r.reminder ? " · a reminder" : r.where && r.where !== "auto" ? ` · ${r.where === "mac" ? pc("on your Mac") : "in the cloud"}` : "";
   const goes = deliveryWords(r.deliverTo).replace(/^, /, " · ");
   return `Scheduled "${r.title}" · ${describeSchedule(r.schedule, zoneOf(r))}${zoneWords(r)}${how}${r.quiet ? " · quiet" : ""}${goes}${r.model ? ` · on ${routineModelName(r)}` : ""}${r.fromOutside ? ` · set up by ${r.fromOutside}` : ""}`;
 }
@@ -1712,8 +1729,8 @@ async function manageRoutine(b: Bot, below: string[], a: ManageArgs, notes: stri
     const mac = a.action === "run_on_mac";
     const moved = setRoutineWhere(r.id, mac ? "mac" : "cloud");
     if (moved.error) return `Not moved: ${moved.error}`;
-    notes.push(`"${r.title}" now runs ${mac ? "on your Mac" : "in the cloud"}`);
-    return `Done: its task now runs ${mac ? `on ${owner}'s Mac` : "in the cloud"}.`;
+    notes.push(`"${r.title}" now runs ${mac ? pc("on your Mac") : "in the cloud"}`);
+    return `Done: its task now runs ${mac ? pcWords`on ${owner}'s Mac` : "in the cloud"}.`;
   }
   if (a.action === "run_now") {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -2222,7 +2239,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
             }),
           ]
         : []),
-      fn("start_task", b.runsOn === "mac" && pcReady() && !member && !opts.outside ? computerWordsFor(process.platform)`Start a long task (a thread) on ${owner}'s Mac, where you work.` : `Start a long task (a thread) on your cloud computer, or on ${owner}'s Mac when it needs their Mac.`, {
+      fn("start_task", b.runsOn === "mac" && pcReady() && !member && !opts.outside ? computerWordsFor(process.platform)`Start a long task (a thread) on ${owner}'s Mac, where you work.` : pcWords`Start a long task (a thread) on your cloud computer, or on ${owner}'s Mac when it needs their Mac.`, {
         ...TASK,
         ...SAY,
         ...WHERE,
@@ -2290,7 +2307,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
           ]),
       fn(
         "manage_routine",
-        `Run a routine now, pause, resume, skip one of its runs (skip: at is that run's time, null for its next; unskip brings one back, null for all) or delete it, change where its task runs, or edit it, when ${owner} asks ("run the news check now", "pause it", "skip Friday's digest", "do today's after all", "stop the water reminder", "run the calendar check on my Mac", "make the digest 8 AM and 5 PM", "move it to Mondays and Fridays", "do the prep 30 minutes before instead"). edit takes a whole new schedule, a title, a goal, quiet or a time zone; the fields it doesn't change are null. It answers with how it went.`,
+        pcWords`Run a routine now, pause, resume, skip one of its runs (skip: at is that run's time, null for its next; unskip brings one back, null for all) or delete it, change where its task runs, or edit it, when ${owner} asks ("run the news check now", "pause it", "skip Friday's digest", "do today's after all", "stop the water reminder", "run the calendar check on my Mac", "make the digest 8 AM and 5 PM", "move it to Mondays and Fridays", "do the prep 30 minutes before instead"). edit takes a whole new schedule, a title, a goal, quiet or a time zone; the fields it doesn't change are null. It answers with how it went.`,
         {
           routine_id: { type: "string", description: "The routine's id from the Routines list." },
           action: { type: "string", enum: ["run_now", "pause", "resume", "skip", "unskip", "delete", "run_on_mac", "run_in_cloud", "edit"] },
@@ -2406,7 +2423,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       ]),
       // The main bot hands to every bot that takes work; a lead on the team chart, to the bots under it (lib/chain.ts).
       ...(handTo.length
-        ? [fn("hand_off", `Hand a task to the bot whose role fits. It runs on that bot's computer (or ${owner}'s Mac).`, { bot_id: { type: "string", enum: handTo.map((o) => o.id) }, ...TASK, ...SAY, ...WHERE })]
+        ? [fn("hand_off", pcWords`Hand a task to the bot whose role fits. It runs on that bot's computer (or ${owner}'s Mac).`, { bot_id: { type: "string", enum: handTo.map((o) => o.id) }, ...TASK, ...SAY, ...WHERE })]
         : []),
       ...(followUps.length
         ? [
@@ -2421,7 +2438,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
                 message: { type: "string", description: `What the task should do now, complete on its own: ${owner}'s words as an instruction to it, with anything it needs from this chat. The task sees only this.` },
                 on_mac: {
                   type: "boolean",
-                  description: `True when a task running in the cloud should carry on on ${owner}'s Mac (they asked for their Mac, or it needs their home internet). A cloud task can't reach the Mac itself. When ${owner}'s own message asks for their Mac, Bops moves it there once its cloud run stops, with a record of what it did; otherwise the message goes to the task and ${owner} is offered the move. Otherwise false.`,
+                  description: pcWords`True when a task running in the cloud should carry on on ${owner}'s Mac (they asked for their Mac, or it needs their home internet). A cloud task can't reach the Mac itself. When ${owner}'s own message asks for their Mac, Bops moves it there once its cloud run stops, with a record of what it did; otherwise the message goes to the task and ${owner} is offered the move. Otherwise false.`,
                 },
                 ...SAY,
               },
@@ -2499,7 +2516,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
           ]),
       ...(textingLine(b) && ownerPhone()
         ? [
-            fn("text_me", `Text ${owner} on their phone (iMessage or SMS) from the team's number. Use it whenever they ask you to text or message them, or for news they'd want on their phone. Never use their Mac's Messages app for this.`, {
+            fn("text_me", pcWords`Text ${owner} on their phone (iMessage or SMS) from the team's number. Use it whenever they ask you to text or message them, or for news they'd want on their phone. Never use their Mac's Messages app for this.`, {
               text: { type: "string", description: "The text, short and plain: no markdown." },
             }),
           ]
@@ -2528,7 +2545,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
           where: {
             type: "string",
             enum: ["mac", "computer", "web"],
-            description: `mac: a window on ${owner}'s Mac (Messages, Mail, Slack…). web: a public page that needs no sign in (prices, news, status pages, docs, listings), read every few minutes with no screen. computer: a site that needs ${owner}'s sign in (X DMs, Gmail), on your own computer's screen.`,
+            description: pcWords`mac: a window on ${owner}'s Mac (Messages, Mail, Slack…). web: a public page that needs no sign in (prices, news, status pages, docs, listings), read every few minutes with no screen. computer: a site that needs ${owner}'s sign in (X DMs, Gmail), on your own computer's screen.`,
           },
           app: { type: ["string", "null"], description: "For mac: the app, e.g. \"Messages\"." },
           window: { type: ["string", "null"], description: "For mac: the conversation, mailbox or window title to watch, e.g. \"Jordan\". Null for the app's window." },
@@ -2825,7 +2842,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       // A member's turn: who's talking, and what's still only the owner's.
       member
         ? // Their name quoted: it's theirs to set (made plain: member-access.ts cleanName), never part of what Bops says.
-          `"${member.name}"${member.email ? ` (${member.email})` : ""} is talking to you now, not ${owner}: someone ${owner} gave this bot to. Do what they ask as you would for ${owner}. You may use the apps, keys and logins you have here for them, but anything that sends, changes, deletes or pays waits for ${owner}'s yes, so say so. Nothing else of ${owner}'s own: their Mac or settings. Routines, reminders, watches, skills${apps ? "" : ", apps"} and new bots are ${owner}'s to set up or change, and what ${member.name} tells you about themselves is never a fact about ${owner}. Say who you're answering when it isn't clear.`
+          pcWords`"${member.name}"${member.email ? ` (${member.email})` : ""} is talking to you now, not ${owner}: someone ${owner} gave this bot to. Do what they ask as you would for ${owner}. You may use the apps, keys and logins you have here for them, but anything that sends, changes, deletes or pays waits for ${owner}'s yes, so say so. Nothing else of ${owner}'s own: their Mac or settings. Routines, reminders, watches, skills${apps ? "" : ", apps"} and new bots are ${owner}'s to set up or change, and what ${member.name} tells you about themselves is never a fact about ${owner}. Say who you're answering when it isn't clear.`
         : "",
       ...(opts.group
         ? [
@@ -2837,7 +2854,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       // Asked by text, in a channel or by email (it changes from turn to turn, so it's here, not in the instructions).
       relayed ? `Pictures show only in the Bops app's chat, so you can't make one from here: if ${owner} asks for one, say they can ask for it in Bops.` : "",
       followUps.length
-        ? `This chat's tasks you can send a message on to (tell_task): ${followUps.map((s) => `"${s.title}" (${s.id}), ${live(s) ? "running" : "finished"} ${s.runsOn === "mac" ? `on ${owner}'s Mac` : "in the cloud"}${apps ? (s.app ? `, on the app ${s.app.name}` : ", on no app") : ""}`).join("; ")}.`
+        ? `This chat's tasks you can send a message on to (tell_task): ${followUps.map((s) => `"${s.title}" (${s.id}), ${live(s) ? "running" : "finished"} ${s.runsOn === "mac" ? pcWords`on ${owner}'s Mac` : "in the cloud"}${apps ? (s.app ? `, on the app ${s.app.name}` : ", on no app") : ""}`).join("; ")}.`
         : "",
       // The user's apps, for change_app (which a routine's run and someone else's turn don't have).
       bg || opts.outside || !apps ? "" : appsLine(b, answering?.lookingAt),
@@ -3364,7 +3381,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
     // a cloud computer can't open them, so the goal has to say what's in them).
     const pics = (answering?.images ?? []).map((i) => uploadPath(i.id)?.path).filter(Boolean) as string[];
     const withImages = (goal: string) =>
-      pics.length ? `${goal}\n\n${pics.length === 1 ? "An image" : `${pics.length} images`} attached by ${owner} (files on their Mac; a cloud computer can't open them): ${pics.join(", ")}` : goal;
+      pics.length ? `${goal}\n\n${pics.length === 1 ? "An image" : `${pics.length} images`} attached by ${owner} (files on their ${pc("Mac")}; a cloud computer can't open them): ${pics.join(", ")}` : goal;
     const sessionIds: string[] = [];
     // Parts started together in this turn (start_task part_of), by their name: one group each.
     const groups = new Map<string, { id: string; title: string }>();
@@ -3495,18 +3512,18 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
             try {
               moved = moveToMac(s.id, message);
             } catch (e) {
-              notes.push(`Couldn't move ${s.title} to your Mac: ${(e as Error).message}`);
+              notes.push(pcWords`Couldn't move ${s.title} to your Mac: ${(e as Error).message}`);
             }
           if (moved) {
             sessionIds.push(moved.id);
-            notes.push(`Moved ${s.title} to your Mac: “${message}”`);
+            notes.push(pcWords`Moved ${s.title} to your Mac: “${message}”`);
           } else {
             // Passed on from someone else's email: the task gets it as information from them, not the user's words.
             replyToSession(s.id, message, undefined, outsideFrom, member ? saidOf(member) : undefined);
             sessionIds.push(s.id);
             // What the task got, in the bot's words, so a wrong send is plain to see.
             notes.push(`Sent to ${s.title}: “${message}”`);
-            if (cloud && a.on_mac === true && asked && !mac?.ready) notes.push(`Couldn't move ${s.title} to your Mac: ${mac?.reason ?? "your Mac isn't set up for bots yet"}`);
+            if (cloud && a.on_mac === true && asked && !mac?.ready) notes.push(pcWords`Couldn't move ${s.title} to your Mac: ${mac?.reason ?? "your Mac isn't set up for bots yet"}`);
             // Suggested, but not asked for by the user: they decide ("Move to your Mac?" under its chip).
             else if (cloud && (a.on_mac === true || mentionsMac(ownWords)) && mac?.ready) offerMove(s.id);
           }
@@ -3665,7 +3682,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       return { text: null };
     }
     // The model's provider said no (out of credit, too many requests, a bad key, no such model, down): in plain words,
-    // with a way to Settings → AI plans, its raw words behind Details and never a key (lib/chat-error.ts).
+    // with a way to Settings → AI subscriptions, its raw words behind Details and never a key (lib/chat-error.ts).
     const failure = chatFailure(e, { model: turnModel, bot: b.name });
     if (failure) console.warn(`[chat] ${botId} couldn't answer: ${failure.kind} (${failure.provider ?? "provider"} ${failure.status ?? ""})`.trim());
     addMessage({ chatId, role: "bot", botId, text: failure ? failure.text : `Something went wrong on my side: ${(e as Error).message}`, ...(failure ? { chatError: failure, bops: true as const } : {}), replyTo: opts.replyTo });

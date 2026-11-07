@@ -839,10 +839,12 @@ function BotKeysCard({ state, bot: b, onAdd, className }: BotKeysProps) {
               <button
                 role="switch"
                 aria-checked={on}
-                aria-label={on ? `Stop ${b.name} using ${k.name}` : `Let ${b.name} use ${k.name}`}
+                // What it is, the same whether on or off (task 87): the switch's checked state says which; a name that said
+                // what a press does read as the opposite state.
+                aria-label={`${b.name} uses ${k.name}`}
                 disabled={busy === k.name}
                 onClick={() => void toggle(k.name, !on)}
-                className={`flex h-[22px] w-[38px] shrink-0 items-center rounded-full p-0.5 disabled:opacity-60 ${on ? "justify-end bg-[color:var(--hb-0a0a0a)]" : "justify-start bg-[color:var(--hb-d9d9d6)]"}`}
+                className={`flex h-[22px] w-[38px] shrink-0 items-center rounded-full p-0.5 disabled:opacity-60 ${on ? "justify-end bg-[color:var(--color-ink)]" : "justify-start bg-[color:var(--hb-d9d9d6)]"}`}
               >
                 <span className={`size-[18px] rounded-full ${on ? "bg-highlighter" : "bg-white"}`} />
               </button>

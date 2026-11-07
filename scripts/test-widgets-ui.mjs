@@ -303,10 +303,10 @@ try {
     assert.deepEqual(cut, [], "titles cut short in Edit");
     assert.equal(await p.locator('[data-widget-id="w_chi"] [data-widget-title]').innerText(), "CHICAGO");
     const first = p.locator("[data-widget]").first();
-    await first.getByRole("radio", { name: "Wide" }).click();
+    await first.getByRole("button", { name: /^Wide size for / }).click();
     await settle(p);
     assert.match(await p.locator("[data-widget-grid] > div").first().getAttribute("class"), /col-span-4/);
-    await p.locator("[data-widget]").first().getByRole("button", { name: "Move later" }).click();
+    await p.locator("[data-widget]").first().getByRole("button", { name: /^Move .* later$/ }).click();
     await settle(p);
     assert.equal(await p.locator("[data-widget]").nth(1).getAttribute("data-widget-id"), "w_clock", "moved one later");
     const n = await p.locator("[data-widget]").count();
@@ -314,8 +314,8 @@ try {
     await settle(p);
     assert.equal(await p.locator("[data-widget]").count(), n + 1, "added");
     const last = p.locator("[data-widget]").last();
-    await last.getByRole("button", { name: "Remove" }).click();
-    await last.getByRole("button", { name: "Remove for sure" }).click();
+    await last.getByRole("button", { name: /^Remove (?!.*for sure$)/ }).click();
+    await last.getByRole("button", { name: /^Remove .* for sure$/ }).click();
     await settle(p);
     assert.equal(await p.locator("[data-widget]").count(), n, "removed");
     await p.locator("[data-edit-widgets]").click();
@@ -353,11 +353,11 @@ try {
     await p.locator("[data-animations]").waitFor();
     await shot(p, "settings-look-animations");
     assert.match(await p.locator('[data-in-progress="animations-setting"]').innerText(), /Being tested[\s\S]*85%/);
-    await p.locator("[data-animations]").getByRole("radio", { name: "Off" }).click();
+    await p.locator("[data-animations]").getByRole("button", { name: "Off animations" }).click();
     await settle(p);
     const st = await fetch(`${BASE}/api/state`, { headers: owner }).then((r) => r.json());
     assert.equal(st.state.look.current.motion, "off");
-    assert.equal(await p.locator("[data-animation-speed]").getByRole("radio", { name: "Fast" }).isDisabled(), true, "speed waits while Off");
+    assert.equal(await p.locator("[data-animation-speed]").getByRole("button", { name: "Fast speed" }).isDisabled(), true, "speed waits while Off");
     await p.keyboard.press("Escape");
     await settle(p);
     assert.equal(await p.locator('[data-widget-page="home"]').count(), 1, "Esc closed Settings only, not the page under it");
