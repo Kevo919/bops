@@ -1,4 +1,4 @@
-// Bot tasks on this PC (lib/server/pc-task-runner.ts, pc-task-setting.ts, app/api/pc-task-runner, vm/pc-approve-mcp.mjs,
+// Bot tasks on this PC (lib/server/pc-task-runner.ts, pc-task-setting.ts, app/api/pc-task-runner, vm/pc-approve-mcp.mjs,
 // cli-agents.ts approveTool): who runs a task (the owner's signed in Claude plan, or the OpenAI key for the Codex
 // executor), how Claude Code is started (its flags and permissions, its working folder), how its stream-json output
 // becomes the thread's steps and answer, what a failure says, and that no key reaches Claude Code, a log or the state.
@@ -45,7 +45,18 @@ writeFileSync(
 const fs = require("node:fs"), path = require("node:path");
 if (process.argv[2] === "--help") {
   const flags = ["--restricted", "--setting-sources", "--settings", "--tools", "--permission-prompt-tool", "--strict-mcp-config", "--disallowedTools"];
+  if (process.env.FAKE_PREFIX_CLAUDE) {
+    // Flags whose names merely CONTAIN the needed ones: a substring check would wrongly pass.
+    const lookalikes = { "--restricted": "--restricted-mode", "--tools": "--toolset-listing", "--permission-prompt-tool": "--permission-prompt-tooling" };
+    process.stdout.write(flags.map((f) => lookalikes[f] ?? f).join("\\n") + "\\n");
+    process.exit(0);
+  }
   process.stdout.write((process.env.FAKE_OLD_CLAUDE ? flags.slice(4) : flags).join("\\n") + "\\n");
+  process.exit(0);
+}
+if (process.argv[2] === "--version") {
+  // 2.1.318 is the floor the flags were checked against (MIN_CLAUDE_VERSION).
+  process.stdout.write((process.env.FAKE_OLD_VERSION ? "2.0.1 (Claude Code)" : "2.1.318 (Claude Code)") + "\\\n");
   process.exit(0);
 }
 let input = "";
@@ -261,7 +272,37 @@ await test("an older Claude Code without those flags isn't run", async () => {
   assert.equal(runner.claudeSupportsTasks(old, { ...runtime.env, FAKE_OLD_CLAUDE: "1" }), false);
   assert.equal(runner.claudeSupportsTasks(join(bin, "none"), runtime.env), false);
   assert.match(runner.PC_WORDS.update, /Update it \(run claude update\)/);
+  // Flags that merely contain the needed names prove nothing: each must be its own word in the help.
+  const lookalike = join(bin, "lookalike-claude");
+  writeFileSync(lookalike, readFileSync(fake, "utf8"));
+  chmodSync(lookalike, 0o755);
+  assert.equal(runner.claudeSupportsTasks(lookalike, { ...runtime.env, FAKE_PREFIX_CLAUDE: "1" }), false, "a lookalike flag name isn't the flag");
 });
+
+await test("a Claude Code older than the version its flags were checked against isn't run", async () => {
+  const oldv = join(bin, "oldv-claude");
+  writeFileSync(oldv, readFileSync(fake, "utf8"));
+  chmodSync(oldv, 0o755);
+  assert.equal(runner.claudeSupportsTasks(oldv, { ...runtime.env, FAKE_OLD_VERSION: "1" }), false, "2.0.1 is under the 2.1.318 floor");
+});
+
+await test("a search whose pattern walks out of its folder asks, wherever its path argument points", async () => {
+  const ws = { workspace, origins: new Set() };
+  assert.deepEqual(runner.pcDecision(ws, "Glob", { path: ".", pattern: "**/*.md" }), { behavior: "allow" });
+  assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "../../*.md" }), { behavior: "ask" }, ".. walks out");
+  assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "C:/Users/*" }), { behavior: "ask" }, "absolute walks out");
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "secret", glob: "*.env" }), { behavior: "allow" });
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "secret", glob: "..\\other/*" }), { behavior: "ask" }, "backslash .. walks out");
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "secret", glob: "/etc/*" }), { behavior: "ask" });
+  // Brace lists and extglob groups that anywhere say ..: taken for the escape they can expand to.
+  // Round 2: brace and extglob syntax asks outright - {.}{.}/x and .{.,}/x never spell .. but expand to it.
+  for (const p of ["{.}{.}/x", ".{.}/x", ".{.,}/x", "{..,x}/secret*", "{a,..}/**", "@(..)/*", "!(..)/*", "+(..)/*", "*(..)/*", "?(..)/*"])
+    assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: p }), { behavior: "ask" }, `${p} asks`);
+  // Round 2: brace syntax asks outright, whatever it seems to say (the lead's instruction).
+  assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "{a,b}/*.md" }), { behavior: "ask" }, "brace syntax asks outright");
+  assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "src/*/[ab]/*.md" }), { behavior: "allow" }, "character classes (not brace syntax) still allow");
+});
+
 
 await test("a user settings file allowing Bash, with a hook and a key, takes no effect", async () => {
   // As the real CLI would find it, in the HOME Claude Code runs with.
