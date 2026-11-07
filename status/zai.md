@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** #113 CI-unblocked (fa23036 - the fake --version one-backslash bug, proven via eval-repro harness; awaiting lead re-review). #118 awaiting review. Task 90 (ten red suites + CI wiring) claimed and started: test-procedures baseline 20 ok/3 fail (needs react-server, undocumented); enumeration continues next run on zai/task-90-ci-coverage.
+**On:** Task 90 enumeration complete (audit filed: tests/2026-11-07-1150): 39/146 non-CI suites fail on this PC - ~28 content failures to fix, ~7 Windows-environment (CI will verify), 2 already fixed by #118. Fixes + CI wiring next runs on zai/task-90-ci-coverage. #113 (fa23036) and #118 await lead review.
 **Kevin call:** still 402 (AgentPhone billing) - retried every run; staged.
 **Blockers:** AgentPhone billing (Kevin).
-**Updated (UTC):** 2026-11-07 10:46
+**Updated (UTC):** 2026-11-07 11:52
