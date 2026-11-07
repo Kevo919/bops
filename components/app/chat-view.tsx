@@ -42,6 +42,7 @@ import { AgentChipPick, boxAgents, pickLine, useBotKeys } from "./new-thread";
 import { AskInPlace, ChatAvatar, chatName, clockTime, memberAnswers, needsYou, post, ReadOnlyLine, StatusIcon, teamOf, useNow } from "./ui";
 import { ReplyDrafts } from "./reply-drafts";
 import { ChatErrorCard } from "./chat-error";
+import { storedChatError } from "@/lib/chat-error";
 import { dropCitations, plainStep } from "@/lib/plain-words";
 import { SkillProposals } from "./skill-proposals";
 
@@ -562,7 +563,10 @@ export function ChatView({
   }, [micError]);
   const attaching = attach.items.filter((a) => a.status !== "failed");
   const send = async () => {
-    const text = draft.trim();
+    // What's in the box as it is now (task 94): an accessibility client or an input method can put words in without an
+    // input event, so the draft caught up only on the box's blur, after the first Send had read it empty.
+    const typed = (document.getElementById("composer") as HTMLTextAreaElement | null)?.value;
+    const text = (typed ?? draft).trim();
     if (!text && !attaching.length) return;
     // In a shared workspace (the viewer has Write on every bot here): their words go to the owner's Bops through
     // Bops Cloud (shared-act.ts), shown as theirs at once. Pictures stay on this Mac (view-only.ts uploads).
@@ -715,9 +719,10 @@ export function ChatView({
             onClick={() => onCall(solo.id)}
             aria-label={`Call ${solo.name}`}
             title={`Call ${solo.name}`}
-            className="flex size-11 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_var(--h-e6e6e3),0_8px_20px_-10px_var(--h-00000040)] hover:shadow-[0_0_0_1px_var(--h-c9c9c6),0_8px_20px_-10px_var(--h-00000040)]"
+            // Its glyph in the ink's own color, which each look turns (task 96: near black on the dark paper).
+            className="flex size-11 items-center justify-center rounded-full bg-white text-ink shadow-[0_0_0_1px_var(--h-e6e6e3),0_8px_20px_-10px_var(--h-00000040)] hover:shadow-[0_0_0_1px_var(--h-c9c9c6),0_8px_20px_-10px_var(--h-00000040)]"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" strokeWidth="1.7" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden>
               <path d="M5 3.5h3.2l1.6 4.2-2.1 1.4a11 11 0 0 0 5.2 5.2l1.4-2.1 4.2 1.6V17a2.5 2.5 0 0 1-2.7 2.5C9.4 19 5 14.6 4.5 8.2A2.5 2.5 0 0 1 5 3.5z" />
             </svg>
           </button>
@@ -1038,7 +1043,15 @@ export function ChatView({
               }}
             />
             )}
-            <button type="submit" aria-label="Send" disabled={!draft.trim() && !attaching.length} className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-[color:var(--hb-0a0a0a)] disabled:opacity-30">
+            {/* Never disabled (task 94): a click on it reads the box itself (send), so words that reached the box without
+                an input event go on the first click; empty, it shows faint and a click does nothing. */}
+            <button
+              type="submit"
+              aria-label="Send"
+              // Faint while the box looks empty, never disabled, nor aria-disabled (which an accessibility client refuses).
+              data-send={!draft.trim() && !attaching.length ? "empty" : "ready"}
+              className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-[color:var(--hb-0a0a0a)] data-[send=empty]:opacity-30"
+            >
               <SendIcon />
             </button>
             </div>
@@ -1262,14 +1275,14 @@ function MoreMenu({ label, size, items }: { label: string; size: "chat" | "sheet
         aria-expanded={open}
         className={
           size === "chat"
-            ? "flex size-11 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_var(--h-e6e6e3),0_8px_20px_-10px_var(--h-00000040)] hover:shadow-[0_0_0_1px_var(--h-c9c9c6),0_8px_20px_-10px_var(--h-00000040)]"
-            : "flex size-[34px] items-center justify-center rounded-full shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f7f7f6)]"
+            ? "flex size-11 items-center justify-center rounded-full bg-white text-ink shadow-[0_0_0_1px_var(--h-e6e6e3),0_8px_20px_-10px_var(--h-00000040)] hover:shadow-[0_0_0_1px_var(--h-c9c9c6),0_8px_20px_-10px_var(--h-00000040)]"
+            : "flex size-[34px] items-center justify-center rounded-full text-ink shadow-[0_0_0_1px_var(--h-e6e6e3)] hover:bg-[color:var(--hb-f7f7f6)]"
         }
       >
         <svg width={size === "chat" ? 18 : 14} height={size === "chat" ? 18 : 14} viewBox="0 0 16 16" aria-hidden>
-          <circle cx="3.2" cy="8" r="1.35" fill="#0A0A0A" />
-          <circle cx="8" cy="8" r="1.35" fill="#0A0A0A" />
-          <circle cx="12.8" cy="8" r="1.35" fill="#0A0A0A" />
+          <circle cx="3.2" cy="8" r="1.35" fill="currentColor" />
+          <circle cx="8" cy="8" r="1.35" fill="currentColor" />
+          <circle cx="12.8" cy="8" r="1.35" fill="currentColor" />
         </svg>
       </button>
       {open && (
@@ -1931,6 +1944,8 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
   const b = state.bots.find((x) => x.id === m.botId);
   // Posted by a routine (a reminder, or a run in the chat): which one, by its name while it's there.
   const fromRoutine = m.routine && state.routines.find((r) => r.id === m.routine!.id);
+  // A provider's no: the card's own (Message.chatError), else one stored before the card, read once (lib/chat-error.ts).
+  const chatError = m.chatError ?? (m.role === "bot" ? storedChatError(m.text, b?.name) : null);
   return (
     <div className={`group/msg flex max-w-[86%] items-end gap-2 self-start ${enterClass}`}>
       {showSender && (b && !continued ? <Mascot botId={b.id} color={b.color} size={24} /> : <span className="w-6 shrink-0" />)}
@@ -1950,9 +1965,10 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
               {/* What a task changed in one of the owner's apps (app-change.tsx), in place of its words, which an older Bops shows. */}
               {m.appChange && appsOwnShown(state) ? (
                 <AppChangeCard m={m} state={state} />
-              ) : m.chatError ? (
-                /* Its chat model's provider said no: plain words, Settings → AI subscriptions, the raw words behind Details (chat-error.tsx). */
-                <ChatErrorCard error={m.chatError} at={m.at} readOnly={ro} />
+              ) : chatError ? (
+                /* Its chat model's provider said no: plain words, the model picker and AI subscriptions, the raw words behind
+                   Details (chat-error.tsx); one stored before the card (task 95) is read as the card would have shown it. */
+                <ChatErrorCard error={chatError} at={m.at} readOnly={ro} />
               ) : (
                 (m.text || !m.images?.length) && (
                   <div className="whitespace-pre-wrap rounded-[18px] bg-[color:var(--hb-f2f2f0)] px-3.5 py-2 text-[14px] leading-5 [overflow-wrap:anywhere]">

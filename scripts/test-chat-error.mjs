@@ -4,7 +4,7 @@
 // the provider's own words are kept for Details, and no key ever shows, given or only shaped like one.
 // Usage: node --experimental-strip-types scripts/test-chat-error.mjs
 import assert from "node:assert/strict";
-import { AI_PLANS, chatErrorKind, chatErrorOf, providerName, withoutKeys } from "../lib/chat-error.ts";
+import { chatErrorKind, chatErrorOf, MODEL_PICKER, providerName, storedChatError, withoutKeys } from "../lib/chat-error.ts";
 
 let passed = 0;
 const check = (name, fn) => {
@@ -20,7 +20,7 @@ check("Kevin's case: the OpenAI SDK's '429 You have no credits remaining' with a
   const e = chatErrorOf({ provider: "openai", status: 429, message: "429 You have no credits remaining. Add credits at https://platform.openai.com/settings/organization/billing", model: "gpt-5.5", bot: "Boppy" });
   assert.equal(e.kind, "credit");
   assert.equal(e.title, "Out of credit");
-  assert.equal(e.text, `Your OpenAI account is out of credit, so Boppy can't answer. Add credit at platform.openai.com, Billing, or pick another model in ${AI_PLANS}.`);
+  assert.equal(e.text, `Your OpenAI account is out of credit, so Boppy can't answer. Add credit at platform.openai.com, Billing, or pick another model in ${MODEL_PICKER}.`);
   assert.ok(!/^429/.test(e.text) && !e.text.includes("https://"), "no raw status or URL in the line");
   assert.match(e.details, /no credits remaining/, "the raw words are kept for Details");
   assert.equal(e.provider, "OpenAI");
@@ -36,7 +36,7 @@ check("out of credit or quota: 402, 429 insufficient_quota (by code or words), q
   const e = chatErrorOf({ provider: "anthropic", status: 400, code: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API.", bot: "Rook" });
   // Anthropic says low credit with a 400.
   assert.equal(e.kind, "credit");
-  assert.equal(e.text, `Your Anthropic account is out of credit, so Rook can't answer. Add credit at console.anthropic.com, Billing, or pick another model in ${AI_PLANS}.`);
+  assert.equal(e.text, `Your Anthropic account is out of credit, so Rook can't answer. Add credit at console.anthropic.com, Billing, or pick another model in ${MODEL_PICKER}.`);
   assert.equal(chatErrorKind({ status: 500, message: "billing service error" }), "down", "a 5xx is the provider's side, whatever its words");
   assert.equal(chatErrorOf({ provider: "anthropic", status: 403, message: "Your credit balance is too low" }).kind, "credit");
 });
@@ -44,7 +44,7 @@ check("out of credit or quota: 402, 429 insufficient_quota (by code or words), q
 check("rate limited: a 429 that isn't about credit says to try again in a moment", () => {
   const e = chatErrorOf({ provider: "openai", status: 429, code: "rate_limit_exceeded", message: "Rate limit reached for gpt-5.5 on tokens per min (TPM): Limit 30000. Please try again in 2s.", bot: "Boppy" });
   assert.equal(e.kind, "rate");
-  assert.equal(e.text, `OpenAI is getting too many requests right now, so Boppy can't answer yet. Try again in a moment, or pick another model in ${AI_PLANS}.`);
+  assert.equal(e.text, `OpenAI is getting too many requests right now, so Boppy can't answer yet. Try again in a moment, or pick another model in ${MODEL_PICKER}.`);
   assert.equal(chatErrorKind({ message: "Too many requests" }), "rate");
 });
 
@@ -52,7 +52,7 @@ check("bad key: 401 (and a 403 about the key) says the key wasn't accepted", () 
   const e = chatErrorOf({ provider: "openai", status: 401, message: `401 Incorrect API key provided: ${KEY}. You can find your API key at https://platform.openai.com/account/api-keys.`, bot: "Boppy" });
   assert.equal(e.kind, "key");
   assert.equal(e.title, "Key not accepted");
-  assert.match(e.text, /^OpenAI didn't accept your API key, so Boppy can't answer\. Check the key in Keys, or pick another model in Settings → AI subscriptions\.$/);
+  assert.match(e.text, /^OpenAI didn't accept your API key, so Boppy can't answer\. Check the key in Keys, or pick another model in the chat box's model picker\.$/);
   assert.ok(!e.details.includes(KEY) && !e.details.includes("SECRET"), "never the key, even one Bops wasn't told about");
   assert.equal(chatErrorKind({ status: 403, message: "invalid x-api-key" }), "key");
 });
@@ -60,7 +60,7 @@ check("bad key: 401 (and a 403 about the key) says the key wasn't accepted", () 
 check("model not found: 404 (or model_not_found) names the model, without its provider", () => {
   const e = chatErrorOf({ provider: "openai", status: 404, code: "model_not_found", message: "The model `gpt-9` does not exist or you do not have access to it.", model: "openai/gpt-9", bot: "Boppy" });
   assert.equal(e.kind, "model");
-  assert.equal(e.text, `OpenAI doesn't have the model "gpt-9", so Boppy can't answer. Pick another model in ${AI_PLANS}.`);
+  assert.equal(e.text, `OpenAI doesn't have the model "gpt-9", so Boppy can't answer. Pick another model in ${MODEL_PICKER}.`);
   assert.equal(chatErrorKind({ status: 400, message: "Unknown model: foo" }), "model");
 });
 
@@ -69,13 +69,13 @@ check("provider down: any 5xx, and an overloaded or bad gateway answer with no s
   assert.equal(chatErrorKind({ message: "Service Unavailable" }), "down");
   const e = chatErrorOf({ provider: "zai-coding", status: 503, message: "Service temporarily unavailable", bot: "Boppy" });
   assert.equal(e.title, "Z.ai is down");
-  assert.equal(e.text, `Z.ai is having trouble on its side right now, so Boppy can't answer. Try again in a minute, or pick another model in ${AI_PLANS}.`);
+  assert.equal(e.text, `Z.ai is having trouble on its side right now, so Boppy can't answer. Try again in a minute, or pick another model in ${MODEL_PICKER}.`);
 });
 
-check("anything else: plain, still pointing at AI subscriptions, with its words behind Details", () => {
+check("anything else: plain, still pointing at the chat box's model picker, with its words behind Details", () => {
   const e = chatErrorOf({ provider: "openrouter", status: 400, message: "Bad request: messages[0] invalid", bot: "pip" });
   assert.equal(e.kind, "other");
-  assert.equal(e.text, `Pip couldn't answer: OpenRouter turned the request down. Try again, or pick another model in ${AI_PLANS}.`);
+  assert.equal(e.text, `Pip couldn't answer: OpenRouter turned the request down. Try again, or pick another model in ${MODEL_PICKER}.`);
   assert.match(e.details, /^400 Bad request/);
   const unknown = chatErrorOf({ status: 500 });
   assert.equal(unknown.details, undefined, "no words: no Details");
@@ -144,6 +144,17 @@ check("provider names: routes and names both", () => {
   assert.equal(providerName("zai-coding-cn"), "Z.ai");
   assert.equal(providerName("Acme AI"), "Acme AI");
   assert.equal(providerName(""), undefined);
+});
+
+check("95: a message stored before the card (raw 429 words) reads as the card, keys out; anything else stays as written", () => {
+  const e = storedChatError("Something went wrong on my side: 429 You exceeded your current quota, please check your plan and billing details. sk-proj-abcdefghijklmnopqrstuvwxyz0123456789 (insufficient_quota)", "Boppy");
+  assert.equal(e?.kind, "credit");
+  assert.equal(e.title, "Out of credit");
+  assert.match(e.text, /^Your OpenAI account is out of credit, so Boppy can't answer\..*pick another model in the chat box's model picker\.$/);
+  assert.ok(!/sk-proj-/.test(e.details ?? ""), `a key in Details: ${e.details}`);
+  assert.equal(storedChatError("Something went wrong on my side: fetch failed"), null, "not a provider's no");
+  assert.equal(storedChatError("Two meetings today."), null);
+  assert.equal(storedChatError(undefined), null);
 });
 
 console.log(`\nchat errors: ${passed} passed`);

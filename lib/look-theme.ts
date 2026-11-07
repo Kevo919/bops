@@ -284,18 +284,23 @@ textarea::placeholder {
 .boppy-loading-scene [fill="#0A0A0A"] {
   fill: var(--hb-0a0a0a);
 }
+button svg[stroke="#0A0A0A" i],
 button svg [stroke="#0A0A0A" i] {
   stroke: var(--ht-0a0a0a);
 }
+button svg[stroke="#3A3A38" i],
 button svg [stroke="#3A3A38" i] {
   stroke: var(--ht-3a3a38);
 }
+button svg[stroke="#6B6B6B" i],
 button svg [stroke="#6B6B6B" i] {
   stroke: var(--ht-6b6b6b);
 }
+button svg[stroke="#8A8A88" i],
 button svg [stroke="#8A8A88" i] {
   stroke: var(--ht-8a8a88);
 }
+button svg[stroke="#9A9A98" i],
 button svg [stroke="#9A9A98" i] {
   stroke: var(--ht-9a9a98);
 }

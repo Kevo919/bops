@@ -63,7 +63,7 @@ mkdirSync(join(dir, ".data", "users", user), { recursive: true });
 const failure = {
   kind: "credit",
   title: "Out of credit",
-  text: "Your OpenAI account is out of credit, so Boppy can't answer. Add credit at platform.openai.com, Billing, or pick another model in Settings → AI subscriptions.",
+  text: "Your OpenAI account is out of credit, so Boppy can't answer. Add credit at platform.openai.com, Billing, or pick another model in the chat box's model picker.",
   provider: "OpenAI",
   status: 429,
   details: "429 You have no credits remaining. Add credits at https://platform.openai.com/settings/organization/billing (key …)",

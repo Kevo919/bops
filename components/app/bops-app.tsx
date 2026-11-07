@@ -2617,18 +2617,22 @@ export function Settings({
               onClick={onOpenPages}
               aria-label="Widgets: opens your Home page"
               title="Opens your Home page, where your widgets are"
-              className="flex h-[30px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)] max-md:h-11 max-md:text-[15px]"
+              className="flex h-[30px] w-full items-center gap-2 rounded-lg pl-2.5 pr-1 text-left text-[13px] text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)] max-md:h-11 max-md:text-[15px]"
             >
               {glyph(WIDGETS_GLYPH)}
-              <span className="min-w-0 flex-1 truncate">Widgets</span>
-              <span aria-hidden className="flex shrink-0 items-center gap-1 text-[11.5px] text-[color:var(--ht-8a8a88)]">
-                Opens Home
-                <svg width="10" height="10" viewBox="0 0 12 12">
-                  <path d="M4 2.5h5.5V8M9.5 2.5L3 9" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
+              {/* Its whole name, beside Being tested (task 96: it was cut short). */}
+              <span className="shrink-0 whitespace-nowrap">Widgets</span>
             </button>
           </InProgressRow>
+        )}
+        {/* Where it goes, on a line of its own under the row (task 96: beside Being tested, one line cut it to "Opens H…"). */}
+        {!shared && onOpenPages && (
+          <span data-widgets-opens aria-hidden className="flex items-center gap-1 pb-1 pl-[36px] text-[11px] leading-[14px] text-[color:var(--ht-8a8a88)]">
+            Opens your Home page
+            <svg width="9" height="9" viewBox="0 0 12 12" className="shrink-0">
+              <path d="M4 2.5h5.5V8M9.5 2.5L3 9" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
         )}
         {team_.length > 0 && group("Orgo team only", null, team_)}
       </nav>
