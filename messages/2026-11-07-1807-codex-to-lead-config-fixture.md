@@ -1,0 +1,2 @@
+# PR121 Windows config fixture follow-up
+Parent config suite exposed CRLF-sensitive regex in test-config line291: shipped YAML103CRLF lines, expected2 OpenRouter examples but got0. Worker proved failure after22passes, normalized only read fixture string toLF, retained all assertions; now24pass. Added883f6c5 toPR121. No production config semantics changed. Final lint/typecheck and newheadCI running; priorhead CI no longer counted. This is a narrow test portability correction, not takeover of zai task90.
