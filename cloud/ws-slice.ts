@@ -1,3 +1,5 @@
+import { ownerPlatformOf } from "../lib/owner-platform.ts";
+export { ownerPlatformOf } from "../lib/owner-platform.ts";
 import { createHash } from "node:crypto";
 import { appsOpenTo } from "./apps-team.ts";
 import { accessOf, adminAccess, appsLevelOf, currentFor, isAccessLevel, levelOf, permits, seesChat, usesComputer, type AccessLevel, type MemberAccess, type MemberAccessMap } from "./member-access.ts";
@@ -558,17 +560,6 @@ export function sharedSlice(blob: Record<string, unknown>, ws: string, viewer: S
   };
 }
 
-const PLATFORMS = ["win32", "darwin", "linux"] as const;
-/**
- * The operating system the owner's Bops runs on, as each of their computers said it (state.macs[device].mac.platform,
- * lib/server/mac.ts checkMac): the one they all say, else none (none said yet, or a Mac and a PC both: "the owner's
- * computer" is true of either).
- */
-export function ownerPlatformOf(blob: Record<string, unknown>): (typeof PLATFORMS)[number] | undefined {
-  const macs = isObject(blob.macs) ? Object.values(blob.macs) : [];
-  const said = new Set(macs.flatMap((m) => (isObject(m) && isObject(m.mac) && PLATFORMS.includes(m.mac.platform as never) ? [m.mac.platform as (typeof PLATFORMS)[number]] : [])));
-  return said.size === 1 ? [...said][0] : undefined;
-}
 
 /**
  * The Orgo computer each of the `shown` bots works on (hostOf: its own, or the main bot's it shares), by bot id: for an
