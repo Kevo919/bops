@@ -7,7 +7,9 @@ import { mailOn } from "./mail";
 import { memoryOn } from "./memory";
 import { fromThisMac } from "./owner-email";
 import { phoneOn } from "./phone";
-import { agentPhoneBase, agentPhoneView, lastProbe, probeAccount, type AgentPhoneView } from "./agentphone-status";
+import { agentPhoneBase, agentPhoneView, probeAccount, probeIfStale, type AgentPhoneView } from "./agentphone-status";
+import { botNumbers } from "./bot-number";
+import { MAIN_WORKSPACE } from "../types";
 import { getState } from "./store";
 import { fromBopsWindow } from "./ui-token";
 import { checkZapier, zapierOn } from "./zapier";
@@ -254,7 +256,7 @@ function viewOf(s: Service, owner: boolean, cloud: boolean): ServiceView {
     ...(owner ? { fields: s.fields.map((f, i) => ({ name: f.name, label: f.label, secret: f.secret, hint: f.hint, set: !!saved[i], shown: f.secret ? shownSecret(saved[i]) : (saved[i] ?? "") })) } : {}),
     ...(owner && current ? { check: { ok: current.ok, status: current.status, words: current.words } } : {}),
     // The AgentPhone panel (its number, agent, and what calls and texts need): the owner's view only.
-    ...(owner && s.id === "phone" && saved[0] ? { phone: agentPhoneView(shownSecret(saved[0])) } : {}),
+    ...(owner && s.id === "phone" && saved[0] ? { phone: { ...agentPhoneView(shownSecret(saved[0])), botNumber: botNumbers()[MAIN_WORKSPACE] ?? null } } : {}),
   };
 }
 
@@ -266,9 +268,7 @@ export async function servicesView(request: Request): Promise<ServicesView> {
   const owner = !cloud && ownerHere(request);
   // AgentPhone's panel: one read-only look (GET /v1/numbers and /v1/agents) with the key Bops runs with, at most every
   // five minutes, so it says what was found without a Check. Nothing is called or sent.
-  const key = process.env.AGENTPHONE_API_KEY?.trim();
-  const seen = lastProbe();
-  if (owner && key && (!seen || Date.now() - seen.at > 5 * 60_000)) await probeAccount(key).catch(() => null);
+  if (owner) await probeIfStale();
   return { mode: cloud ? "cloud" : "self", editable: owner, services: SERVICES.filter((s) => !cloud || !s.selfOnly).map((s) => viewOf(s, owner, cloud)) };
 }
 

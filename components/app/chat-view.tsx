@@ -41,6 +41,7 @@ import { threadAgentWords, threadKind } from "./bot-ai";
 import { AgentChipPick, boxAgents, pickLine, useBotKeys } from "./new-thread";
 import { AskInPlace, ChatAvatar, chatName, clockTime, memberAnswers, needsYou, post, ReadOnlyLine, StatusIcon, teamOf, useNow } from "./ui";
 import { ReplyDrafts } from "./reply-drafts";
+import { ChatErrorCard } from "./chat-error";
 import { dropCitations, plainStep } from "@/lib/plain-words";
 import { SkillProposals } from "./skill-proposals";
 
@@ -1949,6 +1950,9 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
               {/* What a task changed in one of the owner's apps (app-change.tsx), in place of its words, which an older Bops shows. */}
               {m.appChange && appsOwnShown(state) ? (
                 <AppChangeCard m={m} state={state} />
+              ) : m.chatError ? (
+                /* Its chat model's provider said no: plain words, Settings → AI plans, the raw words behind Details (chat-error.tsx). */
+                <ChatErrorCard error={m.chatError} at={m.at} readOnly={ro} />
               ) : (
                 (m.text || !m.images?.length) && (
                   <div className="whitespace-pre-wrap rounded-[18px] bg-[color:var(--hb-f2f2f0)] px-3.5 py-2 text-[14px] leading-5 [overflow-wrap:anywhere]">

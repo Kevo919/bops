@@ -1,9 +1,11 @@
 // Settings, Services, AgentPhone (components/app/services.tsx AgentPhonePanel, lib/server/services.ts,
 // lib/server/agentphone-status.ts), in the real built app, light and dark, at 1280 px and 412 px: with AGENTPHONE_API_KEY
 // set (local mode, no Bops Cloud), the panel shows the key by its last four only, the number and agent a read-only
-// probe found (GET /v1/numbers and /v1/agents, nothing placed or sent), calls ready, and texting's 10DLC registration
-// needed in Bops' own words; it's marked Being tested at 80%; the page isn't blank, never scrolls sideways, and nothing
-// throws. AgentPhone is a stub on 127.0.0.1; a made-up Orgo too; nothing leaves this computer.
+// probe found (GET /v1/numbers and /v1/agents, nothing placed or sent), calls "key works; funds not checked" (AgentPhone
+// has no balance to read; never "Ready to call"), and texting's 10DLC registration needed in Bops' own words; after a
+// real call's 402 (kept in .data/agentphone-calls.json) it says calls need funds. Settings, Email and phone and Boppy's
+// profile show the same number as Services, as "your AgentPhone number" (lib/bot-number.ts), never "No number yet".
+// It's marked Being tested at 80%; the page isn't blank, never scrolls sideways, and nothing throws. AgentPhone is a stub on 127.0.0.1; a made-up Orgo too; nothing leaves this computer.
 // The same harness as scripts/test-agent-instances-ui.mjs (`npx next build` first).
 // Usage: node scripts/test-agentphone-services-ui.mjs   (SHOTS=<dir> saves the screenshots there)
 import assert from "node:assert/strict";
@@ -147,6 +149,8 @@ const server = spawn(process.execPath, [join(root, "node_modules", "next", "dist
     BOPS_TELEMETRY: "0",
     AGENTPHONE_API_KEY: KEY,
     BOPS_AGENTPHONE_BASE: apBase,
+    // The public address saved: Kevin's own number still never takes texts for Boppy (only a line Bops sets up does).
+    BOPS_AGENTPHONE_HOOK_URL: "https://hooks.example.test/agentphone",
     BOPS_ENV_LOCAL: join(dir, "home", "env.local"),
   },
   stdio: ["ignore", "pipe", "pipe"],
@@ -242,6 +246,29 @@ async function openServices(page) {
   await page.locator('[data-settings-nav="services"]').click();
   await settle(page);
 }
+async function openEmailAndPhone(page) {
+  await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
+  await page.locator("aside").first().waitFor({ timeout: 30000 });
+  await page.waitForTimeout(500);
+  await page.getByRole("button", { name: /team, account and settings/ }).first().click();
+  await page.getByRole("menuitem", { name: "Settings", exact: true }).first().click();
+  await settle(page);
+  if (await page.locator("[data-settings-pane-back]").isVisible().catch(() => false)) await page.locator("[data-settings-pane-back]").click();
+  await page.locator('[data-settings-nav="email"]').click();
+  await settle(page);
+}
+async function openProfile(page) {
+  await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
+  await page.locator("aside").first().waitFor({ timeout: 30000 });
+  await page.waitForTimeout(500);
+  await page.locator("aside button").filter({ hasText: /^\s*Boppy/ }).first().click();
+  await settle(page);
+  await page.getByRole("button", { name: "Boppy's profile", exact: true }).first().click();
+  await settle(page);
+}
+// The last real call's outcome, as agentphone-status.ts keeps it (a hash of the key, never the key).
+const keyHash = createHash("sha256").update(KEY).digest("hex").slice(0, 16);
+const callsFile = join(dir, ".data", "agentphone-calls.json");
 async function noSideways(page, what) {
   const m = await page.evaluate(() => ({ W: innerWidth, s: Math.max(document.scrollingElement.scrollWidth, document.body.scrollWidth) }));
   assert.ok(m.s <= m.W + 1, `${what}: the page scrolls sideways (${m.s}px in ${m.W}px)`);
@@ -254,7 +281,7 @@ try {
       const { ctx, page, errors } = await context("owner");
       await page.setViewportSize({ width, height: width > 500 ? 860 : 915 });
       const tag = `${theme}-${width}`;
-      await check(`${tag}: the AgentPhone panel shows the key's last four, the number and agent, calls ready, texting's 10DLC words`, async () => {
+      await check(`${tag}: the AgentPhone panel shows the key's last four, the number and agent, funds not checked, texting's 10DLC words`, async () => {
         await openServices(page);
         const card = page.locator('[data-service="phone"]');
         await card.waitFor({ state: "visible", timeout: 20000 });
@@ -262,8 +289,9 @@ try {
         await panel.waitFor({ state: "visible", timeout: 15000 });
         const text = await panel.innerText();
         assert.match(text, /Key: saved, ends in Wx81/);
-        assert.match(text, /Number: \+1 \(555\) 010-2000, agent "Front desk"/);
-        assert.match(text, /Calls: Ready to call/);
+        assert.match(text, /Number: \+1 \(555\) 010-2000 \(your AgentPhone number\), agent "Front desk"/);
+        assert.match(text, /Calls: Key works; funds not checked\. If a call fails, add funds in AgentPhone → Billing\./);
+        assert.doesNotMatch(text, /Ready to call/);
         assert.match(text, /Texts: Texting needs AgentPhone's 10DLC registration: agentphone\.ai\/register/);
         const wip = card.locator('[data-in-progress="agentphone-calls-texts"]').first();
         assert.equal(await wip.getAttribute("data-in-progress-state"), "testing");
@@ -280,9 +308,55 @@ try {
         await shot(page, `agentphone-services-${tag}`);
         if (shots) await card.screenshot({ path: join(shots, `agentphone-card-${tag}.png`) });
       });
+      await check(`${tag}: Settings, Email and phone shows the same number, as your AgentPhone number`, async () => {
+        await openEmailAndPhone(page);
+        const box = page.locator('[data-bot-number="agentphone"]').first();
+        await box.waitFor({ state: "visible", timeout: 15000 });
+        const text = await box.innerText();
+        assert.match(text, /Your AgentPhone number: \+1 \(555\) 010-2000\. Boppy can call and text from it; texts to it don't reach Boppy yet\./);
+        const all = await page.locator("main, body").first().innerText();
+        assert.doesNotMatch(all, /No number yet/);
+        assert.doesNotMatch(all, /text (or call )?Boppy at/i, "never 'text Boppy at' your own number, address saved or not");
+        await noSideways(page, `${tag} email and phone`);
+        await shot(page, `agentphone-email-phone-${tag}`);
+      });
+      await check(`${tag}: Boppy's profile shows the same number, as your AgentPhone number`, async () => {
+        await openProfile(page);
+        const box = page.locator('section[data-panel] [data-bot-number="agentphone"]').first();
+        await box.waitFor({ state: "visible", timeout: 15000 });
+        const text = await box.innerText();
+        assert.match(text, /mobile · your AgentPhone number/);
+        assert.match(text, /\+1 \(555\) 010-2000/);
+        assert.doesNotMatch(text, /No number yet/);
+        assert.match(text, /Boppy can call and text from it; texts to it don't reach Boppy yet\./);
+        assert.doesNotMatch(text, /text (or call )?Boppy at/i);
+        assert.ok(await page.getByRole("button", { name: "Call +1 (555) 010-2000" }).first().isVisible(), "Call it");
+        await noSideways(page, `${tag} profile`);
+        await shot(page, `agentphone-profile-${tag}`);
+      });
       await check(`${tag}: nothing threw`, async () => assert.deepEqual(errors, []));
       await ctx.close();
     }
+  }
+  // A real call came back 402: calls need funds until one goes through, in both looks.
+  writeFileSync(callsFile, JSON.stringify({ state: "needs funds", at: Date.now(), key: keyHash }));
+  for (const theme of ["light", "dark"]) {
+    await fetch(`${BASE}/api/look`, { method: "POST", headers: owner, body: JSON.stringify({ action: "set", look: { theme } }) });
+    const { ctx, page, errors } = await context("owner");
+    await page.setViewportSize({ width: 1280, height: 860 });
+    await check(`${theme}: after a 402, the panel says calls need funds`, async () => {
+      await openServices(page);
+      const card = page.locator('[data-service="phone"]');
+      const panel = card.locator("[data-agentphone-panel]");
+      await panel.waitFor({ state: "visible", timeout: 15000 });
+      const text = await panel.innerText();
+      assert.match(text, /Calls: Calls need funds: add funds in AgentPhone → Billing\./);
+      assert.doesNotMatch(text, /funds not checked|Ready to call/);
+      await card.scrollIntoViewIfNeeded();
+      if (shots) await card.screenshot({ path: join(shots, `agentphone-card-needs-funds-${theme}.png`) });
+      assert.deepEqual(errors, []);
+    });
+    await ctx.close();
   }
   await check("the probe only read: no call placed, no text sent", async () => {
     assert.ok(apSeen.length > 0, "the probe ran");
