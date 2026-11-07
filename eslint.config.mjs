@@ -5,6 +5,12 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // vm/*.cjs run as plain CommonJS under Node (or Bops.exe with ELECTRON_RUN_AS_NODE), outside the bundler:
+  // require() is how they load node: builtins, so the TypeScript rule against it doesn't apply to them.
+  {
+    files: ["vm/**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

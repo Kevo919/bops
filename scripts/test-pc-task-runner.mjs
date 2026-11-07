@@ -1,3 +1,4 @@
+
 // Bot tasks on this PC (lib/server/pc-task-runner.ts, pc-task-setting.ts, app/api/pc-task-runner, vm/pc-approve-mcp.mjs,
 // cli-agents.ts approveTool): who runs a task (the owner's signed in Claude plan, or the OpenAI key for the Codex
 // executor), how Claude Code is started (its flags and permissions, its working folder), how its stream-json output
@@ -14,7 +15,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { basename, delimiter, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -45,7 +46,18 @@ writeFileSync(
 const fs = require("node:fs"), path = require("node:path");
 if (process.argv[2] === "--help") {
   const flags = ["--restricted", "--setting-sources", "--settings", "--tools", "--permission-prompt-tool", "--strict-mcp-config", "--disallowedTools"];
+  if (process.env.FAKE_PREFIX_CLAUDE) {
+    // Flags whose names merely CONTAIN the needed ones: a substring check would wrongly pass.
+    const lookalikes = { "--restricted": "--restricted-mode", "--tools": "--toolset-listing", "--permission-prompt-tool": "--permission-prompt-tooling" };
+    process.stdout.write(flags.map((f) => lookalikes[f] ?? f).join("\\n") + "\\n");
+    process.exit(0);
+  }
   process.stdout.write((process.env.FAKE_OLD_CLAUDE ? flags.slice(4) : flags).join("\\n") + "\\n");
+  process.exit(0);
+}
+if (process.argv[2] === "--version") {
+  // 2.1.318 is the floor the flags were checked against (MIN_CLAUDE_VERSION).
+  process.stdout.write((process.env.FAKE_OLD_VERSION ? "2.0.1 (Claude Code)" : "2.1.318 (Claude Code)") + "\\\n");
   process.exit(0);
 }
 let input = "";
@@ -261,7 +273,225 @@ await test("an older Claude Code without those flags isn't run", async () => {
   assert.equal(runner.claudeSupportsTasks(old, { ...runtime.env, FAKE_OLD_CLAUDE: "1" }), false);
   assert.equal(runner.claudeSupportsTasks(join(bin, "none"), runtime.env), false);
   assert.match(runner.PC_WORDS.update, /Update it \(run claude update\)/);
+  // Flags that merely contain the needed names prove nothing: each must be its own word in the help.
+  const lookalike = join(bin, "lookalike-claude");
+  writeFileSync(lookalike, readFileSync(fake, "utf8"));
+  chmodSync(lookalike, 0o755);
+  assert.equal(runner.claudeSupportsTasks(lookalike, { ...runtime.env, FAKE_PREFIX_CLAUDE: "1" }), false, "a lookalike flag name isn't the flag");
 });
+
+await test("a Claude Code older than the version its flags were checked against isn't run", async () => {
+  const oldv = join(bin, "oldv-claude");
+  writeFileSync(oldv, readFileSync(fake, "utf8"));
+  chmodSync(oldv, 0o755);
+  assert.equal(runner.claudeSupportsTasks(oldv, { ...runtime.env, FAKE_OLD_VERSION: "1" }), false, "2.0.1 is under the 2.1.318 floor");
+});
+
+await test("a search whose pattern walks out of its folder asks, wherever its path argument points", async () => {
+  const ws = { workspace, origins: new Set() };
+  assert.deepEqual(runner.pcDecision(ws, "Glob", { path: ".", pattern: "**/*.md" }), { behavior: "allow" });
+  assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "../../*.md" }), { behavior: "ask" }, ".. walks out");
+  assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "C:/Users/*" }), { behavior: "ask" }, "absolute walks out");
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "secret", glob: "*.env" }), { behavior: "allow" });
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "secret", glob: "..\\other/*" }), { behavior: "ask" }, "backslash .. walks out");
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "secret", glob: "/etc/*" }), { behavior: "ask" });
+  // Brace lists and extglob groups that anywhere say ..: taken for the escape they can expand to.
+  // Round 2: brace and extglob syntax asks outright - {.}{.}/x and .{.,}/x never spell .. but expand to it.
+  for (const p of ["{.}{.}/x", ".{.}/x", ".{.,}/x", "{..,x}/secret*", "{a,..}/**", "@(..)/*", "!(..)/*", "+(..)/*", "*(..)/*", "?(..)/*"])
+    assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: p }), { behavior: "ask" }, `${p} asks`);
+  // Round 2: brace syntax asks outright, whatever it seems to say (the lead's instruction).
+  assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "{a,b}/*.md" }), { behavior: "ask" }, "brace syntax asks outright");
+  assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "src/*/[ab]/*.md" }), { behavior: "allow" }, "character classes (not brace syntax) still allow");
+});
+
+// Round 3 (task 60). Glob and Grep: a backslash off Windows asks; Grep's `pattern` is a regex, never a path.
+await test("round 3: a backslash in a glob asks off Windows (an escape, not a separator); Windows still reads it as one", async () => {
+  assert.equal(runner.patternStaysPut("src\\*.md", "linux"), false, "a backslash asks off Windows");
+  assert.equal(runner.patternStaysPut("\\.\\./x", "darwin"), false);
+  assert.equal(runner.patternStaysPut("src\\*.md", "win32"), true, "a separator on Windows");
+  assert.equal(runner.patternStaysPut("..\\x", "win32"), false, ".. still walks out on Windows");
+  if (process.platform !== "win32") {
+    const ws = { workspace, origins: new Set() };
+    assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "src\\*.md" }), { behavior: "ask" });
+    assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "x", glob: "src\\*.ts" }), { behavior: "ask" });
+  }
+});
+
+await test("round 3: Grep's pattern is a regex and isn't read as a path; its glob and path still are", async () => {
+  const ws = { workspace, origins: new Set() };
+  for (const pattern of ["\\d{3}", "interface\\{\\}", "a+(b)", "/api/", "^\\.\\./", "C:/x"])
+    assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern, glob: "*.ts" }), { behavior: "allow" }, `${pattern} doesn't ask`);
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "\\d{3}" }), { behavior: "allow" }, "no glob at all");
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "x", glob: "{a,b}/*.ts" }), { behavior: "ask" }, "the glob is still checked");
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "x", glob: "../*.ts" }), { behavior: "ask" });
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: "/etc", pattern: "x" }), { behavior: "ask" }, "the path is still checked");
+});
+
+await test("round 3: the Windows turn runs the launcher as Node (ELECTRON_RUN_AS_NODE), with a unique go file and a 30 s cap", async () => {
+  assert.equal(runner.windowsJobTurn({ file: "claude", args: [], env: {} }, "linux"), null, "only on Windows");
+  const a = runner.windowsJobTurn({ file: "C:\\claude.exe", args: ["-p"], env: { PATH: "x" } }, "win32");
+  const b = runner.windowsJobTurn({ file: "C:\\claude.exe", args: ["-p"], env: { PATH: "x" } }, "win32");
+  assert.equal(a.file, process.execPath, "the launcher runs on Bops' own executable (Bops.exe when packaged)");
+  assert.equal(a.env.ELECTRON_RUN_AS_NODE, "1", "so Bops.exe runs it as Node instead of opening Bops again");
+  assert.equal(a.env.BOPS_JOB_KEEP_RUN_AS_NODE, undefined, "the turn's own env didn't have it, so the CLI won't either");
+  assert.equal(a.env.PATH, "x");
+  assert.deepEqual(a.args.slice(1), ["C:\\claude.exe", "-p"]);
+  assert.ok(Number(a.env.BOPS_JOB_WAIT_MS) >= 30_000, "a cold PowerShell plus the first compile fits in the wait");
+  assert.match(basename(a.goFile), /^bops-job-go-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/, "a randomUUID in the name");
+  assert.notEqual(a.goFile, b.goFile);
+  assert.equal(a.env.BOPS_JOB_GO, a.goFile);
+  const kept = runner.windowsJobTurn({ file: "claude", args: [], env: { ELECTRON_RUN_AS_NODE: "1" } }, "win32");
+  assert.equal(kept.env.BOPS_JOB_KEEP_RUN_AS_NODE, "1");
+});
+
+// The launcher itself is plain Node, so it runs here as it does on Windows (only the job and the sitter don't).
+const launcherScript = join(root, "vm", "win-job-launcher.cjs");
+const probe = join(bin, "launch-probe");
+writeFileSync(probe, `#!${process.execPath}
+const fs = require("node:fs");
+fs.writeFileSync(process.env.PROBE_OUT, JSON.stringify({ go: fs.existsSync(process.env.BOPS_JOB_GO), asNode: process.env.ELECTRON_RUN_AS_NODE ?? null, keep: process.env.BOPS_JOB_KEEP_RUN_AS_NODE ?? null }));
+`);
+chmodSync(probe, 0o755);
+let launches = 0;
+const launch = ({ env = {}, goAt, failAt, cli = probe } = {}) =>
+  new Promise((resolveLaunch) => {
+    const n = ++launches;
+    const go = join(tmp, `launch-go-${n}`);
+    const out = join(tmp, `launch-out-${n}.json`);
+    const e = { ...process.env, BOPS_JOB_GO: go, PROBE_OUT: out, ...env };
+    if (!("BOPS_JOB_WAIT_MS" in env)) delete e.BOPS_JOB_WAIT_MS;
+    const t0 = Date.now();
+    const kid = spawn(process.execPath, [launcherScript, cli], { env: e, stdio: ["ignore", "pipe", "pipe"] });
+    let stderr = "";
+    kid.stderr.on("data", (d) => (stderr += d));
+    const timers = [];
+    if (goAt !== undefined) timers.push(setTimeout(() => writeFileSync(go, "go"), goAt));
+    if (failAt !== undefined) timers.push(setTimeout(() => writeFileSync(`${go}.failed`, "assign failed"), failAt));
+    kid.on("exit", (code) => {
+      timers.forEach(clearTimeout);
+      resolveLaunch({ code, stderr, ms: Date.now() - t0, ran: existsSync(out) ? JSON.parse(readFileSync(out, "utf8")) : null });
+    });
+  });
+
+await test("round 3: no go file within the cap: the launcher fails closed, loudly, without running the CLI", { skip: process.platform === "win32" }, async () => {
+  const r = await launch({ env: { BOPS_JOB_WAIT_MS: "400" } });
+  assert.equal(r.ran, null, "the CLI never ran outside the job");
+  assert.equal(r.code, runner.LAUNCHER_EXIT.noJob);
+  assert.match(r.stderr, /\[bops-launcher\] NOT starting Claude Code: the job sitter didn't say go within 400 ms/);
+  assert.equal(runner.launcherFailure(r.code, r.stderr), runner.PC_WORDS.noJob, "the turn says it couldn't start");
+});
+
+await test("round 3: the sitter's failure marker ends the wait at once, and fails closed", { skip: process.platform === "win32" }, async () => {
+  const r = await launch({ failAt: 200 });
+  assert.equal(r.ran, null);
+  assert.equal(r.code, runner.LAUNCHER_EXIT.noJob);
+  assert.match(r.stderr, /failed before it held this turn/);
+  assert.ok(r.ms < 2500, `stopped as soon as the marker came (${r.ms} ms), not at the cap`);
+});
+
+await test("round 3: a go file that comes late (cold PowerShell, first compile) still starts the CLI inside the job", { skip: process.platform === "win32" }, async () => {
+  const r = await launch({ goAt: 3500 });
+  assert.equal(r.code, 0, r.stderr);
+  assert.deepEqual(r.ran, { go: true, asNode: null, keep: null }, "the CLI started only after the go file, and without ELECTRON_RUN_AS_NODE");
+});
+
+await test("round 3: the launcher takes ELECTRON_RUN_AS_NODE back out of the CLI's env unless the turn had it", { skip: process.platform === "win32" }, async () => {
+  const r = await launch({ goAt: 0, env: { ELECTRON_RUN_AS_NODE: "1" } });
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(r.ran.asNode, null);
+  const k = await launch({ goAt: 0, env: { ELECTRON_RUN_AS_NODE: "1", BOPS_JOB_KEEP_RUN_AS_NODE: "1" } });
+  assert.deepEqual(k.ran, { go: true, asNode: "1", keep: null });
+});
+
+await test("round 3: a missing CLI behind the launcher says Claude Code isn't installed, as ENOENT does without it", { skip: process.platform === "win32" }, async () => {
+  const r = await launch({ goAt: 0, cli: join(tmp, "no-such-claude") });
+  assert.equal(r.code, runner.LAUNCHER_EXIT.noCli, r.stderr);
+  assert.match(r.stderr, /\[bops-launcher\] Claude Code isn't installed/);
+  assert.equal(runner.launcherFailure(r.code, r.stderr), runner.PC_WORDS.noClaude);
+  // The CLI's own exit codes aren't taken for the launcher's: only with its stderr line.
+  assert.equal(runner.launcherFailure(127, "some CLI error"), undefined);
+  assert.equal(runner.launcherFailure(1, "[bops-launcher] x"), undefined);
+});
+
+await test("round 3: the sitter writes the failure marker on every failure before it assigns, and compiles race-free", async () => {
+  const ps = readFileSync(join(root, "vm", "win-job-sitter.ps1"), "utf8");
+  const fail = /function Fail\([^)]*\) \{[\s\S]*?\n\}/.exec(ps)?.[0] ?? "";
+  assert.match(fail, /Set-Content -Path "\$GoFile\.failed"/, "Fail writes <go>.failed");
+  assert.match(fail, /exit 1/);
+  const rest = ps.replace(fail, "");
+  assert.doesNotMatch(rest, /\bexit\b/, "no way out of the sitter but Fail");
+  assert.match(rest, /trap \{ Fail /, "unforeseen errors fail the same way");
+  assert.doesNotMatch(ps, /-OutputAssembly \$dll\b/, "never compiles straight to the shared path");
+  assert.match(ps, /-OutputAssembly \$tmpDll/);
+  assert.match(ps, /Move-Item -LiteralPath \$tmpDll -Destination \$dll/);
+  assert.match(ps, /if \(-not \(Test-Path \$dll\)\) \{ throw \}/, "losing the move to another sitter counts as success");
+  assert.match(ps, /\[guid\]::NewGuid\(\)/, "each compile has its own temp name");
+});
+
+await test("round 3: a go file that can't be written after the assign fails like the rest (marker), and the turn says noJob", async () => {
+  const ps = readFileSync(join(root, "vm", "win-job-sitter.ps1"), "utf8");
+  assert.match(ps, /Set-Content -Path \$GoFile -Value "go"[^\n]*catch \{ Fail "go file couldn't be written/, "the go file's failure goes through Fail");
+  const fail = /function Fail\([^)]*\) \{[\s\S]*?\n\}/.exec(ps)?.[0] ?? "";
+  assert.match(fail, /-not \(Test-Path -LiteralPath \$GoFile\)/, "the marker is written whenever no go file was, assigned or not");
+  // The job's close kills the launcher with no [bops-launcher] line: no go file at the turn's end is what says it.
+  assert.equal(runner.launcherFailure(1, "Not logged in · Please run /login", false), runner.PC_WORDS.noJob, "not a sign-in error");
+  assert.equal(runner.launcherFailure(null, "", false), runner.PC_WORDS.noJob);
+  assert.equal(runner.launcherFailure(1, "Not logged in · Please run /login", true), undefined, "a CLI that ran keeps its own failure words");
+});
+
+await test("round 3: the sitter is spawned without detached (DETACHED_PROCESS gives powershell no console, so the script never runs)", async () => {
+  const o = runner.SITTER_SPAWN_OPTIONS;
+  assert.notEqual(o.detached, true, "detached must stay off");
+  assert.equal(o.windowsHide, true);
+  assert.equal(o.stdio, "ignore");
+  const src = readFileSync(join(root, "lib", "server", "pc-task-runner.ts"), "utf8");
+  const started = src.slice(src.lastIndexOf("started: (launcherPid: number) =>"), src.lastIndexOf("wentAhead: () =>"));
+  assert.match(started, /spawn\(powershell, \[[^\]]*\], SITTER_SPAWN_OPTIONS\)/, "the sitter's spawn uses those options");
+  assert.doesNotMatch(started, /detached/);
+});
+
+await test("round 3: the sitter's late exit after the turn is over writes no marker and warns nothing", { skip: process.platform === "win32" }, async () => {
+  // A stand-in powershell.exe (under a fake SystemRoot) that exits 1 a moment after it starts, as a sitter does
+  // when its launcher ends.
+  const sysRoot = join(tmp, "sysroot");
+  const psDir = join(sysRoot, "System32", "WindowsPowerShell", "v1.0");
+  mkdirSync(psDir, { recursive: true });
+  writeFileSync(join(psDir, "powershell.exe"), `#!${process.execPath}\nsetTimeout(() => process.exit(1), 300);\n`);
+  chmodSync(join(psDir, "powershell.exe"), 0o755);
+  const was = { SystemRoot: process.env.SystemRoot, TEMP: process.env.TEMP };
+  Object.assign(process.env, { SystemRoot: sysRoot, TEMP: tmp });
+  try {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    // A healthy turn: go written, turn ends (cleanup), then the sitter exits.
+    let jt = runner.windowsJobTurn({ file: "claude", args: [], env: {} }, "win32");
+    writeFileSync(jt.goFile, "go");
+    const logged = logs.length;
+    jt.started(process.pid);
+    assert.equal(jt.wentAhead(), true);
+    jt.cleanup();
+    await wait(800);
+    assert.ok(!existsSync(jt.goFile) && !existsSync(`${jt.goFile}.failed`), "no stale marker after a healthy turn");
+    assert.ok(!logs.slice(logged).some((l) => /left before it held the job/.test(l)), "no warning for a turn that ran");
+    // Stop during the wait: no go file yet, the turn ends, then the sitter exits.
+    jt = runner.windowsJobTurn({ file: "claude", args: [], env: {} }, "win32");
+    jt.started(process.pid);
+    assert.equal(jt.wentAhead(), false);
+    jt.cleanup();
+    await wait(800);
+    assert.ok(!existsSync(`${jt.goFile}.failed`), "Stop leaves no marker behind");
+    // While the turn is still on, a sitter that leaves without a go file still writes the marker.
+    jt = runner.windowsJobTurn({ file: "claude", args: [], env: {} }, "win32");
+    jt.started(process.pid);
+    await wait(800);
+    assert.ok(existsSync(`${jt.goFile}.failed`), "a live turn's launcher is told");
+    jt.cleanup();
+    assert.ok(!existsSync(`${jt.goFile}.failed`), "cleanup removes the marker");
+  } finally {
+    for (const [k, v] of Object.entries(was)) if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+});
+
 
 await test("a user settings file allowing Bash, with a hook and a key, takes no effect", async () => {
   // As the real CLI would find it, in the HOME Claude Code runs with.
