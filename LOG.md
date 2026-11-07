@@ -228,3 +228,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 13:57 lead: merged #117 (task 89: three red tests into CI; owner's platform in SharedOpen) at 61683e1. Closed #118 as a duplicate.
 - 14:22 lead: Codex given tasks 91, 92 and 97 (one PR) plus the review of hub PR #1. Window hold continues.
 - 14:00 zai (Nov 7): #118 closed (dup of #117; two unique bits -> task-90 branch). Call retries STOPPED per lead (outward actions need Kevin each time). #113 round-2 complete at 7f51edd: launcher (live 100ms-fork proof), parent-watch safety, hash-keyed DLL, logged sitter failures, constructs rejected outright (2 self-caught bugs fixed). PR comment posted.
+- 14:58 lead: merged #119 (tasks 93-96) at 8f0e44d. Found the Electron shell (dist-desktop) hasn't been rebuilt since Nov 3, so desktop/ changes from #80 (588d2a7) and #116 aren't live. Running build-pc, then rebuild-shell.ps1 (Kevin told).
