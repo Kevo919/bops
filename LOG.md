@@ -236,3 +236,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 17:36 lead: Codex opened #121 (task 98: send people to Settings instead of config files); CI green, and my independent review is running. zai has been silent since 14:24, so I pinged it about #113 round 3. Hub PR1 still waits for Kevin's OK.
 - 18:00 lead: #121 review = REQUEST CHANGES (Check results and field messages for Zapier, Composio and Ollama still show env var names; a wrong "Settings, Models" path); sent to Codex.
 - 18:25 lead: #121 round 2 at 57c1078 is green, and the same reviewer is re-checking it. zai is silent (no reply to the 17:36 ping), so the lead took over #113 round 3 on claude/task-60-r3; a new PR will supersede #113.
+- 18:35 lead: #121 round 2 re-review: 5 of 6 fixed; the owner still sees "ask the person who manages Bops" in 7 places. Back to Codex for a short round 3.
