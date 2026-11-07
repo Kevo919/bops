@@ -81,10 +81,7 @@ import { LIGHT, logRoute, routeChat, speedFor, tierParam, withSpeed, type Config
  * throughout, so the bot wrote "on your Mac" back): fixed words only, never a name, title or message (computerWordsFor
  * leaves what's interpolated exactly as it is).
  */
-// Only this desktop app's own machine is reworded: on a bot's computer (a runner, onRunner(), or a turn it answers there,
-// currentTurn()) the server's platform is that computer's, not the owner's, so the owner's computer keeps the words it
-// was written with ("darwin": none change).
-const ownPlatform = () => (onRunner() || currentTurn() ? "darwin" : process.platform);
+import { ownPlatform } from "./owner-platform";
 const pcWords = (text: TemplateStringsArray, ...values: unknown[]) => computerWordsFor(ownPlatform())(text, ...values);
 const pc = (text: string) => computerWords(text, ownPlatform());
 
@@ -348,17 +345,17 @@ function persona(b: Bot, others: Bot[]) {
     // A bot that shares works on the main bot's computer, its four screens shared with the team (lib/screens.ts).
     b.runsOn === "mac" && pcReady()
       ? // As start_task places it (prefersPc): only on the owner's own turn, left to auto, not one part of a group, and not asked for the cloud.
-        computerWordsFor(process.platform)`You work on ${owner}'s own Mac: a task you start (start_task) on ${owner}'s own turn runs there, unless its where is cloud, it's one part of a group (part_of) or its goal asks for the cloud. A task from anyone else's turn goes where Bops can run it. Each task is a thread ${owner} can open.`
+        computerWordsFor(ownPlatform())`You work on ${owner}'s own Mac: a task you start (start_task) on ${owner}'s own turn runs there, unless its where is cloud, it's one part of a group (part_of) or its goal asks for the cloud. A task from anyone else's turn goes where Bops can run it. Each task is a thread ${owner} can open.`
       : b.runsOn === "mac"
-        ? computerWordsFor(process.platform)`You're set to work on ${owner}'s own Mac, but it isn't ready right now: a task you start goes where Bops can run it, and Bops says so. Each task is a thread ${owner} can open.`
+        ? computerWordsFor(ownPlatform())`You're set to work on ${owner}'s own Mac, but it isn't ready right now: a task you start goes where Bops can run it, and Bops says so. Each task is a thread ${owner} can open.`
         : workComputer(b).id === b.id
       ? `You have your own cloud computer with a browser and four screens, so up to 4 long tasks at once. Each task is a thread ${owner} can open.`
       : `You work on ${workComputer(b).name}'s cloud computer, sharing its four screens with your team, so a task of yours waits when they're all in use. Each task is a thread ${owner} can open.`,
     `You're told the time, what's running and a briefing of your computer as of now. Use them to answer questions about what you're doing, what's open, or what's waiting on ${owner}. Talk about the work, not screen numbers, unless ${owner} asks about a screen.`,
     getState().mac?.ready
       ? fullAccessOn()
-        ? pcWords`You can also work on ${owner}'s own Mac with full access: a Chrome of your own there (so websites see their home internet), a shell, their files and the apps installed on it (Messages, Notes, Calendar, Finder…). Tasks that need their files or Mac apps go there (start_task with where "mac"); most other work belongs on your cloud computer. Those Mac apps aren't your apps (below): for an app you have there, use it yourself, never a Mac app of the same name.`
-        : pcWords`You can also work on ${owner}'s own Mac, in a Chrome of your own there, so websites see their home internet. You can't use the apps on their Mac (Messages, Notes, Finder…) or their files for now. Most work belongs on your cloud computer; use their Mac only when the task needs it or they ask (start_task with where).`
+        ? pcWords`You can also work on ${owner}'s own Mac with full access: a Chrome of your own there (so websites see their home internet), a shell, their files and the native apps installed on it. Tasks that need their files or Mac apps go there (start_task with where "mac"); most other work belongs on your cloud computer. Those Mac apps aren't your apps (below): for an app you have there, use it yourself, never a Mac app of the same name.`
+        : pcWords`You can also work on ${owner}'s own Mac, in a Chrome of your own there, so websites see their home internet. You can't use the native apps on their Mac or their files for now. Most work belongs on your cloud computer; use their Mac only when the task needs it or they ask (start_task with where).`
       : "",
     // How to handle a request, then the two rules that keep the bot doing the work instead of promising it.
     agentsLine(b, owner),
@@ -2239,7 +2236,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
             }),
           ]
         : []),
-      fn("start_task", b.runsOn === "mac" && pcReady() && !member && !opts.outside ? computerWordsFor(process.platform)`Start a long task (a thread) on ${owner}'s Mac, where you work.` : pcWords`Start a long task (a thread) on your cloud computer, or on ${owner}'s Mac when it needs their Mac.`, {
+      fn("start_task", b.runsOn === "mac" && pcReady() && !member && !opts.outside ? computerWordsFor(ownPlatform())`Start a long task (a thread) on ${owner}'s Mac, where you work.` : pcWords`Start a long task (a thread) on your cloud computer, or on ${owner}'s Mac when it needs their Mac.`, {
         ...TASK,
         ...SAY,
         ...WHERE,
@@ -3560,7 +3557,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
           // words never put work on the owner's PC (sessions.ts startSession checks again).
           const prefersPc = b.runsOn === "mac" && !member && !opts.outside && (!args.where || args.where === "auto") && !args.part_of?.trim() && !/\bcloud\b/i.test(args.goal ?? "");
           const onPc = prefersPc && pcReady();
-          if (prefersPc && !onPc) notes.push(computerWordsFor(process.platform)`${b.name} works on this Mac, but it isn't ready, so "${args.title}" runs where Bops can run it`);
+          if (prefersPc && !onPc) notes.push(computerWordsFor(ownPlatform())`${b.name} works on this Mac, but it isn't ready, so "${args.title}" runs where Bops can run it`);
           sessionIds.push(startSession({ botId, goal: withImages(args.goal), title: args.title, chatId, sentVia: "you", ...place, ...(onPc ? { where: "mac" as const } : {}), group: groupOf(args.part_of), ...(procedure ? { procedure } : {}), agents: picks }).id);
         }
       }

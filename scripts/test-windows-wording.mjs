@@ -167,7 +167,7 @@ check("85: the bot's own prompt says this PC's word (no 'on your Mac' for the bo
     if (t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")) return;
     // Mac as a word in copy: a string or a template, not an identifier (moveToMac, thenOnMac) or the "mac" enum.
     if (!/[\s"'`(]Mac('s)?\b(?!\w)/.test(line.replace(/\b(moveToMac|mentionsMac|asksForMac|thenOnMac|onTheirMac)\b/g, ""))) return;
-    if (/pcWords`|pc\(|computerWordsFor\(process\.platform\)`|computerWords\(/.test(line)) return;
+    if (/pcWords`|pc\(|computerWordsFor\((?:process\.platform|ownPlatform\(\))\)`|computerWords\(/.test(line)) return;
     // Said on a bot's computer (a runner, or a turn it answers): that computer's platform isn't the owner's, so the
     // owner's computer keeps its written words there (the #116 review: "not from Alex's computer").
     if (/onRunner\(\) \?|You're answering from your computer/.test(line)) return;
@@ -175,7 +175,7 @@ check("85: the bot's own prompt says this PC's word (no 'on your Mac' for the bo
   });
   assert.deepEqual(raw, [], "prompt copy with a raw Mac in it");
   assert.match(src, /pc\("What you say to the user as you start/, "the start line's example");
-  assert.match(src, /const ownPlatform = \(\) => \(onRunner\(\) \|\| currentTurn\(\) \? "darwin" : process\.platform\)/, "a runner's turn keeps the owner's words");
+  assert.match(src, /import \{ ownPlatform \} from "\.\/owner-platform"/, "owner wording uses the shared recorded-platform helper");
   const words = computerWordsFor("win32");
   assert.equal(words`Pulling up ${"Jordan"}'s chat on your Mac.`, "Pulling up Jordan's chat on your PC.");
 });
