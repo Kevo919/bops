@@ -43,8 +43,6 @@ process.env.HOME = scratch;
 symlinkSync(join(rootPath, "node_modules"), join(scratch, "node_modules"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
-mkdirSync(join(scratch, "keychain"));
-process.env.BOPS_TEST_KEYCHAIN = join(scratch, "keychain");
 // Off the Mac, secrets go to an encrypted file (lib/server/secret-file.ts) whose key, on Windows, is in Credential Manager:
 // a scratch entry of this run's own, never the real "Bops Vault/bops-file-key" (taken out again at the end).
 process.env.BOPS_TEST_SECRET_KEY_ACCOUNT = `bops-test-cloud-${process.pid}-${Date.now()}`;
@@ -56,7 +54,6 @@ writeFileSync(
   join(bin, "security"),
   `#!/usr/bin/env node
 const fs = require("fs"), path = require("path");
-const file = (a) => path.join(process.env.BOPS_TEST_KEYCHAIN, encodeURIComponent(a));
 const arg = (args, flag) => args[args.indexOf(flag) + 1];
 function run(args) {
   if (args[0] === "find-generic-password") {

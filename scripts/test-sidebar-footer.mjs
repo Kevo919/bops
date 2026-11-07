@@ -1,4 +1,4 @@
-// Tests for the sidebar's footer (components/app/sidebar-footer.tsx and SidebarFooter in sidebar.tsx):
+// Tests for the sidebar's footer (components/app/sidebar-footer.tsx and SidebarFooter in sidebar.tsx):
 // which button is the pill for each page open (Settings at Logins or Your Apps, Logins, Routines, Knowledge,
 // the Apps home or an app a bot made; none: Logins), that the one pointed at wins over it (your account
 // too) and leaving goes back to it, that the others are round with their tooltips, that the Routines badge
@@ -15,6 +15,8 @@ import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
+/** A component's source, its line endings as Linux has them too (a Windows checkout is CRLF). */
+const srcText = (p) => readFileSync(`${rootPath}/${p}`, "utf8").replace(/\r\n/g, "\n");
 
 const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
 const rootUrl = pathToFileURL(rootPath).href;
@@ -147,8 +149,8 @@ await test("the button pointed at is the pill over the open page's, which stays 
 });
 
 await test("the footer remembers the page button expanded last, never your account's, in this window's storage", () => {
-  const src = readFileSync(`${rootPath}/components/app/sidebar-footer.tsx`, "utf8");
-  const row = readFileSync(`${rootPath}/components/app/sidebar.tsx`, "utf8");
+  const src = srcText("components/app/sidebar-footer.tsx");
+  const row = srcText("components/app/sidebar.tsx");
   assert.match(src, /export function useLastPill/, "a hook keeps the last one");
   assert.match(src, /if \(!isFooterPage\(k\) \|\| readLastPill\(\) === k\) return;/, "only Logins, Routines, Knowledge or Apps: not your account");
   assert.match(src, /localStorage\.setItem\(LAST_PILL_KEY, k\)/, "kept for the next window");
@@ -195,7 +197,7 @@ await test("no hover expansion where nothing hovers (a touch screen)", () => {
   globalThis.matchMedia = () => ({ matches: false });
   assert.equal(canHover(), true);
   globalThis.matchMedia = was;
-  const src = readFileSync(`${rootPath}/components/app/sidebar-footer.tsx`, "utf8");
+  const src = srcText("components/app/sidebar-footer.tsx");
   assert.match(src, /pointerType === "touch" \|\| !canHover\(\)\) return/, "pointer over the row only counts with a hovering pointer");
   // A portal opened from the row (the Restart dialog) is inside it in React's tree but not on the page:
   // pointer and focus there count as outside, and a document listener settles the pill once it's away.
@@ -285,7 +287,7 @@ await test("Knowledge's dot: blue on its corner, softly pulsing (not with reduce
     assert.ok(dot, `${open}: the dot`);
     assert.match(dot[1], /absolute -right-px -top-px/, "on the top right corner, outside the clipped button");
     assert.match(dot[2], /motion-new-pulse[^"]*motion-reduce:hidden/, "the pulse, gone with reduced motion");
-    assert.match(dot[2], /bg-\[#2F7BFF\]/);
+    assert.match(dot[2], /bg-\[color:var\(--hb-2f7bff\)\]/);
     assert.equal(dot[2].replace(/<[^>]+>/g, "").trim(), "", "no number");
     assert.match(html, /aria-label="Knowledge, something new"/);
   }
@@ -294,7 +296,7 @@ await test("Knowledge's dot: blue on its corner, softly pulsing (not with reduce
   assert.match(renderNews("knowledge", true), /aria-label="Knowledge"/);
   assert.doesNotMatch(renderNews("vault", false), /data-new-dot/, "nothing new: no dot");
   assert.doesNotMatch(render(base, "vault"), /data-new-dot/, "on the server, before the copy is in: no dot");
-  const css = readFileSync(`${rootPath}/app/globals.css`, "utf8");
+  const css = srcText("app/globals.css");
   assert.match(css, /\.motion-new-pulse \{\s*animation: new-pulse [^;]*infinite;/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\.motion-new-pulse \{\s*animation: none;/);
 });
@@ -340,7 +342,7 @@ await test("Apps (what the bots made) is one of the pill's buttons: open, pointe
   assert.equal(s.find((x) => x.label === "Your Apps").title, "Apps your bots made for you");
   assert.match(html, /data-footer-key="apps"[^>]*><button[^>]*aria-label="Your Apps"[^>]*><svg[^>]*aria-hidden="true"/);
   // The same slot as the others, so it takes part in the swap.
-  assert.match(html, /data-footer-slot="Your Apps" data-footer-key="apps" class="motion-footer-slot relative flex h-9 min-w-9 basis-9 grow-0 shrink"/);
+  assert.match(html, /data-footer-slot="Your Apps" data-footer-key="apps" class="motion-footer-slot relative flex h-9 min-w-9 basis-9 max-md:h-11 max-md:min-w-11 max-md:basis-11 grow-0 shrink"/);
 });
 
 await test("the motion: a flex-grow swap on one curve, inside the row, and none with reduced motion", () => {
@@ -354,10 +356,10 @@ await test("the motion: a flex-grow swap on one curve, inside the row, and none 
   }
   assert.match(html, /active:scale-\[\.96\]/, "a small press");
   assert.match(html, /motion-reduce:transition-none/, "the press too, with reduced motion");
-  const css = readFileSync(`${rootPath}/app/globals.css`, "utf8");
-  const curve = "250ms cubic-bezier(0.2, 0.8, 0.2, 1)";
-  assert.match(css, new RegExp(`\\.motion-footer-slot \\{\\s*transition: flex-grow ${curve.replace(/[().]/g, "\\$&")};`));
-  assert.match(css, /\.motion-footer-label \{[^}]*max-width 250ms[^}]*opacity/);
+  const css = srcText("app/globals.css");
+  const curve = "calc(250ms * var(--motion-time, 1)) cubic-bezier(0.2, 0.8, 0.2, 1)";
+  assert.match(css, new RegExp(`\\.motion-footer-slot \\{\\s*transition: flex-grow ${curve.replace(/[().*]/g, "\\$&")};`));
+  assert.match(css, /\.motion-footer-label \{[^}]*max-width calc\(250ms \* var\(--motion-time, 1\)[^}]*opacity/);
   // Reduced motion: the swap is instant.
   const reduced = [...css.matchAll(/@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/g)].map((m) => m[1]).join("\n");
   assert.match(reduced, /\.motion-footer-slot,\s*\.motion-footer-label \{\s*transition: none;/);
@@ -367,8 +369,8 @@ await test("all five fit the sidebar, People's room left empty at the end: four 
   const html = renderYou(base, "knowledge");
   assert.equal(slots(html).length, 5);
   assert.match(html, /data-footer-row="true" class="flex items-center gap-1 pb-1 pt-3 pr-10"/, "4px apart, no padding at the left, People's 40px kept empty at the right");
-  const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
-  const side = readFileSync(`${rootPath}/components/app/sidebar.tsx`, "utf8");
+  const app = srcText("components/app/bops-app.tsx");
+  const side = srcText("components/app/sidebar.tsx");
   const width = Number(app.match(/grid-cols-\[(\d+)px_minmax/)[1]);
   assert.equal(width, 340, "the sidebar's width");
   assert.match(side, /<aside className="flex min-h-0 w-\[340px\] shrink-0 flex-col [^"]*px-2\.5 /, "the column's width, 10px at each side");
@@ -405,7 +407,7 @@ await test("the workspace switcher says under the default why Orgo still shows b
 
 await test("no em or en dashes in what the footer shows", () => {
   for (const f of ["components/app/sidebar-footer.tsx", "components/app/sidebar.tsx"]) {
-    const shown = readFileSync(`${rootPath}/${f}`, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    const shown = srcText("${f}").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     assert.ok(!/[–—]/.test(shown), `${f} shows a dash`);
   }
 });

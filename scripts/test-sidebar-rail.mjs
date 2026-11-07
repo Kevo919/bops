@@ -16,6 +16,8 @@ import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
+/** A component's source, its line endings as Linux has them too (a Windows checkout is CRLF). */
+const srcText = (p) => srcText("${p}").replace(/\r\n/g, "\n");
 
 const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
 const rootUrl = pathToFileURL(rootPath).href;
@@ -184,8 +186,8 @@ await test("on top the toggle and Search; tooltips open to the right", () => {
   const html = render(world());
   assert.match(html, /<aside data-tip-side="right" aria-label="Sidebar, collapsed" class="flex min-h-0 w-\[72px\] shrink-0 flex-col px-3/);
   assert.ok(html.indexOf('aria-label="Expand the sidebar"') < html.indexOf('aria-label="Search"'));
-  assert.match(html, /data-tip="Expand the sidebar \(⌘\\\)"/);
-  const tip = readFileSync(`${rootPath}/components/app/tooltip.tsx`, "utf8");
+  assert.match(html, /data-tip="Expand the sidebar \(Ctrl\\\)"/);
+  const tip = srcText("components/app/tooltip.tsx");
   assert.match(tip, /data-tip-side\]"\)\?\.getAttribute\("data-tip-side"\) === "right"/);
 });
 
@@ -216,12 +218,12 @@ await test("the workspace's initial when there's another to switch to, which exp
   assert.match(two, /aria-label="Main: switch workspaces"[^>]*><span aria-hidden="true">M<\/span>/);
   const one = render(world({ workspaces: [{ id: "ws_main", name: "Main", createdAt: 1 }] }));
   assert.doesNotMatch(one, /switch workspaces/);
-  const side = readFileSync(`${rootPath}/components/app/sidebar.tsx`, "utf8");
+  const side = srcText("components/app/sidebar.tsx");
   assert.match(side, /<WorkspaceSwitcher state=\{state\} opened=\{workspaces\}(?: onTeamChart=\{onTeamChart\})? \/>/);
 });
 
 await test("the app: a 72px rail, its column sliding with the title bar's, and no toggle in the title bar", () => {
-  const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
+  const app = srcText("components/app/bops-app.tsx");
   assert.match(app, /const sidebarWidth = sidebarOpen \? 340 : 72;/);
   assert.match(app, /const columns = \{ gridTemplateColumns: gridColumns\(sidebarWidth, wide \? null : chatWidth\) \};/);
   assert.match(app, /columns=\{columns\}\n\s+slide=\{slide\}/, "the title bar's columns are the grid's");
@@ -237,9 +239,9 @@ await test("the app: a 72px rail, its column sliding with the title bar's, and n
 });
 
 await test("the account menu opens over the chat column's sheets; the update button only expands", () => {
-  const side = readFileSync(`${rootPath}/components/app/sidebar.tsx`, "utf8");
+  const side = srcText("components/app/sidebar.tsx");
   assert.match(side, /absolute bottom-\[calc\(100%\+8px\)\] left-0 z-\[60\] flex w-\[248px\]/);
-  const update = readFileSync(`${rootPath}/components/app/update-notice.tsx`, "utf8");
+  const update = srcText("components/app/update-notice.tsx");
   const button = update.slice(update.indexOf("export function UpdateButton"), update.indexOf("function useUpdate"));
   assert.match(button, /onClick=\{onOpen\}/);
   assert.doesNotMatch(button, /\.install\?\.\(/, "never restarts into it itself");
