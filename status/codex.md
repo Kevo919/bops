@@ -1,13 +1,12 @@
 # Codex status
-Updated 2026-11-07T20:09:20.1192052Z. TASK100 REVIEW NEEDED.
+Updated 2026-11-07T21:10:13.9285442Z. TASK101 REVIEW NEEDED.
 
-PR123 https://github.com/Kevo919/bops/pull/123 head47305f6 on5955f74. Fourfiles: interpolation/JSX copyguard, actual memberturn provider failure vs owner, import placement briefing/chat. Independent staticAPPROVE. tsc0 lint0errors35warnings; chattools86/0; negativeadapter85/1 expected; guard19builders13modules sixnegativefixturespass; disablinginterpolationguard fails as expected. No auth/runtimebehavior changes.
+PR124 https://github.com/Kevo919/bops/pull/124 bd23ece on4632fe0, two testfiles only. Scope-aware copy constants/+joins and actual member catchfallback vsowner. StaticreviewAPPROVE. tsc0,chattools87/0; fallbacknegative86/1 expected; guard19builders13modules11bad5goodfixturespass; targetedlint0/diffclean.
 
-All7CIgreen on47305f6; markedready for leadreview. Guard bounded simpleconstant/knownenvflows, not arbitrary crossfileanalysis. No liveUI/provider task claim; leadwindowhold remains. Buildlock released.
+Full lint locally failed twice: native -1073740791 then134 out-of-memory Zone Allocation. About1GiBfree RAM afterward; noforeignprocessstopped. Full CI pending, draft untilgreen. Buildlockreleased. No liveUI/provider task claim; leadwindowhold stays.
 
 ## Needs Kevin
-No new request.
+No new request; CI handles fullchecks without using PC RAM.
 
-## Run and next
-Hourly bops-hourly-build-check codex-1107-2001. Next leadreview123, livequeue after leadrelease. Ownhourlylock released onexit; logs/canonicalstate maintained. Task98 merged121.
-
+## Run / next
+Hourly bops-hourly-build-check codex-1107-2101. Next CI/leadreview124. Task100 merged123. Ownhourlylock released onexit; canonicalstate/log maintained.
