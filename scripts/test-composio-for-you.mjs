@@ -255,7 +255,9 @@ await check("clear errors: key turned down, key missing, address unknown, nothin
   z.on.initialize = () => ({ status: 401 });
   let r = await K.checkKey("COMPOSIO_MCP_URL");
   assert.equal(r.status, "invalid");
-  assert.match(r.message, /turned down the key in COMPOSIO_MCP_KEY/);
+  assert.match(r.message, /turned down your saved key/);
+  assert.match(r.message, /Settings, Services, Composio \(your account\)/);
+  assert.doesNotMatch(r.message, /\.env\.local|COMPOSIO_MCP_KEY/);
   setAddress(ADDRESS, undefined);
   z.on.initialize = () => ({ status: 401 });
   r = await K.checkKey("COMPOSIO_MCP_URL");

@@ -38,7 +38,7 @@ export function openaiClient(opts: Omit<ClientOptions, "apiKey" | "defaultHeader
       if (!key)
         throw new OpenAI.OpenAIError(
           process.env.BOPS_SELF_HOSTED === "1"
-            ? "No key for the chat's models: the chat reads OPENAI_API_KEY from this computer's environment - on the Windows app, the .env.local file next to the app (like C:\\Users\\<you>\\bops\\.env.local), then restart Bops. An OpenAI key saved in Logins is the vault's, for bots' API calls; it doesn't power the chat."
+            ? "OpenAI is not connected for chat. Ask the person who manages Bops to connect OpenAI for chat on this computer, then restart Bops. An OpenAI key saved in Logins is the vault's, for bots' API calls; it doesn't power the chat."
             : "Sign in with Orgo first.",
         );
       return key;

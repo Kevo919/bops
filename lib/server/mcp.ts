@@ -158,7 +158,7 @@ function childEnv(name: string, def: McpServerDef): NodeJS.ProcessEnv {
   const own = process.platform === "win32" ? ["PATH", "HOME", "TEMP", "TMP", "SYSTEMROOT", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "PATHEXT", "PROGRAMFILES"] : ["PATH", "HOME", "TEMP", "TMP"];
   for (const k of own) if (process.env[k] !== undefined) env[k] = process.env[k];
   for (const key of def.env ?? []) {
-    if (process.env[key] === undefined) throw new Error(`The MCP server "${name}" names the key ${key}, which isn't set. Add it to .env.local and restart Bops.`);
+    if (process.env[key] === undefined) throw new Error(`The connection "${name}" needs an access key that is not configured. Ask the person who manages Bops to finish setting up this connection, then restart Bops.`);
     env[key] = process.env[key];
   }
   return env;
