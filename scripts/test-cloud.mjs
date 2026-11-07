@@ -429,7 +429,7 @@ await selfHosted({ OPENAI_API_KEY: "sk-self" }, async () => {
 await selfHosted({}, () =>
   assert.rejects(ai.responses.create({ model: "x", input: "x" }), {
     message:
-      "OpenAI is not connected for chat. Ask the person who manages Bops to connect OpenAI for chat on this computer, then restart Bops. An OpenAI key saved in Logins is the vault's, for bots' API calls; it doesn't power the chat.",
+      /OpenAI is not connected for chat\. Settings → This (PC|Mac|computer) → Keys.*Logins is the vault.*doesn.t power the chat\./,
   }),
 );
 signOut();

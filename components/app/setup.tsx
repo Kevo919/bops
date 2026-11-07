@@ -1122,7 +1122,7 @@ export function KeysCard() {
             </div>
           ))}
           <a className="text-[12px] underline" href="https://github.com/Kevo919/bops/blob/windows-port/docs/keys.md" target="_blank" rel="noopener noreferrer">How to get keys and set spending limits</a>
-          <p className="text-[12px] text-pencil">A successful authentication check does not guarantee credits or access to every model. After the person managing Bops changes an account, restart Bops and refresh this list.</p>
+          <p className="text-[12px] text-pencil">A successful authentication check does not guarantee credits or access to every model. After following the setup guide to change an account, restart Bops and refresh this list.</p>
           <p data-accounts-help className="text-[12px] text-pencil">More than one account for a provider: follow the “How to get keys and set spending limits” guide linked above to connect your extra account. This screen checks saved accounts; it does not add or edit them. Once connected, each account gets its own row and Check here, and you pick it for a model in Models. Bots&apos; tasks on their computers still use the default account.</p>
         </div>
       }

@@ -72,7 +72,7 @@ await check("no key, self-hosted: the error gives plain setup guidance and prese
       const m = String(e.message);
       assert.match(m, /OpenAI is not connected for chat/);
       assert.doesNotMatch(m, /\.env\.local|OPENAI_API_KEY/);
-      assert.match(m, /person who manages Bops/);
+      assert.match(m, /Settings → This (PC|Mac|computer) → Keys/);
       assert.match(m, /Logins is the vault/, "a key in Logins is said to be the vault's");
       assert.match(m, /doesn.t power the chat/, "and not to power the chat");
       return true;

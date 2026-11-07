@@ -143,7 +143,7 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
       <div className="flex items-center gap-3">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-[13.5px] font-semibold leading-[18px]">Connections</span>
-          <span className="text-[12px] leading-4 text-pencil">Outside accounts your bots can use. Use Settings, Services for connected apps and Zapier. Other provider accounts need setup by the person who manages Bops. Saved keys are never shown here.</span>
+          <span className="text-[12px] leading-4 text-pencil">Outside accounts your bots can use. Use Settings, Services for connected apps and Zapier. For other provider accounts, follow the setup guide linked in Keys. Saved keys are never shown here.</span>
           <span className="pt-0.5 text-[12px] leading-4 text-[color:var(--ht-3a3a38)]">{busy === "refresh" ? "Reading…" : rows ? `${on} of ${CONNECTIONS.length} set up` : "Status unavailable"}</span>
         </div>
         <button className={light} disabled={busy !== null} onClick={() => { setBusy("refresh"); setError(null); void load(); }}>Refresh</button>

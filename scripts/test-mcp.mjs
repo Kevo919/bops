@@ -351,7 +351,7 @@ await check("a missing custom connection key gives administrator guidance withou
   delete process.env.BOPS_TEST_MISSING_MCP_KEY;
   await assert.rejects(() => M.listTools("missing-key", { ...M.mcpServers().fake, env: ["BOPS_TEST_MISSING_MCP_KEY"] }), e => {
     assert.match(e.message, /connection "missing-key" needs an access key/);
-    assert.match(e.message, /person who manages Bops/);
+    assert.match(e.message, /Settings → This (PC|Mac|computer) → Keys/);
     assert.doesNotMatch(e.message, /\.env\.local|BOPS_TEST_MISSING_MCP_KEY/);
     return true;
   });

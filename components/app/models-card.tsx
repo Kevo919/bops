@@ -1,4 +1,6 @@
 "use client";
+import { providerSetupGuide } from "@/lib/setup-words";
+import { useComputerPlatform } from "./computer-words";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { post } from "./ui";
@@ -353,6 +355,7 @@ function AccountSelect({
   disabled?: boolean;
   onChange: (label: string) => void;
 }) {
+  const platform = useComputerPlatform();
   const labels = provider?.accounts ?? [];
   if (!provider?.keyName || (!labels.length && !value)) return null;
   return (
@@ -382,7 +385,7 @@ function AccountSelect({
       </select>
       {missing && (
         <span data-account-missing className="text-[color:var(--ht-9a5b00)]">
-          Account not connected. Choose an available account, or ask the person who manages Bops to connect this one.
+          Account not connected. Choose an available account. {providerSetupGuide(platform)}
         </span>
       )}
     </label>

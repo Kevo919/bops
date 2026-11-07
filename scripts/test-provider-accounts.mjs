@@ -219,7 +219,7 @@ try {
       return true;
     });
     await assert.rejects(P.createOnProvider({ model: "openrouter/x/gone", input: "hi" }), /The OpenRouter \(nope\) account is not connected\. Choose another account for this model in Settings → This (PC|Mac|computer) → Models/);
-    assert.match(P.refusal("openrouter", 401, "{}", SECRETS.OPENROUTER_API_KEY__WORK, "m", "WORK").message, /OpenRouter \(work\) turned this down: your OpenRouter key \(work\) isn't valid\. Ask the person who manages Bops to reconnect this account/);
+    assert.match(P.refusal("openrouter", 401, "{}", SECRETS.OPENROUTER_API_KEY__WORK, "m", "WORK").message, /OpenRouter \(work\) turned this down: your OpenRouter key \(work\) isn't valid\. Settings → This (PC|Mac|computer) → Keys/);
   });
 
   await test("Keys: each account its own row, checked on its own key at the provider's address; a name that isn't one is refused", async () => {

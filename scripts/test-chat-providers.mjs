@@ -203,6 +203,8 @@ console.warn = () => {};
 
 const S = await import(`${rootUrl}/lib/server/store.ts`);
 const P = await import(`${rootUrl}/lib/server/chat-providers.ts`);
+const { providerSetupGuide } = await import(`${rootUrl}/lib/setup-words.ts`);
+const setupGuide = providerSetupGuide(process.platform);
 const M = await import(`${rootUrl}/lib/chat-models.ts`);
 const A = await import(`${rootUrl}/lib/agents.ts`);
 const R = await import(`${rootUrl}/lib/server/routing.ts`);
@@ -410,7 +412,7 @@ await check("Ollama: OLLAMA_API_KEY, when set, goes as Bearer and never into the
     assert.equal(ollamaGot[0].headers.authorization, "Bearer ol-test-SECRET555");
     ollamaNext.push(() => [{ error: { message: "unauthorized ol-test-SECRET555" } }, 401]);
     const no = await fails({ model: "ollama/qwen2.5:3b", input: "hi" });
-    assert.equal(no.message, "Ollama needs a valid access key. Ask the person who manages Bops to check the Ollama connection, or choose another model.");
+    assert.equal(no.message, `Ollama needs a valid access key. ${setupGuide} Or choose another model.`);
     assert.equal(no.status, 401);
     assert.ok(!no.message.includes("SECRET555") && !no.said.includes("SECRET555"));
   } finally {
@@ -453,7 +455,7 @@ await check("Ollama: a model it hasn't pulled, and an address with nothing there
   process.env.OLLAMA_BASE_URL = `http://127.0.0.1:${port}/v1`;
   try {
     const off = await fails({ model: "ollama/qwen2.5:3b", input: "hi" });
-    assert.equal(off.message, `Couldn't reach Ollama at http://127.0.0.1:${port}/v1: ask the person who manages Bops to check that Ollama is running and its saved address is correct, then try again.`);
+    assert.equal(off.message, `Couldn't reach Ollama at http://127.0.0.1:${port}/v1: check that Ollama is running and its saved address is correct. ${setupGuide}`);
     assert.equal(off.status, undefined);
     delete process.env.OLLAMA_BASE_URL;
     assert.equal(P.ollamaBase(), "http://127.0.0.1:11434/v1", "the default address");
@@ -464,7 +466,7 @@ await check("Ollama: a model it hasn't pulled, and an address with nothing there
 
 await check("a provider's no is plain words naming the provider and the fix, with its HTTP status, and never the key", async () => {
   const e401 = await fails({ model: "anthropic/claude-opus-5-5", input: "hi" }, () => json({ type: "error", error: { type: "authentication_error", message: `invalid x-api-key ${KEYS.ANTHROPIC_API_KEY}` } }, 401));
-  assert.equal(e401.message, "Claude turned this down: your Anthropic key isn't valid. Ask the person who manages Bops to reconnect this account, or choose another model.");
+  assert.equal(e401.message, `Claude turned this down: your Anthropic key isn't valid. ${setupGuide} Or choose another model.`);
   assert.equal(e401.status, 401);
   assert.equal(e401.provider, "anthropic");
 
@@ -486,7 +488,7 @@ await check("a provider's no is plain words naming the provider and the fix, wit
   assert.equal(zaiCn.status, 429);
   assert.equal(zaiCn.provider, "zai-coding-cn");
   const cn401 = await fails({ model: "zai-coding-cn/glm-5.3", input: "hi" }, () => json({ error: { code: "1000", message: `bad key ${KEYS.ZAI_CODING_CN_API_KEY}` } }, 401));
-  assert.equal(cn401.message, "z.ai (China) turned this down: your open.bigmodel.cn key isn't valid. Ask the person who manages Bops to reconnect this account, or choose another model.");
+  assert.equal(cn401.message, `z.ai (China) turned this down: your open.bigmodel.cn key isn't valid. ${setupGuide} Or choose another model.`);
 
   const busy = await fails({ model: "openrouter/x/y", input: "hi" }, () => json({ error: { message: "Rate limit exceeded" } }, 429));
   assert.match(busy.message, /^OpenRouter is getting too many requests/);
@@ -506,7 +508,7 @@ await check("a provider's no is plain words naming the provider and the fix, wit
 await check("no key, a lost conversation, and no answer at all: said plainly too", async () => {
   delete process.env.DEEPINFRA_API_KEY;
   const none = await fails({ model: "deepinfra/meta/llama", input: "hi" });
-  assert.equal(none.message, "DeepInfra is not connected. Ask the person who manages Bops to connect it, or pick another model.");
+  assert.equal(none.message, `DeepInfra is not connected. ${setupGuide} Or pick another model.`);
   const lost = await fails({ model: "anthropic/claude-sonnet-5-5", previous_response_id: "resp_gone", input: [{ type: "function_call_output", call_id: "x", output: "y" }] });
   assert.match(lost.message, /^Claude lost track of this reply/);
   assert.equal(lost.status, 410);
@@ -701,7 +703,7 @@ await check("a chat set to Claude whose key is wrong: the chat says so in plain 
   next.push(() => json({ type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } }, 401));
   await Chat.handleMessage(chatId, "Hello?");
   const said = S.getState().messages.filter((m) => m.chatId === chatId && m.role === "bot").at(-1);
-  assert.match(said.text, /Claude turned this down: your Anthropic key isn't valid\. Ask the person who manages Bops to reconnect this account/);
+  assert.match(said.text, /Claude turned this down: your Anthropic key isn't valid\. Settings → This (PC|Mac|computer) → Keys/);
   assert.equal(said.chatError?.kind, "key", "shown as the error card, with Details");
   assert.match(said.chatError.details, /invalid x-api-key/);
 });

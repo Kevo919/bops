@@ -359,7 +359,7 @@ async function send(provider: AgentRoute, url: string, headers: Record<string, s
       timedOut
         ? `${whoOf(provider, acct)} took too long to answer (over ${Math.round(TIMEOUT_MS / 1000)} seconds). Try again, or pick another model.`
         : provider === "ollama"
-          ? `Couldn't reach Ollama at ${ollamaBase()}: ask the person who manages Bops to check that Ollama is running and its saved address is correct, then try again.`
+          ? `Couldn't reach Ollama at ${ollamaBase()}: check that Ollama is running and its saved address is correct. ${providerSetupGuide(ownPlatform())}`
           : `Couldn't reach ${whoOf(provider, acct)}: check this server's internet connection, then try again.`,
       provider,
     );
@@ -393,13 +393,13 @@ export function refusal(provider: AgentRoute, status: number, raw: string, key: 
   const balance = status === 402 || /insufficient[ _]balance|credit balance|no (resource package|balance)|no credits?( remaining| left)?|out of credit|insufficient[ _]quota|quota exceeded|exceeded your current quota|billing|1113|top ?up|payment required/i.test(words);
   const err = (m: string) => new ChatProviderError(m, provider, status, words);
   if (provider === "ollama") {
-    if (status === 401 || status === 403) return err(`Ollama needs a valid access key. Ask the person who manages Bops to check the Ollama connection, or choose another model.`);
+    if (status === 401 || status === 403) return err(`Ollama needs a valid access key. ${providerSetupGuide(ownPlatform())} Or choose another model.`);
     if (status === 404 || /not found|try pulling/i.test(words)) return err(`Ollama doesn't have the model "${model}". Pull it on the server (ollama pull ${model}), or pick another model.`);
     if (status >= 500) return err(`Ollama had a problem running "${model}" (HTTP ${status})${words ? `: ${words}` : ""}. The server may be short of memory for it: try a smaller model.`);
     return err(`Ollama turned this down (HTTP ${status})${words ? `: ${words}` : ""}.`);
   }
   if (status === 401 || (status === 403 && /key|auth|token|credential/i.test(words) && !balance))
-    return err(`${who} turned this down: your ${ACCOUNTS[provider]} key${acct ? ` (${accountWord(acct)})` : ""} isn't valid. Ask the person who manages Bops to reconnect this account, or choose another model.`);
+    return err(`${who} turned this down: your ${ACCOUNTS[provider]} key${acct ? ` (${accountWord(acct)})` : ""} isn't valid. ${providerSetupGuide(ownPlatform())} Or choose another model.`);
   if (balance)
     return err(
       provider === "zai" || provider === "zai-coding" || provider === "zai-coding-cn"
@@ -440,7 +440,7 @@ export async function createOnProvider(params: Params, opts: { timeoutMs?: numbe
     throw new ChatProviderError(
       acct
         ? `The ${whoOf(provider, acct)} account is not connected. Choose another account for this model in ${modelsSettingsPath(ownPlatform())}. ${providerSetupGuide(ownPlatform())}`
-        : `${ACCOUNTS[provider]} is not connected. Ask the person who manages Bops to connect it, or pick another model.`,
+        : `${ACCOUNTS[provider]} is not connected. ${providerSetupGuide(ownPlatform())} Or pick another model.`,
       provider,
     );
 

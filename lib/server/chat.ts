@@ -26,6 +26,7 @@ import { computerWords, computerWordsFor } from "@/lib/computer-words";
 import { chatModelLabel, chatModels, providerOf } from "@/lib/chat-models";
 import { contactLine, createBot, namesTheUser } from "./bots";
 import { creditsOut, noteOutOfCredit, outOfCreditWords } from "./cloud";
+import { memberSetupWords } from "@/lib/setup-words";
 import { chatFailure } from "./chat-failure";
 import { noOwnComputer } from "./plan";
 import { agentLabel, agentName, agentNamed, aiOf, modelShort, paysLabel, readyAgents } from "@/lib/agents";
@@ -3680,9 +3681,10 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
     }
     // The model's provider said no (out of credit, too many requests, a bad key, no such model, down): in plain words,
     // with a way to Settings → AI subscriptions, its raw words behind Details and never a key (lib/chat-error.ts).
-    const failure = chatFailure(e, { model: turnModel, bot: b.name });
+    const foundFailure = chatFailure(e, { model: turnModel, bot: b.name });
+    const failure = foundFailure ? { ...foundFailure, text: memberSetupWords(foundFailure.text, !!opts.member), ...(foundFailure.details ? { details: memberSetupWords(foundFailure.details, !!opts.member) } : {}) } : undefined;
     if (failure) console.warn(`[chat] ${botId} couldn't answer: ${failure.kind} (${failure.provider ?? "provider"} ${failure.status ?? ""})`.trim());
-    addMessage({ chatId, role: "bot", botId, text: failure ? failure.text : `Something went wrong on my side: ${(e as Error).message}`, ...(failure ? { chatError: failure, bops: true as const } : {}), replyTo: opts.replyTo });
+    addMessage({ chatId, role: "bot", botId, text: failure ? failure.text : `Something went wrong on my side: ${memberSetupWords(e instanceof Error ? e.message : String(e), !!opts.member)}`, ...(failure ? { chatError: failure, bops: true as const } : {}), replyTo: opts.replyTo });
     return { text: null };
   } finally {
     // Still drawing a picture: it keeps typing until that's in (drawFor).
