@@ -1,5 +1,6 @@
 "use client";
 
+import { WHOSE_WORDS } from "@/lib/bot-number";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import type { ServicesView, ServiceView } from "@/lib/server/services";
 import { InProgress } from "./in-progress";
@@ -126,13 +127,24 @@ function PanelLine({ label, state, words, link }: { label: string; state: "ok" |
 
 /** AgentPhone, once a key is saved: the key (last four only), the number and agent found, and whether calls and texts are ready. */
 function AgentPhonePanel({ p }: { p: NonNullable<ServiceView["phone"]> }) {
-  const calls = p.calls === "working" || p.calls === "ready" ? "ok" : p.calls === "needs funds" ? "bad" : "none";
+  // Funds not checked (AgentPhone has no balance to read): amber, never "ready".
+  const calls = p.calls === "working" ? "ok" : p.calls === "funds not checked" ? "wait" : p.calls === "needs funds" ? "bad" : "none";
+  // The bot's number as every other screen shows it (lib/bot-number.ts), and the one calls and texts go from.
+  const bot = p.botNumber;
+  const agent = p.agent ? `, agent "${p.agent}"` : "";
+  const numberWords = bot
+    ? bot.whose === "agentphone" || !p.number || bot.phone === p.number
+      ? `${bot.phone} (${WHOSE_WORDS[bot.whose]})${agent}`
+      : `${bot.phone} (${WHOSE_WORDS.bops}). Calls and texts you ask for go from ${p.number} (${WHOSE_WORDS.agentphone})${agent}`
+    : p.number
+      ? `${p.number} (${WHOSE_WORDS.agentphone})${agent}`
+      : (p.problem ?? (p.checked ? "None found" : "Press Check to look it up"));
   const texts = p.texts === "working" || p.texts === "enabled" ? "ok" : p.texts === "activating" ? "wait" : p.texts === "registration needed" ? "bad" : "none";
   return (
     <div data-agentphone-panel className="flex flex-col gap-1.5 rounded-lg bg-desk/60 px-2.5 py-2">
       <PanelLine label="Key" state="ok" words={`saved, ${p.key}`} />
-      <PanelLine label="Number" state={p.number ? "ok" : "none"} words={p.number ? `${p.number}${p.agent ? `, agent "${p.agent}"` : ""}` : (p.problem ?? (p.checked ? "None found" : "Press Check to look it up"))} />
-      <PanelLine label="Calls" state={calls} words={p.callsWords} link={p.calls === "needs funds" ? "https://agentphone.ai/dashboard" : undefined} />
+      <PanelLine label="Number" state={bot || p.number ? "ok" : "none"} words={numberWords} />
+      <PanelLine label="Calls" state={calls} words={p.callsWords} link={p.calls === "needs funds" || p.calls === "funds not checked" ? "https://agentphone.ai/dashboard" : undefined} />
       <PanelLine label="Texts" state={texts} words={p.textsWords} link={p.texts === "registration needed" ? "https://agentphone.ai/register" : undefined} />
     </div>
   );

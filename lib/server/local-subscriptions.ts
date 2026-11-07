@@ -33,7 +33,22 @@ const signingOut = registry.signingOut ??= new Set();
 const generations = registry.generations ??= new Map();
 const stopping = registry.stopping ??= new Map();
 const closed = registry.closed ??= new WeakSet();
-const advance = (kind: LocalSubscriptionKind) => generations.set(kind, (generations.get(kind) ?? 0) + 1);
+const advance = (kind: LocalSubscriptionKind) => { generations.set(kind, (generations.get(kind) ?? 0) + 1); checked.delete(kind); };
+/**
+ * The last sign-in check per CLI, for readers that only need to know roughly (the chat box's agent chip, through
+ * /api/pc-task-runner): reused for CHECKED_MS, so mounting the chip or focusing the window doesn't run the CLI each
+ * time. Gone on any sign-in change here (advance), and replaced by every full check (Settings, AI plans).
+ */
+const CHECKED_MS = 60_000;
+const checked = new Map<LocalSubscriptionKind, { at: number; generation: number; value: LocalSubscriptionStatus }>();
+/** For tests: forget the cached checks. */
+export const forgetLocalChecks = () => checked.clear();
+/** The sign-in as last checked within a minute (and nothing changed here since), else checked now. */
+export async function cachedLocalSubscriptionStatus(kind: LocalSubscriptionKind): Promise<LocalSubscriptionStatus> {
+  const c = checked.get(kind);
+  if (c && Date.now() - c.at < CHECKED_MS && c.generation === (generations.get(kind) ?? 0) && !registry.logins.has(kind) && !signingOut.has(kind)) return c.value;
+  return getLocalSubscriptionStatus(kind);
+}
 const status = (kind: LocalSubscriptionKind, state: LocalSubscriptionStatus["state"], extra: Partial<LocalSubscriptionStatus> = {}): LocalSubscriptionStatus => ({ kind, available: state !== "missing", connected: state === "connected", state, checkedAt: Date.now(), ...extra });
 const args = (kind: LocalSubscriptionKind, action: "status" | "login" | "logout") => {
   if (kind === "claude") return ["auth", action, ...(action === "status" ? ["--json"] : action === "login" ? ["--claudeai"] : [])];
@@ -91,6 +106,13 @@ async function run(kind: LocalSubscriptionKind, command: string[]): Promise<{ co
   });
 }
 export async function getLocalSubscriptionStatus(kind: LocalSubscriptionKind): Promise<LocalSubscriptionStatus> {
+  const generation = generations.get(kind) ?? 0;
+  const value = await checkLocalSubscription(kind);
+  // Kept for cachedLocalSubscriptionStatus: a settled answer only, and only if nothing changed while it was checked.
+  if (value.state !== "connecting" && (generations.get(kind) ?? 0) === generation) checked.set(kind, { at: Date.now(), generation, value });
+  return value;
+}
+async function checkLocalSubscription(kind: LocalSubscriptionKind): Promise<LocalSubscriptionStatus> {
   if (stopping.has(kind)) return stoppingStatus(kind);
   if (!localSubscriptionRuntime(kind).file) return status(kind, "missing");
   if (signingOut.has(kind)) return status(kind, "error", { error: "Sign-out is still in progress." });

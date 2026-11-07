@@ -1,4 +1,6 @@
 import "server-only";
+import { botNumbers } from "./bot-number";
+import { agentPhoneBase } from "./agentphone-status";
 import { planRoom } from "./plan-room";
 import { openaiClient } from "./openai-client";
 import { SidebandWS } from "openai/resources/live/sideband/ws";
@@ -62,7 +64,7 @@ import { checkVerification, forgetVerification, pendingConsentAt, pendingVerific
  *   calls while the Mac is away (cloudCall, below).
  */
 
-const AP = "https://api.agentphone.ai/v1";
+// AgentPhone is at https://api.agentphone.ai, or BOPS_AGENTPHONE_BASE (a stub on this computer, for tests): agentphone-status.ts agentPhoneBase.
 const openai = openaiClient({ maxRetries: 0 });
 
 export const phoneOn = () => (cloudOn() ? !!cloudSessionNow()?.agentphone : !!process.env.AGENTPHONE_API_KEY);
@@ -109,7 +111,7 @@ function inLine(botId: string, work: () => Promise<void>) {
  */
 async function ap<T>(method: string, path: string, body?: unknown, scope: "sub" | "parent" = "sub"): Promise<T> {
   const via = cloudProxy("agentphone");
-  const res = await fetch(via ? `${via.url}/v1${path}` : `${AP}${path}`, {
+  const res = await fetch(via ? `${via.url}/v1${path}` : `${agentPhoneBase()}/v1${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${via ? via.key : process.env.AGENTPHONE_API_KEY}`,
@@ -1212,6 +1214,7 @@ export async function phoneStatus() {
   const room = planRoom();
   if (!phoneOn()) return { on: false as const, room };
   const reg = await ap<{ campaign_status?: string; message?: string }>("GET", "/register/status").catch(() => null);
+  const numbers = botNumbers();
   return {
     on: true as const,
     texting: reg?.campaign_status ?? "unknown",
@@ -1228,7 +1231,8 @@ export async function phoneStatus() {
       const main = getState().bots.find((b) => b.isMain && workspaceOf(b) === w.id);
       // The number its calls go to: the workspace's line, else the main bot's own number.
       const reach = w.line?.phone ?? (main?.phone && main.phoneLine ? main.phone : undefined);
-      return { id: w.id, name: w.name, main: main?.name ?? null, mainId: main?.id ?? null, line: w.line ? { phone: prettyPhone(w.line.phone), type: w.line.type } : null, call: reach ? prettyPhone(reach) : null };
+      // `number`: the one every screen shows (lib/bot-number.ts), your own AgentPhone number when Bops set up none.
+      return { id: w.id, name: w.name, main: main?.name ?? null, mainId: main?.id ?? null, line: w.line ? { phone: prettyPhone(w.line.phone), type: w.line.type } : null, call: reach ? prettyPhone(reach) : null, number: numbers[w.id] ?? null };
     }),
     lines: getState()
       .bots.filter((b) => b.phone)

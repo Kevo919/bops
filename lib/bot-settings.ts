@@ -92,7 +92,7 @@ export const SETTINGS_WORDS = {
   phoneSummary: (number: string, voice: string | null, n: number) => [number, voice && `${voice} voice`, `${n} ${n === 1 ? "sequence" : "sequences"} on`].filter(Boolean).join(" · "),
   notTaking: "not taking calls",
   phoneLabel: "mobile · texts and calls",
-  teamNumber: (kind: string) => `mobile · ${kind} · the team's number`,
+  teamNumber: (kind: string) => `mobile · ${kind} · the team's number, a number Bops set up`,
   voice: "Voice",
   pickedForName: "Picked for its name",
   pickedForNameIs: (v: string) => `Picked for its name (${v})`,

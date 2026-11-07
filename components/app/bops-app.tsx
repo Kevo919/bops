@@ -1,5 +1,6 @@
 "use client";
 
+import { numberSentence, workspaceNumber, type BotNumber } from "@/lib/bot-number";
 import { useComputerWords } from "./computer-words";
 
 import { APPS_NAME, appsOwnShown, appsShown } from "@/lib/apps-access";
@@ -1737,7 +1738,7 @@ type PhoneInfo = {
   owners?: OwnerNumber[];
   pending?: PendingCode[];
   verify?: boolean;
-  workspaces?: { id: string; name: string; main: string | null; line: { phone: string; type: string } | null; call: string | null }[];
+  workspaces?: { id: string; name: string; main: string | null; line: { phone: string; type: string } | null; call: string | null; number?: BotNumber | null }[];
   lines?: { bot: string; phone: string }[];
 };
 
@@ -1768,7 +1769,7 @@ function ReachNote({ label, line, retry }: { label: string; line: string; retry?
  */
 function MobileRows({ info, onInfo }: { info: PhoneInfo; onInfo: (p: PhoneInfo) => void }) {
   const phone = useOwnerPhone(info, onInfo);
-  const reach = (info.workspaces ?? []).filter((w) => w.line || w.call);
+  const reach = (info.workspaces ?? []).filter((w) => w.line || w.call || w.number);
   return (
     <>
       <ReachBanner info={info} phone={phone} />
@@ -1777,12 +1778,13 @@ function MobileRows({ info, onInfo }: { info: PhoneInfo; onInfo: (p: PhoneInfo) 
         <div className="flex flex-col gap-1 border-t border-[color:var(--h-f0f0ee)] pt-2.5 text-[12.5px] leading-[18px] text-[color:var(--ht-3a3a38)]">
           {reach.map((w) => {
             const who = w.main ?? "your main bot";
-            const text = w.line?.phone ?? w.call;
+            const text = w.line?.phone ?? w.call ?? w.number?.phone;
             return (
               <div key={w.id} className="flex flex-col gap-1">
                 <span>
                   {reach.length > 1 && <span className="text-[color:var(--ht-9a9a98)]">{w.name}: </span>}
-                  {w.call && w.call !== text ? `Text ${who} at ${text} · call at ${w.call}` : `Text or call ${who} at ${text}`}
+                  {/* Your AgentPhone number (no line Bops set up): the same words as every other screen (lib/bot-number.ts). */}
+                  {!w.line && !w.call && w.number ? numberSentence(w.number, who) : w.call && w.call !== text ? `Text ${who} at ${text} · call at ${w.call}` : `Text or call ${who} at ${text}`}
                   <span className="text-[color:var(--ht-9a9a98)]"> ({who} hands work to the team)</span>
                 </span>
                 {text && <LineLink phone={text} />}
@@ -2224,19 +2226,20 @@ function WorkspaceReach({ state }: { state: AppState }) {
   const has = !!(w?.mailClaimed || w?.mailPick);
   const [phone] = usePhoneInfo<PhoneInfo>();
   const [email] = useOwnerEmailInfo();
+  // The number every screen shows (lib/bot-number.ts), as /api/phone says it; before it answers, the state's own line.
+  const said = phone?.workspaces?.find((x) => x.id === ws);
+  const number = said ? (said.number ?? null) : workspaceNumber({ line: w?.line, mainPhone: main?.phone && main.phoneLine ? main.phone : null, defaultWorkspace: false });
   // Neither texting nor email here (a self-hosted Bops without AgentPhone or AgentMail): no number or address will come.
-  if (phone?.on === false && email?.on === false && !w?.line?.phone && !has)
+  if (phone?.on === false && email?.on === false && !number && !has)
     return <ReachNotSetUp title="Texts, calls and email" intro={`This is where you see the address people email and the number they text to reach ${w?.name ?? "this workspace"}'s bots.`} />;
   return (
     <>
       <EmailAddresses state={state} only={ws} />
       <div className="flex flex-col gap-2 px-[22px] pt-4">
         <span className="text-[13px] font-semibold">Phone</span>
-        <div className="rounded-[14px] px-3.5 py-3 text-[13px] shadow-[0_0_0_1px_var(--h-e6e6e3)]">
-          {w?.line?.phone ? (
-            <span>
-              Text or call {main?.name ?? "its main bot"} at <span className="font-mono text-[12.5px]">{w.line.phone}</span>
-            </span>
+        <div className="rounded-[14px] px-3.5 py-3 text-[13px] shadow-[0_0_0_1px_var(--h-e6e6e3)]" data-bot-number={number?.whose ?? ""}>
+          {number ? (
+            <span>{numberSentence(number, main?.name ?? "its main bot")}</span>
           ) : (
             <span className="text-[color:var(--ht-6b6b6b)]">No number yet. A workspace gets one to text and call its main bot.</span>
           )}

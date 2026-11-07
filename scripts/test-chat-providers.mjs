@@ -161,6 +161,8 @@ const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, 
 const sent = [];
 const next = [];
 const openaiAsked = [];
+/** OpenAI's no to the next chat turns, while set: its status and body. */
+let openaiNo = null;
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
   const req = new Request(input, init);
@@ -170,6 +172,8 @@ globalThis.fetch = async (input, init) => {
   if (url.origin === "https://api.openai.com") {
     const b = JSON.parse(await req.text());
     openaiAsked.push(b);
+    // A chat turn OpenAI turns down (openaiNo), as its API does: the SDK reads it into an APIError.
+    if (openaiNo && String(b.instructions ?? "").includes("If a tapback says it all")) return new Response(JSON.stringify(openaiNo.body), { status: openaiNo.status, headers: { "content-type": "application/json", "x-should-retry": "false" } });
     return json({ id: `resp_oa_${openaiAsked.length}`, object: "response", model: "gpt-test", status: "completed", output: [{ id: "m", type: "message", role: "assistant", content: [{ type: "output_text", text: "From OpenAI.", annotations: [] }] }], usage: { input_tokens: 1, output_tokens: 1, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } });
   }
   if (["api.anthropic.com", "api.z.ai", "open.bigmodel.cn", "api.deepseek.com", "openrouter.ai", "api.deepinfra.com"].includes(url.host)) {
@@ -688,6 +692,8 @@ await check("a chat set to Claude whose key is wrong: the chat says so in plain 
   await Chat.handleMessage(chatId, "Hello?");
   const said = S.getState().messages.filter((m) => m.chatId === chatId && m.role === "bot").at(-1);
   assert.match(said.text, /Claude turned this down: your Anthropic key isn't valid\. Check ANTHROPIC_API_KEY in \.env\.local/);
+  assert.equal(said.chatError?.kind, "key", "shown as the error card, with Details");
+  assert.match(said.chatError.details, /invalid x-api-key/);
 });
 
 await check("Auto (no model): the turn goes to OpenAI as before, with web_search", async () => {
@@ -701,6 +707,39 @@ await check("Auto (no model): the turn goes to OpenAI as before, with web_search
   assert.ok(turn);
   assert.equal(turn.model, "gpt-6.1-sol");
   assert.ok(turn.tools.some((t) => t.type === "web_search"));
+});
+
+await check("Auto, and OpenAI says the account has no credits: the chat says so plainly, with the raw words for Details and no key", async () => {
+  const Chat = await import(`${rootUrl}/lib/server/chat.ts`);
+  S.update(() => delete S.chat(chatId).model);
+  openaiNo = { status: 429, body: { error: { message: `You have no credits remaining. Add credits at https://platform.openai.com/settings/organization/billing (key ${process.env.OPENAI_API_KEY})`, type: "insufficient_quota", code: "insufficient_quota" } } };
+  try {
+    await Chat.handleMessage(chatId, "Are you there?");
+  } finally {
+    openaiNo = null;
+  }
+  const said = S.getState().messages.filter((m) => m.chatId === chatId && m.role === "bot").at(-1);
+  assert.equal(said.chatError?.kind, "credit", JSON.stringify(said));
+  assert.match(said.text, /^Your OpenAI account is out of credit, so \w+ can't answer\. Add credit at platform\.openai\.com, Billing, or pick another model in Settings → AI plans\.$/);
+  assert.equal(said.chatError.text, said.text);
+  assert.equal(said.chatError.status, 429);
+  assert.match(said.chatError.details, /no credits remaining/);
+  const all = JSON.stringify(said);
+  assert.ok(!all.includes(process.env.OPENAI_API_KEY), "never the key");
+  assert.ok(!/Something went wrong/.test(said.text));
+});
+
+await check("a chat set to DeepSeek that's out of balance: the provider's own plain words, as a credit card", async () => {
+  const Chat = await import(`${rootUrl}/lib/server/chat.ts`);
+  S.update(() => (S.chat(chatId).model = "deepseek/deepseek-chat"));
+  next.push(() => json({ error: { message: "Insufficient Balance", type: "unknown_error" } }, 402));
+  await Chat.handleMessage(chatId, "Hello again?");
+  S.update(() => delete S.chat(chatId).model);
+  const said = S.getState().messages.filter((m) => m.chatId === chatId && m.role === "bot").at(-1);
+  assert.equal(said.chatError?.kind, "credit");
+  assert.match(said.text, /^DeepSeek says your DeepSeek account has no credit left/);
+  assert.equal(said.chatError.provider, "DeepSeek");
+  assert.ok(!JSON.stringify(said).includes(KEYS.DEEPSEEK_API_KEY));
 });
 
 await check("the window's picker renders right (the --ui pass)", async () => {

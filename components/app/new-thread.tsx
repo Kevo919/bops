@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent as KeyEvent, type RefObject } from "react";
 import { useOwnComputerWords } from "./computer-words";
-import { AGENTS, agentLabel, agentName, agentState, aiOf, anyModel, modelsFor, modelShort, OPENCODE_OTHER, paysLabel, readyAgents, upper, type AgentState } from "@/lib/agents";
+import { AGENTS, agentLabel, agentName, agentState, aiOf, anyModel, modelsFor, modelShort, nextRunState, nextRunWhere, OPENCODE_OTHER, paysLabel, readyAgents, upper, type AgentState, type RunPlace } from "@/lib/agents";
 import { workBot, workspaceOf, type AppState, type Bot, type BotAgent, type Session } from "@/lib/types";
 import { AgentMark } from "./agent-marks";
 import { useVaultKeyNames } from "./keys";
@@ -48,6 +48,7 @@ export function useBotKeys(state: AppState, b: Bot | undefined) {
 
 /** An agent that isn't ready, in a word or two, for a chip: "not signed in", "no key". */
 export function notReadyWords(st: AgentState) {
+  if (st.short) return st.short;
   return st.button === "sign_in" ? "not signed in" : st.button === "add_key" ? "no key" : st.button === "show" ? "signing in" : st.button === "retry" ? "sign in didn't finish" : "not ready";
 }
 
@@ -228,13 +229,65 @@ export function NewThread({
  * is (the server starts them there, ready or not), and the agents there are to pick from: the ready ones and the
  * Default. Shown only to the owner, and only when there's a choice.
  */
-export function boxAgents(state: AppState, b: Bot, value: string | null, keys?: ReadonlySet<string>) {
+export function boxAgents(state: AppState, b: Bot, value: string | null, keys?: ReadonlySet<string>, place?: RunPlace) {
   const ai = aiOf(b, state);
   const ready = readyAgents(b, state, keys);
   const def = ai.agents.find((x) => x.id === ai.default) ?? ai.agents[0];
   const options = ready.some((x) => x.id === def.id) ? ready : [def, ...ready];
   const picked = ready.find((x) => x.id === value);
-  return { ready, def, options, picked, now: picked ?? def, defReady: ready.some((x) => x.id === def.id) };
+  // The Default as the next message would run it, where it would run (lib/agents.ts nextRunState): with `place`
+  // (this PC's Bot tasks, the cloud computer's status), what the chip says of it; without, as readyAgents has it.
+  const defState = place ? nextRunState(def, b, state, place, keys) : undefined;
+  return { ready, def, options, picked, now: picked ?? def, defReady: defState ? defState.ready : ready.some((x) => x.id === def.id), defState };
+}
+
+/**
+ * What the chip needs to know of where the next message's tasks run (lib/agents.ts RunPlace), read when it matters
+ * only: this PC's Bot tasks (/api/pc-task-runner) for a bot that works here, and its cloud computer's status
+ * (/api/computer) for an agent on a Claude or ChatGPT plan there. Read once, and again when the window comes to
+ * the front (a sign in done meanwhile, the computer fallen asleep); never polled.
+ */
+export function useRunPlace(state: AppState, b: Bot | undefined, agent: BotAgent | undefined): RunPlace {
+  const where = b ? nextRunWhere(b, state) : "cloud";
+  const wantPc = !!b && !state.shared && where === "pc" && agent?.kind === "claude" && agent.pays === "plan";
+  const wantComputer = !!b && !state.shared && where === "cloud" && !!agent && agent.pays === "plan";
+  const [pc, setPc] = useState<RunPlace["pc"]>(undefined);
+  const [computerStatus, setStatus] = useState<string | undefined>(undefined);
+  const [again, setAgain] = useState(0);
+  const botId = b?.id;
+  useEffect(() => {
+    if (!wantPc && !wantComputer) return;
+    const front = () => setAgain((n) => n + 1);
+    window.addEventListener("focus", front);
+    return () => window.removeEventListener("focus", front);
+  }, [wantPc, wantComputer]);
+  useEffect(() => {
+    if (!wantPc) return;
+    let stop = false;
+    void fetch("/api/pc-task-runner", { cache: "no-store" })
+      .then(async (r) => {
+        const j = r.ok ? ((await r.json()) as { runner?: "claude" | "openai" | null; problem?: string }) : null;
+        if (!stop) setPc(j ? { runner: j.runner ?? null, ...(j.problem ? { problem: j.problem } : {}) } : null);
+      })
+      .catch(() => !stop && setPc(null));
+    return () => {
+      stop = true;
+    };
+  }, [wantPc, again]);
+  useEffect(() => {
+    if (!wantComputer || !botId) return;
+    let stop = false;
+    void fetch(`/api/computer?bot=${encodeURIComponent(botId)}`, { cache: "no-store" })
+      .then(async (r) => {
+        const j = r.ok ? ((await r.json()) as { computer?: { status?: string } }) : null;
+        if (!stop && j) setStatus(j.computer?.status);
+      })
+      .catch(() => {});
+    return () => {
+      stop = true;
+    };
+  }, [wantComputer, botId, again]);
+  return { ...(wantPc ? { pc } : {}), ...(wantComputer ? { computerStatus } : {}) };
 }
 
 /**
@@ -248,10 +301,16 @@ export function AgentChipPick({ state, bot: b, value, keys, defaultOpen = false,
   const menuId = useId();
   useDismiss(open, () => setOpen(false), box);
   const ownWords = useOwnComputerWords(state);
-  const { options, now, def, defReady } = boxAgents(state, b, value, keys);
+  const first = boxAgents(state, b, value, keys);
+  // Where the next message's tasks run, and how that is now: the Default is said as it would really run (nextRunState).
+  const place = useRunPlace(state, b, first.def);
+  const { options, now, def, defReady } = boxAgents(state, b, value, keys, place);
   if (options.length < 2 || state.shared) return null;
   const at = { bot: b, state };
-  const off = (x: BotAgent) => (x.id === def.id && !defReady ? notReadyWords(agentState(x, b, state, keys, ownWords)) : "");
+  const defSaid = nextRunState(def, b, state, place, keys, ownWords);
+  const off = (x: BotAgent) => (x.id === def.id && !defReady ? notReadyWords(defSaid) : "");
+  // Ready, with something worth knowing (its computer asleep: it wakes when you send).
+  const note = now.id === def.id && defReady ? defSaid.note : undefined;
   // Its name, or (not ready) its kind and why, which a narrow chip mustn't cut off; the menu and its name say which.
   const label = off(now) ? `${AGENTS[now.kind].name} · ${off(now)}` : agentName(now, at);
   return (
@@ -262,12 +321,14 @@ export function AgentChipPick({ state, bot: b, value, keys, defaultOpen = false,
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label={`Agent for new tasks: ${agentName(now, at)}${off(now) ? `, ${off(now)}` : ""}`}
-        title={value && now.id === value ? `Tasks from this message run on ${agentLabel(now, at)}` : `Tasks run on ${b.name}'s Default, ${agentLabel(now, at)}${off(now) ? `, which is ${off(now)}` : ""}`}
+        aria-label={`Agent for new tasks: ${agentName(now, at)}${off(now) ? `, ${off(now)}` : note ? `, ${note}` : ""}`}
+        data-agent-ready={off(now) ? (defSaid.checking ? "checking" : "no") : "yes"}
+        title={value && now.id === value ? `Tasks from this message run on ${agentLabel(now, at)}` : `Tasks run on ${b.name}'s Default, ${agentLabel(now, at)}${off(now) || note ? `. ${defSaid.line}` : ""}`}
         className="flex h-[30px] items-center gap-1.5 rounded-full px-2 text-[12.5px] leading-4 text-[color:var(--ht-3a3a38)] hover:bg-[color:var(--hb-f2f2f0)]"
       >
         <AgentMark kind={now.kind} size={15} />
-        <span className={`max-w-[170px] truncate ${off(now) ? "text-[color:var(--ht-b54708)]" : ""}`}>{label}</span>
+        <span className={`max-w-[170px] truncate ${off(now) && !defSaid.checking ? "text-[color:var(--ht-b54708)]" : ""}`}>{label}</span>
+        {note && <span data-agent-note className="max-w-[180px] truncate text-[11px] text-[color:var(--ht-6b6b6b)]">· {note}</span>}
         {(now.pays === "plan" || now.model?.startsWith("zai-coding/")) && <span className="max-w-[180px] truncate text-[11px]">· {paysLabel(now, state, workBot(b, state.bots).computerId)}</span>}
         <span aria-hidden className="text-[9px] text-[color:var(--ht-9a9a98)]">
           ▾
