@@ -26,6 +26,7 @@ import { computerWords, computerWordsFor } from "@/lib/computer-words";
 import { chatModelLabel, chatModels, providerOf } from "@/lib/chat-models";
 import { contactLine, createBot, namesTheUser } from "./bots";
 import { creditsOut, noteOutOfCredit, outOfCreditWords } from "./cloud";
+import { chatFailure } from "./chat-failure";
 import { noOwnComputer } from "./plan";
 import { agentLabel, agentName, agentNamed, aiOf, modelShort, paysLabel, readyAgents } from "@/lib/agents";
 import { botChatId, live, MIN_EVERY_MINUTES, pairChatId, routineSent, settingsOf, TAPBACK_EMOJI, TAPBACKS, saidOf, workBot, workspaceOf, type AppApproval, type Bot, type ChannelKind, type Delivery, type MemberTurn, type Message, type ReplyDraft, type Routine, type RoutineRun, type Schedule, type Session, type SkillProposal, type Tapback } from "@/lib/types";
@@ -2158,6 +2159,8 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
   // A turn someone else started: who it came from, for what it passes on and starts (sessions.ts StartOptions.outside).
   const outsideFrom = opts.outside ? (opts.from ?? "someone outside Bops") : undefined;
   if (!bg) setTyping(chatId, botId, true);
+  // The model this turn asked, once routed: a provider's no is said with it (chatFailure).
+  let turnModel: string | undefined;
   try {
     // Its teammates: the ones it may ask on the team chart (lib/chain.ts: everyone, without one), and on a member's
     // turn only the ones they see (Read or Write) too. A bot it may not ask, or not given them, stays hidden: in what
@@ -2902,6 +2905,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
     const routed = kept?.config ? { config: kept.config as Config } : await routing;
     if ("router" in routed && routed.router) logRoute({ kind: "chat", chatId, botId, words: lastWords(chatId).slice(0, 400), ran: routed.config, router: routed.router });
     const { model, effort, mode } = routed.config;
+    turnModel = model;
     const reasoning = { effort, ...(mode ? { mode } : {}) };
     const speed = speedFor(model, waiting);
     const create = (input: unknown[], previous?: string) =>
@@ -3669,7 +3673,15 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
     // A routine's run that failed: said by routines.ts, where it's recorded and sent on.
     if (bg) return { text: null, error: noteOutOfCredit(e) ? NO_CREDIT_FOR_ROUTINES : (e as Error).message };
     // Out of AI credit: said plainly here, and never sent on by email, text or a channel (null).
-    addMessage({ chatId, role: "bot", botId, text: noteOutOfCredit(e) ? outOfCreditWords() : `Something went wrong on my side: ${(e as Error).message}`, replyTo: opts.replyTo });
+    if (noteOutOfCredit(e)) {
+      addMessage({ chatId, role: "bot", botId, text: outOfCreditWords(), replyTo: opts.replyTo });
+      return { text: null };
+    }
+    // The model's provider said no (out of credit, too many requests, a bad key, no such model, down): in plain words,
+    // with a way to Settings → AI plans, its raw words behind Details and never a key (lib/chat-error.ts).
+    const failure = chatFailure(e, { model: turnModel, bot: b.name });
+    if (failure) console.warn(`[chat] ${botId} couldn't answer: ${failure.kind} (${failure.provider ?? "provider"} ${failure.status ?? ""})`.trim());
+    addMessage({ chatId, role: "bot", botId, text: failure ? failure.text : `Something went wrong on my side: ${(e as Error).message}`, ...(failure ? { chatError: failure, bops: true as const } : {}), replyTo: opts.replyTo });
     return { text: null };
   } finally {
     // Still drawing a picture: it keeps typing until that's in (drawFor).

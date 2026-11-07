@@ -2,6 +2,7 @@ import { cloudOn, cloudSession } from "@/lib/server/cloud";
 import { onPostgres } from "@/lib/server/persist";
 import { assignWorkspaceLine, checkWorkspaceLine, ensurePhone, phoneCatchUp, phoneStatus, releaseWorkspaceLine, removeOwnerPhone, setLineCard } from "@/lib/server/phone";
 import { notReady } from "@/lib/server/ready";
+import { probeIfStale } from "@/lib/server/agentphone-status";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,9 @@ const local = (request: Request) => ["localhost", "127.0.0.1", "::1"].includes(n
  */
 export async function GET(request?: Request) {
   if (request && new URL(request.url).searchParams.get("fresh") === "1" && cloudOn()) await cloudSession(true).catch(() => {});
+  // Your own AgentPhone number (local mode, with a key): the read-only probe at most every five minutes, so Email and
+  // phone and the bot's profile show it without a Check in Services first. Only GET /v1/numbers and /v1/agents.
+  await probeIfStale();
   return Response.json(await phoneStatus().catch((e: Error) => ({ on: true, error: e.message })));
 }
 

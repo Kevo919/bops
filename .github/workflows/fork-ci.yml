@@ -90,6 +90,10 @@ jobs:
         run: node --conditions=react-server scripts/test-agentphone-calls.mjs
       - name: Chat provider tests
         run: node --conditions=react-server scripts/test-chat-providers.mjs
+      - name: Chat error card wording tests (a provider's no in plain words, never a key)
+        run: node --experimental-strip-types --no-warnings scripts/test-chat-error.mjs
+      - name: Agent chip readiness tests (where the next message's tasks really run)
+        run: node --experimental-strip-types --no-warnings scripts/test-chat-readiness.mjs
       - name: Key check tests
         run: node --conditions=react-server scripts/test-key-check.mjs
       - name: LLM catalog tests
@@ -162,6 +166,8 @@ jobs:
         run: node scripts/test-windows-wording.mjs
       - name: AgentPhone panel in Settings, Services (light and dark)
         run: node scripts/test-agentphone-services-ui.mjs
+      - name: Chat error card (light and dark, desktop and phone)
+        run: node scripts/test-chat-error-ui.mjs
 
   android:
     if: github.repository != 'OrgoAI/bops'

@@ -389,7 +389,7 @@ export function refusal(provider: AgentRoute, status: number, raw: string, key: 
   const who = whoOf(provider, acct);
   const keyName = accountKeyName(chatKeyName(provider), acct);
   const words = said(raw, key);
-  const balance = status === 402 || /insufficient[ _]balance|credit balance|no (resource package|balance)|out of credit|insufficient[ _]quota|quota exceeded|exceeded your current quota|billing|1113|top ?up|payment required/i.test(words);
+  const balance = status === 402 || /insufficient[ _]balance|credit balance|no (resource package|balance)|no credits?( remaining| left)?|out of credit|insufficient[ _]quota|quota exceeded|exceeded your current quota|billing|1113|top ?up|payment required/i.test(words);
   const err = (m: string) => new ChatProviderError(m, provider, status, words);
   if (provider === "ollama") {
     if (status === 401 || status === 403) return err(`Ollama turned this down: it wants a key. Set OLLAMA_API_KEY in .env.local to the one its proxy expects, then restart Bops.`);
