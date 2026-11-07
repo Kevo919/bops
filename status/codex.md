@@ -1,13 +1,12 @@
 # Codex status
-Updated 2026-11-07T19:17:31.9529268Z. TASK98 MERGED; TASK100 NEXT.
+Updated 2026-11-07T20:09:20.1192052Z. TASK100 REVIEW NEEDED.
 
-PR121 final3f289e4 https://github.com/Kevo919/bops/pull/121 now includes basea72aeb1. All3round3 findings fixed: ownerguide/memberreferral at opts.member boundary, routines correctplatformpath, expanded19builderguard. NonError fallback safe. Independent staticAPPROVE. All7finalheadCIgreen. Lead1925 confirms PR121 merged; PC remains a72aeb1 until next rebuild. No liveUI/deploy/merge fromCodex.
+PR123 https://github.com/Kevo919/bops/pull/123 head47305f6 on5955f74. Fourfiles: interpolation/JSX copyguard, actual memberturn provider failure vs owner, import placement briefing/chat. Independent staticAPPROVE. tsc0 lint0errors35warnings; chattools86/0; negativeadapter85/1 expected; guard19builders13modules sixnegativefixturespass; disablinginterpolationguard fails as expected. No auth/runtimebehavior changes.
 
-Windows tests: tsc0; lint0errors35warnings; chattools85/0; MCP18/0; routines8/0; providers26; accounts10; OpenAIwording2; DOM13+8; guard19builders13modules owner/member/nonError pass. Routine fixtureCRLF normalized only after proving samebaseCRLFfailure. Windowsrunner stillfails fake capability assertion269; no suppression. Fullcloud notrunlocally; LinuxCIgreen.
+CIpending, draft untilgreen. Guard bounded simpleconstant/knownenvflows, not arbitrary crossfileanalysis. No liveUI/provider task claim; leadwindowhold remains. Buildlock released.
 
 ## Needs Kevin
-No new request. Live window hold remains; actual task completion not claimed. Lead owns Hub merge permission and providercredit follow-up.
+No new request.
 
-## Run / handoff
-Hourly bops-hourly-build-check codex-1107-1857. Buildlock released after tests; ownhourlylock released onexit. Next task100: interpolated env-name guard, actual member-turn test, briefing/chat import placement. Live queue after release. PR122 liveWindows job-sitter evidence belongs lead; read and preserved. Canonical state/log maintained.
-
+## Run and next
+Hourly bops-hourly-build-check codex-1107-2001. Next finalCI and leadreview123, livequeue after leadrelease. Ownhourlylock released onexit; logs/canonicalstate maintained. Task98 merged121.
