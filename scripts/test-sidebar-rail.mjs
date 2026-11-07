@@ -1,4 +1,4 @@
-// Tests for the collapsed sidebar (components/app/sidebar-rail.tsx): one avatar per chat of the workspace
+// Tests for the collapsed sidebar (components/app/sidebar-rail.tsx): one avatar per chat of the workspace
 // in the sidebar's order (the main bot first, with its star, then by latest activity); the open chat marked;
 // each bot's mark as its row would say it (how many things wait on you, counted as Needs your attention
 // counts them, else unread, else working, none in a shared workspace); its name in the tooltip, which opens
@@ -17,7 +17,7 @@ import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 /** A component's source, its line endings as Linux has them too (a Windows checkout is CRLF). */
-const srcText = (p) => srcText("${p}").replace(/\r\n/g, "\n");
+const srcText = (p) => readFileSync(`${rootPath}/${p}`, "utf8").replace(/\r\n/g, "\n");
 
 const rootPath = fileURLToPath(new URL("..", import.meta.url)).replace(/[\\/]$/, "");
 const rootUrl = pathToFileURL(rootPath).href;
@@ -227,7 +227,8 @@ await test("the app: a 72px rail, its column sliding with the title bar's, and n
   assert.match(app, /const sidebarWidth = sidebarOpen \? 340 : 72;/);
   assert.match(app, /const columns = \{ gridTemplateColumns: gridColumns\(sidebarWidth, wide \? null : chatWidth\) \};/);
   assert.match(app, /columns=\{columns\}\n\s+slide=\{slide\}/, "the title bar's columns are the grid's");
-  assert.match(app, /className=\{`grid min-h-0 flex-1 \$\{slide\}`\} style=\{columns\}/);
+  // The grid div grew a narrow form (minmax(0,1fr), no slide); the wide one keeps the slide.
+  assert.match(app, /className=\{narrow \? "grid min-h-0 flex-1" : `grid min-h-0 flex-1 \$\{slide\}`\} style=\{narrow \? NARROW_COLUMNS : columns\}/);
   assert.match(app, /const slide = edgeDragged \? "" : SLIDE;/, "they slide, except while the chat's edge is dragged");
   assert.match(app, /const SLIDE = "transition-\[grid-template-columns\] duration-200 ease-out motion-reduce:transition-none";/);
   assert.doesNotMatch(app, /Show the sidebar/);
