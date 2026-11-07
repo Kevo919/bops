@@ -61,6 +61,7 @@ function repliedToWho(m: Message, state: AppState): string {
 
 /** Whose Mac a thread runs on or could move to, the same way: "Your Mac", or the owner's in a shared workspace. */
 const ownerMac = (state: AppState) => (state.shared ? "Owner's Mac" : "Your Mac");
+// (Shown through useOwnComputerWords: the owner's, in a shared workspace, named for the owner's computer, SharedOpen.platform.)
 /** What a blocked thread needs (BLOCKER_ASK says it of the user), of the owner in a shared workspace. */
 const OWNER_BLOCKER_ASK: Record<Blocker, string> = {
   sign_in: "the owner to sign in",

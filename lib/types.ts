@@ -2161,6 +2161,11 @@ export type MacState = {
   next?: "codex" | "chrome" | "elsewhere";
   installing?: boolean;
   checkedAt?: number;
+  /**
+   * The operating system this Bops runs on (process.platform), kept with this Mac's own state (state.macs[device].mac)
+   * so Bops Cloud can tell a viewer of a shared workspace what the owner's computer is (cloud/ws-slice.ts ownerPlatformOf).
+   */
+  platform?: "win32" | "darwin" | "linux";
   /** Words that mean a task belongs on the Mac (apps like Messages or Notes, "my desktop"…). */
   rules: string[];
   /**

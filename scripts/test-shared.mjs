@@ -107,6 +107,8 @@ const cloudState = (status = "done", hash = `h-${status}`) => ({
   hash,
   seq: 7,
   state: {
+    // Dana's Bops runs on a Mac, as Bops Cloud says it (cloud/ws-slice.ts ownerPlatformOf): her Mac is called one here.
+    platform: "darwin",
     workspace: { id: "ws_main", name: "Acme", createdAt: 1 },
     bots: [{ id: "boppy", name: "Dana's Boppy", role: "Lead", color: "#123456", isMain: true, workspaceId: "ws_main", computerStatus: "ready" }],
     chats: [{ id: "bot:boppy", kind: "bot", botIds: ["boppy"], createdAt: 1 }],
@@ -543,7 +545,7 @@ await check("the window is shown the shared workspace in place of the user's own
   assert.equal(v.sessions[0].title, "Find leads");
   assert.equal(v.routines[0].title, "Morning brief");
   assert.deepEqual(v.liveMoods, { boppy: { mood: "thinking", chatId: "bot:boppy" } }, "only its own bots' moods");
-  assert.deepEqual(v.shared, { ...listed, wsId: WS, ownBots: { ws_main: 1 }, more: [], levels: {} }, "and how many bots each of the user's own has, for the switcher");
+  assert.deepEqual(v.shared, { ...listed, wsId: WS, ownBots: { ws_main: 1 }, more: [], levels: {}, platform: "darwin" }, "and how many bots each of the user's own has, for the switcher, and what the owner's computer is");
   // The user's account, vault and settings stay theirs.
   assert.equal(v.vault, mine.vault);
   assert.equal(v.account, mine.account);
@@ -1993,6 +1995,58 @@ await check("an Admin sees a bot's computer live, with Take control and orgo.ai;
   // Its screen's plan is read from the shared workspace's own route (never /api/vnc, the user's own bot of that id).
   assert.equal(callAllowed("GET", "/api/workspaces/shared/screen?bot=boppy"), true);
   assert.equal(callAllowed("GET", "/api/vnc?bot=boppy&display=99"), false);
+});
+
+/* ---------------- The owner's computer, named as it is ---------------- */
+
+await check("the owner's computer is named as Bops Cloud says it is: the owner's Mac on a Mac, the owner's PC on Windows, the owner's computer when it doesn't say, never this computer's words", async () => {
+  const { ownerPlatformOf, sharedSlice } = await import(`${rootUrl}/cloud/ws-slice.ts`);
+  const { TabBar } = await import(`${rootUrl}/components/app/panel-tabs.tsx`);
+  const { ComputerView } = await import(`${rootUrl}/components/app/computer.tsx`);
+  const L = await import(`${rootUrl}/lib/shared.ts`);
+  // Bops Cloud: what every one of the owner's computers says (state.macs[device].mac.platform, lib/server/mac.ts checkMac).
+  const macs = (...ps) => ({ macs: Object.fromEntries(ps.map((p, i) => [`dev_${i}`, { mac: { ready: true, ...(p ? { platform: p } : {}) } }])) });
+  assert.equal(ownerPlatformOf(macs("win32")), "win32");
+  assert.equal(ownerPlatformOf(macs("darwin", "darwin")), "darwin");
+  assert.equal(ownerPlatformOf(macs("darwin", "win32")), undefined, "a Mac and a PC: neither");
+  assert.equal(ownerPlatformOf(macs(undefined)), undefined, "an owner's Bops from before: none said");
+  assert.equal(ownerPlatformOf({ macs: { d: { mac: { platform: "plan9" } } } }), undefined, "only a platform Bops knows");
+  assert.equal(ownerPlatformOf({}), undefined);
+  // In the slice for anyone but the owner (the owner's own window names its own computer).
+  const blob = { ...macs("win32"), workspaces: [{ id: "ws_main", name: "Acme", createdAt: 1, access: { "sam@x.test": { level: "read" } } }], bots: [], chats: [], sessions: [], routines: [], watches: [] };
+  assert.equal(sharedSlice(blob, "ws_main", { role: "member", id: "u-sam", email: "sam@x.test" }).platform, "win32");
+  assert.equal(sharedSlice(blob, "ws_main", { role: "owner", id: "" }).platform, undefined);
+  // The viewer's window, by what the slice said: each place that names the owner's computer.
+  const cases = [
+    ["darwin", "Mac"],
+    ["win32", "PC"],
+    [undefined, "computer"],
+  ];
+  for (const [platform, word] of cases) {
+    const c = cloudState("running");
+    if (platform) c.state.platform = platform;
+    else delete c.state.platform;
+    c.state.bots = [{ ...c.state.bots[0], runsOn: "mac" }];
+    c.state.sessions = [{ ...c.state.sessions[0], status: "running", runsOn: "mac", answer: undefined }];
+    c.state.levels = { boppy: "write" };
+    c.messages = [...c.messages, { id: "m-chip", chatId: "bot:boppy", role: "bot", botId: "boppy", text: "On it", at: 4, sessionIds: ["s1"] }];
+    const v = viewState(own(), { ...listed, role: "member", wsId: WS }, c, {});
+    assert.equal(v.shared.platform, platform, `${word}: the window has it`);
+    const re = (s) => new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/'/g, "(?:'|&#x27;)"));
+    const chat = renderToStaticMarkup(h(ChatView, chatProps(v, "bot:boppy")));
+    assert.match(chat, re(`title="On the owner's ${word}"`), `${word}: the thread's chip`);
+    assert.match(text(chat), re(`Owner's ${word}`), `${word}: the chip's words`);
+    const sheet = text(renderToStaticMarkup(h(ThreadSheet, { state: v, session: v.sessions[0], onClose: noop, onShowComputer: noop })));
+    assert.match(sheet, re(`on the owner's ${word} ·`), `${word}: the sheet's line`);
+    assert.match(sheet, re(`This runs on the owner's ${word}. Only the owner can tell it more.`), `${word}: no reply to it`);
+    assert.equal(L.threadAnswerer(v, v.sessions[0]), `This runs on the owner's ${word}. Only the owner can tell it more.`, `${word}: who answers it`);
+    const tab = renderToStaticMarkup(h(TabBar, { state: v, tabs: [{ id: "tab_c", kind: "computer", botId: "boppy" }], active: "chat", chatBotId: "boppy", onPick: noop, onClose: noop, onNew: noop }));
+    assert.match(tab, re(`>Owner's ${word}<`), `${word}: its tab`);
+    const view = text(renderToStaticMarkup(h(ComputerView, { state: v, bot: v.bots[0], display: 100, onDisplay: noop, follow: { on: true, auto: noop, resume: noop }, mode: "panel" })));
+    assert.match(view, re(`Dana's Boppy works on the owner's ${word}.`), `${word}: its computer`);
+    // Nothing calls a PC a Mac, or a Mac a PC.
+    for (const other of ["Mac", "PC"].filter((w) => w !== word)) assert.ok(!re(`owner's ${other}`).test(text(chat) + sheet + text(tab) + view), `${word}: never the owner's ${other}`);
+  }
 });
 
 /* ---------------- Every card: live for whoever may answer it, else one line saying who can ---------------- */

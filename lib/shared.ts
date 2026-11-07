@@ -9,6 +9,7 @@ import type { MemberAppAct, SharedApps, SharedGroup } from "@/cloud/protocol";
  * the server's memory alone (never in the user's state, never synced, never on disk), and it's shown in
  * place of the user's own workspace while it's open.
  */
+import { computerWords, computerWordsFor } from "@/lib/computer-words";
 import { askOwnersOnly, threadOwnersOnly } from "@/lib/member-access";
 
 /** The roles in a workspace: the owner everything; an Admin every bot, its computer and its apps, all but deleting it; a Member what the owner picks. */
@@ -54,6 +55,8 @@ export type SharedOpen = SharedWorkspace & {
    */
   adminActs?: true;
   ownerOld?: true;
+  /** The owner's computer's operating system (cloud/ws-slice.ts ownerPlatformOf): none when Bops Cloud doesn't say. */
+  platform?: "win32" | "darwin" | "linux";
   /** What the user did to them that the owner's Bops hasn't kept yet: on its way, waiting, or not gone and why. */
   appActs?: { key: string; act: MemberAppAct; at: number; state: "sending" | "waiting" | "failed"; error?: string }[];
 };
@@ -122,8 +125,15 @@ export const numberPausedUntil = (state: Viewing, unpaid?: boolean) =>
 export const your = (state: Viewing) => (state.shared ? "the owner's" : "your");
 /** "Your", at the start of a line. */
 export const Your = (state: Viewing) => (state.shared ? "The owner's" : "Your");
-/** "your Mac" to the owner, "the owner's Mac" in a shared workspace. */
-export const yourMac = (state: Viewing) => `${your(state)} Mac`;
+/** The owner's computer's operating system in a shared workspace (SharedOpen.platform), "unknown" when not said or not shared. */
+export const ownerPlatform = (state: Viewing) => state.shared?.platform ?? "unknown";
+/**
+ * Fixed copy about the owner's computer, in a shared workspace, in its own words: "the owner's Mac" on a Mac, "the
+ * owner's PC" on Windows, "the owner's computer" when Bops Cloud doesn't say. Never this computer's words: the owner's isn't this one.
+ */
+export const ownerWords = (state: Viewing) => computerWordsFor(ownerPlatform(state));
+/** "your Mac" to the owner (this computer's words go over it where it's shown), the owner's computer, named as it is, in a shared workspace. */
+export const yourMac = (state: Viewing) => (state.shared ? computerWords("the owner's Mac", ownerPlatform(state)) : "your Mac");
 /**
  * Whether the viewer may act in a shared workspace for these bots: every one at Write (a group with one at Read
  * stays watch only). Never in the user's own, where everything's theirs and nothing goes through Bops Cloud.
@@ -255,7 +265,7 @@ export function threadAnswerer(state: Viewing & { bots: readonly { id: string; r
   if (s.blocker === "payment") return OWNER_PAY_LINE;
   if (kind === "elsewhere") return OWNER_PHONE_LINE;
   if (readOnly(state, [s.botId])) return readOnlyLine([s.botId], state.shared.levels);
-  if (threadOwnersOnly(s, adminActs(state))) return ON_MAC_LINE;
+  if (threadOwnersOnly(s, adminActs(state))) return ownerWords(state)(ON_MAC_LINE);
   if (kind === "brain") return OWNER_ONLY_LINE;
   if (appWorkBlocked(state, s)) return APP_WORK_LINE;
   if (s.blocker) return screenAskMine(state, s.botId, s.blocker) ? "you" : state.shared.role === "admin" ? OWNER_ONLY_LINE : ownersLine(state);
