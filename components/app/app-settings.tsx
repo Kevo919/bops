@@ -398,7 +398,7 @@ export function RenewalLine({ zone, flip: send, onRenewal }: { zone: AppDnsZone;
             onClick={flip}
             className="flex shrink-0 items-center gap-1.5 rounded-full px-1.5 py-0.5 text-[12px] leading-4 text-ink hover:bg-[color:var(--bops-tint)]/[0.04] disabled:opacity-50"
           >
-            <span className={`relative h-4 w-7 rounded-full transition-colors ${r.on ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-d9d9d6)]"}`}>
+            <span className={`relative h-4 w-7 rounded-full transition-colors ${r.on ? "bg-[color:var(--color-ink)]" : "bg-[color:var(--hb-d9d9d6)]"}`}>
               <span className={`absolute top-0.5 size-3 rounded-full bg-white transition-all ${r.on ? "left-3.5" : "left-0.5"}`} />
             </span>
             Auto-renew

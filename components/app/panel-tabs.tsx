@@ -4,7 +4,7 @@ import { useComputerWords } from "./computer-words";
 
 import { createContext, createElement, useEffect, useRef, useState } from "react";
 import { APPS_NAME, appsLine } from "@/lib/apps-access";
-import { GROUP_NAME } from "@/lib/memory-categories";
+import { categoryOf, GROUP_NAME } from "@/lib/memory-categories";
 import { live, type AppState, type Bot } from "@/lib/types";
 import { computerOf } from "@/lib/screens";
 import { AutopilotIcon, type AutopilotSection } from "./autopilot";
@@ -210,7 +210,8 @@ export function TabBar({
   const all: PanelTab[] = [{ id: CHAT_TAB, kind: "computer", botId: chatBotId }, ...(browser ? [browser] : []), ...tabs];
   return (
     // Narrow (narrow.ts), in the panel's own bar: as wide as its tabs, the bar scrolling them sideways.
-    <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden max-md:flex-none max-md:overflow-visible">
+    // Tabs that don't fit at their least width scroll sideways (no bar shown) rather than squeezing to a letter.
+    <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] max-md:flex-none max-md:overflow-visible [&::-webkit-scrollbar]:hidden">
       {all.map((t) => (
         <Tab key={t.id} state={state} tab={t} on={t.id === active} closable={t.id !== CHAT_TAB && t.id !== BROWSER_TAB && t.kind !== "widgets"} onPick={() => onPick(t.id)} onClose={() => onClose(t.id)} />
       ))}
@@ -286,7 +287,14 @@ function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState
               : t.kind === "crm"
                 ? t.file
                 : t.kind === "memory"
-                  ? GROUP_NAME
+                  ? // The kind it's on (Tasks, People, Issues...), as its page is titled (task 87); all of them: Knowledge.
+                    t.category === "all"
+                    ? GROUP_NAME
+                    : t.category === "issues"
+                      ? "Issues"
+                      : t.category === "skills"
+                        ? "Skills"
+                        : (categoryOf(t.category)?.label ?? GROUP_NAME)
                   : t.kind === "autopilot"
                     ? "Routines"
                     : t.kind === "widgets"
@@ -294,11 +302,12 @@ function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState
                       : "New tab";
   return (
     <div
+      data-panel-tab={t.kind}
       onClick={onPick}
       onAuxClick={(e) => e.button === 1 && closable && onClose()}
       title={t.kind === "web" ? t.url : t.kind === "preview" ? `${label}, ${t.url.replace(/^http:\/\//, "").replace(/\/$/, "")}` : label}
       // Clipped, so what's in a tab stays inside it while it opens up.
-      className={`group/tab flex h-[30px] min-w-0 max-w-[220px] shrink cursor-pointer max-md:h-11 max-md:max-w-[200px] max-md:shrink-0 items-center gap-1.5 overflow-hidden rounded-[10px] pl-2.5 ${closable ? "pr-1" : "pr-3"} text-[13px] leading-4 transition-[background-color,box-shadow,color] duration-150 ease-out motion-reduce:transition-none [-webkit-app-region:no-drag] ${
+      className={`group/tab flex h-[30px] ${closable ? "min-w-[112px]" : "min-w-[96px]"} max-w-[220px] shrink cursor-pointer max-md:h-11 max-md:max-w-[200px] max-md:shrink-0 items-center gap-1.5 overflow-hidden rounded-[10px] pl-2.5 ${closable ? "pr-1" : "pr-3"} text-[13px] leading-4 transition-[background-color,box-shadow,color] duration-150 ease-out motion-reduce:transition-none [-webkit-app-region:no-drag] ${
         opening ? "motion-tab-in" : ""
       } ${on ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f),0_2px_6px_-3px_var(--h-00000026)]" : "text-[color:var(--ht-6b6b6b)] hover:bg-[color:var(--hb-eeeeec)]"}`}
     >
@@ -327,7 +336,10 @@ function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState
       ) : (
         <GlobeIcon />
       )}
-      <span className={`truncate ${on ? "font-medium" : ""}`}>{label}</span>
+      {/* Never cut to a letter or two (task 87): the tab keeps a width that shows a word, then an ellipsis; the whole name is its tooltip. */}
+      <span data-tab-label className={`min-w-0 flex-1 truncate ${on ? "font-medium" : ""}`}>
+        {label}
+      </span>
       {needsYou ? (
         <span className="size-[7px] shrink-0 rounded-full bg-highlighter shadow-[0_0_0_1.5px_var(--h-0a0a0a)]" title="Needs you" />
       ) : t.kind === "made-app" && state.madeApps?.find((a) => a.id === t.appId)?.building ? (

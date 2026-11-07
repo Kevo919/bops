@@ -145,10 +145,11 @@ function AgentCard({ a, busy, onCheck, onEdit, onRemove }: { a: AgentView; busy:
         </span>
       )}
       <div className="flex flex-wrap gap-1.5">
-        <button className={dark} disabled={!!busy} onClick={onCheck}>
+        {/* Each named for its agent (task 86): a list of them isn't a row of buttons all called Check. */}
+        <button className={dark} disabled={!!busy} onClick={onCheck} aria-label={`Check ${a.name}`}>
           {busy === `check:${a.id}` ? "Checking…" : "Check"}
         </button>
-        <button className={light} disabled={!!busy} onClick={onEdit}>
+        <button className={light} disabled={!!busy} onClick={onEdit} aria-label={`Change ${a.name}`}>
           Change
         </button>
         {confirm ? (
@@ -156,12 +157,12 @@ function AgentCard({ a, busy, onCheck, onEdit, onRemove }: { a: AgentView; busy:
             <button className={`${pill} bg-destructive text-primary-foreground`} disabled={!!busy} onClick={onRemove}>
               Remove {a.name}
             </button>
-            <button className={light} onClick={() => setConfirm(false)}>
+            <button className={light} onClick={() => setConfirm(false)} aria-label={`Keep ${a.name}`}>
               Keep it
             </button>
           </>
         ) : (
-          <button className={light} disabled={!!busy} onClick={() => setConfirm(true)}>
+          <button className={light} disabled={!!busy} onClick={() => setConfirm(true)} aria-label={`Remove ${a.name}`}>
             Remove
           </button>
         )}

@@ -85,7 +85,7 @@ export function ChatSwitch({ state }: { state: AppState }) {
           aria-label={ownWords(state.shared ? "Answer with every Mac closed" : "Answer with your Mac closed")}
           disabled={busy}
           onClick={() => void flip()}
-          className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors disabled:opacity-60 ${view.on ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-e6e6e3)]"}`}
+          className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors disabled:opacity-60 ${view.on ? "bg-[color:var(--color-ink)]" : "bg-[color:var(--hb-e6e6e3)]"}`}
         >
           <span className={`absolute top-[3px] size-4 rounded-full bg-white shadow-[0_1px_2px_var(--h-00000033)] transition-[left] ${view.on ? "left-[19px]" : "left-[3px]"}`} />
         </button>

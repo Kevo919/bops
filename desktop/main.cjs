@@ -3,7 +3,7 @@
  * isn't already running, opens the window with the Mac title bar from the design, and on quit
  * stops what it started, including the bots' background browsers.
  */
-const { app, autoUpdater, BrowserWindow, clipboard, desktopCapturer, dialog, ipcMain, Menu, nativeImage, Notification, powerMonitor, screen, session, shell, systemPreferences, Tray } = require("electron");
+const { app, autoUpdater, BrowserWindow, clipboard, desktopCapturer, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerMonitor, screen, session, shell, systemPreferences, Tray } = require("electron");
 const { execFile, execFileSync, spawn } = require("node:child_process");
 const winHost = require("./windows.cjs");
 const { installBackground } = require("./background.cjs");
@@ -1216,6 +1216,11 @@ function restart() {
   return restarting;
 }
 ipcMain.handle("relaunch", () => restart());
+// The look's theme (components/app/look-style.tsx): the window's frame follows it. On Windows the title bar and the
+// menu bar are the system's, drawn dark on a PC set to dark even while Bops is Light; "system" goes back to the PC's.
+ipcMain.handle("set-theme", (_, theme) => {
+  nativeTheme.themeSource = theme === "dark" || theme === "light" ? theme : "system";
+});
 
 /** Stops a release build's server this app didn't start (the one on the port, which gave this process id if it answered), once it's surely Bops' own. Says whether it did. */
 async function stopOtherServer(pid) {

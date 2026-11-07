@@ -92,6 +92,8 @@ export function Sidebar({
   onOpenMemory,
   onOpenAutopilot,
   footer,
+  footerOpen,
+  chatInSight = true,
   menuActions: actions,
   onCollapse,
   search = null,
@@ -123,6 +125,13 @@ export function Sidebar({
   onOpenAutopilot: (open: AutopilotOpen) => void;
   /** Which of the footer's buttons is the pill: the page open on the right (sidebar-footer.tsx footerPageOf). */
   footer?: FooterPage;
+  /**
+   * The footer's page that's really open (sidebar-footer.tsx openFooterPage), null when none is: only it is pressed,
+   * never the resting pill (task 87: Logins read as open on every screen). Undefined: the resting pill, as before.
+   */
+  footerOpen?: FooterPage | null;
+  /** Whether the chat is what's in sight: not while Settings, a bot's page or a widgets page covers it (its row isn't marked then). */
+  chatInSight?: boolean;
   /** What a bot's right-click menu does (bot-menu.tsx). */
   menuActions?: BotMenuActions;
   /** Fold the sidebar to its rail of icons (sidebar-rail.tsx, which unfolds it again). */
@@ -238,7 +247,7 @@ export function Sidebar({
         key={c.id}
         chat={c}
         state={state}
-        selected={c.id === chatId}
+        selected={chatInSight && c.id === chatId}
         onClick={() => onOpenChat(c.id)}
         onMenu={openMenu(c)}
         menuOpen={!!menu && b === menu.botId}
@@ -310,7 +319,7 @@ export function Sidebar({
           {sidebarList(state, chats, !q).map((item) => {
             if ("chat" in item) return chatItem(item.chat);
             const g = item.group;
-            const open = item.chats.find((c) => c.id === chatId);
+            const open = chatInSight ? item.chats.find((c) => c.id === chatId) : undefined;
             return (
               <BotGroupBlock
                 key={`group:${g.key}`}
@@ -367,6 +376,7 @@ export function Sidebar({
       <SidebarFooter
         state={state}
         open={footer}
+        current={footerOpen}
         you={(expanded) => <YouMenuView state={state} expanded={expanded} needsYou={setup.length > 0} onAccount={onAccount} onSettings={onSettings} onSetup={onSetup} onTeam={onTeam} />}
         onVault={onVault}
         onOpenAutopilot={onOpenAutopilot}
@@ -390,6 +400,7 @@ export function Sidebar({
 export function SidebarFooter({
   state,
   open = "vault",
+  current,
   hover: initialHover,
   news,
   vertical = false,
@@ -402,6 +413,8 @@ export function SidebarFooter({
   state: AppState;
   /** The page that's open; null, none (only the vertical column says so: the row's pill rests on Logins). */
   open?: FooterPage | null;
+  /** The page that's really open, when it isn't `open` (the resting pill): only it is pressed. Undefined: `open`'s. */
+  current?: FooterPage | null;
   hover?: FooterKey;
   news?: boolean;
   /**
@@ -420,6 +433,8 @@ export function SidebarFooter({
   // Apps only for an @orgo.ai account for now (lib/apps-access.ts); in a shared workspace, its owner's, when they gave the user Your Apps.
   const apps = appsShown(state);
   const page = (open === "knowledge" && !knowledge) || (open === "apps" && !apps) ? "vault" : open;
+  // What's pressed: the page really open (task 87: the resting Logins pill read as open while nothing of it was).
+  const on = current === undefined ? page : current;
   const { hover, row } = useFooterHover(initialHover);
   const shown = (k: FooterKey | null) => ((k === "knowledge" && !knowledge) || (k === "apps" && !apps) ? null : k);
   // The pill stays on the page button expanded last, not back on Logins, once the pointer leaves the row.
@@ -430,15 +445,15 @@ export function SidebarFooter({
       <FooterButton
         name="vault"
         expanded={pill === "vault"}
-        pressed={page === "vault"}
+        pressed={on === "vault"}
         label="Logins"
         tip="Your accounts and logins, and which bots can use them"
         onClick={onVault}
         trail={<AppsTrail state={state} expanded={pill === "vault"} />}
       />
-      <AutopilotButton state={state} expanded={pill === "routines"} pressed={page === "routines"} onOpen={onOpenAutopilot} />
-      {knowledge && <KnowledgeButton state={state} expanded={pill === "knowledge"} pressed={page === "knowledge"} news={news} onOpen={() => onOpenMemory({})} />}
-      {apps && <FooterButton name="apps" expanded={pill === "apps"} pressed={page === "apps"} label={APPS_NAME} tip={appsLine(state)} onClick={onApps} icon={<AppsIcon size={16} />} />}
+      <AutopilotButton state={state} expanded={pill === "routines"} pressed={on === "routines"} onOpen={onOpenAutopilot} />
+      {knowledge && <KnowledgeButton state={state} expanded={pill === "knowledge"} pressed={on === "knowledge"} news={news} onOpen={() => onOpenMemory({})} />}
+      {apps && <FooterButton name="apps" expanded={pill === "apps"} pressed={on === "apps"} label={APPS_NAME} tip={appsLine(state)} onClick={onApps} icon={<AppsIcon size={16} />} />}
     </>
   );
   if (vertical)
@@ -778,7 +793,7 @@ function ChatRow({
         : `${members.map((m) => m.name).join(", ")}${state.shared ? "" : " and you"}`;
 
   return (
-    <button onClick={onClick} onContextMenu={onMenu} className={`group/chat flex items-center gap-3 rounded-[14px] p-2.5 text-left ${selected ? "bg-[color:var(--hb-eeeeec)]" : "hover:bg-[color:var(--bops-tint)]/[0.03]"} ${menuOpen ? "shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)]" : ""}`}>
+    <button onClick={onClick} onContextMenu={onMenu} aria-current={selected ? "page" : undefined} className={`group/chat flex items-center gap-3 rounded-[14px] p-2.5 text-left ${selected ? "bg-[color:var(--hb-eeeeec)]" : "hover:bg-[color:var(--bops-tint)]/[0.03]"} ${menuOpen ? "shadow-[inset_0_0_0_1.5px_var(--h-0a0a0a)]" : ""}`}>
       {solo?.isMain ? (
         <span className="relative shrink-0">
           <ChatAvatar chat={c} bots={state.bots} size={44} />

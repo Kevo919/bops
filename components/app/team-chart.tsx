@@ -1268,7 +1268,7 @@ export function Switch({ label, on, onFlip, disabled, tip }: { label: string; on
       className="flex w-full items-center justify-between gap-3 text-left text-[13px] leading-[18px] text-[color:var(--ht-3a3a38)] disabled:opacity-50"
     >
       <span className="min-w-0 flex-1">{label}</span>
-      <span className={`relative h-5 w-[34px] shrink-0 rounded-full transition-colors ${on ? "bg-[color:var(--hb-0a0a0a)]" : "bg-[color:var(--hb-d9d9d5)]"}`}>
+      <span className={`relative h-5 w-[34px] shrink-0 rounded-full transition-colors ${on ? "bg-[color:var(--color-ink)]" : "bg-[color:var(--hb-d9d9d5)]"}`}>
         <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow-[0_1px_2px_var(--h-00000033)] transition-all ${on ? "left-[16px]" : "left-0.5"}`} />
       </span>
     </button>

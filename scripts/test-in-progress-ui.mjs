@@ -271,14 +271,14 @@ try {
       // disabled), the red label, 85% and what's left, which opens under the label and pushes what follows down.
       const app = await context(phone ? "phone" : "owner", true);
       for (const [p, id, name, left, real, file] of [
-        ["profile", "pc-tasks-claude-plan", "Bot tasks on this PC", "A real task on your PC.", '[role="group"][aria-label="Bot tasks on this PC"]', "being-tested-pc-tasks"],
+        ["subscriptions", "pc-tasks-claude-plan", "Bot tasks on this PC", "A real task on your PC.", '[role="group"][aria-label="Bot tasks on this PC"]', "being-tested-pc-tasks"],
         ["mac", "composio-for-you", "Composio (your account)", "Paste your For You address and key, then a live check.", '[data-connection="COMPOSIO_MCP_URL"]', "being-tested-composio"],
         ["look", "animations-setting", "Animations", "Try it on your PC.", "[data-animations]", "being-tested-animations"],
       ])
         await check(`${tag}: ${name} is usable, marked Being tested, 85%, a tap on the label says what's left below it`, async () => {
           const pg = app.page;
           await openSettings(pg);
-          if (phone || p !== "profile") await place(pg, phone, p);
+          await place(pg, phone, p);
           const el = pg.locator(`[data-in-progress="${id}"]`).filter({ visible: true }).first();
           await el.waitFor({ state: "visible", timeout: 15000 });
           await el.scrollIntoViewIfNeeded();
