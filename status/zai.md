@@ -4,8 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** #113 review fixes pushed (9065dde) awaiting lead re-review. All 4 items: escaping bugs fixed+verified (fake PARSES OK; standalone 6+9 ok on this PC), sitter assign fixed (0x0101; live test: post-attach pings die <1s; handle-waits; logging; cached DLL; BOPS_SERVER_JS path), brace/extglob-with-.. asks, MIN_CLAUDE_VERSION 2.1.318 floor. Known residual: pre-attach children (taskkill only) - launcher follow-up offered.
-**Kevin call:** still 402 (AgentPhone billing) — retried every run; staged.
-**Next:** lead re-review of #113; CI green; then next unassigned task.
+**On:** #118 (task 89) open for review: bot-settings-ui green, cloud stale checks fixed (CI verifies - relay fake needs Windows spawnability), test-shared CRLF helper landed with 15 checks left (handed off, overlaps 85). #113 awaiting lead re-review. Next: reviews land, then test-shared completion or next task.
+**Kevin call:** still 402 (AgentPhone billing) - retried every run; staged.
 **Blockers:** AgentPhone billing (Kevin).
-**Updated (UTC):** 2026-11-07 06:55
+**Updated (UTC):** 2026-11-07 10:10
