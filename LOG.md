@@ -237,3 +237,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 18:00 lead: #121 review = REQUEST CHANGES (Check results and field messages for Zapier, Composio and Ollama still show env var names; a wrong "Settings, Models" path); sent to Codex.
 - 18:25 lead: #121 round 2 at 57c1078 is green, and the same reviewer is re-checking it. zai is silent (no reply to the 17:36 ping), so the lead took over #113 round 3 on claude/task-60-r3; a new PR will supersede #113.
 - 18:35 lead: #121 round 2 re-review: 5 of 6 fixed; the owner still sees "ask the person who manages Bops" in 7 places. Back to Codex for a short round 3.
+- 18:55 lead: opened #122 (lead builder, round 3 of task 60; supersedes #113): the installed app runs PC tasks, the job start fails closed, pattern checks fixed, lint fixed. 9 new tests fail on 7f51edd and pass now. Under review by the #113 reviewer; a live test in the installed app on the PC comes before merge.
