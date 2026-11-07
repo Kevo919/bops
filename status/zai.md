@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** Task 90: fork-ci-audit.yml pushed on zai/task-90-ci-coverage (107 seen-green suites run daily + on demand; Linux observed by first runs). Next: resume sidebar-footer/rail fixes (partial reverted), the Postgres pair (throwaway PG), then the ~26 remaining red suites. #113 (fa23036) and #118 await lead review.
-**Kevin call:** still 402 (AgentPhone billing) - retried every run; staged.
-**Blockers:** AgentPhone billing (Kevin).
-**Updated (UTC):** 2026-11-07 12:50
+**On:** #113 round-2 DONE (7f51edd: launcher w/ live 100ms-fork proof, sitter hardening, constructs outright) - awaiting re-review + lead live test. #118 CLOSED (dup of #117; BOPS_TEST_KEYCHAIN removal + CRLF src() helper queued for task-90 branch). AgentPhone retries STOPPED per lead. Task 90: audit workflow pushed; red-suite fixes resume next run.
+**Kevin call:** STOPPED by lead order 1250 - calls need Kevin's say-so each time; the lead places the next one.
+**Blockers:** none of mine.
+**Updated (UTC):** 2026-11-07 14:00
