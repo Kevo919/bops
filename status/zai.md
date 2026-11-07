@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** #113 round-2 DONE (7f51edd: launcher w/ live 100ms-fork proof, sitter hardening, constructs outright) - awaiting re-review + lead live test. #118 CLOSED (dup of #117; BOPS_TEST_KEYCHAIN removal + CRLF src() helper queued for task-90 branch). AgentPhone retries STOPPED per lead. Task 90: audit workflow pushed; red-suite fixes resume next run.
-**Kevin call:** STOPPED by lead order 1250 - calls need Kevin's say-so each time; the lead places the next one.
+**On:** Task 90 (branch b51c56f, force-pushed after rebase): test-shared GREEN on this PC (CRLF-safe source reads); sidebar-footer 16 ok (grid-template test next); rail partway; dead BOPS_TEST_KEYCHAIN removed. #113 r3 = the lead's (untouched). Next: the two moved-grid-template tests, the Postgres pair, then the rest of the 39 red suites.
+**Calls:** none placed (lead's standing rule).
 **Blockers:** none of mine.
-**Updated (UTC):** 2026-11-07 14:00
+**Updated (UTC):** 2026-11-07 19:55
