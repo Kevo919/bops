@@ -81,8 +81,12 @@ import { LIGHT, logRoute, routeChat, speedFor, tierParam, withSpeed, type Config
  * throughout, so the bot wrote "on your Mac" back): fixed words only, never a name, title or message (computerWordsFor
  * leaves what's interpolated exactly as it is).
  */
-const pcWords = computerWordsFor(process.platform);
-const pc = (text: string) => computerWords(text, process.platform);
+// Only this desktop app's own machine is reworded: on a bot's computer (a runner, onRunner(), or a turn it answers there,
+// currentTurn()) the server's platform is that computer's, not the owner's, so the owner's computer keeps the words it
+// was written with ("darwin": none change).
+const ownPlatform = () => (onRunner() || currentTurn() ? "darwin" : process.platform);
+const pcWords = (text: TemplateStringsArray, ...values: unknown[]) => computerWordsFor(ownPlatform())(text, ...values);
+const pc = (text: string) => computerWords(text, ownPlatform());
 
 /**
  * Chat engine. Every bot answers in its own chat, like texting a person: it replies, looks things up
@@ -2470,7 +2474,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
         ? []
         : [
             // On a computer's runner there's no browser (the Mac app's hidden window): nothing says there is, to any turn there.
-            fn("web_fetch", onRunner() ? pcWords`Read one web page (an article, docs, a product, price or status page) and get its text, as the page sends it: there's no browser here, so a page that draws itself with JavaScript or shows a "checking your browser" wall can't be read here, only from Bops on ${owner}'s Mac. Try this first for any page that needs no sign in; find pages with web_search. Only a page that needs ${owner}'s sign in, or clicking through, is a task.` : `Read one web page (an article, docs, a product, price or status page, a web app) and get its text. Pages that draw themselves with JavaScript or show a "checking your browser" wall are read in a browser for you, so try this first for any page that needs no sign in; find pages with web_search. Only a page that needs ${owner}'s sign in, or clicking through, is a task.`, {
+            fn("web_fetch", onRunner() ? `Read one web page (an article, docs, a product, price or status page) and get its text, as the page sends it: there's no browser here, so a page that draws itself with JavaScript or shows a "checking your browser" wall can't be read here, only from Bops on ${owner}'s Mac. Try this first for any page that needs no sign in; find pages with web_search. Only a page that needs ${owner}'s sign in, or clicking through, is a task.` : `Read one web page (an article, docs, a product, price or status page, a web app) and get its text. Pages that draw themselves with JavaScript or show a "checking your browser" wall are read in a browser for you, so try this first for any page that needs no sign in; find pages with web_search. Only a page that needs ${owner}'s sign in, or clicking through, is a task.`, {
               url: { type: "string", description: "The page's address, e.g. \"https://example.com/pricing\"." },
             }),
           ]),
@@ -2825,7 +2829,7 @@ async function turn(botId: string, chatId: string, opts: TurnOptions = {}): Prom
       opts.outside ? "" : watchesNote([botId, ...below], b.isMain && !member),
       // Answered on the bot's computer (runner-chat.ts): what waits for the owner's Mac.
       onBox
-        ? pcWords`You're answering from your computer, not from ${owner}'s Mac. Routines, reminders, watches, skills, new bots, pages, pictures and apps, and handing work to a teammate, wait for ${owner}'s Mac: if asked, say ${owner} can ask for it there.`
+        ? `You're answering from your computer, not from ${owner}'s Mac. Routines, reminders, watches, skills, new bots, pages, pictures and apps, and handing work to a teammate, wait for ${owner}'s Mac: if asked, say ${owner} can ask for it there.`
         : "",
       // Someone else's turn: what's the user's alone (NOT_FROM_OUTSIDE).
       opts.outside

@@ -202,7 +202,7 @@ export function WidgetPageView({ state, pageId, onClose, onGone, links, covered 
           <h1 className="min-w-0 truncate text-[20px] font-semibold leading-7 text-ink">{page.name}</h1>
         )}
         <span className="min-w-0 flex-1" />
-        <button onClick={() => setEditing(!editing)} aria-pressed={editing} className={editing ? `${shape} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)] shadow-[0_0_0_1px_var(--h-0a0a0a)]` : pill} data-edit-widgets>
+        <button onClick={() => setEditing(!editing)} className={editing ? `${shape} bg-[color:var(--hb-0a0a0a)] text-[color:var(--bops-on-fill)] shadow-[0_0_0_1px_var(--h-0a0a0a)]` : pill} data-edit-widgets>
           {editing ? "Done" : "Edit"}
         </button>
         {pinned ? (
@@ -354,13 +354,22 @@ function WidgetCard({ state, page, widget: w, index, editing, links }: { state: 
         // Buttons that say whether they're pressed (task 86): an accessibility client presses a button (its Invoke), which
         // an ARIA radio drawn on a button didn't take; each named for its widget, as a page has several.
         <div role="group" aria-label={`${name}'s size`} className="mb-2 flex w-fit gap-0.5 rounded-full bg-[color:var(--bops-tint)]/[0.05] p-[3px]">
-          {SIZES.map((s) => (
+          {SIZES.map((s, i) => (
             <button
               key={s}
               type="button"
               aria-pressed={w.size === s}
               aria-label={`${SIZE_WORD[s]} size for ${name}`}
               onClick={() => w.size !== s && void edit({ size: s })}
+              // The arrow keys move along the sizes and pick, as Look's choices do (segmented.tsx).
+              onKeyDown={(e) => {
+                const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+                if (!step) return;
+                e.preventDefault();
+                const next = (i + step + SIZES.length) % SIZES.length;
+                e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
+                if (SIZES[next] !== w.size) void edit({ size: SIZES[next] });
+              }}
               className={`rounded-full px-2.5 py-0.5 text-[12px] leading-4 outline-none focus-visible:shadow-[0_0_0_1.5px_var(--h-0a0a0a)] ${w.size === s ? "bg-white text-ink shadow-[0_0_0_1px_var(--h-0000000f)]" : "text-pencil hover:text-ink"}`}
             >
               {SIZE_WORD[s]}

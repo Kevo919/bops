@@ -435,7 +435,7 @@ try {
         await shot(page, `${theme}-84-edit-done`);
         const ratio = await edit.evaluate(CONTRAST);
         assert.ok(ratio >= 4.5, `Done reads at ${ratio}:1`);
-        assert.equal(await edit.getAttribute("aria-pressed"), "true", "Edit says it's on");
+        assert.equal(await edit.getAttribute("aria-pressed"), null, "its name says the state (Done), not aria-pressed as well");
         await edit.click();
         await settle(page);
         assert.equal((await edit.innerText()).trim(), "Edit", "Done leaves Edit");
@@ -498,6 +498,13 @@ try {
         await pressByAx(page, "button", "Medium size for Showings");
         await page.getByRole("button", { name: "Medium size for Showings", pressed: true }).waitFor({ timeout: 5000 });
         await pressByAx(page, "button", "Small size for Showings", " ");
+        await page.getByRole("button", { name: "Small size for Showings", pressed: true }).waitFor({ timeout: 5000 });
+        // The arrow keys move along the sizes and pick, as Look's do.
+        await page.getByRole("button", { name: "Small size for Showings" }).focus();
+        await page.keyboard.press("ArrowRight");
+        await page.getByRole("button", { name: "Medium size for Showings", pressed: true }).waitFor({ timeout: 5000 });
+        assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "Medium size for Showings", "focus moved with the arrow");
+        await page.keyboard.press("ArrowLeft");
         await page.getByRole("button", { name: "Small size for Showings", pressed: true }).waitFor({ timeout: 5000 });
         await page.locator("[data-edit-widgets]").click();
       });

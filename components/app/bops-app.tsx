@@ -2097,7 +2097,8 @@ const GLYPHS: Record<SettingsPane, string> = {
   usage: "M3 13V9M6.3 13V6M9.6 13V8M13 13V3.5",
   reach: "M5 2h6v12H5zM7.3 12h1.4",
   phone: "M5 1.8h6v12.4H5zM7.3 12.3h1.4M2.6 5.5a3.6 3.6 0 0 1 0 5M13.4 5.5a3.6 3.6 0 0 0 0 5",
-  subscriptions: "M6 2v3.2M10 2v3.2M4 5.2h8v2.6a4 4 0 0 1-8 0zM8 11.8V14",
+  // A ticket: a plan you hold (Services is the plug, AI plans the sparkle).
+  subscriptions: "M2.5 4.5h11v2a1.5 1.5 0 0 0 0 3v2h-11v-2a1.5 1.5 0 0 0 0-3zM9.5 4.5v7",
   ai: "M8 2l1.3 3.4L13 6.7l-3.7 1.3L8 11.5 6.7 8 3 6.7l3.7-1.3z",
   privacy: "M8 2l5 1.9v3.9c0 3.1-2.1 5.6-5 6.6-2.9-1-5-3.5-5-6.6V3.9z",
   mac: "M2.5 3.5h11v7.5h-11zM1.5 13h13",
