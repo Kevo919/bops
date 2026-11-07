@@ -1,4 +1,4 @@
-// Bot tasks on this PC (lib/server/pc-task-runner.ts, pc-task-setting.ts, app/api/pc-task-runner, vm/pc-approve-mcp.mjs,
+// Bot tasks on this PC (lib/server/pc-task-runner.ts, pc-task-setting.ts, app/api/pc-task-runner, vm/pc-approve-mcp.mjs,
 // cli-agents.ts approveTool): who runs a task (the owner's signed in Claude plan, or the OpenAI key for the Codex
 // executor), how Claude Code is started (its flags and permissions, its working folder), how its stream-json output
 // becomes the thread's steps and answer, what a failure says, and that no key reaches Claude Code, a log or the state.
@@ -56,7 +56,7 @@ if (process.argv[2] === "--help") {
 }
 if (process.argv[2] === "--version") {
   // 2.1.318 is the floor the flags were checked against (MIN_CLAUDE_VERSION).
-  process.stdout.write((process.env.FAKE_OLD_VERSION ? "2.0.1 (Claude Code)" : "2.1.318 (Claude Code)") + "\n");
+  process.stdout.write((process.env.FAKE_OLD_VERSION ? "2.0.1 (Claude Code)" : "2.1.318 (Claude Code)") + "\\\n");
   process.exit(0);
 }
 let input = "";
