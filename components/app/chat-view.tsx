@@ -1,6 +1,6 @@
 "use client";
 
-import { useComputerWords, useOwnComputerWords } from "./computer-words";
+import { useComputerWords, useOwnComputerWords, useComputerPlatform } from "./computer-words";
 
 import { screenMap, screenNo } from "@/lib/screens";
 import { askKind, chatAsks } from "@/lib/asks";
@@ -323,6 +323,7 @@ export function ChatView({
   onBack?: () => void;
 }) {
   // Who's typing: also a bot answering on its computer, or whose computer is waking to (lib/types.ts withRemoteTyping).
+  const computerPlatform = useComputerPlatform();
   const c = withRemoteTyping(given, state.liveMoods);
   // In a shared workspace, over the message box: whether what they say runs on the chat's bots' computers (lib/shared.ts computerLine).
   const computerSaid = state.shared ? computerLine(state, c.botIds.flatMap((id) => state.bots.filter((b) => b.id === id && b.runsOn !== "mac" && !!workBot(b, state.bots).computerId))) : null;
@@ -1081,7 +1082,7 @@ export function ChatView({
           )}
           {micError && <div className="px-3 pt-1.5 text-[12px] leading-4 text-[color:var(--ht-b42318)]">{micError}</div>}
           {micNote && !micError && <div data-mic-note className="px-3 pt-1.5 text-[12px] leading-4 text-[color:var(--ht-b54708)]">{micNote}</div>}
-          {(modelError ?? chatModelHint(state, c)) && <div className="px-3 pt-1.5 text-[12px] leading-4 text-[color:var(--ht-b54708)]">{modelError ?? chatModelHint(state, c)}</div>}
+          {(modelError ?? chatModelHint(state, c, computerPlatform)) && <div className="px-3 pt-1.5 text-[12px] leading-4 text-[color:var(--ht-b54708)]">{modelError ?? chatModelHint(state, c, computerPlatform)}</div>}
         </div>
       </div>
 

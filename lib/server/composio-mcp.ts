@@ -68,8 +68,8 @@ export function composioMcpUrl(raw: string | undefined = process.env.COMPOSIO_MC
 export function composioMcpKeyProblem(raw: string | undefined = process.env.COMPOSIO_MCP_KEY): string | null {
   const k = raw?.trim();
   if (!k) return null;
-  if (/^ak_/i.test(k)) return "COMPOSIO_MCP_KEY is a Platform project key (it starts with ak_). For You uses its own key: in Composio, open For You, then Settings, Sessions & API Key, and copy the key that starts with ck_.";
-  if (k.length > 512 || !/^[\x21-\x7e]+$/.test(k)) return "COMPOSIO_MCP_KEY doesn't look like a key: copy it again from For You, Connect my agent, as one line with no spaces.";
+  if (/^ak_/i.test(k)) return "This is a Platform project key (it starts with ak_). For You uses its own key: in Composio, open For You, then Settings, Sessions & API Key, and copy the key that starts with ck_.";
+  if (k.length > 512 || !/^[\x21-\x7e]+$/.test(k)) return "This does not look like a key: copy it again from For You, Connect my agent, as one line with no spaces.";
   return null;
 }
 
@@ -241,7 +241,7 @@ export async function checkComposioMcp(): Promise<{ status: "not set" | "works" 
   if (!composioMcpSet()) return { status: "not set", message: "Composio (your account) is not connected. Add its address in Settings, Services, Composio (your account), then restart Bops." };
   const bad = composioMcpKeyProblem();
   if (bad) return { status: "invalid", message: bad };
-  if (!composioMcpUrl()) return { status: "invalid", message: process.env.COMPOSIO_MCP_URL?.trim() ? "COMPOSIO_MCP_URL must be an https address on connect.composio.dev. In Composio, open For You, then Connect my agent, and copy the address." : "COMPOSIO_MCP_URL isn't set: in Composio, open For You, then Connect my agent, and copy the address." };
+  if (!composioMcpUrl()) return { status: "invalid", message: process.env.COMPOSIO_MCP_URL?.trim() ? "The Composio address must start with https:// and be on connect.composio.dev. Copy it from For You, Connect my agent into Settings, Services, Composio (your account)." : "The Composio address is missing. Copy it from For You, Connect my agent into Settings, Services, Composio (your account)." };
   try {
     const list = await client.freshList();
     if (!list.length) return { status: "works", message: "Composio answered, but nothing is connected yet. In Composio, open For You, then Connect Apps, and connect Gmail or another app." };

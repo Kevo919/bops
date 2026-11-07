@@ -95,8 +95,8 @@ export const zapierText = (s: string) => client.scrub(s);
 
 /** Settings' Check: a new session and the action list. Only after the owner presses Check. Never the address or what Zapier said. */
 export async function checkZapier(): Promise<{ status: "not set" | "works" | "invalid" | "unavailable" | "rate limited"; message: string }> {
-  if (!zapierSet()) return { status: "not set", message: "ZAPIER_MCP_URL isn't set in the running server's environment." };
-  if (!zapierOn()) return { status: "invalid", message: "ZAPIER_MCP_URL must be an https address on zapier.com. Copy the server URL from mcp.zapier.com." };
+  if (!zapierSet()) return { status: "not set", message: "Zapier is not connected. Add its server address in Settings, Services, Zapier, then restart Bops." };
+  if (!zapierOn()) return { status: "invalid", message: "The Zapier address must start with https:// and be on zapier.com. Copy it from mcp.zapier.com into Settings, Services, Zapier." };
   try {
     const n = (await client.freshList()).length;
     return n ? { status: "works", message: `Zapier answered with ${n} action${n === 1 ? "" : "s"} your bots can use in your chats.` } : { status: "works", message: "Zapier answered, but your server has no actions yet. Add some at mcp.zapier.com." };

@@ -205,7 +205,7 @@ try {
     assert.equal(asked.at(-1).url, "https://api.openai.com/v1/responses");
     assert.equal(asked.at(-1).auth, `Bearer ${SECRETS.OPENAI_API_KEY__SIDE}`);
     assert.deepEqual(used, [], "the default client (OPENAI_API_KEY or Orgo) isn't used");
-    await assert.rejects(P.respond(def, { model: "openai/gpt-5-gone", input: "hi" }), /The OpenAI \(nope\) account is not connected\. Ask the person who manages Bops to connect it/);
+    await assert.rejects(P.respond(def, { model: "openai/gpt-5-gone", input: "hi" }), /The OpenAI \(nope\) account is not connected\. Choose another account for this model in Settings → This (PC|Mac|computer) → Models/);
     assert.deepEqual(used, []);
     await P.respond(def, { model: "openai/gpt-5-plain", input: "hi" });
     assert.deepEqual(used, ["gpt-5-plain"], "no account: the default client, as before");
@@ -218,7 +218,7 @@ try {
       noSecret(e.message, "the error");
       return true;
     });
-    await assert.rejects(P.createOnProvider({ model: "openrouter/x/gone", input: "hi" }), /The OpenRouter \(nope\) account is not connected\. Ask the person who manages Bops to connect it/);
+    await assert.rejects(P.createOnProvider({ model: "openrouter/x/gone", input: "hi" }), /The OpenRouter \(nope\) account is not connected\. Choose another account for this model in Settings → This (PC|Mac|computer) → Models/);
     assert.match(P.refusal("openrouter", 401, "{}", SECRETS.OPENROUTER_API_KEY__WORK, "m", "WORK").message, /OpenRouter \(work\) turned this down: your OpenRouter key \(work\) isn't valid\. Ask the person who manages Bops to reconnect this account/);
   });
 
@@ -259,8 +259,8 @@ try {
 
   await test("the Keys card honestly explains extra accounts need administrator setup, and bots use the default", () => {
     const src = readFileSync(join(root, "components/app/setup.tsx"), "utf8");
-    assert.match(src, /data-accounts-help[^>]*>More than one account for a provider: ask the person who manages this Bops/);
-    assert.match(src, /Adding extra accounts is not available in this screen yet/);
+    assert.match(src, /data-accounts-help[^>]*>More than one account for a provider: follow the/);
+    assert.match(src, /This screen checks saved accounts; it does not add or edit them/);
     assert.match(src, /Bots&apos; tasks on their computers still use the default account/);
   });
 

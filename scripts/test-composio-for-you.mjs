@@ -167,6 +167,11 @@ const callTool = (id, name, args) => chatSays(null, [{ id, type: "function", fun
 const C = await import(`${rootUrl}/lib/server/composio-mcp.ts`);
 const CC = await import(`${rootUrl}/lib/server/composio-mcp-chat.ts`);
 const K = await import(`${rootUrl}/lib/server/key-check.ts`);
+const checkedKey = async (...args) => {
+  const result = await K.checkKey(...args);
+  assert.doesNotMatch(result.message ?? "", /[A-Z_]{4,}_(KEY|URL)|\.env/);
+  return result;
+};
 const S = await import(`${rootUrl}/lib/server/store.ts`);
 const { botChatId } = await import(`${rootUrl}/lib/types.ts`);
 const { NeedsOk, replyToAsk } = await import(`${rootUrl}/lib/server/permission.ts`);
@@ -195,11 +200,11 @@ await check("only https on connect.composio.dev; http, other hosts, a user, anot
   for (const ok of ["https://connect.composio.dev/mcp", "https://CONNECT.composio.dev./mcp", "https://connect.composio.dev:443/mcp?x=1"]) assert.ok(C.composioMcpUrl(ok), ok);
   for (const bad of ["http://connect.composio.dev/mcp", "https://connect.composio.dev.evil.example/mcp", "https://evilcomposio.dev/mcp", "https://composio.dev/mcp", "https://backend.composio.dev/mcp", "https://user:pw@connect.composio.dev/mcp", "https://connect.composio.dev:8443/mcp", "ftp://connect.composio.dev/mcp", "not a url", "", ADDRESS])
     assert.equal(C.composioMcpUrl(bad), null, bad);
-  for (const [url, words] of [["http://connect.composio.dev/mcp", /https address on connect\.composio\.dev/], ["https://mcp.evil.example/mcp", /https address on connect\.composio\.dev/]]) {
+  for (const [url, words] of [["http://connect.composio.dev/mcp", /https:\/\/ and be on connect\.composio\.dev/], ["https://mcp.evil.example/mcp", /https:\/\/ and be on connect\.composio\.dev/]]) {
     setAddress(url, KEY);
     assert.equal(C.composioMcpOn(), false);
     assert.equal(C.composioMcpSet(), true);
-    const r = await K.checkKey("COMPOSIO_MCP_URL");
+    const r = await checkedKey("COMPOSIO_MCP_URL");
     assert.equal(r.status, "invalid");
     assert.match(r.message, words);
     assert.deepEqual(await CC.composioMcpChatTools(), []);
@@ -208,12 +213,12 @@ await check("only https on connect.composio.dev; http, other hosts, a user, anot
   assert.equal(z.got.length, 0, "nothing was sent to the fake server");
   assert.equal(elsewhere.length, 0, "nothing was sent anywhere");
   setAddress("https://connect.composio.dev/mcp", ["ak", "fake", "platform", "z".repeat(8)].join("_"));
-  const r = await K.checkKey("COMPOSIO_MCP_URL");
+  const r = await checkedKey("COMPOSIO_MCP_URL");
   assert.equal(r.status, "invalid");
   assert.match(r.message, /Platform project key \(it starts with ak_\)/);
   assert.equal(elsewhere.length, 0, "a Platform key is never sent");
   setAddress(undefined, undefined);
-  assert.equal((await K.checkKey("COMPOSIO_MCP_URL")).status, "not set");
+  assert.equal((await checkedKey("COMPOSIO_MCP_URL")).status, "not set");
 });
 
 await check("the test-only loopback override: only with NODE_ENV=test, only that origin, only loopback", async () => {
@@ -240,7 +245,7 @@ await check("the key goes as x-consumer-api-key, to that address only; tools lis
   assert.equal(z.got[0].path, `/mcp/${PATH_SECRET}`);
   assert.deepEqual(list.map((k) => k.name), ["mycomposio_COMPOSIO_SEARCH_TOOLS", "mycomposio_COMPOSIO_MULTI_EXECUTE_TOOL", "mycomposio_COMPOSIO_REMOTE_BASH_TOOL", "mycomposio_COMPOSIO_MANAGE_CONNECTIONS", "mycomposio_GMAIL_FETCH_EMAILS", "mycomposio_GMAIL_SEND_EMAIL", "mycomposio_COMPOSIO_PROXY_EXECUTE"]);
   assert.deepEqual(list.filter((k) => k.readOnly).map((k) => k.tool.name), ["COMPOSIO_SEARCH_TOOLS", "GMAIL_FETCH_EMAILS"], "a hint never makes a send, sandbox code or raw HTTP a read");
-  const r = await K.checkKey("COMPOSIO_MCP_URL");
+  const r = await checkedKey("COMPOSIO_MCP_URL");
   assert.equal(r.status, "works");
   assert.match(r.message, /Composio answered with 7 tools: apps: Gmail; 5 tools to find and use your connected apps \(search tools, multi execute tool, remote bash tool, manage connections, proxy execute\)/);
   assert.match(r.message, /sends, changes, deletes or pays asks you first/);
@@ -253,32 +258,46 @@ await check("the key goes as x-consumer-api-key, to that address only; tools lis
 await check("clear errors: key turned down, key missing, address unknown, nothing connected yet", async () => {
   setAddress(ADDRESS, KEY);
   z.on.initialize = () => ({ status: 401 });
-  let r = await K.checkKey("COMPOSIO_MCP_URL");
+  let r = await checkedKey("COMPOSIO_MCP_URL");
   assert.equal(r.status, "invalid");
   assert.match(r.message, /turned down your saved key/);
   assert.match(r.message, /Settings, Services, Composio \(your account\)/);
   assert.doesNotMatch(r.message, /\.env\.local|COMPOSIO_MCP_KEY/);
   setAddress(ADDRESS, undefined);
   z.on.initialize = () => ({ status: 401 });
-  r = await K.checkKey("COMPOSIO_MCP_URL");
+  r = await checkedKey("COMPOSIO_MCP_URL");
   assert.equal(r.status, "invalid");
   assert.match(r.message, /Composio wants your key.*Connect my agent.*ck_/);
   assert.equal(r.shown, `127.0.0.1:${server.address().port}/•••, no key`);
   setAddress(ADDRESS, KEY);
   z.on.initialize = () => ({ status: 404 });
-  r = await K.checkKey("COMPOSIO_MCP_URL");
+  r = await checkedKey("COMPOSIO_MCP_URL");
   assert.equal(r.status, "invalid");
   assert.match(r.message, /doesn't know this address/);
   setAddress(ADDRESS, KEY);
   z.tools = [];
-  r = await K.checkKey("COMPOSIO_MCP_URL");
+  r = await checkedKey("COMPOSIO_MCP_URL");
   assert.equal(r.status, "works");
   assert.match(r.message, /nothing is connected yet.*Connect Apps/);
   setAddress(undefined, KEY);
-  r = await K.checkKey("COMPOSIO_MCP_URL");
+  r = await checkedKey("COMPOSIO_MCP_URL");
   assert.equal(r.status, "invalid");
-  assert.match(r.message, /COMPOSIO_MCP_URL isn't set/);
+  assert.match(r.message, /Composio address is missing/);
   for (const m of logged) secretFree("the log", m);
+});
+
+await check("Composio field problems and Check messages use plain setup words", async () => {
+  for (const raw of ["ak_synthetic_project", "invalid key with spaces"]) {
+    const problem = C.composioMcpKeyProblem(raw);
+    assert.ok(problem);
+    assert.doesNotMatch(problem, /[A-Z_]{4,}_(KEY|URL)|\.env/);
+  }
+  for (const address of [undefined, "https://wrong.example/mcp"]) {
+    setAddress(address, undefined);
+    const result = await C.checkComposioMcp();
+    assert.doesNotMatch(result.message, /[A-Z_]{4,}_(KEY|URL)|\.env/);
+    assert.match(result.message, /Settings, Services, Composio/);
+  }
 });
 
 /* ---------------- What reads and what asks ---------------- */

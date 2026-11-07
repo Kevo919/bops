@@ -144,6 +144,7 @@ const { ModelsCard, nameFromOpenRouter } = await import(`${rootUrl}/components/a
 let passed = 0;
 const test = async (name, f) => {
   await f();
+  assert.doesNotMatch(box.textContent + [...box.querySelectorAll("[title]")].map(e => e.title).join(" "), /[A-Z_]{4,}_(KEY|URL)|\.env/, "rendered text and tooltips stay plain");
   passed++;
   console.log(`ok ${passed} - ${name}`);
 };
@@ -232,7 +233,7 @@ try {
     await choose(provider, "openrouter");
     assert.equal(bops.orFetches, 1);
     const missing = add.querySelector("[data-key=missing]");
-    assert.match(missing.textContent, /No key yet: add OPENROUTER_API_KEY/);
+    assert.match(missing.textContent, /No key yet: Open setup guide in Keys/);
     assert.equal(missing.querySelector("a").getAttribute("href"), "#settings-keys");
     assert.equal(add.querySelectorAll("[data-or-model]").length, 3);
     const search = add.querySelector("input[aria-label='Search OpenRouter models']");
@@ -306,7 +307,7 @@ try {
     assert.equal(r.querySelector("select[aria-label='Run by']"), null);
     assert.equal(r.querySelector("input[name=models-starter]"), null);
     assert.ok(r.querySelector("input[name=models-chat-default]"));
-    assert.match(r.querySelector("[data-key=missing]").textContent, /Not set up yet: add OLLAMA_BASE_URL/);
+    assert.match(r.querySelector("[data-key=missing]").textContent, /Not set up yet: Open setup guide in Keys/);
     await click(button(box, "Add a model"));
     const add = box.querySelector("[data-add-model]");
     await choose(add.querySelector("select[aria-label=Provider]"), "ollama");
@@ -356,7 +357,7 @@ try {
     const add = box.querySelector("[data-add-model]");
     await choose(add.querySelector("select[aria-label=Provider]"), "openrouter");
     await click(add.querySelector("[data-or-mode=preset]"));
-    assert.match(add.querySelector("[data-presets-nokey]").textContent, /Add OPENROUTER_API_KEY/);
+    assert.match(add.querySelector("[data-presets-nokey]").textContent, /Follow the setup guide linked in Keys to connect OpenRouter/);
     const slug = add.querySelector("input[aria-label='Preset slug']");
     await type(slug, "bad slug!");
     assert.match(add.textContent, /letters, numbers, - and _ only/);
@@ -398,7 +399,7 @@ try {
     assert.equal(row(box, "anthropic/claude-opus-5-5").querySelector("select[aria-label=Account]"), null, "Anthropic has one account here");
     const qwen = row(box, "openrouter/qwen/qwen3-coder-next");
     const sel = qwen.querySelector("select[aria-label=Account]");
-    assert.deepEqual([...sel.querySelectorAll("option")].map((o) => o.textContent), ["Default (OPENROUTER_API_KEY)", "work (OPENROUTER_API_KEY__WORK)"]);
+    assert.deepEqual([...sel.querySelectorAll("option")].map((o) => o.textContent), ["Default account", "work"]);
     assert.match(sel.closest("label").getAttribute("title"), /Bots' tasks on their computers use the default account/);
     await choose(sel, "WORK");
     assert.deepEqual(bops.sent.at(-1), { op: "update", id: "openrouter/qwen/qwen3-coder-next", account: "WORK" });
@@ -428,6 +429,10 @@ try {
     assert.match(setup, /<div id="settings-keys"[^>]*>\s*<KeysCard \/>\s*<\/div>\s*<ModelsCard \/>/);
   });
 
+  await test("model card text and tooltips never display environment identifiers", async () => {
+    const visible = box.textContent + [...box.querySelectorAll("[title]")].map(e => e.title).join(" ");
+    assert.doesNotMatch(visible, /[A-Z_]{4,}_(KEY|URL)|\.env/);
+  });
   console.log(`PASS: ${passed} Models card UI checks (fake Bops, no server)`);
 } finally {
   await act(async () => root.unmount());

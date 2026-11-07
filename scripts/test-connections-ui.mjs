@@ -64,6 +64,7 @@ const answers = {
 };
 const json = (j, status = 200) => ({ ok: status < 400, status, json: async () => j });
 globalThis.fetch = async (url, opts = {}) => {
+  if (url === "/api/config") return json({ platform: "win32" });
   if (url !== "/api/key-check") throw new Error(`unexpected ${url}`);
   if (!opts.method || opts.method === "GET") return json({ keys: rows });
   const { key } = JSON.parse(opts.body);
@@ -78,6 +79,7 @@ const { ConnectionsCard, CONNECTIONS } = await import(`${rootUrl}/components/app
 let passed = 0;
 const test = async (name, f) => {
   await f();
+  assert.doesNotMatch(box.textContent + [...box.querySelectorAll("[title]")].map(e => e.title).join(" "), /[A-Z_]{4,}_(KEY|URL)|\.env/, "rendered text and tooltips stay plain");
   passed++;
   console.log(`ok ${passed} - ${name}`);
 };
@@ -118,7 +120,7 @@ try {
     for (const key of ["COMPOSIO_API_KEY", "COMPOSIO_MCP_URL", "ZAPIER_MCP_URL"]) {
       assert.match(row(key).textContent, /Settings, Services/, `${key}: supported setup screen`);
     }
-    assert.match(row("OPENROUTER_API_KEY").textContent, /not available in Services yet/);
+    assert.match(row("OPENROUTER_API_KEY").textContent, /Settings → This PC → Keys/);
     assert.ok(!text.includes(".env.local"), "no developer file instructions");
     assert.match(row("ZAPIER_MCP_URL").textContent, /not for team members, Telegram, Discord/);
     assert.match(row("OPENROUTER_API_KEY").textContent, /:free/);
@@ -187,6 +189,15 @@ try {
     assert.deepEqual(calls, ["mail", "phone", "memory", "apps"].map(service => ["services", { service }]));
   });
 
+  await test("Keys card shows readable account labels and a real setup guide, not environment identifiers", async () => {
+    const { KeysCard } = await import(`${rootUrl}/components/app/setup.tsx`);
+    globalThis.fetch = async url => { assert.equal(url, "/api/key-check"); return json({ keys: rows }); };
+    await act(async () => { root.render(h(KeysCard)); await settle(); });
+    const visible = box.textContent + [...box.querySelectorAll("[title]")].map(e => e.title).join(" ");
+    assert.doesNotMatch(visible, /[A-Z_]{4,}_(KEY|URL)|\.env/);
+    assert.match(visible, /This screen checks saved accounts; it does not add or edit them/);
+    assert.ok(box.querySelector('a[href="https://github.com/Kevo919/bops/blob/windows-port/docs/keys.md"]'));
+  });
   console.log(`PASS: ${passed} Connections card UI checks (fake Bops, no server)`);
 } finally {
   await act(async () => root.unmount());

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useComputerPlatform } from "./computer-words";
+import { providerSetupGuide } from "@/lib/setup-words";
 import { OpenSettings } from "./open-settings";
 import type { AppState } from "@/lib/types";
 import type { KeyCheckResult } from "@/lib/server/key-check";
@@ -54,7 +56,7 @@ export const CONNECTIONS: Row[] = [
     name: "OpenRouter",
     what: "Hundreds of AI models for chats and bots, some of them free (their ids end in :free). Pick one in Models below, or in a chat's model box.",
     getKey: { label: "Get a key at openrouter.ai/keys", href: "https://openrouter.ai/keys" },
-    paste: "Create a key at openrouter.ai/keys with a credit limit, then ask the person who manages this Bops to connect it. Adding this provider key is not available in Services yet.",
+    paste: "Create a key at openrouter.ai/keys with a credit limit. Use the setup guide linked in the Keys card to connect it; this card does not save provider keys.",
   },
 ];
 
@@ -80,6 +82,7 @@ const openLogins = () => document.querySelector<HTMLButtonElement>('[data-settin
 
 export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> }) {
   const openSettings = useContext(OpenSettings);
+  const platform = useComputerPlatform();
   const [rows, setRows] = useState<KeyCheckResult[] | null>(null);
   const [busy, setBusy] = useState<string | null>("refresh");
   const [error, setError] = useState<string | null>(null);
@@ -162,7 +165,7 @@ export function ConnectionsCard({ state }: { state?: Pick<AppState, "accounts"> 
               {checked && r.message && <div data-message className="text-[12px] text-pencil">{r.message}</div>}
               {r?.shown && <div data-shown className="text-[12px] text-pencil">Saved: {r.shown}</div>}
               <p className="text-[12px] text-pencil">{c.what}</p>
-              <p className="text-[12px] text-pencil">{c.paste}</p>
+              <p className="text-[12px] text-pencil">{c.key === "OPENROUTER_API_KEY" ? providerSetupGuide(platform) : c.paste}</p>
               {c.more && <p className="text-[12px] text-pencil">{c.more}</p>}
               <div className="flex flex-wrap items-center gap-3 text-[12px]">
                 <a className="underline" href={c.getKey.href} target="_blank" rel="noopener noreferrer">{c.getKey.label}</a>

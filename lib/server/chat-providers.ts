@@ -4,6 +4,8 @@ import type { Response, ResponseCreateParamsNonStreaming } from "openai/resource
 import type { AgentRoute } from "@/lib/agents";
 import { chatKeyName, chatModels, providerOf } from "@/lib/chat-models";
 import { llms } from "@/lib/agents";
+import { ownPlatform } from "./owner-platform";
+import { modelsSettingsPath, providerSetupGuide } from "@/lib/setup-words";
 import { accountWord } from "@/lib/accounts";
 import { accountKey } from "./provider-accounts";
 
@@ -437,7 +439,7 @@ export async function createOnProvider(params: Params, opts: { timeoutMs?: numbe
   if (!key && provider !== "ollama")
     throw new ChatProviderError(
       acct
-        ? `The ${whoOf(provider, acct)} account is not connected. Ask the person who manages Bops to connect it, or pick another account for this model in Settings, Models.`
+        ? `The ${whoOf(provider, acct)} account is not connected. Choose another account for this model in ${modelsSettingsPath(ownPlatform())}. ${providerSetupGuide(ownPlatform())}`
         : `${ACCOUNTS[provider]} is not connected. Ask the person who manages Bops to connect it, or pick another model.`,
       provider,
     );
@@ -510,7 +512,7 @@ export function respond(client: OpenAI, params: Params, options?: Parameters<Ope
     const { keyName, key } = accountKey(chatKeyName("openai"), acct);
     if (!key)
       return Promise.reject(
-        new ChatProviderError(`The ${whoOf("openai", acct)} account is not connected. Ask the person who manages Bops to connect it, or pick another account for this model in Settings, Models.`, "openai"),
+        new ChatProviderError(`The ${whoOf("openai", acct)} account is not connected. Choose another account for this model in ${modelsSettingsPath(ownPlatform())}. ${providerSetupGuide(ownPlatform())}`, "openai"),
       );
     return accountClient(client, keyName, key).responses.create({ ...params, model }, options) as Promise<Response>;
   }

@@ -93,10 +93,20 @@ if (UI) {
   globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
   globalThis.matchMedia = () => ({ matches: false });
   const chatId = "bot:boppy";
+const { providerSetupGuide, modelsSettingsPath } = await import(`${rootUrl}/lib/setup-words.ts`);
 await check("the window's picker: Auto first, the models by provider, (no key) where the server has none, and the hint", async () => {
+
   const { ChatModelPick, chatModelHint } = await import(`${rootUrl}/components/app/chat-model.tsx`);
   const { renderToStaticMarkup } = await import("react-dom/server");
   const { createElement: h } = await import("react");
+  for (const [platform, label] of [["win32", "This PC"], ["darwin", "This Mac"], ["unknown", "This computer"]]) {
+    assert.equal(modelsSettingsPath(platform), `Settings → ${label} → Models`);
+    const hint = chatModelHint({ chatKeys: {} }, { model: "zai-coding/glm-5.3" }, platform);
+    assert.ok(hint.includes(`Settings → ${label} → Keys`));
+    assert.ok(hint.includes("How to get keys and set spending limits"));
+    assert.ok(hint.includes("only checks saved accounts"));
+    assert.doesNotMatch(hint, /[A-Z_]{4,}_(KEY|URL)|\.env|ask the person/i);
+  }
   const state = { chatKeys: { anthropic: true, openai: true, zai: false, "zai-coding": false, "zai-coding-cn": false, deepseek: false, openrouter: true } };
   const html = renderToStaticMarkup(h(ChatModelPick, { state, chat: { id: chatId, model: "zai-coding/glm-5.3" } }));
   assert.match(html, /aria-label="Model for this chat"/);
@@ -105,10 +115,10 @@ await check("the window's picker: Auto first, the models by provider, (no key) w
   assert.match(html, /<option value="zai-coding\/glm-5\.3" selected="">GLM 5\.3 \(Coding Plan\) \(no key\)<\/option>/);
   assert.match(html, /<optgroup label="DeepSeek"><option value="deepseek\/deepseek-chat">DeepSeek Chat \(no key\)/);
   assert.match(html, /<optgroup label="Z\.ai Coding Plan \(China\)"><option value="zai-coding-cn\/glm-5\.3">GLM 5\.3 \(Coding Plan, China\) \(no key\)<\/option><\/optgroup>/);
-  assert.equal(chatModelHint(state, { model: "zai-coding-cn/glm-5.3" }), "Z.ai Coding Plan (China) is not connected yet. Ask the person who manages Bops to connect it, or choose another model.");
+  assert.equal(chatModelHint(state, { model: "zai-coding-cn/glm-5.3" }), `Z.ai Coding Plan (China) is not connected yet. ${providerSetupGuide()} Or choose another model.`);
   assert.equal(chatModelHint({ chatKeys: { ...state.chatKeys, "zai-coding-cn": true } }, { model: "zai-coding-cn/glm-5.3" }), null, "its own key, not Z.ai's");
   assert.ok(!/Claude Opus 5\.5 \(no key\)/.test(html));
-  assert.equal(chatModelHint(state, { model: "zai-coding/glm-5.3" }), "Z.ai Coding Plan is not connected yet. Ask the person who manages Bops to connect it, or choose another model.");
+  assert.equal(chatModelHint(state, { model: "zai-coding/glm-5.3" }), `Z.ai Coding Plan is not connected yet. ${providerSetupGuide()} Or choose another model.`);
   assert.equal(chatModelHint(state, { model: "anthropic/claude-opus-5-5" }), null);
   assert.equal(chatModelHint(state, {}), null, "Auto");
   assert.equal(renderToStaticMarkup(h(ChatModelPick, { state: { ...state, shared: { id: "x" } }, chat: { id: chatId } })), "", "not in a shared workspace");
@@ -123,7 +133,7 @@ await check("the window's picker: Ollama only where it's set up (OLLAMA_BASE_URL
   assert.ok(!/ollama/i.test(renderToStaticMarkup(h(ChatModelPick, { state: off, chat: { id: chatId } }))), "not offered without Ollama");
   assert.match(renderToStaticMarkup(h(ChatModelPick, { state: on, chat: { id: chatId } })), /<optgroup label="Ollama \(free, local\)"><option value="ollama\/qwen2\.5:3b">Qwen 2\.5 3B<\/option><\/optgroup>/);
   assert.match(renderToStaticMarkup(h(ChatModelPick, { state: off, chat: { id: chatId, model: "ollama/qwen2.5:3b" } })), /value="ollama\/qwen2\.5:3b" selected="">Qwen 2\.5 3B \(no key\)/, "a chat already on it still shows it");
-  assert.equal(chatModelHint(off, { model: "ollama/qwen2.5:3b" }), "Ollama is not connected yet. Ask the person who manages Bops to connect your Ollama server, or choose another model.");
+  assert.equal(chatModelHint(off, { model: "ollama/qwen2.5:3b" }), `Ollama is not connected yet. ${providerSetupGuide()} Or choose another model.`);
   assert.equal(chatModelHint(on, { model: "ollama/qwen2.5:3b" }), null);
 });
 
