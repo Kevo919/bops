@@ -11,23 +11,48 @@ const bad = /[A-Z_]{4,}_(?:KEY|URL)|\.env/;
 // not arbitrary JavaScript execution or cross-file data flow.
 function scanCopy(file, text) {
  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith("tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
- const constants = new Map();
+ const scopes = new Map();
+ const scopeOf = node => {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+   if (ts.isSourceFile(parent) || ts.isBlock(parent) || ts.isFunctionLike(parent)) return parent;
+  }
+  return source;
+ };
+ const bind = (scope, name, declaration) => {
+  if (!scopes.has(scope)) scopes.set(scope, new Map());
+  scopes.get(scope).set(name, declaration);
+ };
  const collect = node => {
-  if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) constants.set(node.name.text, node.initializer);
+  if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) bind(scopeOf(node), node.name.text, node);
+  if (ts.isFunctionLike(node)) for (const parameter of node.parameters) if (ts.isIdentifier(parameter.name)) bind(node, parameter.name.text, parameter);
   ts.forEachChild(node, collect);
  };
  collect(source);
+ const binding = node => {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+   const found = scopes.get(parent)?.get(node.text);
+   if (found) return found;
+  }
+ };
  const value = (node, seen = new Set()) => {
   if (ts.isStringLiteralLike(node)) return node.text;
   if (ts.isIdentifier(node)) {
-   if (seen.has(node.text)) return "";
-   if (constants.has(node.text)) return value(constants.get(node.text), new Set([...seen, node.text]));
+   const declaration = binding(node);
+   if (declaration) {
+    if (seen.has(declaration) || !declaration.initializer) return "";
+    return value(declaration.initializer, new Set([...seen, declaration]));
+   }
    return /^(?:keyName|envName|envKey)$/.test(node.text) ? "ENVIRONMENT_API_KEY" : "";
   }
   if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) return value(node.left, seen) + value(node.right, seen);
   if (ts.isTemplateExpression(node)) return node.head.text + node.templateSpans.map(span => value(span.expression, seen) + span.literal.text).join("");
   if (ts.isPropertyAccessExpression(node) && /^(?:key|keys|keyName|envName|envKey)$/.test(node.name.text)) return "ENVIRONMENT_API_KEY";
   if (ts.isCallExpression(node)) {
+   if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "join") {
+    let array = node.expression.expression;
+    if (ts.isIdentifier(array)) array = binding(array)?.initializer ?? array;
+    if (ts.isArrayLiteralExpression(array)) return array.elements.map(element => value(element, seen)).join(node.arguments.length ? value(node.arguments[0], seen) : ",");
+   }
    if (ts.isIdentifier(node.expression) && /^(?:accountKeyName|chatKeyName)$/.test(node.expression.text)) return "ENVIRONMENT_API_KEY";
    if (ts.isPropertyAccessExpression(node.expression)) return value(node.expression.expression, seen);
   }
@@ -35,6 +60,7 @@ function scanCopy(file, text) {
  };
  const display = node => {
   for (let parent = node.parent; parent && !ts.isStatement(parent); parent = parent.parent) {
+   if (ts.isNewExpression(parent) && /Error$/.test(parent.expression.getText(source))) return true;
    if (ts.isJsxAttribute(parent)) return /^(?:title|aria-label|placeholder|alt)$/.test(parent.name.getText(source));
    if (ts.isJsxExpression(parent) && !ts.isJsxAttribute(parent.parent)) return true;
    if (ts.isPropertyAssignment(parent) && /^(?:message|title|label|help|hint|problem|notSet|badAddress)$/.test(parent.name.getText(source))) return true;
@@ -61,6 +87,11 @@ function scanCopy(file, text) {
    const prose = /[a-z]{3}/i.test(node.head.text + node.templateSpans.map(s => s.literal.text).join(""));
    if (!internal(node) && (display(node) || prose) && bad.test(value(node))) fail(node, "environment identifier in interpolated copy");
   }
+  if ((ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) || (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "join")) {
+   const resolved = value(node);
+   const prose = /[a-z]{3}\s/i.test(resolved);
+   if (!internal(node) && (display(node) || prose) && bad.test(resolved)) fail(node, "environment identifier in joined copy");
+  }
   if (!process.argv.includes("--negative-interpolation") && ts.isJsxExpression(node) && node.expression && display(node.expression) && bad.test(value(node.expression))) fail(node, "environment identifier in displayed JSX expression");
   ts.forEachChild(node, visit);
  };
@@ -68,6 +99,12 @@ function scanCopy(file, text) {
  return failures;
 }
 const badFixtures = [
+ 'const variable = "OPENAI_API_KEY"; const message = `Add ${variable}`; function other() { const variable = "safe"; }',
+ 'const variable = "OPENAI_API_KEY"; { const variable = "safe"; } const message = `Add ${variable}`;',
+ 'const key = "OPENAI_API_KEY"; throw new Error("Add " + key);',
+ 'const prefix = "OPENAI"; function error() { return "Add " + prefix + "_API_KEY"; }',
+ 'throw new Error(["OPENAI", "API", "KEY"].join("_"));',
+
  'const prefix = "OPENAI"; const message = `Add ${prefix}_API_KEY`;',
  'const variable = "OPENAI_API_KEY"; const message = `Add ${variable}`;',
  'const view = <span title={`${provider.keyName} is set`}>Connected</span>;',
@@ -76,7 +113,7 @@ const badFixtures = [
  'const prefix = "OPENAI"; const suffix = "_API_KEY"; const view = <span>{prefix + suffix}</span>;',
 ];
 for (const fixture of badFixtures) assert.ok(scanCopy("fixture.tsx", fixture).length, `negative fixture escaped: ${fixture}`);
-for (const fixture of ['const view = <span key={row.key} data-key={row.key}>Connected</span>;', 'fetch("/api/key-check", { body: JSON.stringify({ key: row.key }) });', 'const id = `${keyName}\\n${key}`;']) assert.deepEqual(scanCopy("fixture.tsx", fixture), [], fixture);
+for (const fixture of ['const view = <span key={row.key} data-key={row.key}>Connected</span>;', 'fetch("/api/key-check", { body: JSON.stringify({ key: row.key }) });', 'const id = `${keyName}\\n${key}`;', 'const value = "OPENAI_API_KEY"; function note(value) { return `Use ${value}`; }', 'const value = "OPENAI_API_KEY"; { const value = "safe"; const note = `Use ${value}`; }']) assert.deepEqual(scanCopy("fixture.tsx", fixture), [], fixture);
 console.log("PASS: interpolation/JSX negative fixtures fail; internal keys remain allowed");
 const baseline = process.argv.includes("--baseline");
 const failures = files.flatMap(file => scanCopy(file, baseline ? execFileSync("git", ["show", `HEAD:${file}`], { encoding: "utf8" }) : readFileSync(new URL(`../${file}`, import.meta.url), "utf8")));

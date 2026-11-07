@@ -71,6 +71,13 @@ registerHooks({
     }
   },
   load(url, context, next) {
+    if (process.argv.includes("--negative-member-fallback") && url.endsWith("/lib/server/chat.ts")) {
+      const loaded = next(url, context);
+      const source = String(loaded.source);
+      const original = "memberSetupWords(e instanceof Error ? e.message : String(e), !!opts.member)";
+      assert.ok(source.includes(original));
+      return { ...loaded, source: source.replace(original, "(e instanceof Error ? e.message : String(e))") };
+    }
     // Negative control changes only this process's loaded copy, never the shared checkout.
     if (process.argv.includes("--negative-member-copy") && url.endsWith("/lib/setup-words.ts")) {
       const loaded = next(url, context);
@@ -1999,6 +2006,50 @@ await check("real member provider failure asks the manager; owner failure keeps 
   } finally {
     S.update(() => { S.chat(chatId).model = savedModel; S.getState().workspaces[0].memberAccess = savedAccess; });
     if (savedKey === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = savedKey;
+    answers.splice(0, answers.length, ...savedAnswers);
+    globalThis.fetch = savedFetch;
+  }
+});
+
+await check("real non-provider fallback keeps owner setup guidance and gives members the manager route", async () => {
+  const savedModel = S.chat(chatId).model;
+  const savedAccess = S.getState().workspaces[0].memberAccess;
+  const savedKey = process.env.OPENAI_API_KEY;
+  const savedAnswers = [...answers];
+  const savedFetch = globalThis.fetch;
+  let providerCalls = 0;
+  globalThis.fetch = (...args) => {
+    if (String(args[0]).includes("api.openai.com")) providerCalls++;
+    return savedFetch(...args);
+  };
+  try {
+    // Missing application credentials throw OpenAIError without API status, not ChatProviderError:
+    // the actual chat catch must take its unstructured fallback branch.
+    delete process.env.OPENAI_API_KEY;
+    giveAccess({ boppy: "write" });
+    S.update(() => { S.chat(chatId).model = "openai/gpt-6.1-sol"; });
+    const sam = { userId: "user_sam", email: "sam@example.com", name: "Sam", ref: "key_setup_fallback_member" };
+    for (const member of [sam, undefined]) {
+      const before = new Set(messages().map(m => m.id));
+      await Chat.handleMessage(chatId, "Check this connection.", undefined, undefined, undefined, undefined, undefined, undefined, undefined, member);
+      const fresh = messages().filter(m => !before.has(m.id));
+      assert.ok(fresh.some(m => m.role === "user" && (member ? m.member?.userId === sam.userId : !m.member)));
+      const failure = fresh.find(m => m.role === "bot" && m.text.startsWith("Something went wrong on my side:"));
+      assert.ok(failure, "a new bot fallback proves the real catch ran, not an early member gate");
+      assert.equal(failure.chatError, undefined, "unstructured non-provider error exercises the fallback branch");
+      assert.match(failure.text, /OpenAI is not connected for chat/);
+      if (member) {
+        assert.match(failure.text, /Ask the person who manages Bops/);
+        assert.doesNotMatch(failure.text, /Settings →|How to get keys/);
+      } else {
+        assert.match(failure.text, /Settings → This (PC|Mac|computer) → Keys/);
+        assert.doesNotMatch(failure.text, /person who manages/);
+      }
+    }
+    assert.equal(providerCalls, 0, "credential failure occurs before provider requests");
+  } finally {
+    S.update(() => { S.chat(chatId).model = savedModel; S.getState().workspaces[0].memberAccess = savedAccess; });
+    if (savedKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = savedKey;
     answers.splice(0, answers.length, ...savedAnswers);
     globalThis.fetch = savedFetch;
   }
