@@ -105,10 +105,10 @@ await check("the window's picker: Auto first, the models by provider, (no key) w
   assert.match(html, /<option value="zai-coding\/glm-5\.3" selected="">GLM 5\.3 \(Coding Plan\) \(no key\)<\/option>/);
   assert.match(html, /<optgroup label="DeepSeek"><option value="deepseek\/deepseek-chat">DeepSeek Chat \(no key\)/);
   assert.match(html, /<optgroup label="Z\.ai Coding Plan \(China\)"><option value="zai-coding-cn\/glm-5\.3">GLM 5\.3 \(Coding Plan, China\) \(no key\)<\/option><\/optgroup>/);
-  assert.equal(chatModelHint(state, { model: "zai-coding-cn/glm-5.3" }), "Z.ai Coding Plan (China) has no key on this server yet: add ZAI_CODING_CN_API_KEY to .env.local, then restart Bops.");
+  assert.equal(chatModelHint(state, { model: "zai-coding-cn/glm-5.3" }), "Z.ai Coding Plan (China) is not connected yet. Ask the person who manages Bops to connect it, or choose another model.");
   assert.equal(chatModelHint({ chatKeys: { ...state.chatKeys, "zai-coding-cn": true } }, { model: "zai-coding-cn/glm-5.3" }), null, "its own key, not Z.ai's");
   assert.ok(!/Claude Opus 5\.5 \(no key\)/.test(html));
-  assert.equal(chatModelHint(state, { model: "zai-coding/glm-5.3" }), "Z.ai Coding Plan has no key on this server yet: add ZAI_API_KEY to .env.local, then restart Bops.");
+  assert.equal(chatModelHint(state, { model: "zai-coding/glm-5.3" }), "Z.ai Coding Plan is not connected yet. Ask the person who manages Bops to connect it, or choose another model.");
   assert.equal(chatModelHint(state, { model: "anthropic/claude-opus-5-5" }), null);
   assert.equal(chatModelHint(state, {}), null, "Auto");
   assert.equal(renderToStaticMarkup(h(ChatModelPick, { state: { ...state, shared: { id: "x" } }, chat: { id: chatId } })), "", "not in a shared workspace");
@@ -123,7 +123,7 @@ await check("the window's picker: Ollama only where it's set up (OLLAMA_BASE_URL
   assert.ok(!/ollama/i.test(renderToStaticMarkup(h(ChatModelPick, { state: off, chat: { id: chatId } }))), "not offered without Ollama");
   assert.match(renderToStaticMarkup(h(ChatModelPick, { state: on, chat: { id: chatId } })), /<optgroup label="Ollama \(free, local\)"><option value="ollama\/qwen2\.5:3b">Qwen 2\.5 3B<\/option><\/optgroup>/);
   assert.match(renderToStaticMarkup(h(ChatModelPick, { state: off, chat: { id: chatId, model: "ollama/qwen2.5:3b" } })), /value="ollama\/qwen2\.5:3b" selected="">Qwen 2\.5 3B \(no key\)/, "a chat already on it still shows it");
-  assert.equal(chatModelHint(off, { model: "ollama/qwen2.5:3b" }), "Ollama isn't set up on this server: add OLLAMA_BASE_URL (its address, like http://127.0.0.1:11434/v1) to .env.local, then restart Bops.");
+  assert.equal(chatModelHint(off, { model: "ollama/qwen2.5:3b" }), "Ollama is not connected yet. Ask the person who manages Bops to connect your Ollama server, or choose another model.");
   assert.equal(chatModelHint(on, { model: "ollama/qwen2.5:3b" }), null);
 });
 
@@ -400,7 +400,7 @@ await check("Ollama: OLLAMA_API_KEY, when set, goes as Bearer and never into the
     assert.equal(ollamaGot[0].headers.authorization, "Bearer ol-test-SECRET555");
     ollamaNext.push(() => [{ error: { message: "unauthorized ol-test-SECRET555" } }, 401]);
     const no = await fails({ model: "ollama/qwen2.5:3b", input: "hi" });
-    assert.equal(no.message, "Ollama turned this down: it wants a key. Set OLLAMA_API_KEY in .env.local to the one its proxy expects, then restart Bops.");
+    assert.equal(no.message, "Ollama needs a valid access key. Ask the person who manages Bops to check the Ollama connection, or choose another model.");
     assert.equal(no.status, 401);
     assert.ok(!no.message.includes("SECRET555") && !no.said.includes("SECRET555"));
   } finally {
@@ -443,7 +443,7 @@ await check("Ollama: a model it hasn't pulled, and an address with nothing there
   process.env.OLLAMA_BASE_URL = `http://127.0.0.1:${port}/v1`;
   try {
     const off = await fails({ model: "ollama/qwen2.5:3b", input: "hi" });
-    assert.equal(off.message, `Couldn't reach Ollama at http://127.0.0.1:${port}/v1: check that Ollama is running there, and OLLAMA_BASE_URL in .env.local, then try again.`);
+    assert.equal(off.message, `Couldn't reach Ollama at http://127.0.0.1:${port}/v1: ask the person who manages Bops to check that Ollama is running and its saved address is correct, then try again.`);
     assert.equal(off.status, undefined);
     delete process.env.OLLAMA_BASE_URL;
     assert.equal(P.ollamaBase(), "http://127.0.0.1:11434/v1", "the default address");
@@ -454,7 +454,7 @@ await check("Ollama: a model it hasn't pulled, and an address with nothing there
 
 await check("a provider's no is plain words naming the provider and the fix, with its HTTP status, and never the key", async () => {
   const e401 = await fails({ model: "anthropic/claude-opus-5-5", input: "hi" }, () => json({ type: "error", error: { type: "authentication_error", message: `invalid x-api-key ${KEYS.ANTHROPIC_API_KEY}` } }, 401));
-  assert.equal(e401.message, "Claude turned this down: your Anthropic key isn't valid. Check ANTHROPIC_API_KEY in .env.local, then restart Bops.");
+  assert.equal(e401.message, "Claude turned this down: your Anthropic key isn't valid. Ask the person who manages Bops to reconnect this account, or choose another model.");
   assert.equal(e401.status, 401);
   assert.equal(e401.provider, "anthropic");
 
@@ -476,7 +476,7 @@ await check("a provider's no is plain words naming the provider and the fix, wit
   assert.equal(zaiCn.status, 429);
   assert.equal(zaiCn.provider, "zai-coding-cn");
   const cn401 = await fails({ model: "zai-coding-cn/glm-5.3", input: "hi" }, () => json({ error: { code: "1000", message: `bad key ${KEYS.ZAI_CODING_CN_API_KEY}` } }, 401));
-  assert.equal(cn401.message, "z.ai (China) turned this down: your open.bigmodel.cn key isn't valid. Check ZAI_CODING_CN_API_KEY in .env.local, then restart Bops.");
+  assert.equal(cn401.message, "z.ai (China) turned this down: your open.bigmodel.cn key isn't valid. Ask the person who manages Bops to reconnect this account, or choose another model.");
 
   const busy = await fails({ model: "openrouter/x/y", input: "hi" }, () => json({ error: { message: "Rate limit exceeded" } }, 429));
   assert.match(busy.message, /^OpenRouter is getting too many requests/);
@@ -496,7 +496,7 @@ await check("a provider's no is plain words naming the provider and the fix, wit
 await check("no key, a lost conversation, and no answer at all: said plainly too", async () => {
   delete process.env.DEEPINFRA_API_KEY;
   const none = await fails({ model: "deepinfra/meta/llama", input: "hi" });
-  assert.equal(none.message, "No DeepInfra key is set on this server: add DEEPINFRA_API_KEY to .env.local, then restart Bops. Or pick another model.");
+  assert.equal(none.message, "DeepInfra is not connected. Ask the person who manages Bops to connect it, or pick another model.");
   const lost = await fails({ model: "anthropic/claude-sonnet-5-5", previous_response_id: "resp_gone", input: [{ type: "function_call_output", call_id: "x", output: "y" }] });
   assert.match(lost.message, /^Claude lost track of this reply/);
   assert.equal(lost.status, 410);
@@ -691,7 +691,7 @@ await check("a chat set to Claude whose key is wrong: the chat says so in plain 
   next.push(() => json({ type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } }, 401));
   await Chat.handleMessage(chatId, "Hello?");
   const said = S.getState().messages.filter((m) => m.chatId === chatId && m.role === "bot").at(-1);
-  assert.match(said.text, /Claude turned this down: your Anthropic key isn't valid\. Check ANTHROPIC_API_KEY in \.env\.local/);
+  assert.match(said.text, /Claude turned this down: your Anthropic key isn't valid\. Ask the person who manages Bops to reconnect this account/);
   assert.equal(said.chatError?.kind, "key", "shown as the error card, with Details");
   assert.match(said.chatError.details, /invalid x-api-key/);
 });

@@ -418,7 +418,7 @@ try {
     bops.llms.push({ id: "openrouter/x/gone", name: "Gone", provider: "openrouter", model: "x/gone", account: "NOPE", accountMissing: true });
     await click(row(box, "anthropic/claude-sonnet-5-5").querySelector("[data-job=research]"));
     const gone = row(box, "openrouter/x/gone");
-    assert.match(gone.querySelector("[data-account-missing]").textContent, /add OPENROUTER_API_KEY__NOPE to \.env\.local/);
+    assert.match(gone.querySelector("[data-account-missing]").textContent, /Account not connected\. Choose an available account/);
     assert.ok([...gone.querySelectorAll("select[aria-label=Account] option")].some((o) => o.textContent === "nope (account not found)"));
     assert.ok(!/SECRET|sk-/.test(box.innerHTML), "no key anywhere");
   });

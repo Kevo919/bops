@@ -1,9 +1,10 @@
 "use client";
 
 import { useComputerWords } from "./computer-words";
+import { OpenSettings } from "./open-settings";
 import { InProgress } from "./in-progress";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { BRAINS_ON, signInOn, workBot, workspaceOf, type AppState, type Bot, type BotAi } from "@/lib/types";
 import { aiOf, accountOf, paysLabel } from "@/lib/agents";
 import { brainSignIn } from "./brains";
@@ -1122,8 +1123,8 @@ export function KeysCard() {
             </div>
           ))}
           <a className="text-[12px] underline" href="https://github.com/Kevo919/bops/blob/windows-port/docs/keys.md" target="_blank" rel="noopener noreferrer">How to get keys and set spending limits</a>
-          <p className="text-[12px] text-pencil">A successful authentication check does not guarantee credits or access to every model. After changing .env.local, restart Bops and refresh this list.</p>
-          <p data-accounts-help className="text-[12px] text-pencil">More than one account for a provider (a work and a personal key): to add another account, put a line like <span className="font-mono">OPENROUTER_API_KEY__WORK=...</span> in .env.local (the provider&apos;s key name, two underscores, then a label of A to Z, 0 to 9 and _), and restart Bops. Each account gets its own row and Check here, and you pick it for a model in Models. Bots&apos; tasks on their computers still use the default account.</p>
+          <p className="text-[12px] text-pencil">A successful authentication check does not guarantee credits or access to every model. After the person managing Bops changes an account, restart Bops and refresh this list.</p>
+          <p data-accounts-help className="text-[12px] text-pencil">More than one account for a provider: ask the person who manages this Bops to connect your extra account. Adding extra accounts is not available in this screen yet. Once connected, each account gets its own row and Check here, and you pick it for a model in Models. Bots&apos; tasks on their computers still use the default account.</p>
         </div>
       }
     >
@@ -1140,7 +1141,9 @@ type ModuleInfo = { id: string; name: string; help: string; required: boolean; e
  * Harness's plugins: the AI provider and models, the bots' computers, memory, apps, email, phone and
  * the rest. Saved to config/bops.yaml; Bops restarts to use them. Keys stay in .env.local.
  */
-function ModulesCard() {
+export function ModulesCard() {
+  const openSettings = useContext(OpenSettings);
+  const serviceRows = { email: "mail", phone: "phone", memory: "memory", apps: "apps" } as const;
   const [mods, setMods] = useState<ModuleInfo[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, Record<string, unknown>>>({});
@@ -1165,20 +1168,22 @@ function ModulesCard() {
     <Card
       icon={ICONS.modules}
       title="Modules"
-      line="Every part of Bops you can swap or switch off: the AI provider and models, computers, memory, apps, email, phone and more. Saved in config/bops.yaml; keys stay in .env.local."
+      line="Every part of Bops you can swap or switch off: the AI provider and models, computers, memory, apps, email, phone and more. Your choices are saved on the computer running Bops."
       tone="ok"
       status={`${on} of ${mods.length} on and set up`}
       below={
         <div className="flex flex-col gap-1.5">
           {mods.map((m) => {
             const enabled = Boolean(value(m, "enabled", m.enabled));
+            const service = serviceRows[m.id as keyof typeof serviceRows];
             return (
               <div key={m.id} className="rounded-md px-2 py-1.5 shadow-[0_0_0_1px_var(--h-e6e6e3)]">
                 <div className="flex items-center gap-2">
                   <button onClick={() => setOpen(open === m.id ? null : m.id)} className="flex min-w-0 flex-1 flex-col text-left">
                     <span className="text-[12.5px] font-medium leading-4">{m.name}</span>
-                    <span className="truncate text-[12px] leading-4 text-pencil">{!enabled ? "Off" : m.keysSet ? m.help : `Needs ${m.keys.join(", ")} in .env.local`}</span>
+                    <span className="truncate text-[12px] leading-4 text-pencil">{!enabled ? "Off" : m.keysSet ? m.help : "Not set up yet"}</span>
                   </button>
+                  {enabled && !m.keysSet && service && openSettings && <button data-module-service={service} onClick={() => openSettings("services", { service })} className={light}>Set up in Services</button>}
                   {!m.required && (
                     <label className="flex items-center gap-1 text-[12px]">
                       <input type="checkbox" checked={enabled} onChange={(e) => change(m.id, "enabled", e.target.checked)} />

@@ -2011,7 +2011,7 @@ function SelfHosting({ state }: { state: AppState }) {
     <div className="mt-5 flex flex-col border-t border-[color:var(--h-f0f0ee)] pb-5">
       <div className="flex flex-col gap-0.5 px-[22px] pt-4">
         <span className="text-[15px] font-semibold">Self-hosting</span>
-        <span className="text-[12.5px] leading-[17px] text-[color:var(--ht-6b6b6b)]">Your own provider accounts, set in .env.local. The hosted Bops runs these for its users.</span>
+        <span className="text-[12.5px] leading-[17px] text-[color:var(--ht-6b6b6b)]">Your own provider accounts, connected by the person who manages Bops. The hosted Bops runs these for its users.</span>
       </div>
 
       <div className="flex flex-col gap-2 px-[22px] pt-4">

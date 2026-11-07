@@ -382,8 +382,7 @@ function AccountSelect({
       </select>
       {missing && (
         <span data-account-missing className="text-[color:var(--ht-9a5b00)]">
-          Account not found: add {provider.keyName}__{value} to .env.local, then
-          restart Bops.
+          Account not connected. Choose an available account, or ask the person who manages Bops to connect this one.
         </span>
       )}
     </label>

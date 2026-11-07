@@ -28,6 +28,7 @@ registerHooks({
     }
   },
   load(url, context, next) {
+    if (url.endsWith(".css")) return { format: "module", source: "export default {};", shortCircuit: true };
     if (!url.endsWith(".tsx")) return next(url, context);
     const out = ts.transpileModule(readFileSync(fileURLToPath(url), "utf8"), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, verbatimModuleSyntax: false }, fileName: url });
     return { format: "module", source: out.outputText, shortCircuit: true };
@@ -40,6 +41,8 @@ const { parseHTML } = await import("linkedom");
 const { window: win } = parseHTML("<!doctype html><html><body></body></html>");
 const doc = win.document;
 globalThis.window = globalThis;
+globalThis.addEventListener = win.addEventListener.bind(win);
+globalThis.removeEventListener = win.removeEventListener.bind(win);
 globalThis.document = doc;
 Object.defineProperty(globalThis, "navigator", { configurable: true, value: { userAgent: "test" } });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -112,12 +115,11 @@ try {
     assert.match(text, /3 of 4 set up/);
     const links = Object.fromEntries(CONNECTIONS.map((c) => [c.key, [...row(c.key).querySelectorAll("a")].map((a) => a.getAttribute("href"))]));
     assert.deepEqual(links, { COMPOSIO_API_KEY: ["https://composio.dev"], COMPOSIO_MCP_URL: ["https://composio.dev"], ZAPIER_MCP_URL: ["https://mcp.zapier.com"], OPENROUTER_API_KEY: ["https://openrouter.ai/keys"] });
-    // Built from parts, so the line doesn't read as NAME=value to the history's secret scan.
-    const line = (name, value) => [name, value].join("=");
-    for (const [key, words] of [["COMPOSIO_API_KEY", line("COMPOSIO_API_KEY", "your_key")], ["ZAPIER_MCP_URL", line("ZAPIER_MCP_URL", "that_url")], ["OPENROUTER_API_KEY", line("OPENROUTER_API_KEY", "your_key")], ["COMPOSIO_MCP_URL", `${line("COMPOSIO_MCP_URL", "")} followed by the address`]]) {
-      assert.ok(row(key).textContent.includes(words), `${key}: what to paste`);
-      assert.ok(row(key).textContent.includes(".env.local"), `${key}: where`);
+    for (const key of ["COMPOSIO_API_KEY", "COMPOSIO_MCP_URL", "ZAPIER_MCP_URL"]) {
+      assert.match(row(key).textContent, /Settings, Services/, `${key}: supported setup screen`);
     }
+    assert.match(row("OPENROUTER_API_KEY").textContent, /not available in Services yet/);
+    assert.ok(!text.includes(".env.local"), "no developer file instructions");
     assert.match(row("ZAPIER_MCP_URL").textContent, /not for team members, Telegram, Discord/);
     assert.match(row("OPENROUTER_API_KEY").textContent, /:free/);
     assert.ok(!box.querySelector("[data-connection=OPENAI_API_KEY]"), "only these four");
@@ -146,8 +148,8 @@ try {
 
   await test("Composio (your account): plain steps, shown only masked, and Check lists what it found", async () => {
     const r = row("COMPOSIO_MCP_URL");
-    assert.match(r.textContent, /In Composio, open For You, then Connect my agent, copy the address, paste it here/);
-    assert.match(r.textContent, /COMPOSIO_MCP_KEY= followed by the key/);
+    assert.match(r.textContent, /In Composio, open For You, then Connect my agent/);
+    assert.match(r.textContent, /Copy its address and any key it provides into Settings, Services/);
     assert.match(r.textContent, /sends, changes, deletes or pays asks you first/);
     assert.match(r.textContent, /not for team members, Telegram, Discord/);
     assert.equal(r.querySelector("[data-shown]").textContent, "Saved: connect.composio.dev/mcp, key ck_•••••••• saved");
@@ -168,6 +170,21 @@ try {
   await test("in Settings, This Mac: Connections comes right after Models (Keys, Models, Connections)", async () => {
     const setup = readFileSync(`${rootPath}/components/app/setup.tsx`, "utf8");
     assert.match(setup, /<KeysCard \/>\s*<\/div>\s*<ModelsCard \/>\s*<ConnectionsCard state=\{state\} \/>/);
+  });
+
+  await test("missing modules open their actual Services rows and unsupported modules have no false link", async () => {
+    const { ModulesCard } = await import(`${rootUrl}/components/app/setup.tsx`);
+    const { OpenSettings } = await import(`${rootUrl}/components/app/open-settings.ts`);
+    const modules = ["email", "phone", "memory", "apps", "computers"].map(id => ({ id, name: id, enabled: true, keysSet: false, keys: ["TEST_KEY"], settings: [], help: "Test" }));
+    globalThis.fetch = async url => { assert.equal(url, "/api/modules"); return json({ modules }); };
+    const calls = [];
+    await act(async () => { root.render(h(OpenSettings.Provider, { value: (...args) => calls.push(args) }, h(ModulesCard))); await settle(); });
+    assert.ok(!box.textContent.includes(".env.local"));
+    assert.ok(!box.textContent.includes("TEST_KEY"));
+    const links = [...box.querySelectorAll("[data-module-service]")];
+    assert.deepEqual(links.map(b => b.getAttribute("data-module-service")), ["mail", "phone", "memory", "apps"]);
+    for (const b of links) await click(b);
+    assert.deepEqual(calls, ["mail", "phone", "memory", "apps"].map(service => ["services", { service }]));
   });
 
   console.log(`PASS: ${passed} Connections card UI checks (fake Bops, no server)`);
