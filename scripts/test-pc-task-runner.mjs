@@ -45,6 +45,12 @@ writeFileSync(
 const fs = require("node:fs"), path = require("node:path");
 if (process.argv[2] === "--help") {
   const flags = ["--restricted", "--setting-sources", "--settings", "--tools", "--permission-prompt-tool", "--strict-mcp-config", "--disallowedTools"];
+  if (process.env.FAKE_PREFIX_CLAUDE) {
+    // Flags whose names merely CONTAIN the needed ones: a substring check would wrongly pass.
+    const lookalikes = { "--restricted": "--restricted-mode", "--tools": "--toolset-listing", "--permission-prompt-tool": "--permission-prompt-tooling" };
+    process.stdout.write(flags.map((f) => lookalikes[f] ?? f).join("\n") + "\n");
+    process.exit(0);
+  }
   process.stdout.write((process.env.FAKE_OLD_CLAUDE ? flags.slice(4) : flags).join("\\n") + "\\n");
   process.exit(0);
 }
@@ -261,7 +267,39 @@ await test("an older Claude Code without those flags isn't run", async () => {
   assert.equal(runner.claudeSupportsTasks(old, { ...runtime.env, FAKE_OLD_CLAUDE: "1" }), false);
   assert.equal(runner.claudeSupportsTasks(join(bin, "none"), runtime.env), false);
   assert.match(runner.PC_WORDS.update, /Update it \(run claude update\)/);
+  // Flags that merely contain the needed names prove nothing: each must be its own word in the help.
+  const lookalike = join(bin, "lookalike-claude");
+  writeFileSync(lookalike, readFileSync(fake, "utf8"));
+  chmodSync(lookalike, 0o755);
+  assert.equal(runner.claudeSupportsTasks(lookalike, { ...runtime.env, FAKE_PREFIX_CLAUDE: "1" }), false, "a lookalike flag name isn't the flag");
 });
+
+await test("a search whose pattern walks out of its folder asks, wherever its path argument points", async () => {
+  const ws = { workspace, origins: new Set() };
+  assert.deepEqual(runner.pcDecision(ws, "Glob", { path: ".", pattern: "**/*.md" }), { behavior: "allow" });
+  assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "../../*.md" }), { behavior: "ask" }, ".. walks out");
+  assert.deepEqual(runner.pcDecision(ws, "Glob", { path: workspace, pattern: "C:/Users/*" }), { behavior: "ask" }, "absolute walks out");
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "secret", glob: "*.env" }), { behavior: "allow" });
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "secret", glob: "..\other/*" }), { behavior: "ask" }, "backslash .. walks out");
+  assert.deepEqual(runner.pcDecision(ws, "Grep", { path: workspace, pattern: "secret", glob: "/etc/*" }), { behavior: "ask" });
+});
+
+if (process.platform === "win32")
+  await test("the job sitter ends what a turn started when the process that owns the job is gone (Windows)", async () => {
+    const held = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+    const owner = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"], { stdio: "ignore" });
+    await new Promise((r) => setTimeout(r, 300));
+    const sitter = spawn(join(process.env.SystemRoot ?? "C:\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), [
+      "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", join(root, "vm", "win-job-sitter.ps1"), "-Child", String(held.pid), "-Parent", String(owner.pid),
+    ], { stdio: "ignore", windowsHide: true });
+    await new Promise((r) => setTimeout(r, 2500)); // the sitter makes the job and joins the child to it
+    owner.kill();                                   // the owner dies: the sitter leaves, the job handle closes
+    await new Promise((r) => setTimeout(r, 3000));
+    const alive = () => { try { process.kill(held.pid, 0); return true; } catch { return false; } };
+    assert.equal(alive(), false, "the held process ended with the job");
+    sitter.kill();
+    if (alive()) held.kill();
+  });
 
 await test("a user settings file allowing Bash, with a hook and a key, takes no effect", async () => {
   // As the real CLI would find it, in the HOME Claude Code runs with.

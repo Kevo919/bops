@@ -153,7 +153,8 @@ export const CLAUDE_SETTINGS = {
 export const REQUIRED_FLAGS = ["--restricted", "--setting-sources", "--settings", "--tools", "--permission-prompt-tool", "--strict-mcp-config", "--disallowedTools"];
 
 const helpChecked = new Map<string, boolean>();
-/** Whether this claude knows every flag in REQUIRED_FLAGS (its --help, once per binary and its change). */
+/** Whether this claude knows every flag in REQUIRED_FLAGS (its --help, once per binary and its change): each flag
+ *  as its own word in the help, not a substring of another flag's name (`--tools` isn't proved by `--toolsets`). */
 export function claudeSupportsTasks(claude: string, env: NodeJS.ProcessEnv): boolean {
   let stamp = claude;
   try {
@@ -166,7 +167,8 @@ export function claudeSupportsTasks(claude: string, env: NodeJS.ProcessEnv): boo
   let ok = false;
   try {
     const help = execFileSync(claude, ["--help"], { env, encoding: "utf8", timeout: 15_000, windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
-    ok = REQUIRED_FLAGS.every((f) => help.includes(f));
+    const words = new Set(help.split(/\s+/).map((w) => w.replace(/^[[("'{]+/, "").replace(/[\])}"'`,.;:]+$/, "")));
+    ok = REQUIRED_FLAGS.every((f) => words.has(f));
   } catch {
     ok = false;
   }
@@ -259,6 +261,18 @@ export const siteOf = (tool: string, input: Record<string, unknown>) =>
   tool === "WebFetch" || tool === "mcp__browser__browser_navigate" || tool === "mcp__browser__browser_tabs" ? originOf(input.url) : undefined;
 
 /**
+ * Whether a glob pattern stays where it was put (Glob's `pattern`, which says what to find, and Grep's `glob`,
+ * which filters the files searched): no `..` segment and no absolute path, either of which would walk the search
+ * out of the folder the tool was given. Nothing to check counts as staying put (the path itself is still checked).
+ */
+export const patternStaysPut = (pattern: unknown): boolean => {
+  if (typeof pattern !== "string" || !pattern) return true;
+  const p = pattern.replace(/\\/g, "/");
+  if (p.startsWith("/") || p.startsWith("~") || /^[A-Za-z]:/.test(p)) return false;
+  return !p.split("/").includes("..");
+};
+
+/**
  * What the approve path does for a task's tool before any card: "allow" (a file inside its workspace, a site the
  * owner already allowed in this task), "deny" with why (a write outside its workspace, a site that isn't a web
  * page), or "ask" the owner.
@@ -266,6 +280,9 @@ export const siteOf = (tool: string, input: Record<string, unknown>) =>
 export function pcDecision(t: Pick<PcThread, "workspace" | "origins">, tool: string, input: Record<string, unknown>): { behavior: "allow" } | { behavior: "deny"; message: string } | { behavior: "ask" } {
   const file = FILE_TOOLS[tool];
   if (file) {
+    // A search whose pattern walks out of the folder it was given is a read outside it: ask, whichever folder
+    // the tool's own path argument named.
+    if ((tool === "Glob" || tool === "Grep") && !(patternStaysPut(input.pattern) && patternStaysPut(input.glob))) return { behavior: "ask" };
     const target = typeof input[file.key] === "string" && input[file.key] ? String(input[file.key]) : ".";
     if (insideWorkspace(t.workspace, target)) return { behavior: "allow" };
     return file.writes ? { behavior: "deny", message: "Files outside this task's folder can't be changed. Keep your work in your working folder." } : { behavior: "ask" };
@@ -310,6 +327,27 @@ export function claudeFailure(text: string): string {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * On Windows, hold a Job Object (kill on close) on the turn's Claude Code (vm/win-job-sitter.ps1): whatever it
+ * starts joins the job, so nothing of the turn outlives it even if Bops dies before Stop. Fire and forget: when
+ * the sitter can't run, stopClaude's taskkill of the whole tree is still what ends a turn's processes.
+ */
+function startJobSitter(claudePid: number): void {
+  if (process.platform !== "win32") return;
+  const powershell = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const script = join(process.cwd(), "vm", "win-job-sitter.ps1");
+  try {
+    const sitter = spawn(powershell, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-Child", String(claudePid), "-Parent", String(process.pid)], {
+      stdio: "ignore",
+      windowsHide: true,
+      detached: true,
+    });
+    sitter.unref();
+  } catch {
+    /* taskkill at the stop remains */
+  }
+}
 /** Whether any process of a POSIX process group is still there. */
 const groupAlive = (pid: number) => {
   try {
@@ -323,7 +361,8 @@ const exited = (child: ChildProcess) => new Promise<void>((r) => (child.exitCode
 
 /**
  * Stop a turn's Claude Code and whatever it started (its MCP servers, what its shell ran), and resolve only once
- * they're gone: on Windows its whole tree (taskkill /T /F, finished, then Claude Code's own exit); elsewhere its
+ * they're gone: on Windows its whole tree (taskkill /T /F, finished, then Claude Code's own exit; the turn's Job
+ * Object, startJobSitter, is the backstop that ends them anyway if Bops goes down first); elsewhere its
  * process group (spawned detached), SIGTERM, then SIGKILL after `graceMs`, until no process of the group is left.
  * Resolves false when something was still there after all that, so the caller says so rather than going on.
  */
@@ -382,6 +421,7 @@ export function runClaudeTurn(o: {
     } catch {
       return reject(new PcTaskError(PC_WORDS.noClaude));
     }
+    if (child.pid) startJobSitter(child.pid);
     const out = new StringDecoder("utf8");
     const err = new StringDecoder("utf8");
     let buf = "";
