@@ -221,3 +221,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 12:53 lead: #115 re-review = APPROVE WITH NITS (CI green incl. gitleaks); merge-when-green running. Nit filed as task 91.
 - 12:53 lead: merged #115 (chat error cards, Claude readiness, gitleaks fingerprint) at d4b6782. #113, #116 and #117 updated to the new base.
 - 12:54 lead: #113 re-review = REQUEST CHANGES (sitter attaches late so children escape; a sitter failure kills the turn; DLL cache never rebuilds; Node logging; glob brace bypass). Notes in messages 1315.
+- 13:19 lead: status update sent to Kevin (about 80%, ETA Sun Nov 8). Codex asked to review agent-desktop-hub PR #1. #116 re-review is running; #117 builder is fixing; #113 is back with zai (round 2).
