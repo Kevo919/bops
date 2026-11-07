@@ -1,5 +1,5 @@
-import { ownerPlatformOf } from "../lib/owner-platform.ts";
-export { ownerPlatformOf } from "../lib/owner-platform.ts";
+import { ownerPlatformOf } from "./owner-platform.ts";
+export { ownerPlatformOf } from "./owner-platform.ts";
 import { createHash } from "node:crypto";
 import { appsOpenTo } from "./apps-team.ts";
 import { accessOf, adminAccess, appsLevelOf, currentFor, isAccessLevel, levelOf, permits, seesChat, usesComputer, type AccessLevel, type MemberAccess, type MemberAccessMap } from "./member-access.ts";

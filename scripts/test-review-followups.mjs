@@ -32,7 +32,7 @@ for (const file of ['briefing.ts','sessions.ts','chat.ts']) check('92: ' + file 
   assert.ok(!local, 'modules use the shared owner-platform helper');
 });
 check('92: synced owner platforms resolve consistently and mixed owners stay neutral', () => {
-  const code=declaration('lib/owner-platform.ts','ownerPlatformOf')+declaration('lib/server/owner-platform.ts','ownPlatform');
+  const code=declaration('cloud/owner-platform.ts','ownerPlatformOf')+declaration('lib/server/owner-platform.ts','ownPlatform');
   for (const [state, expected] of [
     [{macs:{a:{mac:{platform:'win32'}}}},'win32'],
     [{macs:{a:{mac:{platform:'darwin'}}}},'darwin'],

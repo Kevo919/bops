@@ -1,5 +1,5 @@
 import "server-only";
-import { ownerPlatformOf } from "@/lib/owner-platform";
+import { ownerPlatformOf } from "@/cloud/owner-platform";
 import { getState } from "./store";
 import { onRunner } from "./persist";
 import { currentTurn } from "./turn-context";
