@@ -439,6 +439,17 @@ await test("round 3: a go file that can't be written after the assign fails like
   assert.equal(runner.launcherFailure(1, "Not logged in · Please run /login", true), undefined, "a CLI that ran keeps its own failure words");
 });
 
+await test("round 3: the sitter is spawned without detached (DETACHED_PROCESS gives powershell no console, so the script never runs)", async () => {
+  const o = runner.SITTER_SPAWN_OPTIONS;
+  assert.notEqual(o.detached, true, "detached must stay off");
+  assert.equal(o.windowsHide, true);
+  assert.equal(o.stdio, "ignore");
+  const src = readFileSync(join(root, "lib", "server", "pc-task-runner.ts"), "utf8");
+  const started = src.slice(src.lastIndexOf("started: (launcherPid: number) =>"), src.lastIndexOf("wentAhead: () =>"));
+  assert.match(started, /spawn\(powershell, \[[^\]]*\], SITTER_SPAWN_OPTIONS\)/, "the sitter's spawn uses those options");
+  assert.doesNotMatch(started, /detached/);
+});
+
 await test("round 3: the sitter's late exit after the turn is over writes no marker and warns nothing", { skip: process.platform === "win32" }, async () => {
   // A stand-in powershell.exe (under a fake SystemRoot) that exits 1 a moment after it starts, as a sitter does
   // when its launcher ends.

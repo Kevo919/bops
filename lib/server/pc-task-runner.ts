@@ -385,6 +385,14 @@ export function launcherFailure(code: number | null, errTail: string, wentAhead 
   return undefined;
 }
 
+/**
+ * How the sitter is spawned. Never `detached`: on Windows that's DETACHED_PROCESS, and powershell.exe with no
+ * console exits 0 in about 80 ms without running the script at all (seen on a real PC: no go file, no marker,
+ * every turn waited out the cap). It doesn't need detaching either: it watches Bops' handle itself, and Node on
+ * Windows doesn't end a child when its parent dies. windowsHide keeps its console window from showing.
+ */
+export const SITTER_SPAWN_OPTIONS = { stdio: "ignore", windowsHide: true } as const;
+
 /** How long the launcher waits for the sitter's word (cold PowerShell plus the first Add-Type compile). */
 export const JOB_WAIT_MS = 30_000;
 
@@ -442,11 +450,7 @@ export function windowsJobTurn(
     goFile,
     started: (launcherPid: number) => {
       try {
-        const sitter = spawn(powershell, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", sitterScript, "-Child", String(launcherPid), "-Parent", String(process.pid), "-GoFile", goFile], {
-          stdio: "ignore",
-          windowsHide: true,
-          detached: true,
-        });
+        const sitter = spawn(powershell, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", sitterScript, "-Child", String(launcherPid), "-Parent", String(process.pid), "-GoFile", goFile], SITTER_SPAWN_OPTIONS);
         sitter.once("error", (e: Error) => failed(`couldn't start (${e.message})`));
         sitter.once("exit", (code: number | null) => {
           // Gone before it said go: whatever the reason (its log says which step gave), the launcher stops now.
