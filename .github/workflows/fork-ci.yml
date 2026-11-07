@@ -118,6 +118,8 @@ jobs:
         run: node --conditions=react-server scripts/test-bot-docs.mjs
       - name: Bot SOUL.md and MEMORY.md UI tests
         run: node scripts/test-bot-docs-ui.mjs
+      - name: Bot full settings page UI tests
+        run: node scripts/test-bot-settings-ui.mjs
       - name: Cron schedule tests
         run: node scripts/test-cron.mjs
       - name: Schedule tests
@@ -136,6 +138,10 @@ jobs:
         run: node --conditions=react-server scripts/test-hosted-apps.mjs
       - name: Runner mode (what a computer's runner runs) tests
         run: node --conditions=react-server scripts/test-runner-mode.mjs
+      - name: Bops Cloud (session, providers, state, tunnel, a fake cloud) tests
+        run: node --conditions=react-server scripts/test-cloud.mjs
+      - name: Workspaces shared with the user (read only, Write, every card by role) tests
+        run: node scripts/test-shared.mjs
 
   # The web UI in a phone-sized window (scripts/test-mobile-layout.mjs): a production build served on loopback, a made-up
   # Orgo, Playwright's Chromium. Its own job, so the build doesn't hold up the web job's tests.

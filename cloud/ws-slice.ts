@@ -553,7 +553,21 @@ export function sharedSlice(blob: Record<string, unknown>, ws: string, viewer: S
     // The owner's Bops takes an Admin's acts (members.ts adminGate), said to anyone but the owner: an Admin answers the
     // owner's own asks then, and a Member's window says an Admin can. An Admin's says when it can't yet (ownerOld).
     ...(access && viewer.adminActs ? { adminActs: true as const } : access && viewer.role === "admin" ? { ownerOld: true as const } : {}),
+    // What the owner's computer is, so their window doesn't call a PC a Mac (ownerPlatformOf).
+    ...(access && ownerPlatformOf(blob) ? { platform: ownerPlatformOf(blob) } : {}),
   };
+}
+
+const PLATFORMS = ["win32", "darwin", "linux"] as const;
+/**
+ * The operating system the owner's Bops runs on, as each of their computers said it (state.macs[device].mac.platform,
+ * lib/server/mac.ts checkMac): the one they all say, else none (none said yet, or a Mac and a PC both: "the owner's
+ * computer" is true of either).
+ */
+export function ownerPlatformOf(blob: Record<string, unknown>): (typeof PLATFORMS)[number] | undefined {
+  const macs = isObject(blob.macs) ? Object.values(blob.macs) : [];
+  const said = new Set(macs.flatMap((m) => (isObject(m) && isObject(m.mac) && PLATFORMS.includes(m.mac.platform as never) ? [m.mac.platform as (typeof PLATFORMS)[number]] : [])));
+  return said.size === 1 ? [...said][0] : undefined;
 }
 
 /**
