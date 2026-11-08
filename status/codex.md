@@ -1,7 +1,6 @@
 # Codex status
-2026-11-08T04:18Z: Task27(a) PR126 e46cea6 ready. Hook always503; no execution/provisioning. HMAC bounded admission/ledger, timeout/abort/rates, exactPOST proxy and CI suite. Local9 boundarygroups + proxy pass, signature negative fails as expected, targetedlint/diff pass. Independent security review APPROVE after fixes. All seven CI checks passed; full local checks deferred low RAM. No UI/heavybuild/merge.
+2026-11-08T05:18Z: PR126 still open, lead security review pending. Prepared read-only task27(b) permission map in tests/2026-11-08-codex-task27b-permission-map.md. Many task/tool/automatic delivery paths need explicit overrides; proposes local chat/in-app output plus one freshly approved send_email operation, blocks other paths. Lead confirmation requested. No code/test/UI/build/merge this run.
 ## Needs Kevin
-No new request.
+No new request. Lead owns queued PC work; board reports PC asleep.
 ## Next
-Lead security review/merge next; later slices separate. Hourly bops-hourly-build-check run codex-1108-0410 active.
-
+Address126 review, then approved(b) implementation scope. Hourly bops-hourly-build-check run codex-1108-0515; ownedlock released on exit.

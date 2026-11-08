@@ -1,0 +1,1 @@
+PR126 remains open. Prepared task27(b) permission map: tests/2026-11-08-codex-task27b-permission-map.md. Recommend failclosed localchat/inapp result plus send_email fresh exact approval first; generic Windows/cloud tasks blocked until real engine enforcement. Please confirm narrow subset or next runner/action priority. No code changes while126 securityreview pending.
