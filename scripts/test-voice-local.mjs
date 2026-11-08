@@ -331,7 +331,7 @@ await check("config/modules.cjs carries the voice-local module: settings, the do
   assert.doesNotMatch(m.help, /nothing leaves this machine/, "no promise the address can't keep");
   assert.match(m.help, /--inference-path \/v1\/audio\/transcriptions/, "whisper.cpp's route, said");
   const example = readFileSync(new URL("config/bops.example.yaml", rootUrl), "utf8");
-  assert.match(example, /^# voice-local:\n#   enabled: true\n#   baseURL:.*\n#   model: whisper-1.*\n#   whenDown: error/m, "bops.example.yaml lists it");
+  assert.match(example, /^# voice-local:\r?\n#   enabled: true\r?\n#   baseURL:.*\r?\n#   model: whisper-1.*\r?\n#   whenDown: error/m, "bops.example.yaml lists it");
   process.env.VOICE_LOCAL_BASE_URL = "";
   assert.equal(V.voiceLocalOn(), false, "an empty address is off");
 });
