@@ -77,7 +77,9 @@ if (process.argv[2] === "-i") {
   { mode: 0o755 },
 );
 process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
-const keychain = () => readdirSync(join(scratch, "keychain")).map(decodeURIComponent).sort();
+// The vault is one encrypted file now (secret-file.ts), not a keychain folder: this lists the
+// account names it holds, the way the old folder's file names did.
+const vaultAccounts = async () => Object.keys(JSON.parse(readFileSync(join(scratch, ".data", "secrets.enc.json"), "utf8"))).map(decodeURIComponent).sort();
 
 const freePort = () =>
   new Promise((resolve) => {
@@ -330,7 +332,7 @@ try {
   const img = Up.saveUpload(`data:image/png;base64,${Buffer.from("a-image").toString("base64")}`);
   assert.ok(Up.uploadPath(img.id).path.includes(join(".data", "users", U.scopeOf(A), "uploads")), "A's image in A's folder");
   await K.setUserSecret("login_a1:password", "a-secret");
-  assert.ok(keychain().includes(`${A}:login_a1:password`), "A's vault password under A's name");
+  assert.ok((await vaultAccounts()).includes(`${A}:login_a1:password`), "A's vault password under A's name");
   assert.equal(await S.flushState(10_000), true);
   noStateFile("signed in, nothing is written to a state file");
   const aMessages = await cloudMessages(A);
@@ -363,7 +365,7 @@ try {
   assert.equal(S.stateReady(), false);
   assert.equal(S.getState().account, undefined);
   assert.equal(texts().length, 0, "A's chats left memory");
-  assert.equal(keychain().includes("orgo-api-key"), false, "A's key left the Keychain");
+  assert.equal((await vaultAccounts()).includes("orgo-api-key"), false, "A's key left the Keychain");
 
   await signIn(B);
   assert.equal(texts().some((t) => t.startsWith("A:") || t === LEGACY_TEXT || t === "Booked for Tuesday."), false, "none of A's chats");
@@ -435,7 +437,7 @@ try {
   await assert.rejects(L.pollSignIn(), (e) => e instanceof L.SignInError && e.reason === "cloud", "Couldn't load your Bops from Bops Cloud");
   assert.equal(S.stateReady(), false);
   assert.equal(S.getState().account, undefined);
-  assert.equal(keychain().includes("orgo-api-key"), false, "the key isn't kept until the state loads");
+  assert.equal((await vaultAccounts()).includes("orgo-api-key"), false, "the key isn't kept until the state loads");
   await startCloudServer();
   // Try again: the key Orgo gave is still held, so no new code.
   const again = await L.pollSignIn();
