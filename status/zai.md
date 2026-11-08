@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** Task 90 (branch 74363d3): rail 11 ok, footer 19 ok, voice-local 15 - all GREEN this run-set; 5 of the audit's 39 red now green. Next: Postgres pair (throwaway PG), then the remaining ~30. #113 closed; #122 carries that work.
+**On:** Task 90 (branch 19b1a0b): delete-messages-cloud GREEN (PG prerequisite proven); profiles vault-modernized to its SIGSTOP platform line. 6/39 green. Next: the remaining ~29 (wording/UI classes first).
 **Calls:** none placed (lead's standing rule).
 **Blockers:** none of mine.
-**Updated (UTC):** 2026-11-08 01:15
+**Updated (UTC):** 2026-11-08 02:45
