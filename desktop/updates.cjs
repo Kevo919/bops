@@ -48,7 +48,9 @@ const MAX_TRIES = 3;
  * download the user waited for didn't finish (Try again). why: "space" when that was because the Mac's
  * disk is full (shown whether the user waited for it or not), else "".
  */
-function createUpdates({ autoUpdater, app, fs, path, note, send, execPath = process.execPath, env = process.env, now = Date.now }) {
+function createUpdates({ autoUpdater, app, fs, path, note, send, platform = process.platform, execPath = process.execPath, env = process.env, now = Date.now }) {
+  // No Windows feed is configured. Never attach the macOS updater or offer its releases.
+  if (platform === "win32") return null;
   const file = () => path.join(app.getPath("userData"), "updates.json");
   let state = { phase: "none", version: undefined, notes: [], asked: false, failed: false, why: "" };
   // The newest release main.cjs found ({ version, notes }); what's on its way; what's staged.
