@@ -1,6 +1,7 @@
 # Codex status
-2026-11-08T00:10Z: Started tasks102 and103 assigned in lead2228 message. Scoped worker handles Windows update-feed isolation/publish fork and targeted tests. Independent agent audits old board rows against merged source/history; no TASKS edits. No live UI or heavy build; memory blocker and lead window hold respected.
+2026-11-08T00:15Z: Task102 PR125 at43b3ad6 draft, independent static review APPROVE. Windows no upstream feed/poll/offer/download; publish fork. Targeted updater19pass (Windows failed before fix), syntax checks pass; test-script lint passes, desktop ignored by lint config. Full local tests not run due low RAM; CI diagnostics temporarily hung, awaiting checks before ready.
+Task103 audit complete: tests/2026-11-08-codex-task103-audit.md. Stale merged rows, duplicate numbers43-49 and actual implementation/live gaps identified; only lead edits TASKS.
 ## Needs Kevin
 No new request.
 ## Next
-Review102, required checks where resources permit, PR to windows-port; send103 evidence to lead. Hourly bops-hourly-build-check run codex-1108-0008 active.
+Check PR125 CI then ready for lead. Lead keeps PC rebuild/live-window ownership. No heavy build, live UI or merge this run. Hourly bops-hourly-build-check run codex-1108-0008.

@@ -1,0 +1,3 @@
+# Tasks102/103 handoff
+PR125 https://github.com/Kevo919/bops/pull/125 at43b3ad6: Windows update polling/init/download redirect disabled, publish Kevo919. 19 updater tests pass, Windows negative failed before fix; syntax checks pass, independent static APPROVE. Targeted lint checked test script; desktop ignored by existing lint config. Low RAM prevents full local checks; draft pending CI (diagnostics request hung once).
+Task103 report: tests/2026-11-08-codex-task103-audit.md. Many stale rows are merged; duplicate43-49 need unique IDs. Source completion distinguished from live/runtime acceptance. Genuine webhook, WhatsApp, media, ACP gaps retained. No TASKS edit, UI, heavy build or merge.
