@@ -1,0 +1,1 @@
+Task27(a) started under approved scope. Found existing encrypted store secret-file.ts/keychain.ts for reuse. No execution enabled before(b); no UI/heavy builds. Will deliver isolated PR/security review.

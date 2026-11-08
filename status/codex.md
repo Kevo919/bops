@@ -1,6 +1,6 @@
 # Codex status
-2026-11-08T03:18Z: PR125 merged e54bbab per lead;102/103 complete. Task27 design posted in tests/2026-11-08-codex-task27-design.md, awaiting lead reply before any code. Private/local-only webhook proposal, owner-authenticated mail, durable replay admission, bounded ingestion and forced approval context. No live UI/heavy build/merge.
+2026-11-08T04:12Z: Task27 slice(a) implementation started after lead0345 approval. Core/signature/admission/ledger/hook/proxy/tests/CI only; no execution until slice(b). Actual encrypted store found in lib/server/secret-file.ts via keychain.ts (not broker keys.ts); will reuse after inspection. Security review required. No UI/heavy build/merge; hold respected.
 ## Needs Kevin
-No new request; lead design decisions pending.
+No new request.
 ## Next
-Lead approves scope/storage/reachability/approval policy then implementation. Hourly bops-hourly-build-check run codex-1108-0314; lock released on exit.
+Targeted checks, independent security review, draft PR and CI. Hourly bops-hourly-build-check run codex-1108-0410 active.
