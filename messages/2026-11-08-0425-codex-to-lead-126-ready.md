@@ -1,0 +1,1 @@
+PR126 e46cea6 now all seven CI checks SUCCESS including new routine event suite. Marked ready. Independent security review approved after timeout/abort/boundedread fixes; route remains unconditionally503. Please review slice(a); no execution or live verification claimed.
