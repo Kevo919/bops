@@ -75,6 +75,14 @@ const v92 = { version: "0.0.92", notes: [] };
 
 // Run the real main-process update handlers without starting Electron or a window.
 const mainSource = readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
+function mainBlock(startMarker, endMarker) {
+  const start = mainSource.indexOf(startMarker);
+  const end = mainSource.indexOf(endMarker);
+  assert.notEqual(start, -1, `main.cjs missing start marker: ${startMarker}`);
+  assert.notEqual(end, -1, `main.cjs missing end marker: ${endMarker}`);
+  assert.ok(end > start, `main.cjs markers out of order: ${startMarker} / ${endMarker}`);
+  return mainSource.slice(start, end);
+}
 for (const platform of ["win32", "darwin"]) {
   const handlers = new Map();
   const fetched = [], opened = [];
@@ -85,7 +93,7 @@ for (const platform of ["win32", "darwin"]) {
     shell: { openExternal: (url) => opened.push(url) },
     fetch: async (url) => { fetched.push(url); return { ok: true, text: async () => JSON.stringify({ version: "9.9.9", notes: [] }) }; },
   });
-  vm.runInContext(mainSource.slice(mainSource.indexOf('const LATEST_URL ='), mainSource.indexOf('app.setName("Bops")')), context);
+  vm.runInContext(mainBlock('const LATEST_URL =', 'app.setName("Bops")'), context);
   await vm.runInContext("checkForUpdate()", context);
   handlers.get("update-download")();
   assert.deepEqual(fetched, platform === "win32" ? [] : [FEED_URL]);
@@ -97,7 +105,7 @@ for (const platform of ["win32", "darwin"]) {
   }
   // Execute release initialization too: Windows must not schedule hourly polling.
   let initialized = 0, timers = 0, checks = 0;
-  const readyBlock = mainSource.slice(mainSource.indexOf('  // Release builds only:'), mainSource.indexOf('  // The apps the bots make:'));
+  const readyBlock = mainBlock('  // Release builds only:', '  // The apps the bots make:');
   vm.runInNewContext(readyBlock, {
     process: { platform }, isRelease: () => true,
     createUpdates: () => { initialized++; return {}; }, autoUpdater: {}, app: {}, fs: {}, path,
