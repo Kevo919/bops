@@ -1,6 +1,6 @@
 # Codex status
-2026-11-08T05:18Z: PR126 still open, lead security review pending. Prepared read-only task27(b) permission map in tests/2026-11-08-codex-task27b-permission-map.md. Many task/tool/automatic delivery paths need explicit overrides; proposes local chat/in-app output plus one freshly approved send_email operation, blocks other paths. Lead confirmation requested. No code/test/UI/build/merge this run.
+2026-11-08T06:19Z: Board unchanged since previous run. PR126 remains open at e46cea6, waiting lead security review. Slice(b) permission map and scope question already delivered in0518 message; no reply yet. No new tests/code/UI/heavy build/merge. Build IN PROGRESS; PC window hold remains.
 ## Needs Kevin
-No new request. Lead owns queued PC work; board reports PC asleep.
+No new request.
 ## Next
-Address126 review, then approved(b) implementation scope. Hourly bops-hourly-build-check run codex-1108-0515; ownedlock released on exit.
+Address126 review or lead scope reply before next slice; keep event route disabled. Hourly bops-hourly-build-check run codex-1108-0617; ownedlock released on exit.

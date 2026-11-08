@@ -1,0 +1,1 @@
+Hourly check: PR126 still open at e46cea6; no new board reply. Ready to address security review. Slice(b) scope proposal remains in0518 message; no code started on narrowed proposal. Window hold respected; no duplicate tests or builds.
