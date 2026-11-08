@@ -1356,6 +1356,8 @@ function updateInfo() {
 const sendUpdate = () => mainWin && !mainWin.isDestroyed() && mainWin.webContents.send("update", updateInfo());
 
 async function checkForUpdate() {
+  // The upstream feed contains macOS releases, not this Windows fork.
+  if (process.platform === "win32") return;
   try {
     // The same file the download reads (a test build may point both at this Mac: BOPS_UPDATE_FEED).
     const feed = updates?.feedUrl() ?? LATEST_URL;
@@ -1391,6 +1393,7 @@ ipcMain.handle("update-dismiss", (_, version) => {
 });
 // Download: in the app, or on bops.bot for a copy that can't replace itself. Also the notice's Try again.
 ipcMain.handle("update-download", () => {
+  if (process.platform === "win32") return;
   if (!updates || updates.state().phase === "manual") return shell.openExternal(SITE_URL);
   if (newer) updates.download(newer.version, { asked: true });
 });
@@ -1420,7 +1423,7 @@ app.whenReady().then(() => {
   mainLog(`Bops ${app.getVersion()} opening (pid ${process.pid})`);
   if (process.platform === "darwin" && fs.existsSync(ICON)) app.dock.setIcon(nativeImage.createFromPath(ICON));
   // Release builds only: not `npm run app`, nor a build that runs the source folder (desktop/repo.json).
-  if (isRelease()) {
+  if (isRelease() && process.platform !== "win32") {
     updates = createUpdates({ autoUpdater, app, fs, path, note: updateNote, send: sendUpdate });
     // macOS logging out or shutting down quits Bops itself: that quit isn't held (see before-quit).
     powerMonitor.on("shutdown", () => (systemQuit = true));

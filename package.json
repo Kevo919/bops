@@ -85,7 +85,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "OrgoAI",
+        "owner": "Kevo919",
         "repo": "bops"
       }
     ],

@@ -15,6 +15,7 @@
 // userData a throwaway folder: nothing is fetched or installed.
 // Usage: node scripts/test-updates.mjs
 import assert from "node:assert/strict";
+import vm from "node:vm";
 import { EventEmitter } from "node:events";
 import fs, { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -66,11 +67,47 @@ function make({ inApps = true, execPath = "/Applications/Bops.app/Contents/MacOS
   const testFs = { ...fs, accessSync, statfsSync };
   const sent = [];
   const notes = [];
-  const u = createUpdates({ autoUpdater: fake, app, fs: testFs, path, note: (t) => notes.push(t), send: (s) => sent.push(s), execPath, env, now: () => clock.t });
+  const u = createUpdates({ autoUpdater: fake, app, fs: testFs, path, note: (t) => notes.push(t), send: (s) => sent.push(s), platform: "darwin", execPath, env, now: () => clock.t });
   return { u, fake, sent, notes, dir };
 }
 const v91 = { version: "0.0.91", notes: ["Restart to update."] };
 const v92 = { version: "0.0.92", notes: [] };
+
+// Run the real main-process update handlers without starting Electron or a window.
+const mainSource = readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
+for (const platform of ["win32", "darwin"]) {
+  const handlers = new Map();
+  const fetched = [], opened = [];
+  const context = vm.createContext({
+    process: { platform }, path, fs: {}, console: { log() {} }, AbortSignal,
+    app: { getVersion: () => "0.0.1", getPath: () => scratch }, mainWin: null,
+    ipcMain: { handle: (name, fn) => handlers.set(name, fn) }, restart() {},
+    shell: { openExternal: (url) => opened.push(url) },
+    fetch: async (url) => { fetched.push(url); return { ok: true, text: async () => JSON.stringify({ version: "9.9.9", notes: [] }) }; },
+  });
+  vm.runInContext(mainSource.slice(mainSource.indexOf('const LATEST_URL ='), mainSource.indexOf('app.setName("Bops")')), context);
+  await vm.runInContext("checkForUpdate()", context);
+  handlers.get("update-download")();
+  assert.deepEqual(fetched, platform === "win32" ? [] : [FEED_URL]);
+  assert.deepEqual(opened, platform === "win32" ? [] : ["https://bops.bot"]);
+  assert.equal(handlers.get("update-info")(), null);
+  if (platform === "win32") {
+    assert.equal(vm.runInContext("newer", context), undefined, "Windows must not remember an upstream offer");
+    assert.equal(createUpdates({ platform, autoUpdater: new Proxy({}, { get() { throw new Error("Windows touched updater"); } }) }), null);
+  }
+  // Execute release initialization too: Windows must not schedule hourly polling.
+  let initialized = 0, timers = 0, checks = 0;
+  const readyBlock = mainSource.slice(mainSource.indexOf('  // Release builds only:'), mainSource.indexOf('  // The apps the bots make:'));
+  vm.runInNewContext(readyBlock, {
+    process: { platform }, isRelease: () => true,
+    createUpdates: () => { initialized++; return {}; }, autoUpdater: {}, app: {}, fs: {}, path,
+    updateNote() {}, sendUpdate() {}, powerMonitor: { on() {} },
+    checkForUpdate: () => { checks++; }, setInterval: () => { timers++; },
+  });
+  assert.deepEqual([initialized, timers, checks], platform === "win32" ? [0, 0, 0] : [1, 1, 1]);
+  passed++;
+  console.log(`ok - ${platform} main update polling and download routing`);
+}
 
 test("the switch is on by default, and with a broken updates.json", () => {
   assert.equal(make().u.auto(), true);
