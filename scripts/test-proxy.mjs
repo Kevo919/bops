@@ -14,7 +14,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 // proxy.ts imports "next/server" the way Next resolves it (the package's CommonJS entry file).
 registerHooks({
   resolve(specifier, context, next) {
-    return next(specifier === "next/server" ? "next/server.js" : specifier, context);
+    return next(specifier === "next/server" ? "next/server.js" : specifier === "./lib/routine-hook" ? "./lib/routine-hook.ts" : specifier, context);
   },
 });
 const { NextRequest } = await import("next/server");
