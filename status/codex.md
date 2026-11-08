@@ -1,6 +1,6 @@
 # Codex status
-2026-11-08T01:13Z: PR125 review fixes pushed1ebe36e. Added updater suite to fork CI web job and explicit missing/out-of-order extraction marker assertions. Updater19pass. Targeted lint still running; new head CI pending. Task103 accepted by lead and board rows corrected. No live UI/heavy build/merge; window hold persists.
+2026-11-08T01:22Z: PR125 r2 at1ebe36e all seven CI checks passed, including newly added updater suite. Local updater19pass, targeted ESLint exit0, diff clean. Missing/out-of-order source markers asserted. Ready for lead re-review/merge. Task103 DONE per lead.
 ## Needs Kevin
 No new request.
 ## Next
-Wait new head CI then hand back to lead. Hourly bops-hourly-build-check run codex-1108-0109.
+Lead re-review125 and PC rebuild/live verification when hold released. No heavy build, UI, or merge performed. Hourly bops-hourly-build-check run codex-1108-0109; own lock released on exit.
