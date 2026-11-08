@@ -1,6 +1,6 @@
 # Bops build: progress for Kevin
 
-Plain-English status of the build, kept up to date by the lead. Last updated **2026-11-04 10:15 PM Chicago time**.
+Plain-English status of the build, kept up to date by the lead. Last updated **2026-11-07 7:40 PM Chicago time**.
 
 **Quick links**
 - **Test log** (every feature, how and when it was tested, by whom): [TESTS.md](https://github.com/Kevo919/bops/blob/team/TESTS.md)
@@ -15,17 +15,14 @@ Plain-English status of the build, kept up to date by the lead. Last updated **2
 
 **Connections tally:** [CONNECTIONS.md](CONNECTIONS.md): every account and app Bops can reach.
 
-## Testing target: 100% (now 66%)
-
-The overnight ETAs for 80% slipped because the PC was locked, so Codex couldn't test in the real app. New ETAs count from when you unlock it.
+## Testing target: 100% (now 65% of all checks; most of the rest wait on your items)
 
 | Score | What gets it there | Who | ETA (Chicago) |
 |---|---|---|---|
-| 70% | Server results for the latest version (done), z.ai's Memory and Repos sandbox fixes merged and re-tested | z.ai + lead | ~10 AM Nov 5 |
-| 80% | Every feature tested in the real app on your PC | Codex | ~2 hours after you unlock the PC |
-| 90% | The last review fixes merged and re-tested; a bot task on the cloud computer | z.ai + lead + Codex | ~4 hours after you unlock the PC |
-| 95% | Your items: Gmail sign-in, GitHub checks back on, phone set up, a fix chosen for PC bot tasks | Kevin, then the agents | ~1 hour after you do them |
-| 100% | Zapier address, a real OpenRouter preset and second key, ChatGPT plan sign-in, the other 10 repo recipes, the z.ai China quota (resets Nov 8) | Kevin + agents | Nov 8 |
+| 75% | z.ai's test-coverage work (task 90) merged; PC updated to the latest version and the Settings screens re-checked live | z.ai + lead | Sun Nov 8, midday (the PC update needs free memory) |
+| 85% | Chat working again (OpenAI credit, or choose Claude in the chat's model picker), then one real PC task run by Boppy with your OK | You, then the lead | ~1 hour after you do it |
+| 95% | Phone paired; Gmail via Composio; AgentPhone funds and 10DLC so calls and texts work | You, then the agents | ~1 hour after each |
+| 100% | Live runs of the repo recipes, installer launch check, and the remaining old test suites | Agents | Mon Nov 9 |
 
 ## The MVP (the version to use every day)
 
@@ -55,24 +52,26 @@ The overnight ETAs for 80% slipped because the PC was locked, so Codex couldn't 
 - **Quality:** checks on every change, a secret scan of the whole history, and 5 flaky tests fixed.
 
 ## In review
-- Nothing open. Everything built so far is merged.
+- Nothing open right now. z.ai's test-coverage work (task 90) is still in progress on its branch.
+
+## Merged Nov 5 to 7
+- **Safety for tasks Bops runs on your PC (#80, #122):** each task's processes are held together, so nothing it started keeps running if Bops closes; tested live on your PC. Search patterns can't reach outside the task's folder without asking.
+- **Live-test fixes (#115, #116, #119):** plain error cards (the button opens the model picker), the agent picker always opens, one click on Send sends, the menu bar follows dark/light, "AI subscriptions" in Settings.
+- **Words you see (#104, #110, #120, #121):** "PC" instead of "Mac" everywhere on Windows, including tasks run on Boppy's cloud computer; Settings places instead of config files and key names; saved keys show only "saved" or their last 4.
+- **Calls and texts (#102, #114):** Boppy can place calls and send texts through AgentPhone, asking you every time.
+- **Billing and checks (#96, #97, #105, #107, #111):** usage is counted once, never lost; bots can't claim they did something they didn't.
+- **Updates (#125):** your Windows app never offers the original project's Mac updates; releases point at your own GitHub.
+- **Quality (#109, #117, #123, #124):** red tests fixed and added to the automatic checks; tests for the wording rules.
+- **Earlier (Nov 5):** dark mode (#85), widgets/tabs/pages (#86), grayed-out in-progress features with a percent.
 
 ## Merged Nov 4
 - Repos section (#38), Connections (#40), OpenRouter presets, custom models, Auto Router and a model per routine (#44), several accounts per provider (#45), editable bot files (#39), your own tool servers per bot (#32), Word/PowerPoint/Excel from chat (#41), Goals and ideas (#51), custom schedules (#52)
 
 ## Next
-- Several DeepSeek Harness and Hermes Agent instances you can link and hand tasks to (researching and building now)
-- Unfinished features visible but grayed out, with red "not set up yet" text and a percent complete, so you can see what's coming (building now)
-- Widgets, tabs and pages you can add by asking Boppy, plus an Animations setting in Look (building now)
-- [COMPETITORS.md](COMPETITORS.md): what Bops has vs Meta Muse, ChatGPT Dots, Grok Bot and others, and the 12 gaps (done; gaps added to TASKS 52 to 57)
-- No blank screens: an automatic check that opens every page like your PC and fails on blank pages, error text or dead buttons, with a screenshot each; then fixes ("How bots reach you" first) (building now)
-- Dark mode that turns the whole app dark, every screen (Kevin found the sidebar and Settings list stay light) (building now)
-- Settings needs a real "Your phone" item; the pairing card is buried in This PC, and the phone app needs a Scan button (#77, in progress)
-- Phone pairing with no friction: one screen with QR codes (get the app, Tailscale, pair) and a Scan button in the phone app (building now)
-- PC bot tasks on your Claude Code Max plan, plus a Settings box for an OpenAI key (#80 merged; live test on your PC next)
-- Composio: your Gmail and Drive are in Composio's "For You" area, which Bops' Platform key can't see. Adding a "Composio (your account)" option in Logins so bots can use them (building now). Quick path today: Settings → Logins → Gmail → Connect
-- Codex: every feature tested in the real Bops window on your PC (started now the PC is unlocked)
-- GitHub's automatic checks: you turned them back on; confirmed on the next change
+- Update Bops on your PC to the latest version (waiting for free memory: close unused apps, especially browsers with many tabs).
+- z.ai: get the remaining older test suites green on Windows and into the automatic checks (task 90).
+- A real PC task run by Boppy, live, once chat works and you say OK.
+- Still to build: webhook and email triggers for routines (27), WhatsApp (30/56), podcast and video (32/55), ACP (33).
 
 ## Planned (after the MVP)
 - Checking each repo recipe actually runs, in Docker
@@ -84,7 +83,9 @@ The overnight ETAs for 80% slipped because the PC was locked, so Codex couldn't 
 - Podcast and video generation; ACP (connecting other apps' agents)
 
 ## What only you can do
-- **Composio key** (composio.dev), if you want Gmail, Slack, Notion and other apps connected.
-- **Zapier MCP address** (mcp.zapier.com), if you want Zapier actions.
-- **Phone:** install the APK and the Tailscale app, then pair with the server address and code I sent you.
-- **New lead:** paste the hand-over prompt into a new lead when my usage runs low ([HANDOVER.md](https://github.com/Kevo919/bops/blob/team/HANDOVER.md)).
+- **Chat:** add OpenAI credit, or open the chat's model picker and choose Claude (your Claude Max is signed in).
+- **Say OK** to: merging the agent-desktop hub test scripts (Kevo919/agent-desktop-hub PR #1), and one test PC task.
+- **Free memory on your PC** so the update can build (about 3 GB free is enough).
+- **AgentPhone:** add funds (calls) and finish 10DLC registration (texts). Then **rotate the AgentPhone key** you pasted in chat.
+- **Hermes key** and **Composio "For You" key**, if you want those.
+- **Phone:** install the APK and Tailscale, then pair (Settings → Your phone).
