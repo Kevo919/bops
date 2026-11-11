@@ -287,3 +287,5 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 2026-11-11 09:44 UTC Lead: opened PR #129 (BG-14). Lesson: my first local scan missed commits and wrongly said no exceptions were needed; the PR's first CI run caught it (16 findings). Fixed by keeping exactly the 13 entries CI's own scan needs and dropping 12 unused. Also adds a secret scan to Fork CI (PRs into windows-port were never scanned before), removes a committed compiled file, pins the last unpinned action. CI green.
 
 - 2026-11-11 10:49 UTC Lead: BG-09 started. Security review of PR #126 (Codex, routine event core): APPROVE, three follow-ups for later slices. Report in tests/2026-11-11-lead-security-review-pr126.md and on the PR. Merge waits: PRs into windows-port need the stage gate, and #127 (security upgrades) should land first.
+
+- 2026-11-11 11:52 UTC Lead: BG-09 continued. Listed the 31 process-starting files and who can review each (tests/2026-11-11-bg09-file-list.md). Reviewed Z.AI's PR #113 (PC task Job Object, merged earlier without a review): sound, three low follow-ups. The rest of BG-09 is Claude-written and needs Codex or Z.AI.
