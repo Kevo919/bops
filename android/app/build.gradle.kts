@@ -52,5 +52,7 @@ android {
 // so the app needs no camera permission. Everything else is Android's own WebView and a few screens.
 dependencies {
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+    // Second library: Wear OS Data Layer, so the Bops watch app (android/wear) can ask through this phone.
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
     testImplementation("junit:junit:4.13.2")
 }

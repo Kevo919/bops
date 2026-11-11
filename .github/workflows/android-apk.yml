@@ -1,5 +1,6 @@
 # Builds the Bops Android app and puts it at one link that never changes:
-#   https://github.com/Kevo919/bops/releases/download/android-latest/bops-remote.apk
+#   https://github.com/Kevo919/bops/releases/download/android-latest/bops-remote.apk   (phone)
+#   https://github.com/Kevo919/bops/releases/download/android-latest/bops-watch.apk    (Wear OS / Galaxy Watch)
 # Runs when android/ changes on windows-port, or by hand from the Actions tab. Each run replaces the APK.
 # A run on any other branch publishes to the android-latest-test prerelease instead, never android-latest.
 #
@@ -62,23 +63,31 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$BOPS_KEYSTORE_FILE"
           trap 'rm -f "$BOPS_KEYSTORE_FILE"' EXIT
           cd android
-          ./gradlew assembleRelease
+          ./gradlew :app:assembleRelease :wear:assembleRelease :wear:testReleaseUnitTest
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/bops-remote.apk"
+          cp wear/build/outputs/apk/release/wear-release.apk "$RUNNER_TEMP/bops-watch.apk"
           echo "SIGNING=release-signed (stable key: new versions install over old ones)" >> "$GITHUB_ENV"
 
       - name: Build debug APK (no signing secrets set)
         if: env.HAS_KEYSTORE != 'true'
         run: |
           cd android
-          ./gradlew assembleDebug
+          ./gradlew :app:assembleDebug :wear:assembleDebug :wear:testDebugUnitTest
           cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/bops-remote.apk"
+          cp wear/build/outputs/apk/debug/wear-debug.apk "$RUNNER_TEMP/bops-watch.apk"
           echo "SIGNING=debug-signed (no signing key set up yet: to update, uninstall the old app first, then install this one)" >> "$GITHUB_ENV"
 
       - name: Check the APK
         run: |
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/bops-remote.apk" | head -3
-          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$RUNNER_TEMP/bops-remote.apk" | head -1
-          (cd "$RUNNER_TEMP" && sha256sum bops-remote.apk | tee bops-remote.apk.sha256)
+          for apk in bops-remote bops-watch; do
+            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/$apk.apk" | head -3
+            "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$RUNNER_TEMP/$apk.apk" | head -1
+            (cd "$RUNNER_TEMP" && sha256sum $apk.apk | tee $apk.apk.sha256)
+          done
+          # The Data Layer only connects phone and watch apps signed with the SAME key: fail the build if they differ.
+          a=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/bops-remote.apk" | grep -m1 SHA-256)
+          b=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/bops-watch.apk" | grep -m1 SHA-256)
+          [ "$a" = "$b" ] && echo "phone and watch share a signing key" || { echo "::error::phone and watch APKs are signed with different keys"; exit 1; }
 
       - name: Publish to the prerelease
         env:
@@ -95,7 +104,11 @@ jobs:
             echo
             echo "Signing: $SIGNING."
             echo
-            echo "SHA-256: \`$(cut -d' ' -f1 "$RUNNER_TEMP/bops-remote.apk.sha256")\`"
+            echo "SHA-256 (phone): \`$(cut -d' ' -f1 "$RUNNER_TEMP/bops-remote.apk.sha256")\`"
+            echo
+            echo "Watch app (Wear OS / Galaxy Watch): bops-watch.apk. Install the phone app first. See docs/android-install.md, Watch."
+            echo
+            echo "SHA-256 (watch): \`$(cut -d' ' -f1 "$RUNNER_TEMP/bops-watch.apk.sha256")\`"
           } > "$NOTES"
           if gh release view "$TAG" --repo "$REPO" > /dev/null 2>&1; then
             # Point the tag at this build's commit, then refresh the notes.
@@ -106,5 +119,7 @@ jobs:
               --title "Bops for Android ($TAG)" --notes-file "$NOTES"
           fi
           gh release upload "$TAG" --repo "$REPO" --clobber \
-            "$RUNNER_TEMP/bops-remote.apk" "$RUNNER_TEMP/bops-remote.apk.sha256"
-          echo "Download: https://github.com/$REPO/releases/download/$TAG/bops-remote.apk" >> "$GITHUB_STEP_SUMMARY"
+            "$RUNNER_TEMP/bops-remote.apk" "$RUNNER_TEMP/bops-remote.apk.sha256" \
+            "$RUNNER_TEMP/bops-watch.apk" "$RUNNER_TEMP/bops-watch.apk.sha256"
+          echo "Phone: https://github.com/$REPO/releases/download/$TAG/bops-remote.apk" >> "$GITHUB_STEP_SUMMARY"
+          echo "Watch: https://github.com/$REPO/releases/download/$TAG/bops-watch.apk" >> "$GITHUB_STEP_SUMMARY"

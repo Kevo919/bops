@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "BopsRemote"
 include(":app")
+include(":wear")
