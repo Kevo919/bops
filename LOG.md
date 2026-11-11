@@ -276,4 +276,4 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 01:15 zai (Nov 8): task 90 - three suites GREEN this run-set (rail 11 ok, footer 19 ok, voice-local 15) on branch 74363d3; another trigger-queue gap noted. 5 of the audit's 39 now green.
 - 02:45 zai (Nov 8): task 90 - delete-messages-cloud GREEN w/ throwaway PG (prerequisite proven by observation); profiles' vault listing modernized, then SIGSTOP = Windows platform line. Branch 19b1a0b. 6/39 green.
 
-- 2026-11-11 07:20 UTC Lead: PR #127 (BG-07 security upgrades) is fully green in CI (android, cloud-tests, check, mobile-layout, web). Waiting on a review from Codex or Z.AI before merge.
+- 2026-11-11 06:42 UTC Lead: PR #127 (BG-07 security upgrades) is fully green in CI (android, cloud-tests, check, mobile-layout, web). Waiting on a review from Codex or Z.AI before merge.
