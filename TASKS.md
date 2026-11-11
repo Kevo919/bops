@@ -176,7 +176,7 @@ Added by the lead 2026-11-11. Full description, finding and "done when" for each
 
 | # | Task | Who | Status | Notes |
 |---|---|---|---|---|
-| BG-01 | Name the lead; restart the rhythm; stop-when-blocked rule; cross-family reviews | Kevin + lead | DONE (lead named 11-11) | Stage 0 [CLOUD]. Hourly lead check is a cloud scheduled task |
+| BG-01 | Name the lead; restart the rhythm; stop-when-blocked rule; cross-family reviews | Kevin + lead | DONE (lead named 11-11) | Stage 0 [CLOUD]. Hourly lead check not set up yet (permission refused, waiting on Kevin) |
 | BG-02 | Move the board to a private repo; leave a pointer here | lead + Kevin | TODO | Stage 0 [CLOUD]. See private findings |
 | BG-03 | Rotate the keys named in the private findings | Kevin | WAITING ON KEVIN | Stage 0 |
 | BG-04 | KEVIN-CHECKLIST.md: every Kevin-only item in one ordered list | lead | DONE | Stage 0 [CLOUD]. KEVIN-CHECKLIST.md |
