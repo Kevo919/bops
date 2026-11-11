@@ -204,3 +204,18 @@ Added by the lead 2026-11-11. Full description, finding and "done when" for each
 | BG-26 | Document what other programs may call (for Jarvis), with a sample client | next free | TODO | Stage 4 [CLOUD] |
 | BG-29 | Tested percent at 100 | lead | TODO | Stage 6 |
 | BG-30 | Release checklist for the first daily-use release | lead | TODO | Stage 6 |
+| BG-31 | Keys: credential store, one per service with a spend limit, inventory | next free | TODO | Stage 1. Addendum |
+| BG-32 | Server hardening and outside scan (see private findings) | Kevin + lead | TODO | Stage 0, URGENT. Addendum |
+| BG-33 | Spending caps per bot and provider; loop watchdog | next free | TODO | Stage 3. Addendum |
+| BG-34 | Threat model on one page | lead | TODO | Stage 1. Addendum |
+| BG-35 | Hidden-instruction test set, run every release | next free | TODO | Stage 1. Addendum |
+| BG-36 | Least access for Composio, Zapier, Gmail grants | lead + Kevin | TODO | Stage 4. Addendum |
+| BG-37 | Confirm no usage data is sent; test that fails if a build would | next free | TODO | Stage 1. Addendum |
+| BG-38 | Repo settings: protect windows-port, push protection, Dependabot, code scanning | Kevin + lead | TODO | Stage 0. Addendum |
+| BG-39 | Name and licence check before sharing builds | lead | TODO | Stage 2. Addendum |
+| BG-40 | Encrypted backups of app data, PC and server, with a restore test | next free | TODO | Stage 2. Addendum |
+| BG-41 | Incident runbook and one drill | lead | TODO | Stage 1. Addendum |
+| BG-42 | Server watch and alerts; log rotation | next free | TODO | Stage 2. Addendum |
+| BG-43 | Memory and speed budget on the PC | next free | TODO | Stage 3. Addendum |
+| BG-44 | Android update path | codex | TODO | Stage 2. Addendum |
+| BG-45 | Plain-English user guide | next free | TODO | Stage 3. Addendum |

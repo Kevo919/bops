@@ -90,3 +90,14 @@ All ⏳ not yet tested. Each maps to a task in BUILD_PLAN_V2.md. These are not y
 | Look-only desktop task through the agent-desktop hub | BG-22 | ⏳ |
 | One real-account run per connection | BG-23 | ⏳ |
 | Phone: install, pair, approve, unpair | BG-25 | ⏳ |
+| Outside scan of the server shows only what is meant to be open | BG-32 | ⏳ |
+| No key in a plain file where the credential store is supported | BG-31 | ⏳ |
+| Bot pauses at its spending cap; loop watchdog triggers | BG-33 | ⏳ |
+| Hidden-instruction set: no risky action, no key leak | BG-35 | ⏳ |
+| No usage data leaves the app during a session | BG-37 | ⏳ |
+| Direct push to windows-port is refused | BG-38 | ⏳ |
+| Restore from backup to a clean install | BG-40 | ⏳ |
+| Incident drill completed | BG-41 | ⏳ |
+| Stopped server service raises an alert | BG-42 | ⏳ |
+| App footprint under the limit with other agents running | BG-43 | ⏳ |
+| Android app updates over the previous build | BG-44 | ⏳ |

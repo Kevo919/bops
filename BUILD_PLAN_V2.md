@@ -108,3 +108,48 @@ Estimates are AI-assisted working days and are rough. **[CLOUD]** needs no PC. *
 ## Rough timeline
 
 Stages 0 to 2: about 13 to 15 working days. Stage 3: 10 to 12 more. Stage 4: 6 to 8. With three agents in parallel and the PC on in the evenings, Gate 3 is about four to five calendar weeks away. These are estimates from reading the board and code, and BG-09 may add work.
+
+---
+
+## Addendum, 2026-11-11: final check (only what the first pass missed)
+
+### Security additions
+
+| Task | What | Stage | Done when |
+|---|---|---|---|
+| BG-31 | **Keys.** Move keys out of plain files into the system credential store where the app supports it. One key per service, each with a spending limit set at the provider, and separate keys for the PC and the server so either can be cut off alone. A key inventory (names only) with owner and last-rotated date. | 1 | Inventory complete; no key in a plain file where the store is supported |
+| BG-32 | **Server hardening** (details in the private file, BX-07, BX-08, BX-10). Check what is reachable from outside, close it, bring the other services up to date, then confirm with an outside scan. A short checklist that is re-run monthly. | 0 (urgent) | Outside scan shows only what is meant to be open |
+| BG-33 | **Spending brakes.** A daily and monthly cap per bot and per provider; a bot that reaches its cap pauses and says so. A watchdog for a bot repeating the same failing step. | 3 | Cap test and loop test pass |
+| BG-34 | **Threat model on one page** for the fork: phone, server, PC tasks, repos that run code, tool servers, mail and web content bots read. Re-reviewed at each gate. | 1 | Every row points to a task or a signed accepted risk |
+| BG-35 | **Hidden-instruction tests.** A fixed set of emails, web pages, documents and repo READMEs that try to steer a bot. Run on every release. | 1 | No send, delete, purchase or key leak from the set |
+| BG-36 | **Least access for connected accounts.** For Composio, Zapier and Gmail, grant only the actions bots need; reading is separate from sending; review the grants list. | 4 | Grants list reviewed and trimmed |
+| BG-37 | **Usage sharing is off and stays off.** The original app can send usage counts to its maker when signed in with their account. Confirm the fork sends none (self-hosted setting on, sharing off), and add a test that fails if a build would send any. | 1 | Network test during a session shows no such traffic |
+| BG-38 | **Repo settings.** Protect `windows-port` (pull request and checks required), turn on secret-scanning push protection and Dependabot, add a code-scanning job. The standing "merge without asking" rule plus agents that approve themselves means the branch needs a required review from a different agent family. | 0 | Settings on; a direct push is refused |
+| BG-39 | **Name and licence check.** The fork ships an installer and an Android app under the original's name. Read the original's licence and trademark files and confirm private use is fine and what must change before sharing with anyone. | 2 | One-paragraph note in the repo |
+
+### Recovery and operations additions
+
+| Task | What | Stage | Done when |
+|---|---|---|---|
+| BG-40 | **Backups** of the app's data folder (chats, bots, routines, settings) on the PC and the server, encrypted, with a restore test. | 2 | Restore to a clean install works |
+| BG-41 | **Incident runbook**: a bot did something wrong, a key leaked, the phone was lost, the server was reached. Who does what, in order. One drill. | 1 | Drill logged |
+| BG-42 | **Server watch.** Is the service up, is the disk filling, did the nightly update fail. Alerts to the phone. Logs rotate. | 2 | A stopped service raises an alert |
+| BG-43 | **Memory and speed budget on the PC.** The update could not build with 0.5 GB free. Measure the app's footprint, set a limit, and test with the other agents running. | 3 | Numbers logged; limit in the checks |
+| BG-44 | **Android update path.** How the phone app learns of and installs a newer build; signed with the same key so updates install over the old one. | 2 | Update from one build to the next on a phone |
+| BG-45 | **User guide** in plain English for the fork: install, first run, what each Settings page is for, what to do when chat is down. | 3 | Kevin follows it without help |
+
+### Test checks added
+
+| Check | Task |
+|---|---|
+| Outside scan of the server shows only what is meant to be open | BG-32 |
+| No key in a plain file where the credential store is supported | BG-31 |
+| Bot pauses at its spending cap; loop watchdog triggers | BG-33 |
+| Hidden-instruction set: no risky action, no key leak | BG-35 |
+| No usage data leaves the app during a session | BG-37 |
+| Direct push to windows-port is refused | BG-38 |
+| Restore from backup to a clean install | BG-40 |
+| Incident drill completed | BG-41 |
+| Stopped server service raises an alert | BG-42 |
+| App footprint under the limit with other agents running | BG-43 |
+| Android app updates over the previous build | BG-44 |
