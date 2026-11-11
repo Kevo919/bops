@@ -6,6 +6,10 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 11, 2:00 AM (Chicago) (lead, overnight)
+- **PR #127 (BG-07): security upgrades.** Next.js 16.3.8 to 16.4.6 fixes a critical flaw (anyone could run code on a Bops server through image optimization), plus ten high advisories. Audit now shows 0 critical, 0 high. Typecheck and lint pass; 53 of 58 test scripts pass here and the rest need Node 24 or a browser, which CI has. Waiting for a review.
+- BG-37: read how usage events are switched off. Both machines need a quick confirmation (PC-QUEUE item 4).
+
 ### Nov 11, 12:20 AM (Chicago) (lead)
 - Kevin named Claude lead and asked to start. Stage 0 has begun. BG-01 and BG-04 done: [KEVIN-CHECKLIST.md](KEVIN-CHECKLIST.md) lists everything only Kevin can do, in order. New PC-QUEUE.md.
 

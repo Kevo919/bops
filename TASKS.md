@@ -182,7 +182,7 @@ Added by the lead 2026-11-11. Full description, finding and "done when" for each
 | BG-04 | KEVIN-CHECKLIST.md: every Kevin-only item in one ordered list | lead | DONE | Stage 0 [CLOUD]. KEVIN-CHECKLIST.md |
 | BG-05 | Branch clean-up (131 branches) | codex | TODO | Stage 0 [CLOUD] |
 | BG-06 | True the board; renumber duplicates; generate in-app percents from the task list | lead | TODO | Stage 0 [CLOUD] |
-| BG-07 | Upgrade flagged libraries (1 critical, 10 high); npm audit in the automatic checks | next free | TODO | Stage 1 [CLOUD] then [PC] rebuild. HIGH |
+| BG-07 | Upgrade flagged libraries (1 critical, 10 high); npm audit in the automatic checks | lead | REVIEW | Stage 1. PR #127: audit now 0 critical, 0 high; typecheck, lint and 53/58 local tests pass; CI running. Audit gate in CI is a follow-up. Then [PC] rebuild |
 | BG-08 | Catch up with the original (v0.0.39 to v0.0.50); weekly sync | next free | TODO | Stage 1 [CLOUD] + [PC] |
 | BG-09 | Security review sweep: 27 process-starting files, PR #126, redo the two lost reviews | reviewer from a different family than each author | TODO | Stage 1 [CLOUD] |
 | BG-12 | Phone pairing hardening | next free | TODO | Stage 1 [CLOUD] + phone |
@@ -210,7 +210,7 @@ Added by the lead 2026-11-11. Full description, finding and "done when" for each
 | BG-34 | Threat model on one page | lead | TODO | Stage 1. Addendum |
 | BG-35 | Hidden-instruction test set, run every release | next free | TODO | Stage 1. Addendum |
 | BG-36 | Least access for Composio, Zapier, Gmail grants | lead + Kevin | TODO | Stage 4. Addendum |
-| BG-37 | Confirm no usage data is sent; test that fails if a build would | next free | TODO | Stage 1. Addendum |
+| BG-37 | Confirm no usage data is sent; test that fails if a build would | lead | DOING | Stage 1. Read: events go out only when BOPS_SELF_HOSTED is not 1, a hosted database is not set, BOPS_TELEMETRY is not 0, DO_NOT_TRACK is not 1, and the build is production. The server setup writes BOPS_SELF_HOSTED=1; the PC is recorded as having it. Next: confirm both on the machines (PC-QUEUE), then a fork test |
 | BG-38 | Repo settings: protect windows-port, push protection, Dependabot, code scanning | Kevin + lead | TODO | Stage 0. Addendum |
 | BG-39 | Name and licence check before sharing builds | lead | TODO | Stage 2. Addendum |
 | BG-40 | Encrypted backups of app data, PC and server, with a restore test | next free | TODO | Stage 2. Addendum |
