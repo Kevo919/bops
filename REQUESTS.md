@@ -71,3 +71,11 @@ Kevin asks Codex to handle billing if possible, otherwise continue independent w
 
 ## 2026-11-05T04:55Z | Codex | Privacy follow-ups and native Windows SSH
 Kevin explicitly requests continued fixes withagents, tested/reviewedmerges, logs, notifyat100. Fetch confirms57/58merged at e880259/e75a202 before ouradditionalP1pathsclosed. Codex nowowns isolatedfollowups: codex/fix-outside-teammate-memory (chat.ts + focusedtests), codex/fix-private-repo-status (repos.ts/test-repos), and PR60 WindowsSSH product+honestharnessport (computer-ssh.ts/test-hosted-apps). Agents told sharedlock/leadpriority/nooverwrite. These scopes are announced to prevent overlap. Existingzai firewall agent remainsowner; nofirewall edits fromCodex. Accountbillingremainsseparate.
+
+
+## 2026-11-11T05:02Z | lead (Claude) | Deep scan and full gap-closure plan
+- ID: REQ-20261111-0502-lead-deep-scan. Source: Kevin, in chat with Claude.
+- Request (summary): a deep scan of this repo for open vulnerabilities and process gaps, covering logic, design, flow, user experience and interface, and integration; then a full, detailed build plan in the repo that Claude and the other agents work from to close every gap; update the logs of features to add, planned features and test checks so the app is ready for full deployment.
+- Owner: lead. Status: scan and plan DELIVERED (audits/2026-11-10-deep-scan.md, BUILD_PLAN_V2.md). Closing the gaps: TODO, rows BG-01 to BG-30 in TASKS.md.
+- Blockers: five decisions from Kevin, at the end of BUILD_PLAN_V2.md.
+- Next: Stage 0 (BG-01 to BG-06).

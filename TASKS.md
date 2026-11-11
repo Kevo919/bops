@@ -168,3 +168,39 @@ Still open: #11 (codex: Windows table), #5 (zai: wording), #15 + #17 (codex: rea
 ## Done
 
 - Windows port, phone pairing, Android app v1, tray, notifications, QR pairing, modules, job routing + Z.ai, sync docs, LLMs file (lead), on windows-port at 7568894.
+
+
+## Gap-closure tasks (from the 2026-11-10 deep scan). These now lead; see BUILD_PLAN_V2.md
+
+Added by the lead 2026-11-11. Full description, finding and "done when" for each row is in [BUILD_PLAN_V2.md](BUILD_PLAN_V2.md). **No new features until Gate 3**: open feature rows (27, 30, 32, 33, 45, 52 to 57) are parked. Task 90 continues as BG-18.
+
+| # | Task | Who | Status | Notes |
+|---|---|---|---|---|
+| BG-01 | Name the lead; restart the rhythm; stop-when-blocked rule; cross-family reviews | Kevin + lead | TODO | Stage 0 [CLOUD] |
+| BG-02 | Move the board to a private repo; leave a pointer here | lead + Kevin | TODO | Stage 0 [CLOUD]. See private findings |
+| BG-03 | Rotate the keys named in the private findings | Kevin | WAITING ON KEVIN | Stage 0 |
+| BG-04 | KEVIN-CHECKLIST.md: every Kevin-only item in one ordered list | lead | TODO | Stage 0 [CLOUD] |
+| BG-05 | Branch clean-up (131 branches) | codex | TODO | Stage 0 [CLOUD] |
+| BG-06 | True the board; renumber duplicates; generate in-app percents from the task list | lead | TODO | Stage 0 [CLOUD] |
+| BG-07 | Upgrade flagged libraries (1 critical, 10 high); npm audit in the automatic checks | next free | TODO | Stage 1 [CLOUD] then [PC] rebuild. HIGH |
+| BG-08 | Catch up with the original (v0.0.39 to v0.0.50); weekly sync | next free | TODO | Stage 1 [CLOUD] + [PC] |
+| BG-09 | Security review sweep: 27 process-starting files, PR #126, redo the two lost reviews | reviewer from a different family than each author | TODO | Stage 1 [CLOUD] |
+| BG-12 | Phone pairing hardening | next free | TODO | Stage 1 [CLOUD] + phone |
+| BG-13 | Android hardening and release signing | codex + Kevin | TODO | Stage 1 [CLOUD] |
+| BG-14 | Re-check 37 secret-scan exceptions; remove committed compiled file; pin last action | next free | TODO | Stage 1 [CLOUD] |
+| BG-16 | Fork version numbers, changelog, tagged known-good build | lead | TODO | Stage 2 [CLOUD] |
+| BG-10 | Installer check on the PC: install, launch, uninstall, reinstall | codex | TODO | Stage 2 [PC]. Old rows 14, 42 |
+| BG-11 | Updates on Windows from the fork's releases, with an integrity check | next free | TODO | Stage 2 [CLOUD] + [PC]. Old row 102 |
+| BG-15 | One-step update with a way back, PC and server; build in CI to avoid the PC memory limit | next free | TODO | Stage 2 |
+| BG-17 | Chat always has a working model: start-up check, plain reason, fallback order | next free | TODO | Stage 3. Old row 88 |
+| BG-18 | All 39 test suites pass and run automatically | zai | DOING | Stage 3 [CLOUD]. Was task 90 (6 of 39) |
+| BG-19 | Live sweep of every merged feature on the PC, incl. one real PC task | lead + codex | TODO | Stage 3 [PC] |
+| BG-20 | First-run setup; "which Bops is which" page | next free | TODO | Stage 3 |
+| BG-21 | Screen pass: leftovers (87, 96), full dark, widgets live, keyboard, screen reader, scaling | next free | TODO | Stage 3 |
+| BG-22 | Connect to the agent-desktop hub (after the hub's Gate 1) | next free | TODO | Stage 4. Hub tasks G-26, G-27 |
+| BG-23 | Real-account runs: Composio, Zapier, Hermes, DeepSeek Harness, AgentPhone, a tool server | lead + Kevin | TODO | Stage 4 [PC] |
+| BG-24 | Repo recipes run for real (old rows 35, 37) | codex | TODO | Stage 4 [PC] |
+| BG-25 | Phone live: install, pair, approve, unpair | Kevin + lead | TODO | Stage 4 |
+| BG-26 | Document what other programs may call (for Jarvis), with a sample client | next free | TODO | Stage 4 [CLOUD] |
+| BG-29 | Tested percent at 100 | lead | TODO | Stage 6 |
+| BG-30 | Release checklist for the first daily-use release | lead | TODO | Stage 6 |

@@ -2,6 +2,8 @@
 
 Plain-English status of the build, kept up to date by the lead. Last updated **2026-11-07 7:40 PM Chicago time**.
 
+**Read this first (Nov 10):** a full scan found the code is well ahead of what is installed, tested and tried live, and the base needs security updates. There is now one plan, [BUILD_PLAN_V2.md](BUILD_PLAN_V2.md), with the scan in [audits/2026-11-10-deep-scan.md](audits/2026-11-10-deep-scan.md). The status below is from Nov 7.
+
 **Quick links**
 - **Test log** (every feature, how and when it was tested, by whom): [TESTS.md](https://github.com/Kevo919/bops/blob/team/TESTS.md)
 - The project on GitHub: https://github.com/Kevo919/bops (the code is on branch `windows-port`)

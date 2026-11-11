@@ -6,6 +6,11 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 10, 11:30 PM (Chicago) (lead, cloud session, asked by Kevin)
+- **Deep scan done:** [audits/2026-11-10-deep-scan.md](audits/2026-11-10-deep-scan.md). Main points: libraries with known security advisories (1 critical, 10 high), the fork is 172 commits behind the original, no active lead since Nov 8, tested 65% with 33 older test suites outside the automatic checks, and much of what is merged is not yet on the PC or tried live.
+- **New plan:** [BUILD_PLAN_V2.md](BUILD_PLAN_V2.md). Order: process, security, install and update, a dependable core, integration, then parked features. 28 tasks (BG-01 to BG-30) in TASKS.md; 16 release checks in TESTS.md.
+- **Feature freeze proposed until Gate 3.** Five decisions wait on Kevin (end of the plan). No code changed; nothing was run on the PC.
+
 ### Nov 5, 1:25 PM (Chicago)
 - **Merged #93 (no false "task started") and #94 (Repos can't schedule themselves or keep running after Stop; two security reviews).**
 - **PC rebuilt at c1570a4 and restarted** (Kevin told first). Codex is live-testing: a real PC task, false claims, Services, Agents you run.

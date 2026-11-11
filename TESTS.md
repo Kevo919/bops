@@ -66,3 +66,27 @@ Kinds of test: **Unit/CI** (automatic tests in the code), **Review** (an indepen
 2. **Log each test run** as a new file `tests/YYYY-MM-DD-HHMM-<who>-<feature>.md` (UTC time). Include: the feature and the PR, the kind of test, the exact steps or commands, the real result (paste output), pass or fail, and what wasn't covered. Never put keys or pairing codes in it.
 3. The lead copies the result into the table above, with the date, who ran it and the outcome. A feature counts as **done** only when every column that applies to it is ✅ or explained.
 4. A failed test opens a fix: message the lead with the test file and what broke.
+
+
+## Release-readiness checks added 2026-11-11 (from the deep scan)
+
+All ⏳ not yet tested. Each maps to a task in BUILD_PLAN_V2.md. These are not yet counted in the percent at the top; the lead adds them under BG-06.
+
+| Check | Task | Result |
+|---|---|---|
+| npm audit: 0 critical, 0 high, enforced on every PR | BG-07 | ⏳ (today: 1 critical, 10 high) |
+| 0 commits behind the original after the weekly sync | BG-08 | ⏳ (today: 172 behind) |
+| Each of the 27 process-starting files has a saved security review | BG-09 | ⏳ |
+| Pairing: per-device, expiry, remove a device | BG-12 | ⏳ |
+| Android: signed build; plain connections refused outside private ranges | BG-13 | ⏳ |
+| Windows: install, launch, uninstall, reinstall | BG-10 | ⏳ |
+| Windows: update offered, verified, installed; roll back works | BG-11, BG-15 | ⏳ |
+| Server: update and roll back | BG-15 | ⏳ |
+| Chat answers with the main key empty, and says which model | BG-17 | ⏳ |
+| 39 of 39 test suites in CI | BG-18 | ⏳ (today: 6 of 39) |
+| One real PC task end to end; nothing left running after Bops closes | BG-19 | ⏳ |
+| Clean install to working chat in under 10 minutes | BG-20 | ⏳ |
+| Every screen light and dark; keyboard only; scaling | BG-21 | ⏳ |
+| Look-only desktop task through the agent-desktop hub | BG-22 | ⏳ |
+| One real-account run per connection | BG-23 | ⏳ |
+| Phone: install, pair, approve, unpair | BG-25 | ⏳ |
