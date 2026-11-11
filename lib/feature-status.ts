@@ -37,8 +37,8 @@ export type FeatureInProgress = {
 };
 
 const LIST: FeatureInProgress[] = [
-  { id: "widgets-by-chat", name: "Widgets and pages by chat", percent: 85, left: "Try it on your PC", state: "testing", where: "PR #86" },
-  { id: "animations-setting", name: "Animations", percent: 85, left: "Try it on your PC", state: "testing", where: "PR #86" },
+  { id: "widgets-by-chat", name: "Widgets and pages by chat", percent: 85, left: "Try it on your PC", state: "testing", where: "PR #86, merged; live test left" },
+  { id: "animations-setting", name: "Animations", percent: 85, left: "Try it on your PC", state: "testing", where: "PR #86, merged; live test left" },
   { id: "composio-for-you", name: "Composio (your account)", percent: 85, left: "Paste your For You address and key, then a live check", state: "testing", where: "PR #83, merged; live check left" },
   { id: "pc-tasks-claude-plan", name: "Bot tasks on this PC", percent: 85, left: "A real task on your PC", state: "testing", where: "PR #80, merged; live test left" },
   { id: "phone-verify-codes", name: "Proving your mobile number", percent: 0, left: "Adding Twilio Verify keys in Services is still being built; the setup guide explains manual setup", state: "building", where: "Services screen follow up (task 59, PR #87)" },
@@ -46,7 +46,7 @@ const LIST: FeatureInProgress[] = [
   { id: "agents-dsh-remote", name: "DeepSeek Harness on another computer", percent: 10, left: "dsh documents no task address for other apps yet: its web page needs a sign in token", where: "feature/agent-instances" },
   { id: "agents-dsh-desktop", name: "Drive the DeepSeek Harness app", percent: 5, left: "The app's window takes no outside tasks. Add its dsh.cmd as a program on this PC for now", where: "feature/agent-instances" },
   { id: "agentphone-calls-texts", name: "Calls and texts from your AgentPhone number", percent: 80, left: "A live call and a live text on your PC, once AgentPhone has funds and the 10DLC registration is done", state: "testing", where: "feature/agentphone-calls-texts" },
-  { id: "phone-pairing", name: "Your phone pairing", percent: 75, left: "Finish the review, then pair your phone with a QR code on your PC", where: "feature/easy-phone-pairing (PR #77)" },
+  { id: "phone-pairing", name: "Your phone pairing", percent: 75, left: "A security review (it was merged without one), then pair your phone with a QR code on your PC", where: "PR #77, merged without a review; review in task BG-09" },
 ];
 
 /** Any dash: hyphen, the Unicode hyphens, figure, en and em dashes, the minus sign. */
