@@ -283,3 +283,5 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 2026-11-11 07:16 UTC Lead: BG-14 first pass. 9 of 10 values the secret scan flags in history are made-up test values; 1 needs Kevin to look (checklist item 12; details kept private). Still to do: match the ignore list against CI's scanner version.
 
 - 2026-11-11 07:26 UTC Lead: BG-06. Board has no duplicate ids and every REVIEW row cites a PR. Found that PR #77 (phone pairing) was merged with no review on GitHub; added it to BG-09 and trued the in-app list in PR #128. No reviews yet on any open PR.
+
+- 2026-11-11 09:44 UTC Lead: opened PR #129 (BG-14). Lesson: my first local scan missed commits and wrongly said no exceptions were needed; the PR's first CI run caught it (16 findings). Fixed by keeping exactly the 13 entries CI's own scan needs and dropping 12 unused. Also adds a secret scan to Fork CI (PRs into windows-port were never scanned before), removes a committed compiled file, pins the last unpinned action. CI green.
