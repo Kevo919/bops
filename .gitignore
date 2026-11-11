@@ -59,3 +59,7 @@ next-env.d.ts
 
 # Your module settings (config/modules.cjs): made from config/bops.example.yaml, never committed.
 config/bops.yaml
+
+# Compiled Python (BG-14)
+__pycache__/
+*.pyc

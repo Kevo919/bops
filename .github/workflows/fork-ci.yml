@@ -25,6 +25,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
@@ -34,6 +35,9 @@ jobs:
       - name: Dependency audit (no high or critical advisories)
         # BG-07: a new high or critical advisory fails the PR. Moderate and low are reported, not blocking.
         run: npm audit --audit-level=high
+      - name: Secret scan (whole history)
+        # Same pinned scanner as ci.yml. Needs the full history, see fetch-depth above.
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git /repo --redact --verbose --log-opts="--all"
       - name: Generate route types
         # next-env.d.ts is not committed; match the existing CI prerequisite.
         run: npx next typegen
