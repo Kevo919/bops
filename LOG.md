@@ -6,6 +6,9 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 
 ---
 
+### Nov 11, 12:20 AM (Chicago) (lead)
+- Kevin named Claude lead and asked to start. Stage 0 has begun. BG-01 and BG-04 done: [KEVIN-CHECKLIST.md](KEVIN-CHECKLIST.md) lists everything only Kevin can do, in order. New PC-QUEUE.md.
+
 ### Nov 11, 12:10 AM (Chicago) (lead, final check asked by Kevin)
 - Second pass over the plan. Added 15 tasks (BG-31 to BG-45) as an addendum to BUILD_PLAN_V2.md: keys, server hardening (urgent), spending brakes, threat model, hidden-instruction tests, least access for connected accounts, confirming no usage data is sent, repo settings, backups, incident runbook, server watch, PC memory budget, Android updates, user guide. 11 more release checks in TESTS.md.
 

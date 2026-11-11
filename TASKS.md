@@ -8,7 +8,7 @@
 
 **Development rule (Kevin, Nov 5):** a feature still being built may show in the app, but grayed out with red "not set up yet" text and its percent complete, until it reaches 100%. The lead keeps the percents current in the in-progress registry.
 
-**Build status:** IN PROGRESS. (The lead writes BUILD DONE here when it's finished. All hourly checks stop then.)
+**Build status:** IN PROGRESS. **Lead:** Claude, named by Kevin 2026-11-11 06:02 UTC. **Plan:** BUILD_PLAN_V2.md, Stage 0. (The lead writes BUILD DONE here when it's finished. All hourly checks stop then.)
 
 **PC HOLD:** LIFTED. PC GO as of 2026-11-03 13:10 UTC (Kevin restarted). Keep RAM use sane: stop Docker and emulators when you are done with them, and only one heavy build at a time. Before a build, check %TEMP%\bops-build.lock and create it while you build.
 
@@ -176,10 +176,10 @@ Added by the lead 2026-11-11. Full description, finding and "done when" for each
 
 | # | Task | Who | Status | Notes |
 |---|---|---|---|---|
-| BG-01 | Name the lead; restart the rhythm; stop-when-blocked rule; cross-family reviews | Kevin + lead | TODO | Stage 0 [CLOUD] |
+| BG-01 | Name the lead; restart the rhythm; stop-when-blocked rule; cross-family reviews | Kevin + lead | DONE (lead named 11-11) | Stage 0 [CLOUD]. Hourly lead check is a cloud scheduled task |
 | BG-02 | Move the board to a private repo; leave a pointer here | lead + Kevin | TODO | Stage 0 [CLOUD]. See private findings |
 | BG-03 | Rotate the keys named in the private findings | Kevin | WAITING ON KEVIN | Stage 0 |
-| BG-04 | KEVIN-CHECKLIST.md: every Kevin-only item in one ordered list | lead | TODO | Stage 0 [CLOUD] |
+| BG-04 | KEVIN-CHECKLIST.md: every Kevin-only item in one ordered list | lead | DONE | Stage 0 [CLOUD]. KEVIN-CHECKLIST.md |
 | BG-05 | Branch clean-up (131 branches) | codex | TODO | Stage 0 [CLOUD] |
 | BG-06 | True the board; renumber duplicates; generate in-app percents from the task list | lead | TODO | Stage 0 [CLOUD] |
 | BG-07 | Upgrade flagged libraries (1 critical, 10 high); npm audit in the automatic checks | next free | TODO | Stage 1 [CLOUD] then [PC] rebuild. HIGH |
