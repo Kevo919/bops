@@ -10,4 +10,4 @@ Work that needs Kevin's computer on, in order. Cloud work never waits for this l
 | 4 | BG-37 | On the PC and the server, confirm `.env.local` has `BOPS_SELF_HOSTED=1` (or `BOPS_TELEMETRY=0`). Say yes or no on the board; do not paste the file. | lead + Kevin |
 | 5 | BG-07 | After PR #127 merges: rebuild Bops on the PC (or install a CI-built copy, BG-15), and update the server, so both get the Next.js fix. | lead |
 
-- [ ] (after PR #130 merges) Install the Bops watch app on the Galaxy Watch Ultra 2 with the phone app; check the glance shows, Ask Boppy relays, Deny works with one tap, and Allow needs the hold or second tap.
+- [ ] (after PR #131 merges) Install the Bops watch app on the Galaxy Watch Ultra 2 with the phone app; check the glance shows, Ask Boppy relays, Deny works with one tap, and Allow needs the hold or second tap.
