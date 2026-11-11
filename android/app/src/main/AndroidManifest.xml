@@ -54,6 +54,16 @@
                 android:value="Checks the user's own self-hosted Bops server for messages that need them" />
         </service>
 
+        <!-- The Bops watch app (android/wear) asks through here; the phone does the asking over Tailscale. -->
+        <service
+            android:name=".WatchBridge"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.REQUEST_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/bops/" />
+            </intent-filter>
+        </service>
+
         <receiver android:name=".BootReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

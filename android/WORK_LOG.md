@@ -53,3 +53,9 @@
 - Risks/blockers: HTTP fixtures are injected; no live endpoint integration or physical-device test. Existing deprecation warnings remain.
 - Remaining work: Parent completes and validates web endpoint, reviews combined change, and handles commit/push/PR.
 - Next recommended action: Review Android client and endpoint together before publishing.
+
+### 2026-11-11 | Claude (lead) | Feature | Wear OS watch app — Review Needed
+- Summary: New `android/wear` module (Bops on Wear OS / Galaxy Watch): glance of what needs you (approvals first, Allow/Deny), what's new, and "Ask Boppy" by voice. The phone app relays through a new `WatchBridge` (Wear Data Layer RPC: /bops/pings, /bops/approve, /bops/say) to GET /api/pings, POST /api/apps/approvals, POST /api/chats/bot:boppy/messages, with the phone's existing pairing cookie, no redirects, timeouts, 256 KB read cap.
+- Security: watch has no INTERNET permission and never sees the pairing code; Data Layer only connects same-package, same-signature apps; watch may only Allow once or Deny (no Always); repo-run approvals stay window-only (server rule). CI fails if phone and watch APKs are signed with different keys.
+- Verification so far: CI compile of :app and :wear plus `:wear:test*UnitTest` (GlanceTest). NOT yet run on a real watch or emulator: visual check, voice input and live approvals still need a device test (per build rules, not complete until then).
+- Remaining work: install on the watch, test glance/Allow/Deny/voice against the live server, screenshot; then a Tile (androidx.wear.tiles) for one-glance status.

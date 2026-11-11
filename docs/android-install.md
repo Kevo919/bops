@@ -57,6 +57,20 @@ The code is shown only once. If you lose it, pair again: that also cancels the o
 
 You can add more servers later (your PC and the Hostinger server, for example). Tap **Saved servers** on the setup screen, or **Servers · <name>** at the top of the app, then **Add server**.
 
+## Watch (Wear OS / Galaxy Watch)
+
+Bops on your wrist: what's waiting for your OK (with **Allow** / **Deny**), what's new, and a mic to **Ask Boppy**. The watch goes through the Bops app on your phone, so the phone app must be installed and paired first; the watch never needs Tailscale or the pairing code.
+
+Even without the watch app, Bops notifications from your phone already show up on a paired watch.
+
+1. Download **bops-watch.apk** from the same release: https://github.com/Kevo919/bops/releases/download/android-latest/bops-watch.apk
+2. Turn on developer options on the watch (**Settings → About watch → Software → tap Software version 5 times**), then **Developer options → ADB debugging** and **Debug over Wi-Fi** (Galaxy Watch: **Wireless debugging**). Note the address it shows, like `192.168.1.40:5555`.
+3. On your PC (same Wi-Fi), with Android's platform-tools: `adb connect 192.168.1.40:5555` (accept the prompt on the watch), then `adb -s 192.168.1.40:5555 install bops-watch.apk`.
+   On a Galaxy Watch you can also use the free *Easy Fire Tools* or *Bugjaeger* app on the phone instead of a PC.
+4. Open **Bops** on the watch. It shows *Checking…*, then what needs you. If it says the phone isn't connected, open Bops on the phone once.
+
+The phone and watch apps must come from the **same release**: they're signed with the same key, and the watch only talks to a phone app signed with that key. When you update one, update the other.
+
 ## Updating
 
 Open the same link again, download, and tap **Install** (or **Update**).
