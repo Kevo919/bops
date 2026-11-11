@@ -4,9 +4,9 @@
 # Runs when android/ changes on windows-port, or by hand from the Actions tab. Each run replaces the APK.
 # A run on any other branch publishes to the android-latest-test prerelease instead, never android-latest.
 #
-# Signing: with the four ANDROID_* secrets below set, the APK is release-signed with that one key, so each
-# new APK installs over the last. Without them it is debug-signed: it installs fine, but GitHub's debug key
-# changes from run to run, so an update means uninstalling the old app first. See docs/android-install.md.
+# Signing: with the ANDROID_SIGNING_PASSWORD secret set, both APKs are release-signed with the one permanent key in
+# android/signing/ (encrypted), so each new APK installs over the last. Without it they're debug-signed with this
+# run's key: they install fine, but updating means uninstalling the old app first.
 name: Android APK
 
 on:
@@ -35,7 +35,7 @@ jobs:
       BOPS_VERSION_CODE: ${{ github.run_number }}
       # The release this build lives in; the apps check this one for updates (Watch & updates).
       BOPS_RELEASE_TAG: ${{ github.ref == 'refs/heads/windows-port' && 'android-latest' || 'android-latest-test' }}
-      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_B64 != '' }}
+      HAS_KEYSTORE: ${{ secrets.ANDROID_SIGNING_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -56,19 +56,19 @@ jobs:
       - name: Build signed release APK
         if: env.HAS_KEYSTORE == 'true'
         env:
-          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
-          BOPS_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          BOPS_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          BOPS_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
         run: |
-          export BOPS_KEYSTORE_FILE="$RUNNER_TEMP/bops-release.jks"
-          printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$BOPS_KEYSTORE_FILE"
+          # The one permanent key (android/signing/README.md), decrypted only for this build.
+          export BOPS_KEYSTORE_FILE="$RUNNER_TEMP/bops-release.p12"
           trap 'rm -f "$BOPS_KEYSTORE_FILE"' EXIT
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in android/signing/android-signing.p12.enc \
+            -out "$BOPS_KEYSTORE_FILE" -pass env:ANDROID_SIGNING_PASSWORD
+          export BOPS_KEYSTORE_PASSWORD="$ANDROID_SIGNING_PASSWORD" BOPS_KEY_ALIAS=kevo-apps BOPS_KEY_PASSWORD="$ANDROID_SIGNING_PASSWORD"
           cd android
           ./gradlew :app:assembleRelease :wear:assembleRelease :wear:testReleaseUnitTest :app:testReleaseUnitTest
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/bops-remote.apk"
           cp wear/build/outputs/apk/release/wear-release.apk "$RUNNER_TEMP/bops-watch.apk"
-          echo "SIGNING=release-signed (stable key: new versions install over old ones)" >> "$GITHUB_ENV"
+          echo "SIGNING=release-signed with the permanent key (new versions install over old ones)" >> "$GITHUB_ENV"
 
       - name: Build debug APK (no signing secrets set)
         if: env.HAS_KEYSTORE != 'true'

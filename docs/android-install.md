@@ -76,7 +76,7 @@ When the phone sees a connected watch without Bops, it offers **Get Bops on your
 
 - **Phone app:** when a newer build is out, Bops asks once. **Watch & updates → Update this phone app** downloads it, checks its fingerprint, and Android asks you to confirm. The first time, Android asks you to allow Bops to install apps.
 - **Watch app:** after the phone is updated, **Send update to watch** sends the matching watch app over the watch's own link. Open Bops on the watch and tap **Install update**.
-- Updates only install over the old app when every build is signed with the same key (the `ANDROID_*` signing secrets in GitHub). Without them, uninstall the old app first.
+- Updates install over the old app because every build is signed with one permanent key (`android/signing/`, unlocked in CI by the `ANDROID_SIGNING_PASSWORD` secret). Builds made before that key existed need one uninstall first.
 
 ### From a PC instead
 `adb pair <ip:pairing-port> <code>`, `adb connect <ip:port>`, `adb install bops-watch.apk` (Google's platform-tools).
