@@ -187,7 +187,7 @@ Added by the lead 2026-11-11. Full description, finding and "done when" for each
 | BG-09 | Security review sweep: 27 process-starting files, PR #126, redo the two lost reviews | reviewer from a different family than each author | TODO | Stage 1 [CLOUD] |
 | BG-12 | Phone pairing hardening | next free | TODO | Stage 1 [CLOUD] + phone |
 | BG-13 | Android hardening and release signing | codex + Kevin | TODO | Stage 1 [CLOUD] |
-| BG-14 | Re-check 37 secret-scan exceptions; remove committed compiled file; pin last action | next free | TODO | Stage 1 [CLOUD] |
+| BG-14 | Re-check 37 secret-scan exceptions; remove committed compiled file; pin last action | lead | DOING | Stage 1 [CLOUD]. First pass done: 9 of 10 flagged values are made-up test values; 1 needs Kevin to look (details kept off this public board, see KEVIN-CHECKLIST). Matching the ignore list to CI's scanner still to do |
 | BG-16 | Fork version numbers, changelog, tagged known-good build | lead | TODO | Stage 2 [CLOUD] |
 | BG-10 | Installer check on the PC: install, launch, uninstall, reinstall | codex | TODO | Stage 2 [PC]. Old rows 14, 42 |
 | BG-11 | Updates on Windows from the fork's releases, with an integrity check | next free | TODO | Stage 2 [CLOUD] + [PC]. Old row 102 |

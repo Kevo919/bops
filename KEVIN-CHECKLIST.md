@@ -15,3 +15,4 @@ Everything only Kevin can do for the Bops build, in the order that unblocks the 
 | 9 | **Keys you want connected:** Composio "For You" address, Hermes key, Zapier address | Real-account tests (BG-23) | 10 min each | WAITING |
 | 10 | **AgentPhone funds and texting registration** | Calls and texts actually go through | depends on the provider | WAITING |
 | 11 | **Signing:** decide on an Android release key now and a Windows certificate later (BG-13, BG-10) | Updates install over old versions | decision only | TODO |
+| 12 | **Look at one test value** the secret scan flagged (the lead has the file and line privately). If it is a real key, rotate it on that service's site | BG-14 done; no real key left in public history | 2 min | TODO |

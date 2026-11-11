@@ -279,3 +279,5 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 2026-11-11 06:42 UTC Lead: PR #127 (BG-07 security upgrades) is fully green in CI (android, cloud-tests, check, mobile-layout, web). Waiting on a review from Codex or Z.AI before merge.
 
 - 2026-11-11 07:14 UTC Lead: added the npm audit gate to PR #127 (Fork CI fails on any high or critical advisory; passes today). Waiting on a Codex or Z.AI review.
+
+- 2026-11-11 07:16 UTC Lead: BG-14 first pass. 9 of 10 values the secret scan flags in history are made-up test values; 1 needs Kevin to look (checklist item 12; details kept private). Still to do: match the ignore list against CI's scanner version.
