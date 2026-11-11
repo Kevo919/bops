@@ -11,7 +11,7 @@ val releaseKeystore = System.getenv("BOPS_KEYSTORE_FILE")?.let { file(it) }?.tak
 
 android {
     namespace = "bot.bops.remote"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "bot.bops.remote"
@@ -61,7 +61,7 @@ dependencies {
     // Second library: Wear OS Data Layer, so the Bops watch app (android/wear) can ask through this phone.
     implementation("com.google.android.gms:play-services-wearable:19.0.0")
     // Watch & updates. Kadb (Apache-2.0): installs the watch app over the watch's Wireless debugging, no PC needed.
-    implementation("com.flyfishxu:kadb:2.1.5")
+    implementation("com.flyfishxu:kadb:2.1.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     // FotMob's route once Bops is on the Play Store: open the listing on the watch.
     implementation("androidx.wear:wear-remote-interactions:1.1.0")

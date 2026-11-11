@@ -10,7 +10,7 @@ val releaseKeystore = System.getenv("BOPS_KEYSTORE_FILE")?.let { file(it) }?.tak
 
 android {
     namespace = "bot.bops.watch"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "bot.bops.remote"
