@@ -291,3 +291,5 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 2026-11-11 11:52 UTC Lead: BG-09 continued. Listed the 31 process-starting files and who can review each (tests/2026-11-11-bg09-file-list.md). Reviewed Z.AI's PR #113 (PC task Job Object, merged earlier without a review): sound, three low follow-ups. The rest of BG-09 is Claude-written and needs Codex or Z.AI.
 
 - 2026-11-11 13:49 UTC Lead: Kevin approved all open PRs. Merged to windows-port: #127 (security upgrades + audit gate), #128 (feature list trued), #126 (Codex routine events core, reviewed by the lead; hook stays switched off), #129 (secret-scan exceptions, after a merge to keep both CI steps). BG-06 DONE.
+
+- 2026-11-11 20:15 UTC Lead: Reviewed PR #130 (Wear OS watch app: glance, Allow/Deny, Ask Boppy). No private data; the watch has no internet permission and talks to the phone only; the phone side checks the server address, has no redirects, and caps sizes and timeouts. CI green. Change requested before merge: Allow is a single tap on the watch, so add hold-to-allow or tap-again-to-allow (Deny can stay one tap). Not yet tried on a real watch.
