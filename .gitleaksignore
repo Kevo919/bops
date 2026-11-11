@@ -1,4 +1,17 @@
-# Secret-scan exceptions. Empty on purpose (BG-14, 2026-11-11): the 25 entries that were here were
-# re-checked with gitleaks 8.30.1, the version CI uses, over all 1,194 commits. With no exceptions at
-# all it reports 0 findings, so none of them was still needed. Add an entry only for a value that is
-# plainly made up, with the date and who checked it on the line above.
+# Secret-scan exceptions, re-checked 2026-11-11 by the lead (BG-14) with gitleaks 8.30.1, the version CI uses,
+# over the whole history CI sees (1,085 commits). Each entry below is a made-up value in a test script or a
+# review note, and each one is still flagged without its entry. 12 older entries were removed because the
+# scanner no longer flags them. Add an entry only for a plainly made-up value, with the date and who checked it.
+09d02152afbebf4e672eef26e9449fdeb2f08298:scripts/test-connections-ui.mjs:generic-api-key:113
+480f6fb7f825c62d72a4fea594ad556f7bbc01c1:scripts/test-connections-ui.mjs:generic-api-key:115
+501534ba3dd83ec0b32532176dd459bcae134730:scripts/test-connections-ui.mjs:generic-api-key:113
+588d2a741ea8a443417116bf5259ec65f97a5f17:scripts/test-pc-task-runner.mjs:generic-api-key:25
+7e52c8555c74565850efe78d41ad4a8fd676cdbf:scripts/test-render.mjs:generic-api-key:406
+86346d477659a875b1a3fea5d5a90e4738e5c922:scripts/test-chat-providers.mjs:generic-api-key:26
+86346d477659a875b1a3fea5d5a90e4738e5c922:scripts/test-cli-agents.mjs:generic-api-key:437
+ac68d39cf9284a1e96c6b698c4299ca3df98c95e:scripts/test-cli-agents.mjs:generic-api-key:435
+bb1b2444a99afea5563b9703314238b7868f0af4:scripts/test-chat-providers.mjs:generic-api-key:26
+d3d39c26007b4a6ac6355edd2b7c09ba131a810c:scripts/test-repo-recipes.mjs:aws-access-token:228
+d3d39c26007b4a6ac6355edd2b7c09ba131a810c:scripts/test-repo-recipes.mjs:generic-api-key:229
+da8d5ffa23722e8d2ff1d71429ec41d81a197aea:scripts/test-chat-error.mjs:generic-api-key:15
+dde234dc68b82239e236be9d193b93d185e425fd:tests/2026-11-05-1158-reviewer-pr69-pr72.md:generic-api-key:12
