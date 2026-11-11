@@ -281,3 +281,5 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 2026-11-11 07:14 UTC Lead: added the npm audit gate to PR #127 (Fork CI fails on any high or critical advisory; passes today). Waiting on a Codex or Z.AI review.
 
 - 2026-11-11 07:16 UTC Lead: BG-14 first pass. 9 of 10 values the secret scan flags in history are made-up test values; 1 needs Kevin to look (checklist item 12; details kept private). Still to do: match the ignore list against CI's scanner version.
+
+- 2026-11-11 07:26 UTC Lead: BG-06. Board has no duplicate ids and every REVIEW row cites a PR. Found that PR #77 (phone pairing) was merged with no review on GitHub; added it to BG-09 and trued the in-app list in PR #128. No reviews yet on any open PR.

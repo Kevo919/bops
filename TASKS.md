@@ -181,10 +181,10 @@ Added by the lead 2026-11-11. Full description, finding and "done when" for each
 | BG-03 | Rotate the keys named in the private findings | Kevin | WAITING ON KEVIN | Stage 0 |
 | BG-04 | KEVIN-CHECKLIST.md: every Kevin-only item in one ordered list | lead | DONE | Stage 0 [CLOUD]. KEVIN-CHECKLIST.md |
 | BG-05 | Branch clean-up (131 branches) | codex | TODO | Stage 0 [CLOUD] |
-| BG-06 | True the board; renumber duplicates; generate in-app percents from the task list | lead | TODO | Stage 0 [CLOUD] |
+| BG-06 | True the board; renumber duplicates; generate in-app percents from the task list | lead | REVIEW | Stage 0 [CLOUD]. Board checked: no duplicate ids, every REVIEW row cites a PR. In-app list trued in PR #128 (phone pairing was merged without a review). A generator is not a fit: the app lists features, the board lists tasks |
 | BG-07 | Upgrade flagged libraries (1 critical, 10 high); npm audit in the automatic checks | lead | REVIEW | Stage 1. PR #127: audit now 0 critical, 0 high; typecheck, lint and 53/58 local tests pass; CI fully green. Audit gate (fails on high or critical) added to Fork CI in the same PR. Then [PC] rebuild |
 | BG-08 | Catch up with the original (v0.0.39 to v0.0.50); weekly sync | next free | TODO | Stage 1 [CLOUD] + [PC] |
-| BG-09 | Security review sweep: 27 process-starting files, PR #126, redo the two lost reviews | reviewer from a different family than each author | TODO | Stage 1 [CLOUD] |
+| BG-09 | Security review sweep: 27 process-starting files, PR #126, redo the two lost reviews, and review PR #77 (merged without one) | reviewer from a different family than each author | TODO | Stage 1 [CLOUD] |
 | BG-12 | Phone pairing hardening | next free | TODO | Stage 1 [CLOUD] + phone |
 | BG-13 | Android hardening and release signing | codex + Kevin | TODO | Stage 1 [CLOUD] |
 | BG-14 | Re-check 37 secret-scan exceptions; remove committed compiled file; pin last action | lead | DOING | Stage 1 [CLOUD]. First pass done: 9 of 10 flagged values are made-up test values; 1 needs Kevin to look (details kept off this public board, see KEVIN-CHECKLIST). Matching the ignore list to CI's scanner still to do |
