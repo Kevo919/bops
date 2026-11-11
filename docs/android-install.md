@@ -59,17 +59,27 @@ You can add more servers later (your PC and the Hostinger server, for example). 
 
 ## Watch (Wear OS / Galaxy Watch)
 
-Bops on your wrist: what's waiting for your OK (with **Allow** / **Deny**), what's new, and a mic to **Ask Boppy**. The watch goes through the Bops app on your phone, so the phone app must be installed and paired first; the watch never needs Tailscale or the pairing code.
+Bops on your wrist: what's waiting for your OK (with **Allow** / **Deny**), what's new, and a mic to **Ask Boppy**. The watch goes through the Bops app on your phone, so the watch never needs Tailscale or the pairing code. (Even without the watch app, Bops notifications from your phone already show on a paired watch.)
 
-Even without the watch app, Bops notifications from your phone already show up on a paired watch.
+### Install it from the phone (no PC)
 
-1. Download **bops-watch.apk** from the same release: https://github.com/Kevo919/bops/releases/download/android-latest/bops-watch.apk
-2. Turn on developer options on the watch (**Settings → About watch → Software → tap Software version 5 times**), then **Developer options → ADB debugging** and **Debug over Wi-Fi** (Galaxy Watch: **Wireless debugging**). Note the address it shows, like `192.168.1.40:5555`.
-3. On your PC (same Wi-Fi), with Android's platform-tools: `adb connect 192.168.1.40:5555` (accept the prompt on the watch), then `adb -s 192.168.1.40:5555 install bops-watch.apk`.
-   On a Galaxy Watch you can also use the free *Easy Fire Tools* or *Bugjaeger* app on the phone instead of a PC.
-4. Open **Bops** on the watch. It shows *Checking…*, then what needs you. If it says the phone isn't connected, open Bops on the phone once.
+When the phone sees a connected watch without Bops, it offers **Get Bops on your watch** (like FotMob). You can also open **Watch & updates** from the bar above Bops any time.
 
-The phone and watch apps must come from the **same release**: they're signed with the same key, and the watch only talks to a phone app signed with that key. When you update one, update the other.
+1. On the watch, once: **Settings → About watch → Software information → tap Software version 5 times**. Then **Settings → Developer options**: turn on **ADB debugging** and **Wireless debugging**. Watch and phone must be on the same Wi-Fi.
+2. On the watch, tap **Wireless debugging** and note the **IP address & port**. Tap **Pair new device** and note the **6-digit code** and its **port**.
+3. On the phone, in **Watch & updates → Install directly**, type those four things and tap **Install**. The phone downloads the matching watch app from the release, checks its fingerprint, and installs it on the watch.
+4. Turn **Wireless debugging** off again on the watch.
+
+**Install from Play Store** shows greyed out with "not set up yet": it turns on once Bops is in a Play Store test track. Then the button opens the Play Store on the watch, the way FotMob does it.
+
+### Updates
+
+- **Phone app:** when a newer build is out, Bops asks once. **Watch & updates → Update this phone app** downloads it, checks its fingerprint, and Android asks you to confirm. The first time, Android asks you to allow Bops to install apps.
+- **Watch app:** after the phone is updated, **Send update to watch** sends the matching watch app over the watch's own link. Open Bops on the watch and tap **Install update**.
+- Updates only install over the old app when every build is signed with the same key (the `ANDROID_*` signing secrets in GitHub). Without them, uninstall the old app first.
+
+### From a PC instead
+`adb pair <ip:pairing-port> <code>`, `adb connect <ip:port>`, `adb install bops-watch.apk` (Google's platform-tools).
 
 ## Updating
 

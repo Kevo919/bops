@@ -53,6 +53,9 @@ class WatchActivity : Activity() {
         column.addView(text("Bops", 18f, bold = true))
         headline = text(if (loading) "Checking…" else g.headline, 13f, color = if (g.error != null) 0xFFFF8A80.toInt() else 0xFFB0BEC5.toInt())
         column.addView(headline)
+        UpdateReceiver.readyVersion(this)?.let { v ->
+            column.addView(button("Install update (build $v)") { installUpdate() })
+        }
         column.addView(button("🎤  Ask Boppy") { listen() })
         for (item in g.items.take(12)) {
             column.addView(space(10))
@@ -67,6 +70,17 @@ class WatchActivity : Activity() {
         }
         column.addView(space(8))
         column.addView(button("Refresh") { refresh() })
+    }
+
+    /** The phone sent a newer watch app (UpdateReceiver checked it). Android asks for OK; the first time it asks to allow Bops to install apps. */
+    private fun installUpdate() {
+        if (!packageManager.canRequestPackageInstalls()) {
+            headline.text = "Allow Bops to install updates, then tap Install update again."
+            try { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, android.net.Uri.parse("package:$packageName"))) } catch (_: Exception) {}
+            return
+        }
+        headline.text = "Installing…"
+        try { WatchInstaller.install(this, UpdateReceiver.readyFile(this)) } catch (_: Exception) { headline.text = "Couldn't start the update. Send it again from the phone." }
     }
 
     private fun refresh() = ask("/bops/pings", JSONObject()) { raw -> render(Glance.parse(raw)) }

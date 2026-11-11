@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tells the Bops phone app this watch has the Bops watch app (so it stops offering to install it). -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@array/android_wear_capabilities">
+    <string-array name="android_wear_capabilities">
+        <item>bops_watch</item>
+    </string-array>
+</resources>

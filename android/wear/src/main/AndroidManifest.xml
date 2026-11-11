@@ -3,6 +3,8 @@
 
     <uses-feature android:name="android.hardware.type.watch" />
     <!-- No internet permission: the watch only talks to the Bops app on the user's own phone. -->
+    <!-- Installs updates the phone sends (Android shows its own confirm screen; the user taps OK). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:allowBackup="false"
@@ -25,5 +27,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Updates and version questions from the Bops phone app (Data Layer: same app, same key only). -->
+        <service android:name=".UpdateReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.REQUEST_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:path="/bops/watch-version" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/bops/update-apk/" />
+            </intent-filter>
+        </service>
+        <receiver android:name=".InstallStatus" android:exported="false" />
     </application>
 </manifest>

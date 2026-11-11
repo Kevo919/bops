@@ -33,6 +33,8 @@ jobs:
       contents: write
     env:
       BOPS_VERSION_CODE: ${{ github.run_number }}
+      # The release this build lives in; the apps check this one for updates (Watch & updates).
+      BOPS_RELEASE_TAG: ${{ github.ref == 'refs/heads/windows-port' && 'android-latest' || 'android-latest-test' }}
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_B64 != '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -63,7 +65,7 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$BOPS_KEYSTORE_FILE"
           trap 'rm -f "$BOPS_KEYSTORE_FILE"' EXIT
           cd android
-          ./gradlew :app:assembleRelease :wear:assembleRelease :wear:testReleaseUnitTest
+          ./gradlew :app:assembleRelease :wear:assembleRelease :wear:testReleaseUnitTest :app:testReleaseUnitTest
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/bops-remote.apk"
           cp wear/build/outputs/apk/release/wear-release.apk "$RUNNER_TEMP/bops-watch.apk"
           echo "SIGNING=release-signed (stable key: new versions install over old ones)" >> "$GITHUB_ENV"
@@ -72,7 +74,7 @@ jobs:
         if: env.HAS_KEYSTORE != 'true'
         run: |
           cd android
-          ./gradlew :app:assembleDebug :wear:assembleDebug :wear:testDebugUnitTest
+          ./gradlew :app:assembleDebug :wear:assembleDebug :wear:testDebugUnitTest :app:testDebugUnitTest
           cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/bops-remote.apk"
           cp wear/build/outputs/apk/debug/wear-debug.apk "$RUNNER_TEMP/bops-watch.apk"
           echo "SIGNING=debug-signed (no signing key set up yet: to update, uninstall the old app first, then install this one)" >> "$GITHUB_ENV"
@@ -88,6 +90,11 @@ jobs:
           a=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/bops-remote.apk" | grep -m1 SHA-256)
           b=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/bops-watch.apk" | grep -m1 SHA-256)
           [ "$a" = "$b" ] && echo "phone and watch share a signing key" || { echo "::error::phone and watch APKs are signed with different keys"; exit 1; }
+          # The update feed the apps read (UpdateFeed.kt): version + SHA-256 of each APK in this release.
+          printf '{"versionCode":%s,"phone":{"asset":"bops-remote.apk","sha256":"%s"},"watch":{"asset":"bops-watch.apk","sha256":"%s"}}\n' \
+            "$BOPS_VERSION_CODE" "$(cut -d' ' -f1 "$RUNNER_TEMP/bops-remote.apk.sha256")" "$(cut -d' ' -f1 "$RUNNER_TEMP/bops-watch.apk.sha256")" \
+            > "$RUNNER_TEMP/android-version.json"
+          cat "$RUNNER_TEMP/android-version.json"
 
       - name: Publish to the prerelease
         env:
@@ -120,6 +127,6 @@ jobs:
           fi
           gh release upload "$TAG" --repo "$REPO" --clobber \
             "$RUNNER_TEMP/bops-remote.apk" "$RUNNER_TEMP/bops-remote.apk.sha256" \
-            "$RUNNER_TEMP/bops-watch.apk" "$RUNNER_TEMP/bops-watch.apk.sha256"
+            "$RUNNER_TEMP/bops-watch.apk" "$RUNNER_TEMP/bops-watch.apk.sha256" "$RUNNER_TEMP/android-version.json"
           echo "Phone: https://github.com/$REPO/releases/download/$TAG/bops-remote.apk" >> "$GITHUB_STEP_SUMMARY"
           echo "Watch: https://github.com/$REPO/releases/download/$TAG/bops-watch.apk" >> "$GITHUB_STEP_SUMMARY"
