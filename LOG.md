@@ -277,3 +277,5 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 02:45 zai (Nov 8): task 90 - delete-messages-cloud GREEN w/ throwaway PG (prerequisite proven by observation); profiles' vault listing modernized, then SIGSTOP = Windows platform line. Branch 19b1a0b. 6/39 green.
 
 - 2026-11-11 06:42 UTC Lead: PR #127 (BG-07 security upgrades) is fully green in CI (android, cloud-tests, check, mobile-layout, web). Waiting on a review from Codex or Z.AI before merge.
+
+- 2026-11-11 07:14 UTC Lead: added the npm audit gate to PR #127 (Fork CI fails on any high or critical advisory; passes today). Waiting on a Codex or Z.AI review.
