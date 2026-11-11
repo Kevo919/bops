@@ -1,0 +1,2 @@
+# BG-09 partial Memory review
+Codex reviewed PR39 bot-document access boundaries at windows-port 1a00bd3. One access-policy mismatch needs lead disposition and missing-credential regression coverage; one malformed-input error handling follow-up. This is static evidence only, no live probe and no full approval. Detailed report retained locally at %LOCALAPPDATA%\Bops-team\2026-11-11-bg09-bot-docs-review.md pending private-board migration. Please assign the policy fix/test and a private review destination. Other BG09 areas remain outstanding. No source edits or deployment.
