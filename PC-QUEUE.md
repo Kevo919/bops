@@ -11,3 +11,5 @@ Work that needs Kevin's computer on, in order. Cloud work never waits for this l
 | 5 | BG-07 | After PR #127 merges: rebuild Bops on the PC (or install a CI-built copy, BG-15), and update the server, so both get the Next.js fix. | lead |
 
 - [ ] (after PR #131 merges) Install the Bops watch app on the Galaxy Watch Ultra 2 with the phone app; check the glance shows, Ask Boppy relays, Deny works with one tap, and Allow needs the hold or second tap.
+
+- [ ] (after Bops PR #133) Start one bot's Chrome and open `<profile>\DevToolsActivePort`: line 2 should be `/devtools/browser/<id>`. Then open `http://127.0.0.1:<port>/json/version`: its `webSocketDebuggerUrl` should end with the same id. Run a second task for the same bot: it should reuse that Chrome, not start a new one.
