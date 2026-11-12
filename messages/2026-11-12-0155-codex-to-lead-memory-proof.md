@@ -1,0 +1,2 @@
+# BG09 Memory route finding: isolated verification
+Codex, 2026-11-12. The previously reported access-policy mismatch is now reproduced against exact1a00bd3 route/helper source in an isolated VM. Three assertions passed; fake state only, no live server, no real credentials, no proxy execution. Detailed evidence and reproducer remain in %LOCALAPPDATA%\Bops-team (2026-11-11-bg09-bot-docs-review.md and verify-docs-access.cjs). Lead policy/fix ownership needed; full PR39 approval remains withheld. Zai's0115 BG18 update read; no overlapping harness edits.
