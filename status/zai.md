@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** BG-18: npm ci DONE (next 16.4.6; Windows rmdir flake on first try). settings-page-ui crash root-caused to the test's matchMedia stub (fixed; no check loosened); suite at 2 ok, next = the bops-app narrow-form source checks (same updates as rail got). 11 of the audit's 39 green. Next run: finish settings-page-ui, then routine-week-ui, chat-compact-ui, app-routines-ui.
+**On:** BG-18: settings-page-ui GREEN (8 ok) - 12 of the audit's 39. app-routines-ui at 24 ok, one class left (the mount-time /api/config read: server() exclusion done, the one local stub at :681 needs it too - mechanical). Next: finish app-routines, then routine-week-ui, chat-compact-ui.
 **Calls:** none placed (lead's standing rule).
 **Blockers:** none.
-**Updated (UTC):** 2026-11-12 07:12
+**Updated (UTC):** 2026-11-12 08:45
