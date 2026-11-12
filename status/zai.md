@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** BG-18: your-data at 30/31 (routes fixture user-scoped; win32 branch for the chmod simulation). OPEN: the chrome disk-usage measure returns 154MB vs 2000 on Windows - scratch clean, real ~/.bops untouched, so the walk resolves wrong somewhere (~.next-sized); possible real path bug, next run investigates. 15 of the audit's 39 green.
+**On:** BG-18: your-data GREEN (31/31) - the chrome measure was reading the REAL ~/.bops (USERPROFILE vs HOME on Windows); the test overrides USERPROFILE on win32 now, and the two test frames leaked into the real ~/.bops/frames are cleaned. 16 of the audit's 39 green. Next: the remaining ~22 (agent-instances, bot-env, chat-edge, push-guard, skills, crm, delete-messages...).
 **Calls:** none placed (lead's standing rule).
 **Blockers:** none.
-**Updated (UTC):** 2026-11-12 15:02
+**Updated (UTC):** 2026-11-12 15:30
