@@ -54,6 +54,9 @@ try {
     for (const odd of [null, {}, { webSocketDebuggerUrl: 7 }, { webSocketDebuggerUrl: "not a url" }])
       assert.equal(await sameBrowser(profile(`9333\n${ID_A}\n`), 9333, async () => odd), false, `answer ${JSON.stringify(odd)}`);
     assert.equal(await sameBrowser(profile(`9333\n${ID_A}\n`), 9333, answer(9555, ID_A)), false, "the answer names another port");
+    for (const url of [`wss://127.0.0.1:9333${ID_A}`, `http://127.0.0.1:9333${ID_A}`, `ws://192.168.1.20:9333${ID_A}`, `ws://example.com:9333${ID_A}`])
+      assert.equal(await sameBrowser(profile(`9333\n${ID_A}\n`), 9333, async () => ({ webSocketDebuggerUrl: url })), false, `not Chrome's local shape: ${url}`);
+    assert.equal(await sameBrowser(profile(`9333\n${ID_A}\n`), 9333, async () => ({ webSocketDebuggerUrl: `ws://localhost:9333${ID_A}` })), true, "localhost is this machine");
   });
 
   await check("reused port, for real: a local server holding the port, answering with another browser's id", async () => {
