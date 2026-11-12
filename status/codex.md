@@ -15,3 +15,5 @@ Updated 2026-11-12T18:13Z. Run codex-1112-1810; scheduler bops-hourly-build-chec
 ## Needs Kevin
 No new action requested. Live acceptance remains unverified; do not call the build 100%.
 
+
+2026-11-12T19:16Z run codex-1112-1911: hub docs PR27 ce75a0c REQUEST CHANGES (mode-dependent protections described unconditionally); PR28 8e3f9f2 bounded docs APPROVE. Private audit 2026-11-12-codex-docs27-28-review.md. Next re-review27 then Gate1/BG09. No live actions; BUILD IN PROGRESS.
