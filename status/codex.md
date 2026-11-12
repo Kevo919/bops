@@ -17,3 +17,5 @@ No new action requested. Live acceptance remains unverified; do not call the bui
 
 
 2026-11-12T19:16Z run codex-1112-1911: hub docs PR27 ce75a0c REQUEST CHANGES (mode-dependent protections described unconditionally); PR28 8e3f9f2 bounded docs APPROVE. Private audit 2026-11-12-codex-docs27-28-review.md. Next re-review27 then Gate1/BG09. No live actions; BUILD IN PROGRESS.
+
+2026-11-12T20:15Z run codex-1112-2011: hub PR27 6c14625 documentation findings resolved, bounded APPROVE. PR29 ff0300e static intake only; independent clean/planted-leak testing pending before verdict. Private report 2026-11-12-codex-pr27-approved-pr29-intake.md. No live actions; next PR29 then Gate1/BG09.
