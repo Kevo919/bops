@@ -129,7 +129,7 @@ await test("in the Cloud: Cloud picked, and each computer of the workspace's bot
 
 await test("each runner in plain words, never a dash", () => {
   const x = (status, more = {}) => ({ status, version: "1", buildId: "b", by: "d", at: 1, ...more });
-  assert.deepEqual(R.runnerNow(undefined, false), { text: "Not set up yet", dot: "bg-[#C9C9C6]" });
+  assert.deepEqual(R.runnerNow(undefined, false), { text: "Not set up yet", dot: "bg-[color:var(--hb-c9c9c6)]" });
   assert.equal(R.runnerNow(x("running"), false).text, "Running");
   assert.equal(R.runnerNow(x("running"), true).text, "Asleep");
   assert.equal(R.runnerNow(x("running"), false, "stopped").text, "Its computer is stopped. Its routines wait until it's back.");
@@ -233,10 +233,10 @@ await test("Your bots' computers: has its own Orgo key, with its prefix and when
   assert.equal(B.keyLine(ownKey({ prefix: "", lastUsed: null }), undefined), "Own Orgo key · never used");
 });
 
-await test("in every mode: routines on This Mac, no runner, and bots in browsers on this Mac", () => {
+await test("in every mode: routines on This Mac, no runner, and bots in browsers on this computer", () => {
   const keys = { keys: { [C2]: ownKey({ lastUsed: null }) }, manage: MANAGE };
   assert.match(text(list({ state: state(), keys })), /Iris Ready Own Orgo key sk_live_ab12… · never used Manage in Orgo$/);
-  assert.match(text(list({ state: state({ host: "mac" }), keys })), /Max Uses this Mac Iris Uses this Mac Own Orgo key sk_live_ab12… · never used Manage in Orgo$/);
+  assert.match(text(list({ state: state({ host: "mac" }), keys })), /Max Uses this computer Iris Uses this computer Own Orgo key sk_live_ab12… · never used Manage in Orgo$/);
   // A main bot on another main bot's free computer works on that one: nothing extra.
   const free = state({ bots: [{ id: "boppy", name: "Boppy", color: "#0A0A0A", isMain: true, computer: "own", computerId: C1, computerStatus: "ready", freeComputer: true }, { id: "kai", name: "Kai", color: "#00AAFF", isMain: true, computer: "shared", computerStatus: "ready", workspaceId: "ws_main" }] });
   assert.equal(text(list({ state: free, keys: { keys: { [C1]: ownKey() }, manage: MANAGE } })), "Your bots' computers Boppy Ready Own Orgo key sk_live_ab12… · used 2m ago Manage in Orgo Kai Works on Boppy's computer");

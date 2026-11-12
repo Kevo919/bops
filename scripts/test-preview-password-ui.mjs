@@ -16,6 +16,8 @@ import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
+/** A component's source, its line endings as Linux has them too (a Windows checkout is CRLF). */
+const srcText = (p) => readFileSync(`${root}/${p}`, "utf8").replace(/\r\n/g, "\n");
 
 // (As a path, not a URL's: a folder with a space in its name would be %20, then %2520 once made a URL again.)
 const root = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
@@ -382,22 +384,22 @@ await test("its tab's Password section wraps New password and the switch, togeth
   assert.ok(classes(value).includes("shrink-0"), "its value never squeezed");
   assert.ok(classes(controls).includes("ml-auto") && controls.querySelector("[data-password-new]") && controls.querySelector("[data-password-switch]"), "New password and the switch together at its end");
   await m.done();
-  const tab = readFileSync(`${root}/components/app/preview-tab.tsx`, "utf8");
-  assert.match(tab, /<div className="flex min-h-9 shrink-0 flex-wrap items-center gap-1 border-b border-\[#F0F0EE\] px-2\.5 py-1">\n\s*<div role="group" aria-label="Which one to show" data-preview-places/);
+  const tab = srcText("components/app/preview-tab.tsx");
+  assert.match(tab, /<div className="flex min-h-9 shrink-0 flex-wrap items-center gap-1 border-b border-\[color:var\(--h-f0f0ee\)] px-2\.5 py-1">\r?\n\s*<div role="group" aria-label="Which one to show" data-preview-places/);
   assert.match(tab, /<span data-preview-tools className="ml-auto flex shrink-0 items-center gap-1">\n\s*\{tools && \([^]*aria-label="Width"[^]*<\/div>\n\s*<\/span>\n\s*<\/div>/);
 });
 
 await test("where preview-tab.tsx, app-envs.tsx and hosted-apps.tsx put it", async () => {
-  const tab = readFileSync(`${root}/components/app/preview-tab.tsx`, "utf8");
+  const tab = srcText("components/app/preview-tab.tsx");
   // (In the tab's own session: its site's, and its bot's copy's when it's of one.)
   assert.match(tab, /const partition = previewPartition\(user, ws, name, site, copy\);/);
   assert.match(tab, /const pass = usePreviewTabPassword\(ws, name, site, shown\?\.preview, partition, \(\) => place === "preview" && view\?\.reload\(\)\);/);
   assert.match(tab, /if \(p === "preview"\) await pass\.ready\(\);\n {4}setPicked\(p\);/, "its cookie set before the Preview shows");
   assert.match(tab, /\{place === "preview" && pass\.on && <PreviewLock pass=\{pass\} at=\{at\} \/>\}/);
   assert.match(tab, /onClick=\{\(\) => \(place === "preview" && pass\.on \? pass\.setPopover\("browser"\) : window\.open\(at, "_blank"\)\)\}/);
-  const envs = readFileSync(`${root}/components/app/app-envs.tsx`, "utf8");
+  const envs = srcText("components/app/app-envs.tsx");
   assert.match(envs, /<UrlLink url=\{app\.preview\.url\} \/>\n\s*\{\/\*[^*]*\*\/\}\n\s*<PasswordBeside ws=\{ws\} name=\{app\.name\} site=\{site\} preview=\{app\.preview\} \/>/);
-  const apps = readFileSync(`${root}/components/app/hosted-apps.tsx`, "utf8");
+  const apps = srcText("components/app/hosted-apps.tsx");
   assert.match(apps, /<AppAddress url=\{previewSettings\?\.url \?\? view\.preview\?\.url \?\? null\} \/>\n\s*<PasswordSection ws=\{ws\} name=\{app\.name\} site=\{siteName\} preview=\{view\.preview\} \/>/);
 });
 
