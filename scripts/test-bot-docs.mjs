@@ -2,7 +2,7 @@
 // the generated documents (SOUL.md from the bot's profile and How I work, MEMORY.md from the pinned lines of its
 // memory), how a document is kept (plain line endings, trailing space dropped, empty is none), the size cap
 // (over it is refused whole, never cut quietly), the route (the owner's own Bops window alone: no window token
-// is 403, someone else's workspace open is 403, a bad body is 400), the mirror files under .data (written on a
+// is 403, no window token set at all is 403, someone else's workspace open is 403, a bad or non-object body is 400), the mirror files under .data (written on a
 // save and a reset, never read: a file edited on disk changes nothing), what the bot reads at the start of a
 // chat turn (its SOUL.md in place of How I work, its MEMORY.md next to its memory, with memory off too, and the
 // generated behaviour when neither is written), and that nothing but the owner's window can write them: a
@@ -302,6 +302,33 @@ await check("only the owner's Bops window reads or writes them", async () => {
   assert.equal((await call("PATCH", { botId: "nobody", soul: "x" })).status, 404);
   assert.equal((await call("PATCH", { botId: "boppy" })).status, 400, "nothing to change");
   assert.equal((await call("PATCH", { botId: "boppy", soul: 7 })).status, 400, "not text");
+});
+
+await check("no window token set (hosted, or a dev server outside the app): refused, not let through", async () => {
+  const keep = process.env.BOPS_UI_TOKEN;
+  delete process.env.BOPS_UI_TOKEN;
+  try {
+    for (const window of [false, true]) {
+      assert.equal((await call("GET", null, { window, query: "?bot=boppy" })).status, 403, "read refused");
+      const r = await call("PATCH", { botId: "boppy", soul: "from outside the app" }, { window });
+      assert.equal(r.status, 403, "write refused");
+      noDashes((await r.json()).error, "the refusal");
+    }
+    assert.equal(boppy().soul, undefined, "nothing changed");
+  } finally {
+    process.env.BOPS_UI_TOKEN = keep;
+  }
+});
+
+await check("a body that isn't an object is a plain 400, never a crash", async () => {
+  const raw = (text) =>
+    route.PATCH(new Request("http://localhost/api/bots/docs", { method: "PATCH", headers: { "content-type": "application/json", "x-bops-window": "window-token-test" }, body: text }));
+  for (const text of ["null", "[]", "7", '"boppy"', "{not json"]) {
+    const r = await raw(text);
+    assert.equal(r.status, 400, `${text}: 400`);
+    noDashes((await r.json()).error, "the error");
+  }
+  assert.equal(boppy().soul, undefined, "nothing changed");
 });
 
 await check("GET gives the text as kept (none at first) and the generated documents", async () => {
