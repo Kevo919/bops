@@ -652,7 +652,7 @@ await test("an issue's + Tag opens a Bops picker over the page, not a datalist: 
     const pop = picker();
     assert.ok(pop && !m.box.contains(pop), "in the body, over everything, so the issue's scrolling page can't cut it off");
     assert.match(pop.className, /\bfixed\b/);
-    assert.match(pop.className, /rounded-xl bg-white shadow-\[0_0_0_1px_#0000000F,0_12px_30px_-10px_#00000040\]/, "the app's small menu look");
+    assert.match(pop.className, /rounded-xl bg-white shadow-\[0_0_0_1px_var\(--h-0000000f\),0_12px_30px_-10px_var\(--h-00000040\)\]/, "the app's small menu look");
     assert.deepEqual([pop.style.left, pop.style.top, pop.style.bottom], ["300px", "306px", ""], "under + Tag");
     assert.deepEqual(optionsSaid(), ["Customer ✓", "Outage ✓", "Bug", "Office", "FYI"], "every tag, the ones on it checked, where they are");
     assert.equal(options().filter((o) => o.querySelector("svg path[d^='M2.5 6.2']")).length, 2, "a check mark on each picked one");

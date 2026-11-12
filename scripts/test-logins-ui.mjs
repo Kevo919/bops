@@ -155,10 +155,10 @@ const DASHES = /[‒–—―]| - /;
 
 const NOW = Date.now();
 const DAY = 24 * 3600_000;
-const BOPPY = { id: "boppy", name: "Boppy", role: "Chief of Staff", color: "#C8F25A", isMain: true, computerStatus: "ready", computerId: "desk-boppy", workspaceId: "ws_fern", access: { ca_sales: "read" } };
-const SALES = { id: "sales", name: "Sales", role: "Sales", color: "#2BB673", isMain: false, computerStatus: "none", workspaceId: "ws_fern", access: { ca_attio: "act" } };
-const SUPPORT = { id: "support", name: "Support", role: "Support", color: "#5B8DEF", isMain: false, computerStatus: "none", workspaceId: "ws_fern", access: { ca_sales: "none" } };
-const REX = { id: "rex", name: "Rex", role: "Chief of Staff", color: "#F79009", isMain: true, computerStatus: "none", workspaceId: "ws_north" };
+const BOPPY = { id: "boppy", name: "Boppy", role: "Chief of Staff", color: "var\(--h-c8f25a\)", isMain: true, computerStatus: "ready", computerId: "desk-boppy", workspaceId: "ws_fern", access: { ca_sales: "read" } };
+const SALES = { id: "sales", name: "Sales", role: "Sales", color: "var\(--h-2bb673\)", isMain: false, computerStatus: "none", workspaceId: "ws_fern", access: { ca_attio: "act" } };
+const SUPPORT = { id: "support", name: "Support", role: "Support", color: "var\(--h-5b8def\)", isMain: false, computerStatus: "none", workspaceId: "ws_fern", access: { ca_sales: "none" } };
+const REX = { id: "rex", name: "Rex", role: "Chief of Staff", color: "var\(--h-f79009\)", isMain: true, computerStatus: "none", workspaceId: "ws_north" };
 const stateOf = (o = {}) => ({
   account: { user: { id: "u_ava", name: "Ava Reed", email: "ava@fernway.example" } },
   owner: { name: "Ava" },
@@ -200,7 +200,7 @@ await test("Settings: Account, then Workspace with its switcher, then Orgo team 
   const panes = [];
   const m = await mount(settings(stateOf(), { props: { onPane: (p) => panes.push(p) } }));
   try {
-    assert.deepEqual(nav(m.box), ["profile", "plan", "usage", "reach", "subscriptions", "ai", "privacy", "mac", "general", "team", "chart", "bots", "logins", "email"], "in the mockup's order");
+    assert.deepEqual(nav(m.box), ["profile", "plan", "usage", "reach", "subscriptions", "ai", "privacy", "look", "mac", "services", "general", "team", "chart", "bots", "logins", "email", "repos"], "in the mockup's order");
     const text = m.box.querySelector("nav").textContent;
     assert.match(text, /Account\s*Yours, in every workspace/);
     assert.match(text, /Workspace[^]*fernway[^]*Shared with its people/, "the switcher as the group's heading");
@@ -285,7 +285,7 @@ await test("the side panel: Connected by, Used in with its own workspace locked 
     await click(page.querySelector('[data-account="ca_sales"] button[aria-pressed]'));
     const panel = m.box.querySelector("[data-login-panel]");
     assert.ok(panel, "open");
-    assert.match(page.querySelector('[data-account="ca_sales"]').getAttribute("class"), /shadow-\[0_0_0_1\.5px_#0A0A0A\]/, "the sign in picked, outlined");
+    assert.match(page.querySelector('[data-account="ca_sales"]').getAttribute("class"), /shadow-\[0_0_0_1\.5px_var\(--h-0a0a0a\)\]/, "the sign in picked, outlined");
     assert.match(panel.textContent, /sales@fernway\.example\s*Gmail · in fernway · connected/);
     assert.match(panel.textContent, /Connected by\s*AR\s*Ava Reed \(you\)\s*ava@fernway\.example/);
     assert.match(panel.textContent, /Working/);
