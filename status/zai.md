@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** BG-18: 15 of the audit's 39 green (app-routines 48ok, routine-week 24ok, chat-compact 11ok this run - the /api/config mount-read exclusion + one token). your-data at 26 ok: sweepKept lines 2-vs-3 (oldLines first-non-old break - fixture study needed) + the copy-write-failure test. Next: your-data deep-dive, then the remaining ~22.
+**On:** BG-18: your-data at 30/31 (routes fixture user-scoped; win32 branch for the chmod simulation). OPEN: the chrome disk-usage measure returns 154MB vs 2000 on Windows - scratch clean, real ~/.bops untouched, so the walk resolves wrong somewhere (~.next-sized); possible real path bug, next run investigates. 15 of the audit's 39 green.
 **Calls:** none placed (lead's standing rule).
 **Blockers:** none.
-**Updated (UTC):** 2026-11-12 14:15
+**Updated (UTC):** 2026-11-12 15:02
