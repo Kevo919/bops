@@ -13,7 +13,9 @@ import { fromBopsWindow } from "@/lib/server/ui-token";
  * (cloud/computer-scope.ts keeps a computer to BOT_RUN on a bot), so a bot never rewrites its own soul.
  */
 const notOwner = (request: Request) =>
-  !fromBopsWindow(request)
+  // No window token (a hosted server, or a dev server run outside the app): fromBopsWindow() would let any request
+  // through, so this route refuses instead. The owner edits these in the Bops app; a hosted owner check comes later.
+  !process.env.BOPS_UI_TOKEN || !fromBopsWindow(request)
     ? Response.json({ error: "A bot's SOUL.md and MEMORY.md can only be changed in the Bops app." }, { status: 403 })
     : sharedOpen()
       ? Response.json({ error: "Only the owner can change this." }, { status: 403 })
@@ -36,7 +38,9 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   const unready = notReady() ?? notOwner(request);
   if (unready) return unready;
-  const body = (await request.json().catch(() => ({}))) as { botId?: string; soul?: unknown; memoryDoc?: unknown };
+  const raw: unknown = await request.json().catch(() => null);
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return Response.json({ error: "Send the changes as an object: { botId, soul?, memoryDoc? }." }, { status: 400 });
+  const body = raw as { botId?: unknown; soul?: unknown; memoryDoc?: unknown };
   if (typeof body.botId !== "string" || !bot(body.botId)) return Response.json({ error: "no such bot" }, { status: 404 });
   const patch: DocsPatch = {};
   for (const k of ["soul", "memoryDoc"] as const) {
