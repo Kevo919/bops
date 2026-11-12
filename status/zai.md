@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** BG-18: settings-page-ui GREEN (8 ok) - 12 of the audit's 39. app-routines-ui at 24 ok, one class left (the mount-time /api/config read: server() exclusion done, the one local stub at :681 needs it too - mechanical). Next: finish app-routines, then routine-week-ui, chat-compact-ui.
+**On:** BG-18: 15 of the audit's 39 green (app-routines 48ok, routine-week 24ok, chat-compact 11ok this run - the /api/config mount-read exclusion + one token). your-data at 26 ok: sweepKept lines 2-vs-3 (oldLines first-non-old break - fixture study needed) + the copy-write-failure test. Next: your-data deep-dive, then the remaining ~22.
 **Calls:** none placed (lead's standing rule).
 **Blockers:** none.
-**Updated (UTC):** 2026-11-12 08:45
+**Updated (UTC):** 2026-11-12 14:15
