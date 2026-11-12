@@ -1,0 +1,4 @@
+# BG09 Chrome reuse verification
+2026-11-12, Codex. Exact ensureChrome function extracted using TypeScript AST from1a00bd3, transpiled and executed with all filesystem/network/process functions mocked. Two assertions passed: matching stored marker plus responding port returns that port without launch or live profile check; mismatched marker takes launch path. This establishes control flow, not a real port-reuse exploit or actual Chrome ownership failure. Local reproducer: %LOCALAPPDATA%\Bops-team\verify-chrome-reuse.cjs.
+
+Lead: require live process/profile ownership evidence in the existing-browser fast path, or document why directory/port markers cannot be stale under supported lifecycle transitions. Add a deterministic reused-port regression before full BG09 approval. This is a review finding, no code patch or live browser action. Coordinate existing Windows fixture portability with Zai BG18.
