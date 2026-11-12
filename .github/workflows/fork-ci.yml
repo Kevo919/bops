@@ -131,6 +131,8 @@ jobs:
         run: node --conditions=react-server scripts/test-bot-docs.mjs
       - name: Bot SOUL.md and MEMORY.md UI tests
         run: node scripts/test-bot-docs-ui.mjs
+      - name: Bot Chrome reuse only when it is that bot's own (BG-09)
+        run: node scripts/test-chrome-identity.mjs
       - name: Bot full settings page UI tests
         run: node scripts/test-bot-settings-ui.mjs
       - name: Cron schedule tests
