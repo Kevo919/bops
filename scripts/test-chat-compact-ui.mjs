@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join } from "node:path";
 // Tests for Compact in the window (components/app/chat-view.tsx, lib/chat-summary.ts, lib/types.ts threadCompacts): the
 // chat's menu has Compact for the owner, and in a shared workspace for a member with Write on every bot in it (alone
 // there), never with Read; it's off, saying why, while a bot answers and with nothing new since the last one. Pressed,
@@ -57,7 +57,10 @@ globalThis.matchMedia = () => ({ matches: false, addEventListener() {}, removeEv
 const calls = [];
 let routes = {};
 globalThis.fetch = async (url, init = {}) => {
-  calls.push({ url: String(url), method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined });
+  // The chat reads /api/config when it mounts (the app own settings read); it is not the chat
+  // acting, so it is not kept - the assertions below are about what the chat sends.
+  if (String(url).split("?")[0] !== "/api/config")
+    calls.push({ url: String(url), method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined });
   const path = String(url).split("?")[0];
   const answer = routes[`${init.method ?? "GET"} ${path}`] ?? routes[path];
   if (!answer) return { ok: false, status: 404, json: async () => ({}) };
