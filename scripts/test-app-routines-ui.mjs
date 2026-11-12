@@ -393,7 +393,10 @@ const button = (el, words) => [...el.querySelectorAll("button")].find((b) => b.t
 function server(status = 200, body = { ok: true }) {
   const calls = [];
   globalThis.fetch = async (url, init = {}) => {
-    calls.push({ url: String(url), method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined });
+    // The page reads /api/config when it mounts (the app's own settings read); it is not a routine
+    // acting, so it is not recorded - the assertions below are about what the routines send.
+    if (!(String(url) === "/api/config" && (init.method ?? "GET") === "GET"))
+      calls.push({ url: String(url), method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined });
     return { ok: status < 400, status, json: async () => body };
   };
   return calls;
@@ -677,7 +680,9 @@ await test("one deleting while another row asks: the first is still deleted, and
   const calls = [];
   let answer = noop;
   globalThis.fetch = (url, init = {}) => {
-    calls.push({ url: String(url), method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined });
+    const isConfigRead = String(url) === "/api/config" && (init.method ?? "GET") === "GET";
+    if (!isConfigRead) calls.push({ url: String(url), method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined });
+    if (isConfigRead) return Promise.resolve({ ok: true, status: 200, json: async () => ({}) });
     return new Promise((r) => (answer = () => r({ ok: true, status: 200, json: async () => ({ ok: true }) })));
   };
   const m = await mount(pageEl(listed()));
