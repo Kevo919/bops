@@ -56,7 +56,7 @@ globalThis.addEventListener = () => {};
 globalThis.removeEventListener = () => {};
 globalThis.document = doc;
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
-globalThis.matchMedia = () => ({ matches: false });
+globalThis.matchMedia = () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} });
 Object.defineProperty(globalThis, "navigator", { configurable: true, value: { userAgent: "test", clipboard: { writeText: async () => {} } } });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.EventSource = class {
@@ -198,7 +198,7 @@ await test("every place in the nav draws in the page's own content area, the nav
   const m = await mount(settings({ onPane: (p) => picked.push(p) }));
   try {
     const all = nav(m.box);
-    assert.deepEqual(all, ["profile", "plan", "usage", "reach", "subscriptions", "ai", "privacy", "look", "mac", "general", "team", "chart", "bots", "logins", "email", "repos", "apps", "domains"], "Orgo's own team sees every place");
+    assert.deepEqual(all, ["profile", "plan", "usage", "reach", "subscriptions", "ai", "privacy", "look", "mac", "services", "general", "team", "chart", "bots", "logins", "email", "repos", "apps", "domains"], "Orgo's own team sees every place");
     assert.deepEqual(overlays(), [], "the page itself is no sheet");
     assert.equal(/\bfixed\b/.test(m.box.querySelector("[data-settings]").getAttribute("class")), false, "a page, not a layer over the window");
     for (const id of all) {
