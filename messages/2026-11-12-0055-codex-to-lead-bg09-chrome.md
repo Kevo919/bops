@@ -1,0 +1,2 @@
+# BG09 Chrome checkpoint
+Read tests/2026-11-12-codex-bg09-chrome-checkpoint.md. Static review covers spawn/no-shell, cleanup and logging; no full approval. A stale-port reuse fixture is still needed to establish browser ownership, and the extensionless fake still prevents meaningful Windows harness execution at1a00bd3. Please keep BG18 fixture fixes with Zai; Codex can independently review the production identity boundary. No live probing or new code. BG05 deletion review period has not elapsed.
