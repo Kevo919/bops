@@ -295,8 +295,10 @@ await check("the same sweep deletes this Mac's files older than the keep, but th
   const line = (days, words) => `${JSON.stringify({ at: new Date(NOW - days * DAY).toISOString(), event: words })}\n`;
   const calls = join(work, ".data", "phone-calls.jsonl");
   writeFileSync(calls, line(60, "old call") + line(31, "old call 2") + line(1, "new call"));
-  const routes = join(process.env.HOME, ".bops", "routes.jsonl");
-  mkdirSync(join(process.env.HOME, ".bops"), { recursive: true });
+  // The routes log is the signed-in user's own (~/.bops/users/<scope>/ since users got their own
+    // homes), not the shared root the test once wrote.
+    const routes = join(S.userHome(), "routes.jsonl");
+  mkdirSync(S.userHome(), { recursive: true });
   writeFileSync(routes, line(90, "old route"));
 
   const r = await Priv.sweepKept(NOW);
@@ -765,12 +767,19 @@ await check("a copy that can't be written leaves nothing behind and the delete g
   } finally {
     chmodSync(deletedDir(), 0o700);
   }
-  assert.deepEqual(ids(), []);
-  assert.equal(Up.uploadPath(pic.id), null, "gone at once, as with no copy");
-  assert.deepEqual(readdirSync(deletedDir()), []);
-  const said = warned.findIndex((w) => w.startsWith("[remove] a copy for Recently deleted"));
-  assert.ok(said >= 0, "said why");
-  warned.splice(said, 1);
+  if (process.platform === "win32") {
+    // Windows chmod on a directory is a no-op, so the write cannot be made to fail here: the copy
+    // IS written. Linux CI runs the can't-write half; here the copy is cleaned away so the tests
+    // after this start from an empty Recently deleted, and the stray-half below still runs.
+    for (const e of readdirSync(deletedDir())) rmSync(join(deletedDir(), e), { recursive: true, force: true });
+  } else {
+    assert.deepEqual(ids(), []);
+    assert.equal(Up.uploadPath(pic.id), null, "gone at once, as with no copy");
+    assert.deepEqual(readdirSync(deletedDir()), []);
+    const said = warned.findIndex((w) => w.startsWith("[remove] a copy for Recently deleted"));
+    assert.ok(said >= 0, "said why");
+    warned.splice(said, 1);
+  }
   // A folder with no file beside it, a file half written: swept, and never listed.
   mkdirSync(join(deletedDir(), "del_stray1"));
   writeFileSync(join(deletedDir(), "del_stray1", "img_x.png"), "x");
