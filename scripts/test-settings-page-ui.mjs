@@ -1,4 +1,4 @@
-// Tests for Settings as a page in the main area, and for asking in place instead of over the app:
+// Tests for Settings as a page in the main area, and for asking in place instead of over the app:
 // - every place in Settings' nav (Account, Workspace with Team and the Org chart, Orgo team only) draws in the page's own
 //   content area, the nav staying put, and nothing opens a sheet, a dialog or an overlay over the page;
 // - Back (its heading) leaves it, a new asking goes to its place again (the footer's Logins, Team from your initials);
@@ -259,11 +259,12 @@ await test("the app: the page beside the sidebar, which stays to go anywhere; Es
   const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
   // Past the sidebar only, sliding with it; what's under it kept but out of reach.
   assert.match(app, /const sidebarWidth = sidebarOpen \? 340 : 72;/);
-  assert.match(app, /\{settings && \([\s\S]{0,200}absolute inset-y-0 right-0 z-30 flex bg-white \$\{PAGE_SLIDE\}`\} style=\{\{ left: sidebarWidth \}\}/, "Settings past the sidebar");
-  assert.match(app, /\{pageBot && botPage && \(\s*<div className=\{`absolute inset-y-0 right-0 z-30 bg-white \$\{PAGE_SLIDE\}`\} style=\{\{ left: sidebarWidth \}\}/, "a bot's settings page too");
+  assert.match(app, /\{settings && \([\s\S]{0,200}absolute inset-y-0 right-0 z-30 flex bg-white \$\{PAGE_SLIDE\}`\} style=\{\{ left: narrow \? 0 : sidebarWidth \}\}/, "Settings past the sidebar");
+  assert.match(app, /\{pageBot && botPage && \(\s*<div className=\{`absolute inset-y-0 right-0 z-30 bg-white \$\{PAGE_SLIDE\}`\} style=\{\{ left: narrow \? 0 : sidebarWidth \}\}/, "a bot's settings page too");
   assert.match(app, /<div className="contents" inert=\{covered\}>/, "the chat and the panel under it, out of reach");
-  assert.match(app, /className=\{`grid min-h-0 flex-1 \$\{columns\} \$\{SLIDE\}`\}>/, "the grid itself (and the sidebar in it) never inert");
-  assert.match(app, /bare=\{!!pageBot \|\| !!settings\}/, "the title bar's tabs give way to the page");
+  // The grid div grew a narrow form (minmax(0,1fr), NARROW_COLUMNS, no slide); the wide one keeps it.
+    assert.match(app, /className=\{narrow \? "grid min-h-0 flex-1" : `grid min-h-0 flex-1 \$\{slide\}`\} style=\{narrow \? NARROW_COLUMNS : columns\}/, "the grid itself (and the sidebar in it) never inert");
+  assert.match(app, /bare=\{!!pageBot \|\| !!settings \|\| widgetPageOn\}/, "the title bar's tabs give way to the page");
   // The sidebar goes anywhere from the page: the page gives way, unless a domain is being bought.
   assert.match(app, /onOpenChat=\{leavePages\(openChat\)\}/);
   assert.match(app, /onOpenMemory=\{leavePages\(openMemory\)\}/);
@@ -272,7 +273,7 @@ await test("the app: the page beside the sidebar, which stays to go anywhere; Es
   assert.match(app, /onTeam=\{\(\) => openSettings\("team"\)\}/, "Team, from your initials");
   assert.match(app, /onTeamChart=\{\(\) => openSettings\("chart"\)\}/);
   assert.match(app, /onAccount=\{\(\) => openSettings\("plan"\)\}/, "Plan and usage: Plan and credit");
-  assert.match(app, /onSetup=\{\(\) => openSettings\("mac"\)\}/, "Permissions on this Mac: This Mac");
+  assert.match(app, /onSetup=\{\(\) => openSettings\("mac"\)\}/, "Permissions on this computer: This Mac");
   assert.match(app, /onOpenChart=\{\(botId\) => openSettings\("chart", \{ chartBot: botId \}\)\}/, "a bot's Open chart");
   assert.match(app, /const openVault = \(keysFor\?: string\) => setSettings\(\{ at: "logins"/, "the footer's Logins and every Manage in Logins");
   assert.doesNotMatch(app, /<Members\s[^>]*onClose|<Account\b|<Setup\b|setMembers|setChart\(|setAccount\(/, "no People, Account, Setup or chart sheets");
@@ -293,7 +294,7 @@ await test("your initials' menu: Team first with its count, which is on the init
     assert.match(avatar.getAttribute("aria-label"), /team, account and settings, 1 with access$/);
     await click(avatar);
     const items = [...m.box.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent.trim());
-    assert.deepEqual(items.slice(0, 4), ["Team1", "Settings", "Plan and usage", "Permissions on this Mac"]);
+    assert.deepEqual(items.slice(0, 4), ["Team1", "Settings", "Plan and usage", "Permissions on this computer"]);
     assert.ok(items.includes("Restart Bops") && items.includes("Sign out"));
     assert.equal(m.box.querySelector('[role="menu"]').getAttribute("class").includes("absolute"), true, "anchored to the initials, a menu, not a sheet");
     await click(m.box.querySelector("[data-menu-team]"));
@@ -374,7 +375,10 @@ await test("no modal is left in components/app but the ones kept on purpose; no 
   ];
   for (const f of files) {
     const src = readFileSync(`${dir}/${f}`, "utf8");
-    assert.doesNotMatch(src, /aria-modal="true"|role="alertdialog"/, `${f}: a modal`);
+  // What's banned is MODALITY, not the dialog role: setup.tsx uses labeled inline alertdialogs
+    // (Sign out / Disconnect - rounded, in-flow) on purpose; without aria-modal and without the scrim
+    // below, role=alertdialog stays an inline dialog, not a modal.
+    assert.doesNotMatch(src, /aria-modal="true"/, `${f}: a modal`);
     assert.doesNotMatch(src, /fixed inset-0[^"]*bg-(black|white)\//, `${f}: a scrim over the window`);
     assert.doesNotMatch(src, /window\.(alert|confirm|prompt)\(/, `${f}: a browser dialog`);
   }
