@@ -16,7 +16,7 @@ import { writeSkillFiles } from "./workspace-skills";
 import { userChrome, userHome } from "./store";
 import { bopsHome, chromeRoot } from "./user-paths";
 import { botChromesRunning, onWindows, profileChromeRunning, stopBotChromes, windowsChromeFound, windowsChromeVersion, windowsHome, windowsUserAgent } from "./windows-host";
-import { activePort, ChromeStartError, chromeStartLog, chromeStartWords, pgrepInUse, startBotChrome } from "./chrome-start";
+import { ChromeStartError, chromeStartLog, chromeStartWords, pgrepInUse, sameBrowser, startBotChrome } from "./chrome-start";
 
 /**
  * Local Mac host. Each bot's "screen" is its own background Chrome on the user's Mac, with its own
@@ -170,8 +170,9 @@ export async function ensureChrome(botId: string, port: number): Promise<number>
   const usual = [...moved].find(([, to]) => to === port)?.[0] ?? port;
   const profile = join(dir, `${botId}-${usual}`);
   if (await cdpUp(port)) {
-    // This bot's own Chrome only: the one its profile names the port of (chrome-start.ts activePort), never another bot's on it.
-    if (runningFor() === dir && activePort(profile) === port) return port;
+    // This bot's own Chrome only: the browser on the port must be the one its profile wrote down (chrome-start.ts
+    // sameBrowser: the port and the browser's own id), never another bot's, or anything else, that holds the port now.
+    if (runningFor() === dir && (await sameBrowser(profile, port))) return port;
     if (runningFor() !== dir) await quitBotChromes({ switching: false });
   }
   // The Chromes were closed meanwhile (a sign-out, or another account signing in): one started now

@@ -141,6 +141,47 @@ export function activePort(profile: string): number | null {
 }
 
 /**
+ * The browser id this profile's Chrome wrote: the second line of DevToolsActivePort, "/devtools/browser/<id>",
+ * a fresh id each time Chrome starts. null when the file or the line isn't there or isn't that shape.
+ */
+export function activeBrowserPath(profile: string): string | null {
+  try {
+    const line = (readFileSync(join(profile, "DevToolsActivePort"), "utf8").split(/\r?\n/)[1] ?? "").trim();
+    return /^\/devtools\/browser\/[\w-]{8,64}$/.test(line) ? line : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether the browser answering on `port` is the very Chrome this profile names (BG-09). The port and the
+ * profile's file alone don't prove it: the file can be left from a Chrome that has since gone, and another
+ * program (another bot's Chrome, above all) can hold that port now. So the browser's own id, from its
+ * /json/version, must match the one this profile's Chrome wrote. Any doubt (no file, no id, no answer, an
+ * answer that isn't the shape Chrome gives) is "not proven", and the caller starts this bot's own Chrome.
+ */
+export async function sameBrowser(
+  profile: string,
+  port: number,
+  get: (url: string) => Promise<unknown> = async (url) => {
+    const r = await fetch(url, { signal: AbortSignal.timeout(1000) });
+    return r.ok ? r.json() : null;
+  },
+): Promise<boolean> {
+  if (activePort(profile) !== port) return false;
+  const want = activeBrowserPath(profile);
+  if (!want) return false;
+  try {
+    const v = (await get(`http://127.0.0.1:${port}/json/version`)) as { webSocketDebuggerUrl?: unknown } | null;
+    if (!v || typeof v.webSocketDebuggerUrl !== "string") return false;
+    const u = new URL(v.webSocketDebuggerUrl);
+    return u.pathname === want && (u.port === "" || Number(u.port) === port);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Stop a Chrome and everything it started, and wait till they're gone: `taskkill /T /F` on Windows (the
  * whole tree), the process group on Mac and Linux (it was started detached, so it leads its own group).
  */
