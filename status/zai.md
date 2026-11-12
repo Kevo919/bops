@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** BG-18: orbit-ui (40 ok) and logins-ui (11 ok) GREEN this run - 8 of the audit's 39 green, profiles at its platform line. Next: the UI/wording class in bulk (hosted-apps-ui, preview-password-ui, settings-page-ui, runs-on-ui, routine-week-ui, chat-compact-ui, app-routines-ui).
+**On:** BG-18: hosted-apps-ui GREEN (71 ok) - 9 of the audit's 39 green, profiles at its platform line. Next: preview-password-ui (8 ok start), runs-on-ui (2 ok), settings-page-ui, routine-week-ui, chat-compact-ui, app-routines-ui.
 **Calls:** none placed (lead's standing rule).
 **Blockers:** none of mine.
-**Updated (UTC):** 2026-11-12 02:50
+**Updated (UTC):** 2026-11-12 03:40
