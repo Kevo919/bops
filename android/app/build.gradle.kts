@@ -11,7 +11,7 @@ val releaseKeystore = System.getenv("BOPS_KEYSTORE_FILE")?.let { file(it) }?.tak
 
 android {
     namespace = "bot.bops.remote"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "bot.bops.remote"
@@ -20,6 +20,10 @@ android {
         versionCode = ciVersionCode ?: 1
         versionName = if (ciVersionCode != null) "0.1.0.$ciVersionCode" else "0.1.0"
         testInstrumentationRunner = "bot.bops.remote.MultiServerTests"
+        // Which GitHub release this build checks for updates (CI sets it: android-latest or android-latest-test).
+        buildConfigField("String", "RELEASE_TAG", "\"${System.getenv("BOPS_RELEASE_TAG") ?: "android-latest"}\"")
+        // Flip to true once Bops is in a Play Store track: then Install from Play Store (FotMob's route) turns on.
+        buildConfigField("boolean", "PLAY_LISTED", "false")
     }
 
     signingConfigs {
@@ -46,11 +50,21 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    buildFeatures { buildConfig = true }
+    packaging { resources { excludes += setOf("META-INF/versions/9/OSGI-INF/MANIFEST.MF", "META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*") } }
 }
 
 // One library: Google's code scanner (Play services) for Scan QR code. It shows its own camera screen,
 // so the app needs no camera permission. Everything else is Android's own WebView and a few screens.
 dependencies {
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+    // Second library: Wear OS Data Layer, so the Bops watch app (android/wear) can ask through this phone.
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
+    // Watch & updates. Kadb (Apache-2.0): installs the watch app over the watch's Wireless debugging, no PC needed.
+    implementation("com.flyfishxu:kadb:2.1.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    // FotMob's route once Bops is on the Play Store: open the listing on the watch.
+    implementation("androidx.wear:wear-remote-interactions:1.1.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

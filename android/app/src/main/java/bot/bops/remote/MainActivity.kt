@@ -46,6 +46,7 @@ class MainActivity : Activity() {
     private val servers by lazy { ServerStore(this) }
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var pendingMic: PermissionRequest? = null
+    private var promptedThisRun = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -129,6 +130,8 @@ class MainActivity : Activity() {
         root.addView(Button(this).apply { text = "Add server"; setOnClickListener { showSetup(null) } })
         showContent(android.widget.ScrollView(this).apply { addView(root) })
         PingService.startIfWanted(this)
+        // Like FotMob: once per app start, offer the watch app if a connected watch lacks it, or a newer build.
+        if (!promptedThisRun) { promptedThisRun = true; WatchSetupActivity.promptIfUseful(this) }
     }
 
     /**
@@ -386,7 +389,11 @@ class MainActivity : Activity() {
         }
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         root.addView(Button(this).apply { text = "Servers · ${server.name}"; setOnClickListener { showServers() } })
-        root.addView(Button(this).apply { text = "Settings"; setOnClickListener { showSettings(server) } })
+        root.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(Button(this@MainActivity).apply { text = "Settings"; setOnClickListener { showSettings(server) } }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(Button(this@MainActivity).apply { text = "Watch & updates"; setOnClickListener { startActivity(Intent(this@MainActivity, WatchSetupActivity::class.java)) } }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        })
         root.addView(web, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         showContent(root)
         web?.loadUrl("$address/")

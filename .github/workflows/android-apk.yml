@@ -1,11 +1,12 @@
 # Builds the Bops Android app and puts it at one link that never changes:
-#   https://github.com/Kevo919/bops/releases/download/android-latest/bops-remote.apk
+#   https://github.com/Kevo919/bops/releases/download/android-latest/bops-remote.apk   (phone)
+#   https://github.com/Kevo919/bops/releases/download/android-latest/bops-watch.apk    (Wear OS / Galaxy Watch)
 # Runs when android/ changes on windows-port, or by hand from the Actions tab. Each run replaces the APK.
 # A run on any other branch publishes to the android-latest-test prerelease instead, never android-latest.
 #
-# Signing: with the four ANDROID_* secrets below set, the APK is release-signed with that one key, so each
-# new APK installs over the last. Without them it is debug-signed: it installs fine, but GitHub's debug key
-# changes from run to run, so an update means uninstalling the old app first. See docs/android-install.md.
+# Signing: with the ANDROID_SIGNING_PASSWORD secret set, both APKs are release-signed with the one permanent key in
+# android/signing/ (encrypted), so each new APK installs over the last. Without it they're debug-signed with this
+# run's key: they install fine, but updating means uninstalling the old app first.
 name: Android APK
 
 on:
@@ -32,7 +33,9 @@ jobs:
       contents: write
     env:
       BOPS_VERSION_CODE: ${{ github.run_number }}
-      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_B64 != '' }}
+      # The release this build lives in; the apps check this one for updates (Watch & updates).
+      BOPS_RELEASE_TAG: ${{ github.ref == 'refs/heads/windows-port' && 'android-latest' || 'android-latest-test' }}
+      HAS_KEYSTORE: ${{ secrets.ANDROID_SIGNING_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -46,39 +49,69 @@ jobs:
             android/**/*.gradle*
             android/gradle/wrapper/gradle-wrapper.properties
       - name: Install Android SDK packages
-        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"'
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"'
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - name: Create the permanent signing key (first build only, never shown to anyone)
+        if: env.HAS_KEYSTORE == 'true' && hashFiles('android/signing/android-signing.p12.enc') == ''
+        env:
+          ANDROID_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          KS="$RUNNER_TEMP/new.p12"; trap 'rm -f "$KS"' EXIT
+          keytool -genkeypair -storetype PKCS12 -keystore "$KS" -alias kevo-apps -keyalg RSA -keysize 4096 -validity 36500 \
+            -storepass:env ANDROID_SIGNING_PASSWORD -keypass:env ANDROID_SIGNING_PASSWORD -dname "CN=Kevo919 Apps, O=Kevo919"
+          mkdir -p android/signing
+          openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt -in "$KS" -out android/signing/android-signing.p12.enc -pass env:ANDROID_SIGNING_PASSWORD
+          keytool -list -keystore "$KS" -storepass:env ANDROID_SIGNING_PASSWORD | grep -i "SHA-256" || true
+          git config user.name "android-key-bot"; git config user.email "android-key-bot@users.noreply.github.com"
+          git add android/signing/android-signing.p12.enc
+          git commit -m "android: permanent signing key (encrypted; made by CI, password only in ANDROID_SIGNING_PASSWORD)"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${GITHUB_REF_NAME}"
 
       - name: Build signed release APK
         if: env.HAS_KEYSTORE == 'true'
         env:
-          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
-          BOPS_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          BOPS_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          BOPS_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
         run: |
-          export BOPS_KEYSTORE_FILE="$RUNNER_TEMP/bops-release.jks"
-          printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$BOPS_KEYSTORE_FILE"
+          # The one permanent key (android/signing/README.md), decrypted only for this build.
+          export BOPS_KEYSTORE_FILE="$RUNNER_TEMP/bops-release.p12"
           trap 'rm -f "$BOPS_KEYSTORE_FILE"' EXIT
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in android/signing/android-signing.p12.enc \
+            -out "$BOPS_KEYSTORE_FILE" -pass env:ANDROID_SIGNING_PASSWORD
+          export BOPS_KEYSTORE_PASSWORD="$ANDROID_SIGNING_PASSWORD" BOPS_KEY_ALIAS=kevo-apps BOPS_KEY_PASSWORD="$ANDROID_SIGNING_PASSWORD"
           cd android
-          ./gradlew assembleRelease
+          ./gradlew :app:assembleRelease :wear:assembleRelease :wear:testReleaseUnitTest :app:testReleaseUnitTest
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/bops-remote.apk"
-          echo "SIGNING=release-signed (stable key: new versions install over old ones)" >> "$GITHUB_ENV"
+          cp wear/build/outputs/apk/release/wear-release.apk "$RUNNER_TEMP/bops-watch.apk"
+          echo "SIGNING=release-signed with the permanent key (new versions install over old ones)" >> "$GITHUB_ENV"
 
       - name: Build debug APK (no signing secrets set)
         if: env.HAS_KEYSTORE != 'true'
         run: |
           cd android
-          ./gradlew assembleDebug
+          ./gradlew :app:assembleDebug :wear:assembleDebug :wear:testDebugUnitTest :app:testDebugUnitTest
           cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/bops-remote.apk"
+          cp wear/build/outputs/apk/debug/wear-debug.apk "$RUNNER_TEMP/bops-watch.apk"
           echo "SIGNING=debug-signed (no signing key set up yet: to update, uninstall the old app first, then install this one)" >> "$GITHUB_ENV"
 
       - name: Check the APK
         run: |
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/bops-remote.apk" | head -3
-          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$RUNNER_TEMP/bops-remote.apk" | head -1
-          (cd "$RUNNER_TEMP" && sha256sum bops-remote.apk | tee bops-remote.apk.sha256)
+          for apk in bops-remote bops-watch; do
+            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/$apk.apk" | head -3
+            "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$RUNNER_TEMP/$apk.apk" | head -1
+            (cd "$RUNNER_TEMP" && sha256sum $apk.apk | tee $apk.apk.sha256)
+          done
+          # The Data Layer only connects phone and watch apps signed with the SAME key: fail the build if they differ.
+          a=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/bops-remote.apk" | grep -m1 SHA-256)
+          b=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/bops-watch.apk" | grep -m1 SHA-256)
+          [ "$a" = "$b" ] && echo "phone and watch share a signing key" || { echo "::error::phone and watch APKs are signed with different keys"; exit 1; }
+          # The update feed the apps read (UpdateFeed.kt): version + SHA-256 of each APK in this release.
+          printf '{"versionCode":%s,"phone":{"asset":"bops-remote.apk","sha256":"%s"},"watch":{"asset":"bops-watch.apk","sha256":"%s"}}\n' \
+            "$BOPS_VERSION_CODE" "$(cut -d' ' -f1 "$RUNNER_TEMP/bops-remote.apk.sha256")" "$(cut -d' ' -f1 "$RUNNER_TEMP/bops-watch.apk.sha256")" \
+            > "$RUNNER_TEMP/android-version.json"
+          cat "$RUNNER_TEMP/android-version.json"
 
       - name: Publish to the prerelease
         env:
@@ -95,7 +128,11 @@ jobs:
             echo
             echo "Signing: $SIGNING."
             echo
-            echo "SHA-256: \`$(cut -d' ' -f1 "$RUNNER_TEMP/bops-remote.apk.sha256")\`"
+            echo "SHA-256 (phone): \`$(cut -d' ' -f1 "$RUNNER_TEMP/bops-remote.apk.sha256")\`"
+            echo
+            echo "Watch app (Wear OS / Galaxy Watch): bops-watch.apk. Install the phone app first. See docs/android-install.md, Watch."
+            echo
+            echo "SHA-256 (watch): \`$(cut -d' ' -f1 "$RUNNER_TEMP/bops-watch.apk.sha256")\`"
           } > "$NOTES"
           if gh release view "$TAG" --repo "$REPO" > /dev/null 2>&1; then
             # Point the tag at this build's commit, then refresh the notes.
@@ -106,5 +143,7 @@ jobs:
               --title "Bops for Android ($TAG)" --notes-file "$NOTES"
           fi
           gh release upload "$TAG" --repo "$REPO" --clobber \
-            "$RUNNER_TEMP/bops-remote.apk" "$RUNNER_TEMP/bops-remote.apk.sha256"
-          echo "Download: https://github.com/$REPO/releases/download/$TAG/bops-remote.apk" >> "$GITHUB_STEP_SUMMARY"
+            "$RUNNER_TEMP/bops-remote.apk" "$RUNNER_TEMP/bops-remote.apk.sha256" \
+            "$RUNNER_TEMP/bops-watch.apk" "$RUNNER_TEMP/bops-watch.apk.sha256" "$RUNNER_TEMP/android-version.json"
+          echo "Phone: https://github.com/$REPO/releases/download/$TAG/bops-remote.apk" >> "$GITHUB_STEP_SUMMARY"
+          echo "Watch: https://github.com/$REPO/releases/download/$TAG/bops-watch.apk" >> "$GITHUB_STEP_SUMMARY"
