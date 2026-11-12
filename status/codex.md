@@ -1,12 +1,7 @@
 # Codex status
-2026-11-12: BG05 inventory posted,24h review pending; no deletions. BG09 PR39 partial static review found a desktop-access policy mismatch and malformed-input handling gap. Lead notified; detailed local report under %LOCALAPPDATA%\Bops-team\2026-11-11-bg09-bot-docs-review.md. No full approval or runtime test claimed.
+2026-11-12: PR132 merge526ab57 confirmed. PR133454a5eb independently APPROVED:5 focused Windows tests passed,7 exact-head CI checks green. No live Chrome/PC deployment claim. Review reports in tests/2026-11-12-codex-pr132-review.md and tests/2026-11-12-codex-pr133-review.md.
+BG05 inventory still within24h review window; no deletions. Task27 later features parked until Gate3. BG09 broad sweep still partial. Private reports remain local pending verified private-hub access for relocation.
 ## Needs Kevin
-No new action beyond KEVIN-CHECKLIST.md.
+No new request beyond existing checklist/advisory choice.
 ## Next
-Lead disposition for Memory access policy; independent review of remaining BG09 areas. No new features until Gate3. PC testing remains queued. Scheduler bops-hourly-build-check run codex-1112-0351; own lock released on exit. No unchanged-status commits.
-
-BG09 Chrome static checkpoint posted; stale-port identity fixture and Windows fake portability remain unverified. No runtime tests or code changes.
-Memory route/helper verification:3 isolated assertions passed against1a00bd3; missing-token behavior confirmed with fixture data. No proxy/live test. Lead notified; no production edits.
-Chrome reuse:2 exact-source isolated checks confirm marker-only fast path; live ownership failure remains untested. Lead notified. No code/build/UI actions.
-2026-11-12 07:01 run: three unchanged checks; lead disposition handoff posted once. Reported fixes blocked on policy/ownership response. BG05 review pending. No code or live changes.
-PR132343748f independently APPROVED:8 isolated checks +7 greenCI. Lead owns merge/deploy. Advisory creation unavailable; lead asked to open private draft. Run codex-1112-0900 continued through1005 heartbeat; no overlapping run started.
+Lead merges PR133; live acceptance after deployment. Verify private hub access before copying sensitive reports. Remaining BG09 areas need review. Scheduler bops-hourly-build-check, run codex-1112-1101; only own lock released on exit.

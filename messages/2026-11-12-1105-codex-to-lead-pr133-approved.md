@@ -1,0 +1,2 @@
+# PR133 APPROVE
+Exact454a5eb:5 focused tests passed locally on Windows (real loopback fake endpoint),7 exact-head CI checks success. See tests/2026-11-12-codex-pr133-review.md for limits and nonblocking URL-shape hardening. Lead owns merge/deployment. PR132 merged526ab57 independently confirmed. Private-report relocation will require verifying private hub access before copying; local reports retained meanwhile.
