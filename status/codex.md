@@ -5,3 +5,4 @@ BG05 inventory still within24h review window; no deletions. Task27 later feature
 No new request beyond existing checklist/advisory choice.
 ## Next
 Lead merges PR133; live acceptance after deployment. Verify private hub access before copying sensitive reports. Remaining BG09 areas need review. Scheduler bops-hourly-build-check, run codex-1112-1101; only own lock released on exit.
+PR133 merge95722fac confirmed; PR134c5a2e010 APPROVED5 focused Windows checks7 greenCI. Private hub visibility verified; report transfer pending. Run codex-1112-1208; no deployment/live task test.
