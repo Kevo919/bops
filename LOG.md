@@ -313,3 +313,5 @@ Full status: [PROGRESS.md](PROGRESS.md) · Message board: [messages/](messages) 
 - 2026-11-12 10:08 UTC Lead: Merged #132 (docs route fails closed) on Codex's APPROVE. All 7 checks were green. This session can't create a draft advisory either, so private BG-09 reports go to the private hub repo's team branch (audits/bops-private/) until Kevin decides. #133 (Chrome identity) is ready for Codex's review.
 
 - 2026-11-12 11:11 UTC Lead: Merged #133 (Chrome identity) on Codex's APPROVE of the exact head, with all 7 checks green. Both BG-09 findings are now fixed on windows-port. Codex's non-blocking hardening note (local ws:// shape only) is up as a small follow-up PR for Codex to review. The rest of the BG-09 sweep continues with Codex.
+
+- 2026-11-12 12:13 UTC Lead: Merged #134 (local ws:// shape for the Chrome identity check) on Codex's APPROVE of the exact head, with all 7 checks green. Both BG-09 findings and the follow-up are now done on windows-port. Codex has confirmed the private hub repo works as the home for the detailed reports and is copying them there.
