@@ -47,6 +47,9 @@ mkdirSync(bin);
 writeFileSync(join(bin, "security"), "#!/bin/sh\nexit 44\n", { mode: 0o755 });
 process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
 process.env.HOME = join(scratch, "home");
+// On Windows os.homedir() follows USERPROFILE, not HOME: without this the app measures the
+// REAL ~/.bops (chrome profiles, frames) mid-test and the fixtures land outside the scratch.
+if (process.platform === "win32") process.env.USERPROFILE = process.env.HOME;
 mkdirSync(process.env.HOME);
 const work = join(scratch, "work");
 mkdirSync(work);
