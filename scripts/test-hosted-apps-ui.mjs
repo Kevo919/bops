@@ -167,7 +167,7 @@ await test("the list: one compact line per app with its state, name and address,
 
   const shop = rowOf(html, SHOP);
   assert.match(shop, /data-state="succeeded"/);
-  assert.match(shop, new RegExp(`data-tip="Live · ${id("a1").slice(0, 7)} · 5m"[^>]*bg-\\[#2BB673\\]`), "a green dot that says it's live, which changeset and since when");
+  assert.match(shop, new RegExp(`data-tip="Live · ${id("a1").slice(0, 7)} · 5m"[^>]*bg-\\[color:var\\(--hb-2bb673\\)\\]`), "a green dot that says it's live, which changeset and since when");
   assert.match(shop, new RegExp(`title="${SHOP}"[^>]*truncate`), "a long name is cut short, all of it in the tooltip");
   assert.match(shop, /<a href="https:\/\/shop\.example" target="_blank" rel="noreferrer" title="https:\/\/shop\.example"[^>]*>shop\.example<\/a>/, "its address (its domain) is a link that opens in the browser, shown without https");
   assert.ok(!html.includes(".orgo.dev"), "never an orgo.dev name for Published");
@@ -184,7 +184,7 @@ await test("the list: one compact line per app with its state, name and address,
 
   const menu = rowOf(html, "menu");
   assert.match(menu, /data-state="failed"/);
-  assert.match(menu, new RegExp(`data-tip="Failed · ${id("c3").slice(0, 7)} · 5m: npm run build exited with 1"[^>]*bg-\\[#B42318\\]`), "a red dot whose tooltip says why it failed");
+  assert.match(menu, new RegExp(`data-tip="Failed · ${id("c3").slice(0, 7)} · 5m: npm run build exited with 1"[^>]*bg-\\[color:var\\(--hb-b42318\\)\\]`), "a red dot whose tooltip says why it failed");
   assert.deepEqual(deployIn(menu), { tip: null, disabled: false }, "a failed one can be deployed again");
   assert.ok(menu.includes(`>${id("c2").slice(0, 7)}<`), "what's still served after one failed");
 
@@ -426,7 +426,7 @@ await test("the tab's address, then its domains: each with how it's doing, Check
 
   const apex = between(part, 'data-domain="acme.example"', "data-domain=");
   assert.match(apex, /data-status="active"/);
-  assert.match(apex, /data-tip="Live · its HTTPS certificate is issued"[^>]*bg-\[#2BB673\]/, "a green dot, its certificate in the tooltip");
+  assert.match(apex, /data-tip="Live · its HTTPS certificate is issued"[^>]*bg-\[color:var\(--hb-2bb673\)\]/, "a green dot, its certificate in the tooltip");
   assert.match(apex, /<a href="https:\/\/acme\.example" target="_blank"[^>]*>acme\.example<\/a>/, "a live one opens in the browser");
   assert.ok(apex.includes(">Live<") && apex.includes(">Bought through Orgo<"));
   assert.ok(!part.includes("data-no-zone"), "its zone is read, so nothing said about it");
@@ -435,7 +435,7 @@ await test("the tab's address, then its domains: each with how it's doing, Check
   assert.ok(mine.includes(">Waiting for its DNS<") && !mine.includes("<a "), "and isn't a link yet");
   assert.ok(mine.includes(">DNS at Cloudflare<") && !apex.includes("DNS at"), "who keeps its DNS, on its line");
   const outside = between(mine, "data-outside-dns", "data-zone=");
-  assert.match(mine, /data-publish="recipes\.example\.com" data-outside-dns="true" class="[^"]*bg-\[#F6F6F4\]/, "its DNS greyed out under it");
+  assert.match(mine, /data-publish="recipes\.example\.com" data-outside-dns="true" class="[^"]*bg-\[color:var\(--hb-f6f6f4\)\]/, "its DNS greyed out under it");
   assert.ok(text(outside).includes("Orgo can't set these. Add them at Cloudflare, then Verify."), "the records to set, where its DNS is kept");
   assert.ok(!apex.includes("data-outside-dns"), "not on one bought through Orgo");
   assert.ok(mine.includes(">_orgo-verify.recipes<") && mine.includes(">tok-mine<") && mine.includes(">Found<"));
@@ -521,7 +521,7 @@ await test("the record form: the fields its type takes, filled from the record i
   for (const [f, v] of [["Priority", 10], ["Weight", 5], ["Port", 5060]]) assert.match(srv, new RegExp(`aria-label="${f}"[^>]*data-tip="${f}"[^>]*value="${v}"`), `${f}, named`);
   assert.match(mx, /aria-label="Priority"[^>]*data-tip="Priority"/, "an MX's too");
   const wrong = form({ start: RECORDS[2], error: { text: "Enter a full hostname, like mail.example.com.", field: "value" } });
-  assert.match(wrong, /aria-label="Value" aria-invalid="true"[^>]*shadow-\[0_0_0_1\.5px_#B42318\]/, "the field to fix, ringed in red");
+  assert.match(wrong, /aria-label="Value" aria-invalid="true"[^>]*shadow-\[0_0_0_1\.5px_var\(--h-b42318\)\]/, "the field to fix, ringed in red");
   assert.ok(!/aria-label="Name" aria-invalid/.test(wrong), "and only that one");
   assert.match(wrong, /role="alert"[^>]*>Enter a full hostname, like mail\.example\.com\.</, "why, under it");
   assert.match(form({ start: RECORDS[2], busy: true }), /<button type="submit" disabled=""[^>]*>Saving…</);
@@ -946,9 +946,9 @@ await test("one page, in order: Address, Domains, Settings (port, commands, vari
   const deploys = between(html, "data-deploys", ">History<");
   assert.deepEqual([...deploys.matchAll(/data-deploy="([^"]+)"/g)].map((m) => m[1]), ["dep_3", "dep_2", "dep_1"]);
   const live = between(deploys, 'data-deploy="dep_3"', "data-deploy=");
-  assert.ok(live.includes("bg-[#2BB673]") && (live.match(/>Live</g) ?? []).length === 1, "the live one says so, once, with the green dot");
+  assert.ok(live.includes("bg-\[color:var\(--hb-2bb673\)\]") && (live.match(/>Live</g) ?? []).length === 1, "the live one says so, once, with the green dot");
   const was = between(deploys, 'data-deploy="dep_1"', "data-deploy-log");
-  assert.ok(was.includes(">Was live<") && !was.includes(">Live<") && !was.includes("bg-[#2BB673]"), "an earlier one that went live and was replaced: Was live, grey, never Live");
+  assert.ok(was.includes(">Was live<") && !was.includes(">Live<") && !was.includes("bg-\[color:var\(--hb-2bb673\)\]"), "an earlier one that went live and was replaced: Was live, grey, never Live");
   assert.equal((deploys.match(/>Live</g) ?? []).length, 1, "only one deploy is Live");
   assert.ok(between(deploys, 'data-deploy="dep_2"', "data-deploy=").includes("Failed: The build failed. The log says why."), "a failed one, and why");
   assert.ok(!between(deploys, 'data-deploy="dep_2"', "data-deploy=").includes("Roll back"), "never put back");
@@ -1816,7 +1816,7 @@ await test("the tab of an app with more sites: a list of them with their states,
   const row = between(html, "data-sites", "data-address-section");
   assert.deepEqual([...row.matchAll(/data-site="([^"]+)"/g)].map((m) => m[1]), ["suite", "suite-admin", "suite-till"]);
   assert.match(row, /data-site="suite" aria-pressed="true"/, "its own picked");
-  assert.match(row, /data-site="suite-admin" aria-pressed="false"[^]*?bg-\[#B42318\]/, "each with its state's dot");
+  assert.match(row, /data-site="suite-admin" aria-pressed="false"[^]*?bg-\[color:var\(--hb-b42318\)\]/, "each with its state's dot");
   assert.deepEqual(deployIn(row, "Deploy preview"), { tip: null, disabled: false });
   assert.deepEqual(deployIn(header(html), "Deploy all previews"), { tip: null, disabled: false }, "the title deploys them all");
   assert.ok(!html.slice(0, html.indexOf("data-sites")).includes(">Deploy preview<"), "never one alone in the title");
@@ -1860,17 +1860,17 @@ await test("the Sites list: one line a site, its state, name and domains (each w
     ["old.suite.example", "pending", "Waiting for its DNS"],
     ["older.suite.example", "verifying", "Checking its DNS"],
   ]);
-  assert.match(own, /aria-label="Live" class="[^"]*bg-\[#2BB673\]/, "a live one's dot");
+  assert.match(own, /aria-label="Live" class="[^"]*bg-\[color:var\(--hb-2bb673\)\]/, "a live one's dot");
   assert.match(own, /aria-label="Waiting for its DNS" class="[^"]*animate-pulse/, "one waiting for its DNS");
   assert.ok(!own.includes("data-site-address"), "its domains, not its address");
   assert.ok(own.indexOf(">suite<") < own.indexOf("front.suite.example"), "its name, then its domains");
-  assert.ok(own.indexOf("bg-[#2BB673]") < own.indexOf(">suite<"), "its state first");
+  assert.ok(own.indexOf("bg-\[color:var\(--hb-2bb673\)\]") < own.indexOf(">suite<"), "its state first");
   assert.deepEqual(deployIn(own, "Deploy preview"), { tip: null, disabled: false }, "Deploy this site at its end");
   assert.ok(own.lastIndexOf("Deploy preview") > own.lastIndexOf("older.suite.example"));
   const admin = lineOf(html, "suite-admin");
   assert.ok(admin.includes("Live, no domain yet") && !admin.includes(".orgo.dev"), "none: live before, no domain yet (never an orgo.dev name)");
   assert.ok(!admin.includes("data-site-domain"));
-  assert.match(admin, /bg-\[#B42318\]/, "its own state");
+  assert.match(admin, /bg-\[color:var\(--hb-b42318\)\]/, "its own state");
   assert.deepEqual(deployIn(admin, "Deploy preview"), { tip: null, disabled: false });
   const till = lineOf(html, "suite-till");
   assert.ok(text(till).includes("No domain yet") && !till.includes("data-site-address"), "never made: no domain yet");
@@ -2165,7 +2165,7 @@ await test("Add a site, clicked: its name as its address takes it (as typed), Ad
     await click(m.box.querySelector("[data-remove-app]"));
     assert.ok(m.box.textContent.includes("Remove suite? Its 2 sites and their domains come off the web, and it leaves this workspace."), "asked once more, of the sites on the web (suite-till never was)");
     const tick0 = m.box.querySelector('input[type="checkbox"]');
-    assert.equal(tick0.getAttribute("class"), "size-3.5 accent-[#0A0A0A]", "as every checkbox here");
+    assert.equal(tick0.getAttribute("class"), "size-3.5 accent-[color:var(--ht-0a0a0a)]", "as every checkbox here");
     const tick = m.box.querySelector('input[type="checkbox"]');
     assert.equal(tick.checked, false, "its code kept, to start");
     assert.ok(m.box.textContent.includes("Delete its code in Ingot too, with all its history. This can't be undone."));
@@ -2386,17 +2386,17 @@ await test("Settings, Domains: a row a domain in one card, as Settings' other se
     assert.ok(t.box.textContent.includes("Domains this workspace owns, paid for with Orgo credits."), "a workspace it doesn't know the name of");
     assert.deepEqual([...t.box.querySelectorAll("[data-domain-row]")].map((x) => x.getAttribute("data-domain-row")), ["acme.example", "acme-shop.example", "acme-old.example", "acme-gone.example", "acmebakes.example"], "in Orgo's order");
     const card = t.box.querySelector("[data-domains-card]");
-    assert.match(card.getAttribute("class"), /rounded-\[14px\] px-3\.5 shadow-\[0_0_0_1px_#E6E6E3\]/, "one card, as Email's");
+    assert.match(card.getAttribute("class"), /rounded-\[14px\] px-3\.5 shadow-\[0_0_0_1px_var\(--h-e6e6e3\)\]/, "one card, as Email's");
     for (const r of t.box.querySelectorAll("[data-domain-row]")) {
-      assert.ok(r.closest("[data-domains-card]") === card && /border-b border-\[#F0F0EE\] last:border-0/.test(r.parentElement.getAttribute("class")), "a divided row of it");
+      assert.ok(r.closest("[data-domains-card]") === card && /border-b border-\[color:var\(--h-f0f0ee\)\] last:border-0/.test(r.parentElement.getAttribute("class")), "a divided row of it");
       assert.match(r.innerHTML, /size-\[7px\][^]*font-mono text-\[13px\][^]*text-\[12\.5px\]/, "a 7px dot, its name at 13px, its line at 12.5px");
     }
-    assert.match(button(t.box, "Get a domain").getAttribute("class"), /bg-\[#F2F2F0\]/, "Get a domain, the light button");
+    assert.match(button(t.box, "Get a domain").getAttribute("class"), /bg-\[color:var\(--hb-f2f2f0\)\]/, "Get a domain, the light button");
     assert.ok(!/bg-ink/.test(button(t.box, "Get a domain").getAttribute("class")));
-    assert.match(t.row("acme.example").innerHTML, /bg-\[#2BB673\]/, "green");
+    assert.match(t.row("acme.example").innerHTML, /bg-\[color:var\(--hb-2bb673\)\]/, "green");
     assert.match(t.row("acmebakes.example").innerHTML, /animate-pulse/, "pulsing while it registers");
     assert.ok(t.row("acmebakes.example").disabled, "and doesn't open");
-    assert.match(t.row("acme-old.example").innerHTML, /bg-\[#F79009\][^]*text-\[#B54708\]/, "amber while its renewal needs looking at");
+    assert.match(t.row("acme-old.example").innerHTML, /bg-\[color:var\(--hb-f79009\)\][^]*text-\[color:var\(--ht-b54708\)\]/, "amber while its renewal needs looking at");
     assert.equal(t.row("acme-shop.example").querySelector("[data-domain-line]").textContent, "Expires Oct 21, 2027 · not on an app yet");
     assert.ok(!NO_DASHES.test(text(html)));
     assert.ok(!t.box.querySelector("[data-domain-detail]"), "none open");
@@ -2493,7 +2493,7 @@ await test("Settings, Domains: Get a domain, a search in reading order (a taken 
     assert.ok(calls.at(-1).url.startsWith(`/api/domains/search?ws=${t.ws}&q=acme&page=0`));
     assert.deepEqual([...shop().querySelectorAll("[data-offer]")].map((x) => x.getAttribute("data-offer")), ["acme.example", "acme.test", "acme.invalid"], "the ones that can be bought first");
     const taken = shop().querySelector('[data-offer="acme.invalid"]');
-    assert.ok(taken.textContent.includes("Taken") && !button(taken, "Pick") && taken.innerHTML.includes("text-[#9A9A98]"), "greyed, no Pick");
+    assert.ok(taken.textContent.includes("Taken") && !button(taken, "Pick") && taken.innerHTML.includes("text-\[color:var\(--ht-9a9a98\)\]"), "greyed, no Pick");
     await click(button(shop().querySelector('[data-offer="acme.example"]'), "Pick"));
     const who = shop().querySelector('[data-registrant="acme.example"]');
     assert.equal(who.querySelector('input[aria-label="Postal code"]').value, "94000", "filled from Orgo");
@@ -2737,7 +2737,7 @@ await test("Your Apps in a workspace shared with the user: the apps as the owner
   const html = (el) => renderToStaticMarkup(el);
   const write = html(h(SharedAppsPage, { state: sharedState("write") }));
   assert.match(write, /You can deploy them\./);
-  assert.match(write, /bg-ink text-white">Deploy</);
+  assert.match(write, /bg-\[color:var\(--hb-0a0a0a\)] text-\[color:var\(--bops-on-fill\)]">Deploy</);
   // The card's parts, opened in a DOM.
   const m = await mount(h(SharedAppsPage, { state: sharedState("write") }));
   await click(m.box.querySelector('[data-shared-app="shop"] button[aria-expanded]'));
@@ -2898,7 +2898,7 @@ await test("the three environments, one line each, Local, Preview and Published:
   assert.ok(legacy.includes('data-app-env-state="Running"') && legacy.includes(">Live, no domain yet<") && deployIn(legacy, "Publish")?.disabled === false, "live before: publishes without a domain");
   // Each state's word.
   const failed = envLine(envsOf({ app: shopApp({ preview: STAGING({ live: live("failed", id("e5"), { error: "npm run build exited with 1" }) }) }) }), "preview");
-  assert.match(failed, /data-tip="Its last deploy failed: npm run build exited with 1"[^>]*bg-\[#B42318\]/);
+  assert.match(failed, /data-tip="Its last deploy failed: npm run build exited with 1"[^>]*bg-\[color:var\(--hb-b42318\)\]/);
   assert.match(failed, /data-app-env-state="Failed"/);
   assert.match(envLine(envsOf({ app: shopApp() }), "preview"), /data-app-env-state="Not deployed yet"[^]*Gets a link of its own on its first deploy/);
   const off = envLine(envsOf({ app: shopApp({ preview: STAGING({ off: true }) }) }), "preview");
