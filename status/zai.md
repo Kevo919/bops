@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** BG-18: hosted-apps-ui GREEN (71 ok) - 9 of the audit's 39 green, profiles at its platform line. Next: preview-password-ui (8 ok start), runs-on-ui (2 ok), settings-page-ui, routine-week-ui, chat-compact-ui, app-routines-ui.
+**On:** BG-18: preview-password-ui (10 ok) + runs-on-ui (14 ok) GREEN - 11 of the audit's 39. settings-page-ui blocked on a render crash consistent with stale node_modules (next 16.3.8 vs 16.4.6 since #127) - npm ci (heavy, needs build lock + time) before judging the mount-based suites. Next: routine-week-ui, chat-compact-ui, app-routines-ui (static-source classes first).
 **Calls:** none placed (lead's standing rule).
-**Blockers:** none of mine.
-**Updated (UTC):** 2026-11-12 03:40
+**Blockers:** stale node_modules for mount-based suites.
+**Updated (UTC):** 2026-11-12 04:50
