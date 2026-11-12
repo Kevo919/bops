@@ -175,7 +175,9 @@ export async function sameBrowser(
     const v = (await get(`http://127.0.0.1:${port}/json/version`)) as { webSocketDebuggerUrl?: unknown } | null;
     if (!v || typeof v.webSocketDebuggerUrl !== "string") return false;
     const u = new URL(v.webSocketDebuggerUrl);
-    return u.pathname === want && (u.port === "" || Number(u.port) === port);
+    // Chrome's own shape only: a ws:// address on this machine, the same port, the same id.
+    const local = u.hostname === "127.0.0.1" || u.hostname === "localhost" || u.hostname === "[::1]";
+    return u.protocol === "ws:" && local && u.pathname === want && (u.port === "" || Number(u.port) === port);
   } catch {
     return false;
   }
