@@ -1,23 +1,11 @@
 # Codex status
-Updated 2026-11-12T18:13Z. Run codex-1112-1810; scheduler bops-hourly-build-check.
+2026-11-13T21:24Z | run codex-1113-2119 | scheduler bops-hourly-build-check
 
-## Completed evidence
-- PR132 and PR133 merged; independent bounded reviews passed. PR134 approved with five focused Windows checks and seven green CI checks; lead reports merged.
-- BG09 docs-route and Chrome evidence transferred to verified private hub team board under audits/bops-private. Broad BG09 sweep remains partial.
-- Hub PR25 d5bdcc1: prior review findings fixed; focused suite and independent fixture pass. Bounded approval; lead owns CI/merge gate.
+Hub PR29 0cc7237: bounded APPROVE. Clean Windows fuzz run passed; independent planted retained-array leak exited1 with expected survival/response failures. RSS skipped on Windows. Hub PR30 e0e865a: docs APPROVE. Private report audits/2026-11-13-codex-pr29-30-approved.md; lead notified. CI/merge remains lead-owned.
 
-## Current handoff
-- Hub PR26 b052a08: both reported recovery failures fixed. All 15 focused assertions and two syntax checks pass. Bounded code review APPROVED; exact-head CI and live UI remain lead gates. Private report audits/2026-11-12-codex-pr26-round3.md pushed at 8767c69.
-- Next: remaining requested hub documentation reviews and BG09 sweep.
-- BG05: inventory posted November 11 at 23:43 UTC; 24-hour review and Kevin-seen condition not satisfied. No branch deletion.
-- Task27 later slices parked until Gate3. PC HOLD respected; no live task completion, deployment, heavy build or full matrix in this run.
+Previous interrupted run recovered: its own stale locks removed after no matching fixture processes found; incomplete planted result excluded. No live UI, credentials, deployment or actual Windows task completion tested.
+
+Next: Gate1/BG09 remaining review; BG05 needs Kevin-seen list confirmation and fresh branch-tip check before deletion. No branches deleted. Task27 later slices parked until Gate3. BUILD IN PROGRESS.
 
 ## Needs Kevin
-No new action requested. Live acceptance remains unverified; do not call the build 100%.
-
-
-2026-11-12T19:16Z run codex-1112-1911: hub docs PR27 ce75a0c REQUEST CHANGES (mode-dependent protections described unconditionally); PR28 8e3f9f2 bounded docs APPROVE. Private audit 2026-11-12-codex-docs27-28-review.md. Next re-review27 then Gate1/BG09. No live actions; BUILD IN PROGRESS.
-
-2026-11-12T20:15Z run codex-1112-2011: hub PR27 6c14625 documentation findings resolved, bounded APPROVE. PR29 ff0300e static intake only; independent clean/planted-leak testing pending before verdict. Private report 2026-11-12-codex-pr27-approved-pr29-intake.md. No live actions; next PR29 then Gate1/BG09.
-
-2026-11-12T21:20Z run codex-1112-2115: hub PR29 55d39d9 Windows clean fuzz FAIL twice: final normal probe gets pending-request saturation error. Other checks pass; RSS skipped (no /proc). Private report 2026-11-12-codex-pr29-windows.md pushed184fda0; lead notified. Next re-review readiness fix, then planted-leak validation. No live UI or deployment.
+No new request. Existing coordinated live acceptance and branch-list acknowledgement remain outstanding; do not claim 100%.
