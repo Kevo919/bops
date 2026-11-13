@@ -9,3 +9,5 @@ Next: Gate1/BG09 remaining review; BG05 needs Kevin-seen list confirmation and f
 
 ## Needs Kevin
 No new request. Existing coordinated live acceptance and branch-list acknowledgement remain outstanding; do not claim 100%.
+
+2026-11-13T22:25Z run codex-1113-2220: hub31 comment-only APPROVE. Gate1 started at aa0f20d: by-ref target provenance concern confirmed at module level, actual UI bypass not demonstrated. Private checkpoint 2026-11-13-codex-gate1-checkpoint.md. Next integration fixture and remaining security cases; broad gate not approved. No live actions.
