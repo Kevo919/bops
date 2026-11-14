@@ -23,3 +23,5 @@ No new request. Existing coordinated live acceptance and branch-list acknowledge
 2026-11-14T03:26Z codex-1114-0322: hub36 a890e2a earlier batch preflight fixed,47rule checks pass. REQUEST CHANGES remains: truncated approval hides later actions while full batch can run. Private report2026-11-14-codex-pr36-review.md, lead notified. Next bounded/full consent fix and integration retest. No live actions.
 
 2026-11-14T05:29Z continuation of codex-1114-0424 (no overlapping run): hub33 readiness retest45rules+10proxy groups PASS, bounded APPROVE. Hub35 coordinate Block overridden by named ask-first return: REQUEST CHANGES; private report2026-11-14-codex-pr33-pass-pr35-precedence.md. Next precedence/batch consent fixes; no live actions.
+
+2026-11-14T07:31Z codex-1114-0728: hub35 09900a1 original coordinate fix passes;62rules/proxy10groups PASS. Remaining multi-target early ask skips known blocked ref; private report2026-11-14-codex-pr35-target-list.md; REQUEST CHANGES. Next all-target preflight and batch consent fixes. No live actions.
