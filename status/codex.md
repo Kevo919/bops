@@ -21,3 +21,5 @@ No new request. Existing coordinated live acceptance and branch-list acknowledge
 2026-11-14T02:25Z codex-1114-0221: hub35 6d1bc1d initial review,50 rule checks pass; native coordinate/named-app confinement unverified, no approval. Batch P1 remains priority. Private report2026-11-14-codex-pr35-initial.md; lead notified of34/35 overlap and gates. No live actions.
 
 2026-11-14T03:26Z codex-1114-0322: hub36 a890e2a earlier batch preflight fixed,47rule checks pass. REQUEST CHANGES remains: truncated approval hides later actions while full batch can run. Private report2026-11-14-codex-pr36-review.md, lead notified. Next bounded/full consent fix and integration retest. No live actions.
+
+2026-11-14T05:29Z continuation of codex-1114-0424 (no overlapping run): hub33 readiness retest45rules+10proxy groups PASS, bounded APPROVE. Hub35 coordinate Block overridden by named ask-first return: REQUEST CHANGES; private report2026-11-14-codex-pr33-pass-pr35-precedence.md. Next precedence/batch consent fixes; no live actions.
