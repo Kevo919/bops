@@ -1,0 +1,40 @@
+id: openmausbot
+name: OpenMausBot
+repo: milind-soni/OpenMausBot
+url: https://github.com/milind-soni/OpenMausBot
+license: Apache-2.0
+license_note: "The enterprise/ folder is source-available under its own license; removing it leaves the Apache-2.0 edition."
+what: >-
+  Open-source Grok Bot alternative - a team of AI bots in a chat app, each run through a local agent CLI
+  (Claude, Codex, Grok and others) with approval cards, connected apps (Composio) and an MCP server.
+  Kevin's working copy is the private repo Kevo919/OpenMausBot-private (upstream remote = milind-soni).
+good_for: AI bot team with its own MCP server for Bops to call
+stack: [node, pnpm, typescript, electron]
+requirements:
+  node: ">=24"
+  docker: false
+  other:
+    - "pnpm 10.33 (corepack enable, or npm install -g pnpm@10.33.0)"
+    - "At least one signed-in agent CLI (claude, codex, ...) for bots to answer"
+keys_optional:
+  - name: COMPOSIO_API_KEY
+    for: Connected apps (Gmail, GitHub, Google Drive) - normally pasted in OpenMausBot Settings, API keys
+keys_required: []
+clone: git clone --depth 1 https://github.com/milind-soni/OpenMausBot.git openmausbot
+install:
+  - pnpm install --frozen-lockfile
+run: pnpm dev:server
+background: true
+kind: mcp
+port: 8799
+health:
+  http: http://127.0.0.1:8799/api/health
+  expect: 200
+fits_bot_computer: false
+fits_reason: Untested on a bot's Linux computer; the harness server needs a signed-in agent CLI there to do useful work.
+verified: false
+verified_reason: >-
+  Verified on Kevin's Windows PC on 2026-11-14 (commit a6cd67c), not on a bot's computer: pnpm install passed,
+  pnpm package:win built OpenMausBot-0.1.158-setup.exe, the installed app's harness answered on 127.0.0.1:8799,
+  and its stdio MCP server (via agent-tools/openmausbot-mcp.cmd, set in config/bops.yaml) completed initialize,
+  listed 20 tools and answered list_bots.
