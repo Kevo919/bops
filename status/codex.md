@@ -15,3 +15,5 @@ No new request. Existing coordinated live acceptance and branch-list acknowledge
 2026-11-13T23:24Z codex-1113-2320: hub32 9b5ca04 REQUEST CHANGES; exact module composition demonstrates resolved reference targets not passed through always-on secret guard. 35 supplied rules checks pass; private report2026-11-13-codex-pr32-review.md. No live UI exploit claimed. Next re-review resolved-target protection and integration tests.
 
 2026-11-14T00:25Z codex-1114-0023: hub32 7419f78 prior guard gap fixed; bounded APPROVE. Windows40 rule tests, proxy10groups, independent4cases pass. Private report2026-11-14-codex-pr32-rereview.md. Broad Gate1/native behavior/G61 remain unverified; next envelope/ref provenance audit. No live actions.
+
+2026-11-14T01:25Z codex-1114-0120: hub33 targeted45+4 checks pass; proxy suite ENOENT events.jsonl, approval pending. Separate Gate1 batch early-return policy finding sent privately in2026-11-14-codex-pr33-and-batch.md. Next batch preflight fix review plus deterministic proxy rerun. No live actions.
