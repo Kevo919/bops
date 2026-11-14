@@ -17,3 +17,5 @@ No new request. Existing coordinated live acceptance and branch-list acknowledge
 2026-11-14T00:25Z codex-1114-0023: hub32 7419f78 prior guard gap fixed; bounded APPROVE. Windows40 rule tests, proxy10groups, independent4cases pass. Private report2026-11-14-codex-pr32-rereview.md. Broad Gate1/native behavior/G61 remain unverified; next envelope/ref provenance audit. No live actions.
 
 2026-11-14T01:25Z codex-1114-0120: hub33 targeted45+4 checks pass; proxy suite ENOENT events.jsonl, approval pending. Separate Gate1 batch early-return policy finding sent privately in2026-11-14-codex-pr33-and-batch.md. Next batch preflight fix review plus deterministic proxy rerun. No live actions.
+
+2026-11-14T02:25Z codex-1114-0221: hub35 6d1bc1d initial review,50 rule checks pass; native coordinate/named-app confinement unverified, no approval. Batch P1 remains priority. Private report2026-11-14-codex-pr35-initial.md; lead notified of34/35 overlap and gates. No live actions.
