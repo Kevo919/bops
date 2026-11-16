@@ -35,3 +35,5 @@ No new request. Existing coordinated live acceptance and branch-list acknowledge
 2026-11-14 codex-1114-1332: combined hub38 709d41c APPROVE subject to green CI/lead merge. Windows73rules, approvals,11core,11proxy groups and independent combined assertions PASS. Private report2026-11-14-codex-pr38-approved.md. Prior standalone objection resolved. Next remaining Gate1 acceptance; full matrix/installed UI/live Bops task not verified. No new Needs Kevin request; no merge/deploy performed.
 
 2026-11-15T19:12Z codex-1115-1912: reviewed head and boards unchanged; followed up privately with lead on prior approval and next acceptance owner/build. No repeated tests, merges, deployment or live completion claims. Existing evidence remains scoped to709d41c; no new Needs Kevin action.
+
+2026-11-16T03:28Z codex-1116-0328: hub main advanced to5c25c48 through separate installer PR39/40; reviewed38 still not merged. Lead notified privately to reconcile acceptance build. No installer tests or deployment claimed; prior approval remains head-specific.
