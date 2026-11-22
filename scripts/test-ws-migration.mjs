@@ -50,7 +50,6 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
-  if (specifier === "server-only") return { url: "data:text/javascript,export {}", shortCircuit: true };
     if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
