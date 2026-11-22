@@ -77,7 +77,9 @@ try {
   };
   /** The hook as git runs it before a push of `sha` to `url` (remote `remote`): its exit code and what it said. */
   const push = (sha, { url = "https://github.com/OrgoAI/bops.git", remote = "origin", ref = "refs/heads/feature", cwd = clone, run = hook, extra = {} } = {}) => {
-    const r = spawnSync(run, [remote, url], { cwd, env: { ...env, ...extra }, input: `${ref} ${sha} ${ref} ${"0".repeat(40)}\n`, encoding: "utf8" });
+    // Windows can't exec a shebang script directly; git runs hooks through its own shell, so the test does too.
+    const win = process.platform === "win32";
+    const r = spawnSync(win ? "bash" : run, win ? [run, remote, url] : [remote, url], { cwd, env: { ...env, ...extra }, input: `${ref} ${sha} ${ref} ${"0".repeat(40)}\n`, encoding: "utf8" });
     return { code: r.status, said: `${r.stdout}${r.stderr}` };
   };
   const short = (sha) => git(["rev-parse", "--short", sha]);
