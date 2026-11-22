@@ -135,3 +135,43 @@ jobs:
           node --conditions=react-server scripts/test-widgets.mjs
           node --conditions=react-server scripts/test-windows-ssh.mjs
           node --conditions=react-server scripts/test-ws-delete.mjs
+      # The audit's failing suites that pass on the Windows PC now, each under the condition the audit
+      # gives it. Unlike the steps above, every suite here runs even after one fails, and each result is
+      # printed, so one failure hides none of the others. Linux is observed here, not assumed.
+      # Not here yet: test-profiles and test-delete-messages-cloud need the test Postgres, which the
+      # fork workflows do not start.
+      - name: Fixed since the audit, green on Windows (every result shown)
+        run: |
+          failed=0
+          for entry in \
+            "plain test-agent-instances.mjs" \
+            "plain test-app-routines-ui.mjs" \
+            "plain test-chat-compact-ui.mjs" \
+            "plain test-chat-edge.mjs" \
+            "plain test-hosted-apps-ui.mjs" \
+            "plain test-logins-ui.mjs" \
+            "plain test-orbit-ui.mjs" \
+            "plain test-preview-password-ui.mjs" \
+            "plain test-push-guard.mjs" \
+            "plain test-routine-week-ui.mjs" \
+            "plain test-runs-on-ui.mjs" \
+            "plain test-settings-page-ui.mjs" \
+            "plain test-sidebar-footer.mjs" \
+            "plain test-sidebar-rail.mjs" \
+            "plain test-voice-local.mjs" \
+            "react-server test-delete-messages.mjs" \
+            "react-server test-ws-migration.mjs" \
+            "react-server test-your-data.mjs"
+          do
+            set -- $entry
+            flag=""
+            [ "$1" = react-server ] && flag="--conditions=react-server"
+            if node $flag "scripts/$2" > "$RUNNER_TEMP/$2.log" 2>&1; then
+              echo "PASS  $2"
+            else
+              echo "FAIL  $2: last lines of its output follow"
+              tail -n 25 "$RUNNER_TEMP/$2.log"
+              failed=1
+            fi
+          done
+          exit $failed
