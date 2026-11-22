@@ -79,7 +79,7 @@ await test("the edge: a focusable separator over the panel's left edge, a resize
   assert.match(html, /title="Drag to resize"/);
   assert.match(html, /class="group absolute inset-y-0 -left-1 z-40 flex w-2 cursor-col-resize justify-center outline-none"/);
   assert.doesNotMatch(html, /fixed inset-0/, "the cover is only there while it's dragged");
-  const src = readFileSync(`${rootPath}/components/app/chat-edge.tsx`, "utf8");
+  const src = readFileSync(`${rootPath}/components/app/chat-edge.tsx`, "utf8").replace(/\r\n/g, "\n");
   assert.match(src, /setPointerCapture\(e\.pointerId\)/);
   assert.match(src, /\{dragging && <div aria-hidden className="fixed inset-0 z-\[100\] cursor-col-resize" \/>\}/, "the panel's frames can't take the pointer mid drag");
   assert.match(src, /onDoubleClick=\{\(\) => keep\(CHAT_WIDTH\)\}/);
@@ -88,10 +88,10 @@ await test("the edge: a focusable separator over the panel's left edge, a resize
 });
 
 await test("the app: the edge on the side panel, the title bar's columns the grid's, no slide while it's dragged", () => {
-  const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8");
+  const app = readFileSync(`${rootPath}/components/app/bops-app.tsx`, "utf8").replace(/\r\n/g, "\n");
   assert.match(app, /const \[chatWidth, setChatWidth\] = useState\(storedChatWidth\);/);
-  assert.match(app, /<section ref=\{panelRef\} className="relative flex min-h-0 min-w-0 flex-col bg-white">\n\s+<ChatEdge from=\{sidebarWidth\} width=\{chatWidth\} onWidth=\{setChatWidth\} onDragging=\{setEdgeDragged\} \/>/);
-  assert.match(app, /className=\{`grid h-11 shrink-0 border-b border-\[#ECECEA\] bg-\[#F7F7F6\] \[-webkit-app-region:drag\] \$\{slide\}`\} style=\{columns\}/);
+  assert.match(app, /<section ref=\{panelRef\} data-panel className=\{`relative \${narrow && mShow !== "panel" \? "hidden" : "flex"\} min-h-0 min-w-0 flex-col bg-white`\}>\r?\n\s+\{!narrow && <ChatEdge from=\{sidebarWidth\} width=\{chatWidth\} onWidth=\{setChatWidth\} onDragging=\{setEdgeDragged\} \/>}/, "the section holds the edge, hidden in the narrow form");
+  assert.match(app, /className=\{`grid h-11 shrink-0 border-b border-\[color:var\(\--h-ececea\)] bg-\[color:var\(\--hb-f7f7f6\)] \[-webkit-app-region:drag\] \${slide}`\} style=\{columns\}/, "the title bar: the grid, the line under it, the drag region, the slide");
   assert.match(app, /const slide = edgeDragged \? "" : SLIDE;/);
   assert.doesNotMatch(app, /grid-cols-\[(?:340|72)px_440px/, "no fixed 440px column left");
 });
