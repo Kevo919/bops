@@ -50,6 +50,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror"]);
 registerHooks({
   resolve(specifier, context, next) {
+  if (specifier === "server-only") return { url: "data:text/javascript,export {}", shortCircuit: true };
     if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
@@ -1276,7 +1277,8 @@ await check("Favorites: PATCH saves a workspace's whole list (cleaned), only on 
 });
 
 await check("Nothing unexpected: no stray warnings or rejections", async () => {
-  assert.deepEqual(warned.filter((w) => !/^\[workspaces\] moving onto Orgo workspaces/.test(w)), []);
+  // A scratch cwd has no config/llms.cjs (the Mac release has none either): Bops agent only, said once at start.
+  assert.deepEqual(warned.filter((w) => !/^\[workspaces\] moving onto Orgo workspaces/.test(w) && !/^\[llms\] config\/llms\.yaml: Cannot find module/.test(w)), []);
   assert.deepEqual(rejections, []);
 });
 
