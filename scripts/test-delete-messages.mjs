@@ -1,4 +1,4 @@
-// Tests for deleting messages (lib/server/remove.ts removeMessages, deletePicked, clearChat, deleteChats; the
+// Tests for deleting messages (lib/server/remove.ts removeMessages, deletePicked, clearChat, deleteChats; the
 // DELETE of app/api/chats/[chatId]/messages; Delete now in app/api/privacy and lib/server/privacy.ts; the copies
 // in lib/server/deleted.ts): several picked in a chat go in one change, one copy under Recently deleted, only
 // that chat's, and { id } still deletes one for an older caller; Delete all messages takes a chat's every
@@ -45,6 +45,7 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
+    if (specifier === "server-only") return { url: "data:text/javascript,export {}", shortCircuit: true };
     if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
