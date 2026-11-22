@@ -59,6 +59,8 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
+    // server-only is a marker for the bundler; outside it the package only throws, so it stands in as nothing.
+    if (specifier === "server-only") return { url: "data:text/javascript,export {}", shortCircuit: true };
     if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
