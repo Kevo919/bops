@@ -26,6 +26,9 @@ Object.assign(process.env, {
   BOPS_AGENT_INSTANCES_FILE: join(tmp, "data", "agent-instances.json"),
   BOPS_AGENT_HOMES: join(tmp, "homes"),
   HOME: join(tmp, "home"),
+  // Windows' os.homedir() follows USERPROFILE, not HOME - point it at the scratch home too or the
+  // belongs-to-something-else folder checks compare against the real ~/.dsh instead of the scratch one.
+  ...(process.platform === "win32" ? { USERPROFILE: join(tmp, "home") } : {}),
 });
 // A secret of Bops' own in its environment: no agent's program may see it.
 const OWN_SECRET_NAME = ["OPENAI", "API", "KEY"].join("_");
@@ -158,12 +161,35 @@ if (task.includes("FAIL")) { out({ type: "final", sessionId: sid, reason: { kind
 out({ type: "final", sessionId: sid, reason: { kind: "completed" }, text: "dsh in " + basename(home) + " did: " + task + " (turn " + turns + ", key " + (process.env.DEEPSEEK_API_KEY ? "given" : "none") + ", leaked " + leaked.join(",") + ")" });
 `,
 );
-const dshCmd = join(bin, "dsh");
+// The agent's command must be a real executable for the platform: the shebang file for Linux CI, the .cmd twin on Windows.
+const dshCmd = process.platform === "win32" ? join(bin, "dsh.cmd") : join(bin, "dsh");
 writeFileSync(dshCmd, `#!/bin/sh\nexec "${process.execPath}" "${dshJs}" "$@"\n`);
+// Windows maps a bare dsh to dsh.cmd and runs it through cmd.exe, so the fake bin needs the .cmd twin; Linux CI execs the shebang file.
+if (process.platform === "win32") writeFileSync(join(bin, "dsh.cmd"), `@"${process.execPath}" "${dshJs}" %*
+`);
 chmodSync(dshCmd, 0o755);
-const hermesCmd = join(bin, "hermes");
-writeFileSync(hermesCmd, `#!/bin/sh\n[ "$1" = --version ] && { echo "Hermes Agent v9 fake"; exit 0; }\n[ "$*" = "chat --query-file - --oneshot -Q --source tool" ] || { echo "bad usage: $*" >&2; exit 2; }\ntask=$(cat)\necho "local hermes in $(basename "$HERMES_HOME") did: $task"\n`);
-chmodSync(hermesCmd, 0o755);
+// The same fake as a program Windows can run (the sh file below stays for Linux CI).
+const hermesJs = join(bin, "fake-hermes.mjs");
+writeFileSync(
+  hermesJs,
+  `const args = process.argv.slice(2);
+if (args[0] === "--version") { console.log("Hermes Agent v9 fake"); process.exit(0); }
+if (args.join(" ") !== "chat --query-file - --oneshot -Q --source tool") { console.error("bad usage: " + args.join(" ")); process.exit(2); }
+let task = "";
+process.stdin.on("data", (d) => (task += d));
+process.stdin.on("end", () => {
+  const home = (process.env.HERMES_HOME || "").split(/[\\\\/]/).pop();
+  console.log("local hermes in " + home + " did: " + task);
+});
+`,
+);
+const hermesCmd = process.platform === "win32" ? join(bin, "hermes.cmd") : join(bin, "hermes");
+if (process.platform === "win32") writeFileSync(hermesCmd, `@"${process.execPath}" "${hermesJs}" %*\r
+`);
+
+
+writeFileSync(join(bin, "hermes"), `#!/bin/sh\n[ "$1" = --version ] && { echo "Hermes Agent v9 fake"; exit 0; }\n[ "$*" = "chat --query-file - --oneshot -Q --source tool" ] || { echo "bad usage: $*" >&2; exit 2; }\ntask=$(cat)\necho "local hermes in $(basename "$HERMES_HOME") did: $task"\n`);
+chmodSync(join(bin, "hermes"), 0o755);
 
 // A program that starts a grandchild (which writes its pid, then waits a long time), then waits itself: a stop or a
 // timeout must take both.
@@ -178,8 +204,12 @@ writeFileSync(process.env.DSH_HOME + "/child.pid", String(process.pid));
 setInterval(() => {}, 1000);
 `,
 );
-const treeCmd = join(bin, "dsh-tree");
+// The command must be a real executable per platform: shebang file for Linux CI, .cmd twin on Windows.
+// The command must be a real executable per platform: shebang for Linux CI, .cmd twin on Windows.
+const treeCmd = process.platform === "win32" ? join(bin, "dsh-tree.cmd") : join(bin, "dsh-tree");
 writeFileSync(treeCmd, `#!/bin/sh\nexec "${process.execPath}" "${treeJs}" "$@"\n`);
+if (process.platform === "win32") writeFileSync(join(bin, "dsh-tree.cmd"), `@"${process.execPath}" "${treeJs}" %*
+`);
 chmodSync(treeCmd, 0o755);
 const alive = (pid) => {
   try {
