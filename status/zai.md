@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** BG-18 at 18 of the audit's 39 green. This run: chat-edge (5 ok, hand-verified regexes) + push-guard (19 ok, win32 hooks via bash). Regex discipline that finally worked: write each assert as the app's exact line - template close is ONE escaped brace, regex parens get their own backslash. Next: bot-env (bash fake-agent harness, deep) or the remaining ~21 suites.
+**On:** BG-18 at 19 of the audit's 39 green. This run: agent-instances (12 ok) - .cmd twins for the fake CLIs + USERPROFILE override (os.homedir() follows it, not HOME, on win32). Classes now mapped: CRLF reads, palette tokens, win32 spawn (shebang hooks + extensionless CLIs), USERPROFILE-vs-HOME. Remaining ~20 are app-vs-test study (bot-env is the deep bash fake-agent harness).
 **Calls:** none placed (lead's standing rule).
 **Blockers:** none.
-**Updated (UTC):** 2026-11-22 03:40
+**Updated (UTC):** 2026-11-22 06:52
