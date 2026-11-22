@@ -55,14 +55,16 @@ globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} }
 globalThis.sessionStorage = globalThis.localStorage;
 globalThis.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
 const calls = [];
+// The config reads are kept apart only to be stated on their own: each test below says exactly which it expects.
+const isConfigRead = (c) => c.url.split("?")[0] === "/api/config";
+const configCalls = () => calls.filter(isConfigRead).map((c) => `${c.method} ${c.url}`);
 let routes = {};
 globalThis.fetch = async (url, init = {}) => {
-  // The chat reads /api/config when it mounts (the app own settings read); it is not the chat
-  // acting, so it is not kept - the assertions below are about what the chat sends.
-  if (String(url).split("?")[0] !== "/api/config")
-    calls.push({ url: String(url), method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined });
+  calls.push({ url: String(url), method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined });
   const path = String(url).split("?")[0];
   const answer = routes[`${init.method ?? "GET"} ${path}`] ?? routes[path];
+  // The chat reads /api/config when it mounts (the app's own settings read): answered, like the server would.
+  if (!answer && path === "/api/config" && (init.method ?? "GET") === "GET") return { ok: true, status: 200, json: async () => ({}) };
   if (!answer) return { ok: false, status: 404, json: async () => ({}) };
   const { status = 200, body } = await (typeof answer === "function" ? answer(String(url), init) : answer);
   return { ok: status < 400, status, json: async () => body };
@@ -221,7 +223,8 @@ await check("the owner's Compact asks their Bops, shows Compacting meanwhile, an
   const compact = rows[1];
   assert.equal(compact.hasAttribute("disabled"), false);
   await click(compact);
-  assert.deepEqual(calls.filter((c) => !c.url.endsWith("/read")).map((c) => `${c.method} ${c.url}`), ["POST /api/chats/bot%3Aboppy/compact"]);
+  assert.deepEqual(calls.filter((c) => !c.url.endsWith("/read") && !isConfigRead(c)).map((c) => `${c.method} ${c.url}`), ["POST /api/chats/bot%3Aboppy/compact"]);
+  assert.deepEqual(configCalls(), ["GET /api/config"], "the chat read the app's settings once when it mounted, and nothing else for itself");
   assert.match(v.box.textContent, /Compacting…/);
   const again = await menu(v.box);
   assert.equal(again[1].getAttribute("disabled"), "", "off while it's on its way");
@@ -302,7 +305,8 @@ await check("a thread's Compact: its menu has it where its brain takes it, it as
   let rows = await menu(v.box);
   assert.deepEqual(rows.map((r) => r.textContent.trim()), ["Save as skill", "Compact"]);
   await click(rows[1]);
-  assert.deepEqual(calls.map((c) => `${c.method} ${c.url}`), ["POST /api/sessions/ses_1/compact"]);
+  assert.deepEqual(calls.filter((c) => !isConfigRead(c)).map((c) => `${c.method} ${c.url}`), ["POST /api/sessions/ses_1/compact"]);
+  assert.deepEqual(configCalls(), ["GET /api/config"], "the thread sheet read the app's settings once when it mounted, and nothing else for itself");
   await v.done();
   v = await mount(h(ThreadSheet, sheetProps(s, thread({ ...COMPUTER, status: "running" }))));
   rows = await menu(v.box);
