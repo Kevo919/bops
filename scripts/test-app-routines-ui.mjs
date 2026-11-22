@@ -393,14 +393,16 @@ const button = (el, words) => [...el.querySelectorAll("button")].find((b) => b.t
 function server(status = 200, body = { ok: true }) {
   const calls = [];
   globalThis.fetch = async (url, init = {}) => {
-    // The page reads /api/config when it mounts (the app's own settings read); it is not a routine
-    // acting, so it is not recorded - the assertions below are about what the routines send.
-    if (!(String(url) === "/api/config" && (init.method ?? "GET") === "GET"))
-      calls.push({ url: String(url), method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined });
+    calls.push({ url: String(url), method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined });
     return { ok: status < 400, status, json: async () => body };
   };
   return calls;
 }
+/** The page reads its own settings (GET /api/config) when it mounts. That read is kept with everything else;
+ *  a whole-list assertion states what was sent, then says exactly which settings reads it expects. */
+const isConfigRead = (c) => c.url === "/api/config" && c.method === "GET";
+const sent = (calls) => calls.filter((c) => !isConfigRead(c));
+const configCalls = (calls) => calls.filter(isConfigRead).map((c) => `${c.method} ${c.url}`);
 const offline = () => (globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) }));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pageEl = (s, props = {}) => h(AutopilotPage, { state: s, onBot: noop, onOpenWatch: noop, onOpenSkills: noop, onAsk: noop, onClose: noop, ...props });
@@ -470,11 +472,13 @@ await test("its trash asks on the row, still shut; Cancel puts focus back on it;
     await click(button(b, "Cancel"));
     assert.doesNotMatch(m.box.textContent, /It won't run again/);
     assert.ok(doc.activeElement === trashOf(b), "back on its trash");
-    assert.deepEqual(calls, []);
+    assert.deepEqual(sent(calls), []);
+    assert.deepEqual(configCalls(calls), ["GET /api/config"], "the page read its settings once when it mounted, and nothing else for itself");
 
     await click(trashOf(b));
     await click(button(b, "Delete"));
-    assert.deepEqual(calls.map((x) => [x.method, x.url, x.body]), [["DELETE", "/api/routines", { id: "b" }]]);
+    assert.deepEqual(sent(calls).map((x) => [x.method, x.url, x.body]), [["DELETE", "/api/routines", { id: "b" }]]);
+    assert.deepEqual(configCalls(calls), ["GET /api/config"], "the page read its settings once when it mounted, and nothing else for itself");
     assert.ok(doc.activeElement === row(m.box, "c").querySelector("[data-row-head]"), "the next row");
     await m.again(pageEl({ ...s, routines: s.routines.filter((r) => r.id !== "b") }));
     assert.ok(!row(m.box, "b"), "gone with the state");
@@ -563,7 +567,8 @@ await test("an opened row: Run now, Skip next, Pause, Edit and Delete first, the
     assert.ok(!button(a, "Run now"), "the question takes the actions' place");
     await click(button(a, "Cancel"));
     assert.ok(doc.activeElement === button(a, "Delete"), "back on Delete");
-    assert.deepEqual(calls, []);
+    assert.deepEqual(sent(calls), []);
+    assert.deepEqual(configCalls(calls), [], "nothing read for itself after the page had mounted");
   } finally {
     await m.done();
     offline();
@@ -596,7 +601,8 @@ await test("an app's routines (Apps & logins): a trash on each row; its check sa
     await click(trashOf(c));
     assert.match(c.textContent, /Delete this schedule\? It won't run again, and Gmail's How often goes back to Only when asked\./);
     await click(button(c, "Delete"));
-    assert.deepEqual(calls.map((x) => [x.method, x.url, x.body]), [["DELETE", "/api/routines", { id: "chk" }]]);
+    assert.deepEqual(sent(calls).map((x) => [x.method, x.url, x.body]), [["DELETE", "/api/routines", { id: "chk" }]]);
+    assert.deepEqual(configCalls(calls), [], "nothing read for itself after the page had mounted");
     assert.ok(doc.activeElement === row(m.box, "st").querySelector("[data-row-head]"), "the next row, in the other bot's group");
     const after = { ...s, routines: [starter] };
     await m.again(card(after));
@@ -668,7 +674,8 @@ await test("one question at a time on the page: asking on another row, or in the
     await click(trashOf(row(m.box, "c")));
     await click(row(m.box, "b").querySelector("[data-row-head]"));
     assert.equal(asking(), 0);
-    assert.deepEqual(calls, [], "nothing sent");
+    assert.deepEqual(sent(calls), [], "nothing sent");
+    assert.deepEqual(configCalls(calls), ["GET /api/config"], "the page read its settings once when it mounted, and nothing else for itself");
   } finally {
     await m.done();
     offline();
@@ -680,9 +687,9 @@ await test("one deleting while another row asks: the first is still deleted, and
   const calls = [];
   let answer = noop;
   globalThis.fetch = (url, init = {}) => {
-    const isConfigRead = String(url) === "/api/config" && (init.method ?? "GET") === "GET";
-    if (!isConfigRead) calls.push({ url: String(url), method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined });
-    if (isConfigRead) return Promise.resolve({ ok: true, status: 200, json: async () => ({}) });
+    calls.push({ url: String(url), method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined });
+    // The page's own settings read is answered at once; everything else waits to be told.
+    if (isConfigRead(calls.at(-1))) return Promise.resolve({ ok: true, status: 200, json: async () => ({}) });
     return new Promise((r) => (answer = () => r({ ok: true, status: 200, json: async () => ({ ok: true }) })));
   };
   const m = await mount(pageEl(listed()));
@@ -695,7 +702,8 @@ await test("one deleting while another row asks: the first is still deleted, and
     assert.ok(cancel.textContent === "Cancel" && row(m.box, "b").contains(cancel), "b's question");
     await act(async () => answer());
     await sleep(350);
-    assert.deepEqual(calls.map((x) => x.body), [{ id: "a" }]);
+    assert.deepEqual(sent(calls).map((x) => x.body), [{ id: "a" }]);
+    assert.deepEqual(configCalls(calls), ["GET /api/config"], "the page read its settings once when it mounted, and nothing else for itself");
     assert.ok(doc.activeElement === cancel, "still there");
     assert.match(row(m.box, "b").textContent, /Delete this schedule\?/);
   } finally {
