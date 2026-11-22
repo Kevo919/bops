@@ -1,4 +1,4 @@
-// Tests for Bops' own skills (lib/builtin-skills.ts): their shape (slugs as a skill's folder takes them,
+// Tests for Bops' own skills (lib/builtin-skills.ts): their shape (slugs as a skill's folder takes them,
 // names and descriptions that fit the line a prompt lists, every one under APPS_LABEL, a label of
 // BUILTIN_LABELS), each one as a SKILL.md folder that Bops' own checks take as it is (no secret, no
 // warning, the same name, slug and description back), and their words: every `ingot` subcommand a body
@@ -21,7 +21,6 @@ const rootUrl = pathToFileURL(rootPath).href;
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier === "server-only") return { url: "data:text/javascript,export {}", shortCircuit: true };
     if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);

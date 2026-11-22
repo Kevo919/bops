@@ -1,4 +1,4 @@
-// Tests for the CRM's files recorded in Orgo (lib/server/crm-sync.ts, with crm.ts): a file made, changed,
+// Tests for the CRM's files recorded in Orgo (lib/server/crm-sync.ts, with crm.ts): a file made, changed,
 // renamed or deleted here goes to Orgo in order (its CSV as the Mac wrote it, If-Match the contents the two
 // last agreed on, the sample marked as one); Orgo away, the changes wait in an outbox on disk and go after a
 // restart; what Orgo has comes here when the CRM's list is opened (a file made on another Mac written here,
@@ -39,7 +39,6 @@ process.chdir(work);
 const STAND_INS = new Set(["mac", "relay", "desktop", "mirror", "sessions"]);
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier === "server-only") return { url: "data:text/javascript,export {}", shortCircuit: true };
     if (specifier.startsWith("@/")) specifier = `${rootUrl}/${specifier.slice(2)}`;
     try {
       return next(specifier, context);
