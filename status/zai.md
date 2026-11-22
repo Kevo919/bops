@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** BG-18 at 21 of the audit's 39 green. This run: delete-messages (15 ok) + crm-sync (12 ok) - both died on the server-only package outside Next; the one-line resolve-hook stub (agent-instances' pattern) fixed both. Classes exhausted; the remaining reds are genuine app-vs-test study, bot-env the deepest.
+**On:** BG-18 at 20 of the real red set (40 suites named in no workflow) green - corrected: shared + crm-sync were CI-named all along. This run: ws-migration (34 ok). Next-run shortcut: procedures/skills/skills-v2 need only the server-only stub to show their real failures (20/3, 19/8, 20/4).
 **Calls:** none placed (lead's standing rule).
 **Blockers:** none.
-**Updated (UTC):** 2026-11-22 07:35
+**Updated (UTC):** 2026-11-22 19:42
