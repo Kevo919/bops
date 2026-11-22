@@ -4,7 +4,7 @@
 
 **No-merge rule (lead 0230, standing):** PRs only, never merge. Lead merges after review + green CI.
 
-**On:** BG-18 at 16 of the audit's 39 green. chat-edge diagnosed to its last assert (3 CRLF reads + narrow-aware section/ChatEdge forms; my regex fumbled the template braces - reverted, hand-verify next run). bot-env = deep bash harness, deferred. Next: chat-edge, push-guard, then the rest.
+**On:** BG-18 at 18 of the audit's 39 green. This run: chat-edge (5 ok, hand-verified regexes) + push-guard (19 ok, win32 hooks via bash). Regex discipline that finally worked: write each assert as the app's exact line - template close is ONE escaped brace, regex parens get their own backslash. Next: bot-env (bash fake-agent harness, deep) or the remaining ~21 suites.
 **Calls:** none placed (lead's standing rule).
 **Blockers:** none.
-**Updated (UTC):** 2026-11-12 16:45
+**Updated (UTC):** 2026-11-22 03:40
