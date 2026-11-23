@@ -243,8 +243,11 @@ async function noSideways(page, what) {
 }
 
 // A fake dsh program, so a DeepSeek Harness instance on this PC lists with its own folder.
-const fakeDsh = join(dir, "home", "fake-dsh");
+// Windows runs a bare dsh as dsh.cmd through cmd.exe (the app maps the name); the fake gets the .cmd twin there, the shebang file stays for Linux CI.
+const fakeDsh = process.platform === "win32" ? join(dir, "home", "fake-dsh.cmd") : join(dir, "home", "fake-dsh");
 writeFileSync(fakeDsh, "#!/bin/sh\necho 0.2.2\n");
+if (process.platform === "win32") writeFileSync(fakeDsh, `@echo 0.2.2
+`);
 chmodSync(fakeDsh, 0o755);
 const api = (body) => fetch(`${BASE}/api/agent-instances`, { method: "POST", headers: owner, body: JSON.stringify(body) }).then((r) => r.json());
 await fetch(`${BASE}/api/look`, { method: "POST", headers: owner, body: JSON.stringify({ action: "set", look: { theme: "light" } }) });
