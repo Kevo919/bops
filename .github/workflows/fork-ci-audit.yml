@@ -22,6 +22,11 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+
+      # The UI suites run `next start` against a production build; build it here so they all see the same one.
+      - run: npx next build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
       - name: Suites seen green on Windows (plain)
@@ -145,9 +150,11 @@ jobs:
           failed=0
           for entry in \
             "plain test-agent-instances.mjs" \
+            "plain test-agent-instances-ui.mjs" \
             "plain test-app-routines-ui.mjs" \
             "plain test-chat-compact-ui.mjs" \
             "plain test-chat-edge.mjs" \
+            "plain test-dark-mode.mjs" \
             "plain test-hosted-apps-ui.mjs" \
             "plain test-logins-ui.mjs" \
             "plain test-orbit-ui.mjs" \
