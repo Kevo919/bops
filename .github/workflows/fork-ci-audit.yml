@@ -160,6 +160,7 @@ jobs:
             "plain test-sidebar-rail.mjs" \
             "plain test-voice-local.mjs" \
             "react-server test-delete-messages.mjs" \
+            "react-server test-procedures.mjs" \
             "react-server test-ws-migration.mjs" \
             "react-server test-your-data.mjs"
           do
