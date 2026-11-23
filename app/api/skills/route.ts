@@ -30,6 +30,7 @@ import {
   workspaceLabels,
 } from "@/lib/server/workspace-skills";
 import { MAIN_WORKSPACE, type SkillKind, type SkillRef } from "@/lib/types";
+import { isAbsolute } from "node:path";
 
 export const dynamic = "force-dynamic";
 
@@ -109,7 +110,8 @@ export async function POST(request: Request) {
         return Response.json({ approvals: approveScript(wsId, str(b.sha256) ?? "", b.on !== false) });
       case "import": {
         const path = str(b.path);
-        if (!path || !path.startsWith("/")) return Response.json({ error: "Pick a folder." }, { status: 400 });
+        // A folder's full path: on macOS and Linux one that starts with "/", on Windows a drive letter or a share too.
+        if (!path || !isAbsolute(path)) return Response.json({ error: "Pick a folder." }, { status: 400 });
         // With an existing skill's slug: the folder is its next version (Update from folder), published at once with `publish`.
         if (slug) {
           if (!findRef(wsId, kind, slug)) return Response.json({ error: `That ${kind} was deleted.` }, { status: 404 });
