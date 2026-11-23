@@ -160,6 +160,7 @@ jobs:
             "plain test-sidebar-rail.mjs" \
             "plain test-voice-local.mjs" \
             "react-server test-delete-messages.mjs" \
+            "react-server crm" \
             "react-server test-procedures.mjs" \
             "react-server test-runner-install.mjs" \
             "react-server test-skills-v2.mjs" \
