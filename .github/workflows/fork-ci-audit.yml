@@ -161,6 +161,7 @@ jobs:
             "plain test-voice-local.mjs" \
             "react-server test-delete-messages.mjs" \
             "react-server test-procedures.mjs" \
+            "react-server test-runner-install.mjs" \
             "react-server test-skills-v2.mjs" \
             "react-server test-ws-migration.mjs" \
             "react-server test-your-data.mjs"
