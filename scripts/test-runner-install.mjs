@@ -310,6 +310,10 @@ function noSecrets() {
 
 /* ---------------- Setting one up ---------------- */
 
+// A path a bash -c line can carry: on Windows a backslash path has its backslashes eaten as escapes, so the
+// probe scripts below get forward slashes (Node's fs takes them as they are).
+const forBash = (p) => p.split("\\").join("/");
+
 await check("in the Cloud, a bot's computer without its key gets a runner: its files, its key from Orgo (keyMade), its program, a health check; nothing secret in any command", async () => {
   reset();
   await I.lookAtRunners();
@@ -1107,8 +1111,8 @@ await check("phase 1: the key step is today's whatever identity answers, the pro
   // The health check prints the runner's last auth word, the word alone.
   assert.ok(I.HEALTH_SCRIPT.includes("auth: (identity|key|none)$' /var/log/bops/runner.log"));
   const dir = mkdtempSync(join(tmpdir(), "bops-auth-line-"));
-  const log = join(dir, "runner.log");
-  const file = join(dir, "auth");
+  const log = forBash(join(dir, "runner.log"));
+  const file = forBash(join(dir, "auth"));
   const line = I.STILL_RUNS_SCRIPT.split("; ").find((l) => l.startsWith('echo "auth=')).replace("/var/log/bops/runner.log", log).replace("/opt/bops/runner/auth", file);
   assert.equal(line, I.AUTH_LINE.replace("/var/log/bops/runner.log", log).replace("/opt/bops/runner/auth", file), "the whole auth line");
   writeFileSync(log, "[runner] auth: none\n[runner] identity ok (desktop c1, expires in 52m)\n[runner] auth: identity\n[runner] running the routines of the bots on c1\n");
@@ -1487,8 +1491,8 @@ await check("every command it sends is shell that parses, and the wrapper too", 
 
 await check("the probe says key=yes only for a line that sets a non-empty ORGO_API_KEY, in either file, and prints nothing of it", () => {
   const dir = mkdtempSync(join(tmpdir(), "bops-probe-key-"));
-  const secrets = join(dir, ".orgo-secrets.env");
-  const env = join(dir, ".env");
+  const secrets = forBash(join(dir, ".orgo-secrets.env"));
+  const env = forBash(join(dir, ".env"));
   // The probe's own key line, pointed at these files.
   const line = I.probeScript("x").split("; ").find((l) => l.startsWith("grep "));
   const probe = line.replace("/root/.orgo-secrets.env /root/.env", `${secrets} ${env}`);
