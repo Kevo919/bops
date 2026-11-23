@@ -325,8 +325,9 @@ assert.equal(res.status, 200);
 assert.deepEqual(res.body.files.map((f) => [f.name, f.rows, f.sample]), [["Sample pipeline", 12, true]], "the sample goes in the first time");
 assert.deepEqual(res.body.files[0].columns, [...C.PIPELINE_COLUMNS]);
 assert.ok(existsSync(join(folder(), ".seeded")));
-assert.equal(mode(folder()), 0o700, "the folder is the user's only");
-assert.equal(mode(join(folder(), "Sample pipeline.csv")), 0o600, "and so are the files");
+// The owner-only bits (0o700, 0o600) come from chmod, which on Windows cannot set them: a folder there reports 0o666 whatever the app asked. macOS and Linux keep the check.
+if (process.platform !== "win32") assert.equal(mode(folder()), 0o700, "the folder is the user's only");
+if (process.platform !== "win32") assert.equal(mode(join(folder(), "Sample pipeline.csv")), 0o600, "and so are the files");
 assert.match(onDisk("Sample pipeline"), /^Name,Company,Email,Stage,Value,Owner,Close date,Notes\r\nJordan Lee,Northwind Dental,jordan@example\.com,Proposal,"\$12,000",/);
 res = await read("sample PIPELINE");
 assert.equal(res.status, 200, "names are found with case ignored");
