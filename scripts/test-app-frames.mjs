@@ -126,14 +126,14 @@ await test("an app's page may load its own page again, never another address, no
 });
 
 await test("main.cjs installs it before any window and leaves the apps' webviews to it", () => {
-  const main = readFileSync(`${rootPath}/desktop/main.cjs`, "utf8");
+  const main = readFileSync(`${rootPath}/desktop/main.cjs`, "utf8").replace(/\r\n/g, "\n");
   const ready = main.indexOf("app.whenReady().then(");
   const install = main.indexOf("appFrames = installAppFrames({ app, session, server: URL, preload: path.join(__dirname, \"app-frame-preload.cjs\")");
   assert.ok(install > ready && install < main.indexOf("void createWindow();", ready), "installed when ready, before the window");
-  assert.match(main, /if \(contents\.getType\(\) !== "webview"\) return;\n\s*\/\/ [^\n]*\n\s*if \(appFrames\?\.isApps\(contents\.session\)\) return;\n\s*fenceTabSession\(contents\.session\);/, "a tab's rules never go on the apps' session");
-  const preload = readFileSync(`${rootPath}/desktop/app-frame-preload.cjs`, "utf8");
+  assert.match(main, /if \(contents\.getType\(\) !== "webview"\) return;\n\s*\/\/ [^\n]*\n\s*if \(appFrames\?\.isApps\(contents\.session\) \|| previewFrames\?\.\isPreview\(contents\.session\)\) return;\n\s*fenceTabSession\(contents\.session\);/, "a tab's rules never go on the apps' session");
+  const preload = readFileSync(`${rootPath}/desktop/app-frame-preload.cjs`, "utf8").replace(/\r\n/g, "\n");
   assert.match(preload, /contextBridge\.exposeInMainWorld\("bopsHost", \{\n\s*post: \(message\) => ipcRenderer\.sendToHost\("bops-app", message\),\n\s*listen: \(fn\) => void ipcRenderer\.on\("bops-app", \(_event, message\) => fn\(message\)\),\n\}\);/);
-  const tsx = readFileSync(`${rootPath}/components/app/made-apps.tsx`, "utf8");
+  const tsx = readFileSync(`${rootPath}/components/app/made-apps.tsx`, "utf8").replace(/\r\n/g, "\n");
   assert.match(tsx, /createElement\("webview", \{ ref: setView, src: `\$\{location\.origin\}\$\{path\}`, partition: "bops-apps",/, "the window puts apps on that partition");
   assert.equal(F.PARTITION, "bops-apps");
 });

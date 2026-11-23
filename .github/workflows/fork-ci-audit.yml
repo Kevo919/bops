@@ -151,6 +151,7 @@ jobs:
           for entry in \
             "plain test-agent-instances.mjs" \
             "plain test-agent-instances-ui.mjs" \
+            "plain test-app-frames.mjs" \
             "plain test-app-routines-ui.mjs" \
             "plain test-chat-compact-ui.mjs" \
             "plain test-chat-edge.mjs" \
