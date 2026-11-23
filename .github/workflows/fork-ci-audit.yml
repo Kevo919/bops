@@ -157,6 +157,7 @@ jobs:
             "plain test-dark-mode.mjs" \
             "plain test-hosted-apps-ui.mjs" \
             "plain test-logins-ui.mjs" \
+            "plain test-no-blank-screens.mjs" \
             "plain test-orbit-ui.mjs" \
             "plain test-preview-password-ui.mjs" \
             "plain test-push-guard.mjs" \

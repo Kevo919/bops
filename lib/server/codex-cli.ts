@@ -65,13 +65,15 @@ const install = (g.__bopsCodexInstall ??= {});
 export const installStatus = () => install.status;
 
 /** Install the CLI into binDir(), unless an install is already running; `then` runs once this one ends, however it ended. */
+/** The words a person reads when an install fails: the browser's own ("fetch failed") say nothing. */
+const said = (e: Error) => (/fetch failed|ECONN|ENOTFOUND|ETIMEDOUT|aborted/i.test(e.message) ? "the download didn't answer (is the computer online?)" : e.message);
 export function installCodex(then?: () => void) {
   // Codex here is for tasks on the Mac: a computer's runner has its own, from the Bops template.
   if (install.running || !loopHere("codex")) return;
   install.status = { state: "installing" };
   install.running = download(binDir())
     .then((version) => void (install.status = { state: "installed", version }))
-    .catch((e: Error) => void (install.status = { state: "failed", error: e.message }))
+    .catch((e: Error) => void (install.status = { state: "failed", error: said(e) }))
     .finally(() => {
       install.running = undefined;
       then?.();
