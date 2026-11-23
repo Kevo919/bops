@@ -222,14 +222,14 @@ await part("Each bot's procedures move into its workspace's skills: published fo
 await part("Its bot's prompts list it by name; read_skill reads it in full (a use), or says what it has", async () => {
   const note = W.skillsNote("max");
   hear(note);
-  assert.match(note, /^Your skills: how your workspace does jobs it was shown before, and Bops' own, under labels\. [^\n]*read_skill[^\n]*\nApps and source control \(5\): [^\n]+\nFinance \(1\):\n- Weekly invoice summary: When Tiger asks for the weekly summary$/);
-  assert.match(W.skillsNote("boppy"), /^Your skills: [^\n]+\nApps and source control \(5\): [^\n]+$/, "only Bops' own for a bot with none of its workspace's");
+  assert.match(note, /^Your skills: how your workspace does jobs it was shown before, and Bops' own, under labels\. [^\n]*read_skill[^\n]*\nApps and source control \(7\): [^\n]+\nFinance \(1\):\n- Weekly invoice summary: When Tiger asks for the weekly summary$/);
+  assert.match(W.skillsNote("boppy"), /^Your skills: [^\n]+\nApps and source control \(7\): [^\n]+$/, "only Bops' own for a bot with none of its workspace's");
   const read = W.readSkill("max", "weekly invoice summary");
   hear(read);
   assert.equal(read, "Skill: Weekly invoice summary (version 0.1.0)\n\n# Weekly invoice summary\n\n## When to use\n\nWhen Tiger asks for the weekly summary\n\n## Steps\n\n1. Open Drive\n2. Sum it\n3. Send it");
   assert.equal(W.findRef("ws_main", "skill", weekly.slug).uses, 4);
-  assert.equal(W.readSkill("max", "Payroll"), 'No skill called "Payroll". Your labels: Apps and source control (5), Finance (1). Open one with read_skill and label to see its skills.');
-  assert.equal(W.readSkill("boppy", "Payroll"), 'No skill called "Payroll". Your labels: Apps and source control (5). Open one with read_skill and label to see its skills.');
+  assert.equal(W.readSkill("max", "Payroll"), 'No skill called "Payroll". Your labels: Apps and source control (7), Finance (1). Open one with read_skill and label to see its skills.');
+  assert.equal(W.readSkill("boppy", "Payroll"), 'No skill called "Payroll". Your labels: Apps and source control (7). Open one with read_skill and label to see its skills.');
   // Someone apps aren't open to: the workspace's own only.
   const was = S.getState().account;
   S.update((s) => (s.account = { user: { id: "u_2", email: "tiger@example.com" }, signedInAt: 0 }));
@@ -335,8 +335,11 @@ await part("Draft: what the model is given, and what it answered, tidied", async
   // The script says what it would run, and runs it only with --apply.
   const scriptPath = join(scratch, "fetch.sh");
   writeFileSync(scriptPath, r.draft.files[0].content.replace(/^curl .*$/m, "echo ran"), { mode: 0o755 });
-  assert.equal(execFileSync("/bin/sh", [scriptPath], { encoding: "utf8" }).split("\n")[0], "Would run:");
-  assert.equal(execFileSync("/bin/sh", [scriptPath, "--apply"], { encoding: "utf8" }), "ran\n");
+  // The script is for a POSIX shell. Linux and macOS have it at /bin/sh; Windows has no such path, so there
+  // the shell is looked up on PATH (Git for Windows brings one).
+  const sh = process.platform === "win32" ? "sh" : "/bin/sh";
+  assert.equal(execFileSync(sh, [scriptPath], { encoding: "utf8" }).split("\n")[0], "Would run:");
+  assert.equal(execFileSync(sh, [scriptPath, "--apply"], { encoding: "utf8" }), "ran\n");
   assert.equal(openai.calls.length, 1);
   const { body, input } = openai.calls[0];
   assert.equal(body.model, "gpt-test-chat");
@@ -500,7 +503,12 @@ await part("Draft: the model finding no job, or failing, says so in plain words"
   openai.fail = null;
   delete process.env.OPENAI_API_KEY;
   calls = openai.calls.length;
-  assert.equal(await errorOf(), "No OpenAI key is set: add OPENAI_API_KEY to .env.local.");
+  // The client's own words (lib/server/openai-client.ts); only the Settings path depends on the computer.
+  const keysPath = process.platform === "win32" ? "Settings → This PC → Keys" : process.platform === "darwin" ? "Settings → This Mac → Keys" : "Settings → This computer → Keys";
+  assert.equal(
+    await errorOf(),
+    `OpenAI is not connected for chat. ${keysPath} has the “How to get keys and set spending limits” guide. Follow that guide to connect this account; the Keys card only checks saved accounts. An OpenAI key saved in Logins is the vault's, for bots' API calls; it doesn't power the chat.`,
+  );
   assert.equal(openai.calls.length, calls, "nothing sent without a key");
   process.env.OPENAI_API_KEY = "sk-test-procedures";
 });
