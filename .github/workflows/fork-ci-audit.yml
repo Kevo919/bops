@@ -155,6 +155,7 @@ jobs:
             "plain test-app-routines-ui.mjs" \
             "plain test-chat-compact-ui.mjs" \
             "plain test-chat-edge.mjs" \
+            "plain test-chrome-start.mjs" \
             "plain test-dark-mode.mjs" \
             "plain test-hosted-apps-ui.mjs" \
             "plain test-logins-ui.mjs" \

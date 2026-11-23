@@ -84,7 +84,9 @@ const anyPort = () =>
   });
 const started = [];
 const tracked = (cmd, a, o) => {
-  const c = spawn(cmd, a, o);
+  // Windows can't exec a shebang script; the fake is a Node script, so there Node runs it directly.
+  const [exe, args] = process.platform === "win32" && cmd === fake ? [process.execPath, [cmd, ...a]] : [cmd, a];
+  const c = spawn(exe, args, o);
   started.push(c);
   return c;
 };
